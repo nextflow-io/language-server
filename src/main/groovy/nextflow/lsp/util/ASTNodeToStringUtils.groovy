@@ -1,11 +1,13 @@
 package nextflow.lsp.util
 
+import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.ASTNodeCache
 import nextflow.lsp.compiler.ASTUtils
+import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.ProcessNode
+import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.ConstructorNode
-import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.ast.Variable
 
@@ -14,6 +16,7 @@ import org.codehaus.groovy.ast.Variable
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@CompileStatic
 class ASTNodeToStringUtils {
 
     static String classToString(ClassNode classNode, ASTNodeCache ast) {
@@ -26,27 +29,15 @@ class ASTNodeToStringUtils {
         return builder.toString()
     }
 
-    static String constructorToString(ConstructorNode constructorNode, ASTNodeCache ast) {
+    static String functionToString(FunctionNode node, ASTNodeCache ast) {
         final builder = new StringBuilder()
-        builder.append(constructorNode.getDeclaringClass().getName())
-        builder.append('(')
-        builder.append(parametersToString(constructorNode.getParameters(), ast))
-        builder.append(')')
-        return builder.toString()
-    }
-
-    static String methodToString(MethodNode methodNode, ASTNodeCache ast) {
-        if( methodNode instanceof ConstructorNode )
-            return constructorToString(methodNode, ast)
-
-        final builder = new StringBuilder()
-        final returnType = methodNode.getReturnType()
+        final returnType = node.getReturnType()
         builder.append('def ')
         // builder.append(returnType.getNameWithoutPackage())
         // builder.append(' ')
-        builder.append(methodNode.getName())
+        builder.append(node.getName())
         builder.append('(')
-        builder.append(parametersToString(methodNode.getParameters(), ast))
+        builder.append(parametersToString(node.getParameters(), ast))
         builder.append(')')
         return builder.toString()
     }
@@ -58,6 +49,20 @@ class ASTNodeToStringUtils {
                 builder.append(', ')
             builder.append(variableToString(params[i], ast))
         }
+        return builder.toString()
+    }
+
+    static String processToString(ProcessNode node, ASTNodeCache ast) {
+        final builder = new StringBuilder()
+        builder.append('process ')
+        builder.append(node.getName())
+        return builder.toString()
+    }
+
+    static String workflowToString(WorkflowNode node, ASTNodeCache ast) {
+        final builder = new StringBuilder()
+        builder.append('workflow ')
+        builder.append(node.getName() ?: '<main>')
         return builder.toString()
     }
 

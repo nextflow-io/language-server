@@ -1,10 +1,12 @@
 package nextflow.lsp.util
 
 import groovy.transform.CompileStatic
+import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.ProcessNode
+import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
-import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.syntax.SyntaxException
@@ -49,7 +51,7 @@ class LanguageServerUtils {
             else
                 return CompletionItemKind.Class
         }
-        else if( node instanceof MethodNode ) {
+        else if( node instanceof FunctionNode || node instanceof ProcessNode || node instanceof WorkflowNode ) {
             return CompletionItemKind.Method
         }
         else if( node instanceof Variable ) {
@@ -68,7 +70,7 @@ class LanguageServerUtils {
             else
                 return SymbolKind.Class
         }
-        else if( node instanceof MethodNode ) {
+        else if( node instanceof FunctionNode || node instanceof ProcessNode || node instanceof WorkflowNode ) {
             return SymbolKind.Method
         }
         else if( node instanceof Variable ) {
@@ -84,20 +86,36 @@ class LanguageServerUtils {
         return new Location(uri.toString(), astNodeToRange(node))
     }
 
-    static SymbolInformation astNodeToSymbolInformation(ClassNode node, URI uri, String parentName) {
+    static SymbolInformation astNodeToSymbolInformation(ClassNode node, URI uri) {
         return new SymbolInformation(
                 node.getName(),
                 astNodeToSymbolKind(node),
                 astNodeToLocation(node, uri),
-                parentName)
+                null)
     }
 
-    static SymbolInformation astNodeToSymbolInformation(MethodNode node, URI uri, String parentName) {
+    static SymbolInformation astNodeToSymbolInformation(FunctionNode node, URI uri) {
         return new SymbolInformation(
                 node.getName(),
                 astNodeToSymbolKind(node),
                 astNodeToLocation(node, uri),
-                parentName)
+                null)
+    }
+
+    static SymbolInformation astNodeToSymbolInformation(ProcessNode node, URI uri) {
+        return new SymbolInformation(
+                node.getName(),
+                astNodeToSymbolKind(node),
+                astNodeToLocation(node, uri),
+                null)
+    }
+
+    static SymbolInformation astNodeToSymbolInformation(WorkflowNode node, URI uri) {
+        return new SymbolInformation(
+                node.getName() ?: '<main>',
+                astNodeToSymbolKind(node),
+                astNodeToLocation(node, uri),
+                null)
     }
 
     static SymbolInformation astNodeToSymbolInformation(Variable node, URI uri, String parentName) {

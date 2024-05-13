@@ -85,6 +85,7 @@ import org.codehaus.groovy.ast.expr.UnaryPlusExpression
 import org.codehaus.groovy.ast.stmt.AssertStatement
 import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.EmptyStatement
+import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.ast.tools.GeneralUtils
@@ -232,15 +233,22 @@ class AstBuilder {
     private Statement includeStatement(IncludeStatementContext ctx) {
         final source = stringLiteral(ctx.stringLiteral())
         final modules = ctx.includeNames().includeName().collect { it ->
-            final name = constX(it.name.text)
+            final name = it.name.text
             it.alias
-                ? createX(IncludeDef.Module, name, constX(it.alias.text))
+                ? new IncludeDef.Module(name, it.alias.text)
+                : new IncludeDef.Module(name)
+        }
+        final moduleArgs = modules.collect { module ->
+            final name = constX(module.name)
+            module.alias
+                ? createX(IncludeDef.Module, name, constX(module.alias))
                 : createX(IncludeDef.Module, name)
         } as List<Expression>
-        final include = callThisX('include', args(createX(IncludeDef, args(modules))))
+        final include = callThisX('include', args(createX(IncludeDef, args(moduleArgs))))
         final from = callX(include, 'from', args(constX(source)))
         final load = callX(from, 'load0', args(varX('params')))
-        ast( stmt(load), ctx )
+
+        ast( new IncludeNode(load, source, modules), ctx )
     }
 
     private Statement processDef(ProcessDefContext ctx) {
@@ -271,7 +279,9 @@ class AstBuilder {
         final name = constX(ctx.name.text)
         final statements = [*directives, *inputs, *outputs, *when, *stub, bodyDef].collect(GeneralUtils.&stmt)
         final closure = closureX(block(new VariableScope(), statements))
-        ast( stmt(ast( callThisX('process', args(name, closure)), ctx )), ctx )
+        final methodCall = ast( callThisX('process', args(name, closure)), ctx )
+
+        ast( new ProcessNode(methodCall, ctx.name.text), ctx )
     }
 
     private Expression processDirective(ProcessDirectiveContext ctx) {
@@ -397,18 +407,18 @@ class AstBuilder {
         final arguments = ctx.name
             ? args(constX(ctx.name.text), closure)
             : args(closure)
+        final methodCall = callThisX('workflow', arguments)
 
-        ast( stmt(callThisX('workflow', arguments)), ctx )
+        ast( new WorkflowNode(methodCall, ctx.name?.text), ctx )
     }
 
     private MethodNode functionDef(FunctionDefContext ctx) {
         final name = identifier(ctx.identifier())
-        final modifiers = 0
         final returnType = type(ctx.type())
-        final params = parameters(ctx.formalParameterList())
-        final exceptions = [] as ClassNode[]
+        final params = parameters(ctx.formalParameterList()) ?: [] as Parameter[]
         final code = blockStatements(ctx.blockStatements())
-        ast( new MethodNode(name, modifiers, returnType, params, exceptions, code), ctx )
+
+        ast( new FunctionNode(name, returnType, params, code), ctx )
     }
 
     /// GROOVY STATEMENTS
@@ -1382,4 +1392,44 @@ class AstBuilder {
 
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
 
+}
+
+
+class FunctionNode extends MethodNode {
+
+    FunctionNode(String name, ClassNode returnType, Parameter[] parameters, Statement code) {
+        super(name, 0, returnType, parameters, [] as ClassNode[], code)
+    }
+}
+
+
+class IncludeNode extends ExpressionStatement {
+    final String source
+    final List<IncludeDef.Module> modules
+
+    IncludeNode(Expression expression, String source, List<IncludeDef.Module> modules) {
+        super(expression)
+        this.source = source
+        this.modules = modules
+    }
+}
+
+
+class ProcessNode extends ExpressionStatement {
+    final String name
+
+    ProcessNode(Expression expression, String name) {
+        super(expression)
+        this.name = name
+    }
+}
+
+
+class WorkflowNode extends ExpressionStatement {
+    final String name
+
+    WorkflowNode(Expression expression, String name) {
+        super(expression)
+        this.name = name
+    }
 }

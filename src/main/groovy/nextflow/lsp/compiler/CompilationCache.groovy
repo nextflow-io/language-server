@@ -10,6 +10,8 @@ import groovy.transform.CompileStatic
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.Logger
 import nextflow.script.v2.ScriptParserPluginFactory
+import org.antlr.v4.runtime.InputMismatchException
+import org.antlr.v4.runtime.NoViableAltException
 import org.codehaus.groovy.GroovyBugError
 import org.codehaus.groovy.ast.CompileUnit
 import org.codehaus.groovy.control.CompilationFailedException
@@ -205,6 +207,10 @@ class CompilationCache extends CompilationUnit {
     void compile() {
         try {
             compile(Phases.CANONICALIZATION)
+        }
+        catch( InputMismatchException e ) {
+        }
+        catch( NoViableAltException e ) {
         }
         catch( CompilationFailedException e ) {
         }

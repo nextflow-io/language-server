@@ -6,11 +6,10 @@ import nextflow.lsp.compiler.ASTUtils
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Positions
+import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.ProcessNode
+import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.FieldNode
-import org.codehaus.groovy.ast.MethodNode
-import org.codehaus.groovy.ast.PropertyNode
 import org.eclipse.lsp4j.DocumentSymbol
 import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.TextDocumentIdentifier
@@ -44,13 +43,11 @@ class DocumentSymbolProvider {
 
         final List<Either<SymbolInformation, DocumentSymbol>> result = []
         for( final node : nodes ) {
-            if( !(node instanceof ClassNode || node instanceof MethodNode || node instanceof FieldNode || node instanceof PropertyNode) )
+            if( !(node instanceof FunctionNode || node instanceof ProcessNode || node instanceof WorkflowNode) )
                 continue
 
             final symbolInfo = getSymbolInformation(node, uri)
             if( symbolInfo == null )
-                continue
-            if( !Positions.valid(symbolInfo.location.range.start) )
                 continue
 
             result << Either.<SymbolInformation, DocumentSymbol>forLeft(symbolInfo)
@@ -60,18 +57,14 @@ class DocumentSymbolProvider {
     }
 
     private SymbolInformation getSymbolInformation(ASTNode node, URI uri) {
-        if( node instanceof ClassNode )
-            return LanguageServerUtils.astNodeToSymbolInformation(node, uri, null)
-
-        final classNode = (ClassNode) ASTUtils.getEnclosingNodeOfType(node, ClassNode.class, ast)
-        if( node instanceof MethodNode ) {
-            return LanguageServerUtils.astNodeToSymbolInformation(node, uri, classNode.getName())
+        if( node instanceof FunctionNode ) {
+            return LanguageServerUtils.astNodeToSymbolInformation(node, uri)
         }
-        else if( node instanceof PropertyNode ) {
-            return LanguageServerUtils.astNodeToSymbolInformation(node, uri, classNode.getName())
+        else if( node instanceof ProcessNode ) {
+            return LanguageServerUtils.astNodeToSymbolInformation(node, uri)
         }
-        else if( node instanceof FieldNode ) {
-            return LanguageServerUtils.astNodeToSymbolInformation(node, uri, classNode.getName())
+        else if( node instanceof WorkflowNode ) {
+            return LanguageServerUtils.astNodeToSymbolInformation(node, uri)
         }
         else {
             log.error("could not determine type of definition node: ${node}")

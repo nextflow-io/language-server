@@ -6,11 +6,11 @@ import nextflow.lsp.compiler.ASTUtils
 import nextflow.lsp.compiler.GroovydocUtils
 import nextflow.lsp.util.ASTNodeToStringUtils
 import nextflow.lsp.util.Logger
+import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.ProcessNode
+import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
-import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.MethodNode
-import org.codehaus.groovy.ast.Variable
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.MarkupContent
 import org.eclipse.lsp4j.MarkupKind
@@ -75,17 +75,16 @@ class HoverProvider {
     }
 
     private String getHoverContent(ASTNode node) {
-        if( node instanceof ClassNode ) {
-            return ASTNodeToStringUtils.classToString(node, ast)
+        if( node instanceof FunctionNode ) {
+            return ASTNodeToStringUtils.functionToString(node, ast)
         }
-        else if( node instanceof MethodNode ) {
-            return ASTNodeToStringUtils.methodToString(node, ast)
+        else if( node instanceof ProcessNode ) {
+            return ASTNodeToStringUtils.processToString(node, ast)
         }
-        else if( node instanceof Variable ) {
-            return ASTNodeToStringUtils.variableToString(node, ast)
+        else if( node instanceof WorkflowNode ) {
+            return ASTNodeToStringUtils.workflowToString(node, ast)
         }
         else {
-            log.debug("could not determine type of definition node: ${node}")
             return null
         }
     }

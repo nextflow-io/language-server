@@ -1,5 +1,6 @@
 package nextflow.lsp.providers
 
+import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.ASTNodeCache
 import nextflow.lsp.compiler.ASTUtils
 import nextflow.lsp.util.LanguageServerUtils
@@ -40,6 +41,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either
  * @author Ben Sherman <bentshermann@gmail.com>
  * @author Jordi Deu-Pons <jordi@jordeu.net>
  */
+@CompileStatic
 class CompletionProvider {
 
     private static final CompletionItem NXF_PROCESS = new CompletionItem('process')
@@ -120,7 +122,7 @@ class CompletionProvider {
     Either<List<CompletionItem>, CompletionList> provideCompletion(TextDocumentIdentifier textDocument, Position position, CompletionContext context) {
         if( ast == null ) {
             log.error("ast cache is empty while peoviding completions")
-            return Collections.emptyList()
+            return Either.forLeft(Collections.emptyList())
         }
 
         final uri = URI.create(textDocument.getUri())
@@ -151,9 +153,6 @@ class CompletionProvider {
         else if( offsetNode instanceof VariableExpression )
             populateItemsFromVariableExpression(offsetNode, position, items)
 
-        else if( offsetNode instanceof ClassNode )
-            populateItemsFromClassNode(offsetNode, position, items)
-
         else if( offsetNode instanceof MethodNode )
             populateItemsFromScope(offsetNode, '', items)
 
@@ -175,16 +174,6 @@ class CompletionProvider {
         final methodRange = LanguageServerUtils.astNodeToRange(callX.getMethod())
         final methodName = getMemberName(callX.getMethodAsString(), methodRange, position)
         populateItemsFromExpression(callX.getObjectExpression(), methodName, items)
-    }
-
-    private void populateItemsFromClassNode(ClassNode classNode, Position position, List<CompletionItem> items) {
-        final parentNode = ast.getParent(classNode)
-        if( parentNode !instanceof ClassNode )
-            return
-        final classRange = LanguageServerUtils.astNodeToRange(classNode)
-        final className = getMemberName(classNode.getUnresolvedName(), classRange, position)
-        if( classNode == parentNode.getUnresolvedSuperClass() || classNode in parentNode.getUnresolvedInterfaces() )
-            populateTypes(classNode, className, new HashSet<>(), items)
     }
 
     private void populateItemsFromConstructorCallExpression(ConstructorCallExpression ctorX, Position position, List<CompletionItem> items) {
@@ -240,7 +229,7 @@ class CompletionProvider {
     }
 
     private void populateItemsFromExpression(Expression leftSide, String memberNamePrefix, List<CompletionItem> items) {
-        final existingNames = new HashSet<>()
+        final Set<String> existingNames = []
 
         final properties = ASTUtils.getPropertiesForLeftSideOfPropertyExpression(leftSide, ast)
         final fields = ASTUtils.getFieldsForLeftSideOfPropertyExpression(leftSide, ast)
@@ -281,7 +270,7 @@ class CompletionProvider {
         boolean inProcess = false
         String processLabel = null
 
-        final existingNames = new HashSet<>()
+        final Set<String> existingNames = []
         ASTNode current = node
         while( current != null ) {
             if( current instanceof ClassNode ) {

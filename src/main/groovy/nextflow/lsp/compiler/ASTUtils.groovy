@@ -1,5 +1,9 @@
 package nextflow.lsp.compiler
 
+import groovy.transform.CompileStatic
+import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.ProcessNode
+import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
@@ -25,6 +29,7 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@CompileStatic
 class ASTUtils {
 
     /**
@@ -58,6 +63,9 @@ class ASTUtils {
             return null
 
         final parentNode = astCache.getParent(node)
+
+        if( node instanceof ProcessNode || node instanceof WorkflowNode )
+            return node
 
         if( node instanceof ExpressionStatement )
             node = node.getExpression()
@@ -156,7 +164,7 @@ class ASTUtils {
     static PropertyNode getPropertyFromExpression(PropertyExpression node, ASTNodeCache astCache) {
         final classNode = getTypeOfNode(node.getObjectExpression(), astCache)
         if( classNode == null )
-            return Collections.emptyList()
+            return null
         return classNode.getProperty(node.getProperty().getText())
     }
 
@@ -169,7 +177,7 @@ class ASTUtils {
     static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache astCache) {
         final classNode = getTypeOfNode(node.getObjectExpression(), astCache)
         if( classNode == null )
-            return Collections.emptyList()
+            return null
         return classNode.getField(node.getProperty().getText())
     }
 
