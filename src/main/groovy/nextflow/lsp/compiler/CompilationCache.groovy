@@ -9,6 +9,7 @@ import groovy.lang.GroovyClassLoader
 import groovy.transform.CompileStatic
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.Logger
+import nextflow.script.v2.ScriptParserPluginFactory
 import org.codehaus.groovy.GroovyBugError
 import org.codehaus.groovy.ast.CompileUnit
 import org.codehaus.groovy.control.CompilationFailedException
@@ -41,6 +42,9 @@ class CompilationCache extends CompilationUnit {
     static protected CompilerConfiguration createConfiguration() {
         final importCustomizer = new ImportCustomizer()
         importCustomizer.addImports( java.nio.file.Path.name )
+        // Channel
+        // Duration
+        // MemoryUnit
 
         final Map<String, Boolean> optimizationOptions = [:]
         optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true)
@@ -48,6 +52,7 @@ class CompilationCache extends CompilationUnit {
         final config = new CompilerConfiguration()
         config.addCompilationCustomizers( importCustomizer )
         config.setOptimizationOptions(optimizationOptions)
+        config.setPluginFactory(new ScriptParserPluginFactory())
 
         return config
     }

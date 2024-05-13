@@ -164,7 +164,7 @@ class NextflowServices implements TextDocumentService, WorkspaceService, Languag
     // --- INTERNAL
 
     private Path relativePath(String uri) {
-        workspaceRoot.relativize(Path.of(uri - 'file://'))
+        workspaceRoot.relativize(Path.of(uri.replace('file://', '')))
     }
 
     private void recompileIfContextChanged(URI uri) {
