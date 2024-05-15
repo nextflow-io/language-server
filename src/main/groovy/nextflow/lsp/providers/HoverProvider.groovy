@@ -11,6 +11,7 @@ import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
+import org.codehaus.groovy.ast.stmt.Statement
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.MarkupContent
 import org.eclipse.lsp4j.MarkupKind
@@ -41,26 +42,36 @@ class HoverProvider {
         }
 
         final uri = URI.create(textDocument.getUri())
-        final offsetNode = ast.getNodeAtLineAndColumn(uri, position.getLine(), position.getCharacter())
-        if( offsetNode == null )
+        final nodeTree = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter())
+        if( !nodeTree )
             return null
 
+        final offsetNode = nodeTree.first()
         final definitionNode = ASTUtils.getDefinition(offsetNode, false, ast)
-        if( definitionNode == null )
-            return null
-
-        final content = getHoverContent(definitionNode)
-        if( content == null )
-            return null
-
+        final content = definitionNode ? getHoverContent(definitionNode) : null
         final documentation = definitionNode instanceof AnnotatedNode
             ? GroovydocUtils.groovydocToMarkdownDescription(definitionNode.getGroovydoc())
             : null
 
         final builder = new StringBuilder()
-        builder.append('```groovy\n')
-        builder.append(content)
+        builder.append('```\n')
+        nodeTree.reverse().eachWithIndex { node, i ->
+            builder.append('  ' * i)
+            builder.append(node.class.simpleName)
+            builder.append("(${node.getLineNumber()}:${node.getColumnNumber()}-${node.getLastLineNumber()}:${node.getLastColumnNumber()-1})")
+            if( node instanceof Statement && node.statementLabels ) {
+                builder.append(': ')
+                builder.append(node.statementLabels.join(', '))
+            }
+            builder.append('\n')
+        }
         builder.append('\n```')
+        if( content != null ) {
+            builder.append('\n\n---\n\n')
+            builder.append('```groovy\n')
+            builder.append(content)
+            builder.append('\n```')
+        }
         if( documentation != null ) {
             builder.append('\n\n---\n\n')
             builder.append(documentation)

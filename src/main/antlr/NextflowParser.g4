@@ -107,18 +107,37 @@ includeName
 
 // -- process definition
 processDef
-    :   PROCESS name=identifier
-        nls LBRACE
-        (sep processDirective)*
+    :   PROCESS name=identifier nls LBRACE
+        body=processBody
+        sep? RBRACE
+    ;
+
+processBody
+    // explicit script/exec body with optional stub
+    :   (sep processDirectives)?
         (sep processInputs)?
         (sep processOutputs)?
         (sep processWhen)?
         sep processExec
-        sep? RBRACE
+        (sep processStub)?
+
+    // explicit "Mahesh" form
+    |   (sep processDirectives)?
+        sep processInputs
+        sep processExec
+        (sep processStub)?
+        sep processOutputs
+
+    // implicit script/exec body
+    |   (sep processDirectives)?
+        (sep processInputs)?
+        (sep processOutputs)?
+        (sep processWhen)?
+        sep blockStatements
     ;
 
-processDirective
-    :   identifier argumentList?
+processDirectives
+    :   processDirective (sep processDirective)*
     ;
 
 processInputs
@@ -129,21 +148,20 @@ processOutputs
     :   PROCESS_OUTPUT (sep processDirective)+
     ;
 
+processDirective
+    :   identifier argumentList?
+    ;
+
 processWhen
     :   PROCESS_WHEN nls expression
     ;
 
 processExec
-    // explicit script/exec body with optional stub
     :   (   PROCESS_SCRIPT
         |   PROCESS_SHELL
         |   PROCESS_EXEC
         )
         sep? blockStatements
-        (sep processStub)?
-
-    // implicit script body
-    |   blockStatements
     ;
 
 processStub
@@ -152,44 +170,37 @@ processStub
 
 // -- workflow definition
 workflowDef
-    :   WORKFLOW name=identifier?
-        nls LBRACE
-        sep? workflowBody
+    :   WORKFLOW name=identifier? nls LBRACE
+        body=workflowBody?
         sep? RBRACE
     ;
 
 workflowBody
-    // explicit main block with option take/emit blocks
-    :   (   sep WORKFLOW_TAKE
-            workflowTakes
-        )?
-        sep WORKFLOW_MAIN
-        sep? workflowMain
-        (   (sep WORKFLOW_EMIT)
-            workflowEmits
-        )?
+    // explicit main block with optional take/emit blocks
+    :   (sep WORKFLOW_TAKE workflowTakes)?
+        sep WORKFLOW_MAIN sep? workflowMain
+        (sep WORKFLOW_EMIT workflowEmits)?
 
     // implicit main block
-    |   workflowMain
+    |   sep? workflowMain
     ;
 
-workflowTakes:
-    (sep identifier)+
+workflowTakes
+    :   (sep identifier)+
     ;
 
-workflowMain:
-    blockStatements
+workflowMain
+    :   blockStatements
     ;
 
-workflowEmits:
-    (sep identifier)+
+workflowEmits
+    :   (sep identifier)+
     ;
 
 // -- function definition
 functionDef
-    :   (DEF | type | DEF type) nls
-        identifier LPAREN formalParameterList? rparen nls
-        LBRACE nls blockStatements? RBRACE
+    :   (DEF | type | DEF type) nls identifier LPAREN formalParameterList? rparen nls LBRACE
+        nls blockStatements? RBRACE
     ;
 
 
@@ -622,8 +633,11 @@ keywords
     |   DEF
     |   FROM
     |   IN
+    |   INCLUDE
     |   INSTANCEOF
+    |   PROCESS
     |   RETURN
+    |   WORKFLOW
     |   NullLiteral
     |   BooleanLiteral
     |   BuiltInPrimitiveType

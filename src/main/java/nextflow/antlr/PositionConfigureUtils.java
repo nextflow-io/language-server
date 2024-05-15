@@ -106,6 +106,15 @@ public class PositionConfigureUtils {
         return astNode;
     }
 
+    public static <T extends ASTNode> T configureAST(T astNode, ASTNode start, ParserRuleContext ctx) {
+        astNode.setLineNumber(start.getLineNumber());
+        astNode.setColumnNumber(start.getColumnNumber());
+
+        configureEndPosition(astNode, ctx.getStop());
+
+        return astNode;
+    }
+
     public static <T extends ASTNode> void configureEndPosition(T astNode, Token token) {
         Tuple2<Integer, Integer> endPosition = endPosition(token);
         astNode.setLastLineNumber(endPosition.getV1());

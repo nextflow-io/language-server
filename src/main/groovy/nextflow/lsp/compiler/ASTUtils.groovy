@@ -38,14 +38,14 @@ class ASTUtils {
      *
      * @param offsetNode
      * @param nodeType
-     * @param astCache
+     * @param ast
      */
-    static ASTNode getEnclosingNodeOfType(ASTNode offsetNode, Class<? extends ASTNode> nodeType, ASTNodeCache astCache) {
+    static ASTNode getEnclosingNodeOfType(ASTNode offsetNode, Class<? extends ASTNode> nodeType, ASTNodeCache ast) {
         ASTNode current = offsetNode
         while( current != null ) {
             if( nodeType.isInstance(current) )
                 return current
-            current = astCache.getParent(current)
+            current = ast.getParent(current)
         }
         return null
     }
@@ -56,13 +56,13 @@ class ASTUtils {
      *
      * @param node
      * @param strict
-     * @param astCache
+     * @param ast
      */
-    static ASTNode getDefinition(ASTNode node, boolean strict, ASTNodeCache astCache) {
+    static ASTNode getDefinition(ASTNode node, boolean strict, ASTNodeCache ast) {
         if( node == null )
             return null
 
-        final parentNode = astCache.getParent(node)
+        final parentNode = ast.getParent(node)
 
         if( node instanceof ProcessNode || node instanceof WorkflowNode )
             return node
@@ -71,30 +71,30 @@ class ASTUtils {
             node = node.getExpression()
 
         if( node instanceof ClassNode ) {
-            return tryToResolveOriginalClassNode(node, strict, astCache)
+            return tryToResolveOriginalClassNode(node, strict, ast)
         }
         else if( node instanceof ConstructorCallExpression ) {
-            return ASTUtils.getMethodFromCallExpression(node, astCache)
+            return ASTUtils.getMethodFromCallExpression(node, ast)
         }
         else if( node instanceof DeclarationExpression && !node.isMultipleAssignmentDeclaration() ) {
             final originType = node.getVariableExpression().getOriginType()
-            return tryToResolveOriginalClassNode(originType, strict, astCache)
+            return tryToResolveOriginalClassNode(originType, strict, ast)
         }
         else if( node instanceof ClassExpression ) {
-            return tryToResolveOriginalClassNode(node.getType(), strict, astCache)
+            return tryToResolveOriginalClassNode(node.getType(), strict, ast)
         }
         else if( node instanceof MethodNode ) {
             return node
         }
         else if( node instanceof ConstantExpression && parentNode != null ) {
             if( parentNode instanceof MethodCallExpression ) {
-                return ASTUtils.getMethodFromCallExpression(parentNode, astCache)
+                return ASTUtils.getMethodFromCallExpression(parentNode, ast)
             }
             else if( parentNode instanceof PropertyExpression ) {
-                final propertyNode = ASTUtils.getPropertyFromExpression(parentNode, astCache)
+                final propertyNode = ASTUtils.getPropertyFromExpression(parentNode, ast)
                 return propertyNode != null
                     ? propertyNode
-                    : ASTUtils.getFieldFromExpression(parentNode, astCache)
+                    : ASTUtils.getFieldFromExpression(parentNode, ast)
             }
         }
         else if( node instanceof VariableExpression ) {
@@ -115,18 +115,18 @@ class ASTUtils {
      * a given method or variable.
      *
      * @param node
-     * @param astCache
+     * @param ast
      */
-    static ASTNode getTypeDefinition(ASTNode node, ASTNodeCache astCache) {
-        final defNode = getDefinition(node, false, astCache)
+    static ASTNode getTypeDefinition(ASTNode node, ASTNodeCache ast) {
+        final defNode = getDefinition(node, false, ast)
         if( defNode == null )
             return null
 
         if( defNode instanceof MethodNode ) {
-            return tryToResolveOriginalClassNode(defNode.getReturnType(), true, astCache)
+            return tryToResolveOriginalClassNode(defNode.getReturnType(), true, ast)
         }
         else if( defNode instanceof Variable ) {
-            return tryToResolveOriginalClassNode(defNode.getOriginType(), true, astCache)
+            return tryToResolveOriginalClassNode(defNode.getOriginType(), true, ast)
         }
         return null
     }
@@ -159,10 +159,10 @@ class ASTUtils {
      * Get the property definition for a property expression.
      *
      * @param node
-     * @param astCache
+     * @param ast
      */
-    static PropertyNode getPropertyFromExpression(PropertyExpression node, ASTNodeCache astCache) {
-        final classNode = getTypeOfNode(node.getObjectExpression(), astCache)
+    static PropertyNode getPropertyFromExpression(PropertyExpression node, ASTNodeCache ast) {
+        final classNode = getTypeOfNode(node.getObjectExpression(), ast)
         if( classNode == null )
             return null
         return classNode.getProperty(node.getProperty().getText())
@@ -172,10 +172,10 @@ class ASTUtils {
      * Get the field definition for a property expression.
      *
      * @param node
-     * @param astCache
+     * @param ast
      */
-    static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache astCache) {
-        final classNode = getTypeOfNode(node.getObjectExpression(), astCache)
+    static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
+        final classNode = getTypeOfNode(node.getObjectExpression(), ast)
         if( classNode == null )
             return null
         return classNode.getField(node.getProperty().getText())
@@ -186,10 +186,10 @@ class ASTUtils {
      * property expression (i.e. by inspecting the type of the left-hand side).
      *
      * @param node
-     * @param astCache
+     * @param ast
      */
-    static List<FieldNode> getFieldsForLeftSideOfPropertyExpression(Expression node, ASTNodeCache astCache) {
-        final classNode = getTypeOfNode(node, astCache)
+    static List<FieldNode> getFieldsForLeftSideOfPropertyExpression(Expression node, ASTNodeCache ast) {
+        final classNode = getTypeOfNode(node, ast)
         if( classNode == null )
             return Collections.emptyList()
         final isStatic = node instanceof ClassExpression
@@ -201,10 +201,10 @@ class ASTUtils {
      * property expression (i.e. by inspecting the type of the left-hand side).
      *
      * @param node
-     * @param astCache
+     * @param ast
      */
-    static List<PropertyNode> getPropertiesForLeftSideOfPropertyExpression(Expression node, ASTNodeCache astCache) {
-        final classNode = getTypeOfNode(node, astCache)
+    static List<PropertyNode> getPropertiesForLeftSideOfPropertyExpression(Expression node, ASTNodeCache ast) {
+        final classNode = getTypeOfNode(node, ast)
         if( classNode == null )
             return Collections.emptyList()
         final isStatic = node instanceof ClassExpression
@@ -216,10 +216,10 @@ class ASTUtils {
      * property expression (i.e. by inspecting the type of the left-hand side).
      *
      * @param node
-     * @param astCache
+     * @param ast
      */
-    static List<MethodNode> getMethodsForLeftSideOfPropertyExpression(Expression node, ASTNodeCache astCache) {
-        final classNode = getTypeOfNode(node, astCache)
+    static List<MethodNode> getMethodsForLeftSideOfPropertyExpression(Expression node, ASTNodeCache ast) {
+        final classNode = getTypeOfNode(node, ast)
         if( classNode == null )
             return Collections.emptyList()
         final isStatic = node instanceof ClassExpression
@@ -230,9 +230,9 @@ class ASTUtils {
      * Get the type (i.e. class node) of an ast node.
      *
      * @param node
-     * @param astCache
+     * @param ast
      */
-    static ClassNode getTypeOfNode(ASTNode node, ASTNodeCache astCache) {
+    static ClassNode getTypeOfNode(ASTNode node, ASTNodeCache ast) {
         if( node instanceof BinaryExpression ) {
             final leftExpr = node.getLeftExpression()
             if( node.getOperation().getText().equals("[") && leftExpr.getType().isArray() )
@@ -247,33 +247,33 @@ class ASTUtils {
             return node.getType()
         }
         else if( node instanceof MethodCallExpression ) {
-            final methodNode = ASTUtils.getMethodFromCallExpression(node, astCache)
+            final methodNode = ASTUtils.getMethodFromCallExpression(node, ast)
             return methodNode != null
                 ? methodNode.getReturnType()
                 : node.getType()
         }
         else if( node instanceof PropertyExpression ) {
-            final propertyNode = ASTUtils.getPropertyFromExpression(node, astCache)
+            final propertyNode = ASTUtils.getPropertyFromExpression(node, ast)
             return propertyNode != null
-                ? getTypeOfNode(propertyNode, astCache)
+                ? getTypeOfNode(propertyNode, ast)
                 : node.getType()
         }
         else if( node instanceof Variable ) {
             if( node.getName() == 'this' ) {
-                final enclosingClass = (ClassNode) getEnclosingNodeOfType(node, ClassNode.class, astCache)
+                final enclosingClass = (ClassNode) getEnclosingNodeOfType(node, ClassNode.class, ast)
                 if( enclosingClass != null )
                     return enclosingClass
             }
             else if( node.isDynamicTyped() ) {
-                final defNode = ASTUtils.getDefinition(node, false, astCache)
+                final defNode = ASTUtils.getDefinition(node, false, ast)
                 if( defNode instanceof Variable ) {
                     if( defNode.hasInitialExpression() ) {
-                        return getTypeOfNode(defNode.getInitialExpression(), astCache)
+                        return getTypeOfNode(defNode.getInitialExpression(), ast)
                     }
                     else {
-                        final declNode = astCache.getParent(defNode)
+                        final declNode = ast.getParent(defNode)
                         if( declNode instanceof DeclarationExpression )
-                            return getTypeOfNode(declNode.getRightExpression(), astCache)
+                            return getTypeOfNode(declNode.getRightExpression(), ast)
                     }
                 }
             }
@@ -291,11 +291,11 @@ class ASTUtils {
      * Get the list of available method overloads for a method call expression.
      *
      * @param node
-     * @param astCache
+     * @param ast
      */
-    static List<MethodNode> getMethodOverloadsFromCallExpression(MethodCall node, ASTNodeCache astCache) {
+    static List<MethodNode> getMethodOverloadsFromCallExpression(MethodCall node, ASTNodeCache ast) {
         if( node instanceof MethodCallExpression ) {
-            final leftType = getTypeOfNode(node.getObjectExpression(), astCache)
+            final leftType = getTypeOfNode(node.getObjectExpression(), ast)
             if( leftType != null )
                 return leftType.getMethods(node.getMethod().getText())
         }
@@ -311,21 +311,21 @@ class ASTUtils {
      * Get the method node for a method call expression.
      *
      * @param node
-     * @param astCache
+     * @param ast
      */
-    static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache astCache) {
-        return getMethodFromCallExpression(node, astCache, -1)
+    static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache ast) {
+        return getMethodFromCallExpression(node, ast, -1)
     }
 
     /**
      * Find the method node which most closely matches a method call expression.
      *
      * @param node
-     * @param astCache
+     * @param ast
      * @param argIndex
      */
-    static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache astCache, int argIndex) {
-        final methods = getMethodOverloadsFromCallExpression(node, astCache)
+    static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache ast, int argIndex) {
+        final methods = getMethodOverloadsFromCallExpression(node, ast)
         if( methods.isEmpty() || node.getArguments() !instanceof ArgumentListExpression )
             return null
 

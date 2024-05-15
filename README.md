@@ -21,7 +21,7 @@ To build from the command line, run the following command:
 To run the language server, use the following command:
 
 ```sh
-java -jar build/libs/nextflow-language-server-all.jar
+java -jar build/libs/language-server-all.jar
 ```
 
 Protocol messages are exchanged using standard input/output.

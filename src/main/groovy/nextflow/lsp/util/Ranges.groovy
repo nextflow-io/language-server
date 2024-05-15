@@ -16,11 +16,7 @@ class Ranges {
         return contains(r1, r2.start) || contains(r1, r2.end)
     }
 
-    static String getSubstring(String string, Range range) {
-        return getSubstring(string, range, 0)
-    }
-
-    static String getSubstring(String string, Range range, int maxLines) {
+    static String getSubstring(String string, Range range, int maxLines = 0) {
         final reader = new BufferedReader(new StringReader(string))
         final builder = new StringBuilder()
         final start = range.start

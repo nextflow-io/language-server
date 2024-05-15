@@ -137,7 +137,7 @@ class NextflowServices implements TextDocumentService, WorkspaceService, Languag
         recompileIfContextChanged(uri)
 
         final provider = new CompletionProvider(astCache)
-        final result = provider.provideCompletion(params.getTextDocument(), params.getPosition(), params.getContext())
+        final result = provider.provideCompletion(params.getTextDocument(), params.getPosition())
         return CompletableFuture.completedFuture(result)
     }
 

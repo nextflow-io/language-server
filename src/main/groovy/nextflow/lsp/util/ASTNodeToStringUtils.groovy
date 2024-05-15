@@ -62,7 +62,7 @@ class ASTNodeToStringUtils {
     static String workflowToString(WorkflowNode node, ASTNodeCache ast) {
         final builder = new StringBuilder()
         builder.append('workflow ')
-        builder.append(node.getName() ?: '<main>')
+        builder.append(node.getName() ?: '<entry>')
         return builder.toString()
     }
 

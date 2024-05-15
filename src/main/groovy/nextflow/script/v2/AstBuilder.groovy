@@ -252,55 +252,78 @@ class AstBuilder {
     }
 
     private Statement processDef(ProcessDefContext ctx) {
-        final directives = ctx.processDirective().collect(this.&processDirective)
-        final inputs = ctx.processInputs()
-            ? ctx.processInputs().processDirective().collect(this.&processInput)
-            : List.of()
-        final outputs = ctx.processOutputs()
-            ? ctx.processOutputs().processDirective().collect(this.&processOutput)
-            : List.of()
-        final when = ctx.processWhen()
-            ? List.of(callThisX('when', expression(ctx.processWhen().expression())))
-            : List.of()
-        final type = processType(ctx.processExec())
-        final exec = closureX(blockStatements(ctx.processExec().blockStatements()))
-        final stub = ctx.processExec().processStub()
-            ? List.of(callThisX('stub', closureX(blockStatements(ctx.processExec().processStub().blockStatements()))))
-            : List.of()
-        final bodyDef = createX(
+        final name = ctx.name.text
+        final directives = processDirectives(ctx.body.processDirectives())
+        final inputs = processInputs(ctx.body.processInputs())
+        final outputs = processOutputs(ctx.body.processOutputs())
+        final when = processWhen(ctx.body.processWhen())
+        final type = processType(ctx.body.processExec())
+        final exec = blockStatements(ctx.body.blockStatements() ?: ctx.body.processExec().blockStatements())
+        exec.addStatementLabel(type)
+        final bodyDef = stmt(createX(
             BodyDef,
             args(
-                exec,
-                constX(ctx.processExec().blockStatements().text), // TODO: source code formatting
+                closureX(exec),
+                constX(ctx.text), // TODO: source code formatting
                 constX(type),
                 new ListExpression() // TODO: variable references (see VariableVisitor)
             )
-        )
-        final name = constX(ctx.name.text)
-        final statements = [*directives, *inputs, *outputs, *when, *stub, bodyDef].collect(GeneralUtils.&stmt)
-        final closure = closureX(block(new VariableScope(), statements))
-        final methodCall = ast( callThisX('process', args(name, closure)), ctx )
+        ))
+        final stub = processStub(ctx.body.processStub())
+        final closure = closureX(block(new VariableScope(), [
+            directives,
+            inputs,
+            outputs,
+            when,
+            stub,
+            bodyDef
+        ]))
+        final methodCall = callThisX('process', args(constX(name), closure))
 
-        ast( new ProcessNode(methodCall, ctx.name.text), ctx )
+        ast( new ProcessNode(methodCall, name, directives, inputs, outputs, exec, stub), ctx )
     }
 
-    private Expression processDirective(ProcessDirectiveContext ctx) {
-        ast( processMethodCall(ctx, ''), ctx )
+    private Statement processDirectives(ProcessDirectivesContext ctx) {
+        if( !ctx )
+            return EmptyStatement.INSTANCE
+        final result = ast( block(new VariableScope(), ctx.processDirective().collect(this.&processDirective)), ctx )
+        result.addStatementLabel('directives')
+        return result
     }
 
-    private Expression processInput(ProcessDirectiveContext ctx) {
+    private Statement processDirective(ProcessDirectiveContext ctx) {
+        stmt(ast( processMethodCall(ctx), ctx ))
+    }
+
+    private Statement processInputs(ProcessInputsContext ctx) {
+        if( !ctx )
+            return EmptyStatement.INSTANCE
+        final result = ast( block(new VariableScope(), ctx.processDirective().collect(this.&processInput)), ctx )
+        result.addStatementLabel('input')
+        return result
+    }
+
+    private Statement processInput(ProcessDirectiveContext ctx) {
         final result = processMethodCall(ctx, '_in_')
         fixProcessInputOutputs(result)
-        return ast( result, ctx )
+        return stmt(ast( result, ctx ))
     }
 
-    private Expression processOutput(ProcessDirectiveContext ctx) {
+    private Statement processOutputs(ProcessOutputsContext ctx) {
+        if( !ctx )
+            return EmptyStatement.INSTANCE
+        final result = ast( block(new VariableScope(), ctx.processDirective().collect(this.&processOutput)), ctx )
+        result.addStatementLabel('output')
+        return result
+    }
+
+    private Statement processOutput(ProcessDirectiveContext ctx) {
         final result = processMethodCall(ctx, '_out_')
         fixProcessInputOutputs(result)
-        return ast( result, ctx )
+        return stmt(ast( result, ctx ))
     }
 
-    private MethodCallExpression processMethodCall(ProcessDirectiveContext ctx, String prefix) {
+    private MethodCallExpression processMethodCall(ProcessDirectiveContext ctx, String prefix = '') {
         final name = prefix + identifier(ctx.identifier())
         final arguments = argumentList(ctx.argumentList())
         return ast( callThisX(name, arguments), ctx )
@@ -372,44 +395,84 @@ class AstBuilder {
         return expr
     }
 
+    private Statement processWhen(ProcessWhenContext ctx) {
+        if( !ctx )
+            return EmptyStatement.INSTANCE
+        final result = stmt(ast( callThisX('when', expression(ctx.expression())), ctx ))
+        result.addStatementLabel('when')
+        return result
+    }
+
     private String processType(ProcessExecContext ctx) {
-        ctx.PROCESS_EXEC()
-            ? 'exec'
-            : ctx.PROCESS_SHELL()
-            ? 'shell'
-            : 'script'
+        if( !ctx )
+            return 'script'
+
+        if( ctx.PROCESS_EXEC() )
+            return 'exec'
+        else if( ctx.PROCESS_SHELL() )
+            return 'shell'
+        else
+            return 'script'
+    }
+
+    private Statement processStub(ProcessStubContext ctx) {
+        if( !ctx )
+            return EmptyStatement.INSTANCE
+        final result = stmt(ast( callThisX('stub', closureX(blockStatements(ctx.blockStatements()))), ctx ))
+        result.addStatementLabel('stub')
+        return result
     }
 
     private Statement workflowDef(WorkflowDefContext ctx) {
-        final body = ctx.workflowBody()
-        final takes = body.workflowTakes()
-            ? body.workflowTakes().identifier().collect( take ->
-                callThisX("_take_${take.text}", new ArgumentListExpression())
-            )
-            : List.of()
-        final emits = body.workflowEmits()
-            ? body.workflowEmits().identifier().collect( emit ->
-                callThisX("_emit_${emit.text}", new ArgumentListExpression())
-            )
-            : List.of()
-        final code = blockStatements(body.workflowMain().blockStatements())
-        final bodyDef = createX(
+        final name = ctx.name?.text
+        final takes = workflowTakes(ctx.body.workflowTakes())
+        final emits = workflowEmits(ctx.body.workflowEmits())
+        final main = blockStatements(ctx.body.workflowMain().blockStatements())
+        main.addStatementLabel('main')
+        final bodyDef = stmt(createX(
             BodyDef,
             args(
-                closureX(code),
+                closureX(main),
                 constX(ctx.text), // TODO: source code formatting
                 constX('workflow'),
                 new ListExpression() // TODO: variable references (see VariableVisitor)
             )
-        )
-        final statements = [*takes, *emits, bodyDef].collect(GeneralUtils.&stmt)
-        final closure = closureX(block(new VariableScope(), statements))
-        final arguments = ctx.name
-            ? args(constX(ctx.name.text), closure)
+        ))
+        final closure = closureX(block(new VariableScope(), [
+            takes,
+            emits,
+            bodyDef
+        ]))
+        final arguments = name
+            ? args(constX(name), closure)
             : args(closure)
         final methodCall = callThisX('workflow', arguments)
 
-        ast( new WorkflowNode(methodCall, ctx.name?.text), ctx )
+        ast( new WorkflowNode(methodCall, name, takes, emits, main), ctx )
+    }
+
+    private Statement workflowTakes(WorkflowTakesContext ctx) {
+        if( !ctx )
+            return EmptyStatement.INSTANCE
+
+        final statements = ctx.identifier().collect( take ->
+            stmt(callThisX("_take_${take.text}", new ArgumentListExpression()))
+        )
+        final result = ast( block(new VariableScope(), statements), ctx )
+        result.addStatementLabel('take')
+        return result
+    }
+
+    private Statement workflowEmits(WorkflowEmitsContext ctx) {
+        if( !ctx )
+            return EmptyStatement.INSTANCE
+
+        final statements = ctx.identifier().collect( emit ->
+            stmt(callThisX("_emit_${emit.text}", new ArgumentListExpression()))
+        )
+        final result = ast( block(new VariableScope(), statements), ctx )
+        result.addStatementLabel('emit')
+        return result
     }
 
     private MethodNode functionDef(FunctionDefContext ctx) {
@@ -468,9 +531,9 @@ class AstBuilder {
     }
 
     private BlockStatement blockStatements(BlockStatementsContext ctx) {
-        final List<Statement> code = ctx
-            ? ctx.statement().collect( this.&statement )
-            : List<Statement>.of()
+        if( !ctx )
+            return block(new VariableScope(), List<Statement>.of())
+        final code = ctx.statement().collect( this.&statement )
         ast( block(new VariableScope(), code), ctx )
     }
 
@@ -743,16 +806,16 @@ class AstBuilder {
 
     private Expression pathElement(Expression expression, PathElementContext ctx) {
         if( ctx instanceof PropertyPathExprAltContext )
-            return ast( pathPropertyElement(expression, ctx), ctx )
+            return ast( pathPropertyElement(expression, ctx), expression, ctx )
 
         if( ctx instanceof ClosurePathExprAltContext )
-            return ast( pathClosureElement(expression, ctx.closure()), ctx )
+            return ast( pathClosureElement(expression, ctx.closure()), expression, ctx )
 
         if( ctx instanceof ArgumentsPathExprAltContext )
-            return ast( pathArgumentsElement(expression, ctx.arguments().argumentList()), ctx )
+            return ast( pathArgumentsElement(expression, ctx.arguments()), expression, ctx )
 
         if( ctx instanceof IndexPathExprAltContext )
-            return ast( pathIndexElement(expression, ctx.indexPropertyArgs()), ctx )
+            return ast( pathIndexElement(expression, ctx.indexPropertyArgs()), expression, ctx )
 
         throw new IllegalStateException()
     }
@@ -816,13 +879,13 @@ class AstBuilder {
         if( expression instanceof VariableExpression || expression instanceof GStringExpression || (expression instanceof ConstantExpression && expression.value instanceof String) )
             return thisMethodCall(expression, arguments)
 
-        // e.g. 1 { }, 1.1 { }, (1 / 2) { }, m() { }, { -> ... } { }
+        // e.g. <expr> { } -> <expr>.call { }
         return callMethodCall(expression, arguments)
     }
 
-    private Expression pathArgumentsElement(Expression caller, ArgumentListContext ctx) {
-        final arguments = argumentList(ctx)
-        return methodCall(caller, arguments)
+    private Expression pathArgumentsElement(Expression caller, ArgumentsContext ctx) {
+        final arguments = argumentList(ctx.argumentList())
+        return ast( methodCall(caller, arguments), caller, ctx )
     }
 
     private Expression pathIndexElement(Expression expression, IndexPropertyArgsContext ctx) {
@@ -1076,12 +1139,12 @@ class AstBuilder {
         if( caller instanceof VariableExpression || caller instanceof GStringExpression || (caller instanceof ConstantExpression && caller.value instanceof String) )
             return thisMethodCall(caller, arguments)
 
-        // e.g. 1(), 1.1(), ((int) 1 / 2)(1, 2), {a, b -> a + b }(1, 2), m()()
+        // e.g. <expr>(<args>) -> <expr>.call(<args>)
         return callMethodCall(caller, arguments)
     }
 
     private Expression propMethodCall(PropertyExpression caller, Expression arguments) {
-        final result = callX( caller.objectExpression, caller.property, arguments )
+        final result = callX(caller.objectExpression, caller.property, arguments)
         result.setImplicitThis(false)
         result.setSafe(caller.isSafe())
         result.setSpreadSafe(caller.isSpreadSafe())
@@ -1091,7 +1154,7 @@ class AstBuilder {
         if( caller.isSpreadSafe() )
             result.setSafe(false)
 
-        return result
+        return ast( result, caller, arguments )
     }
 
     private Expression thisMethodCall(Expression caller, Expression arguments) {
@@ -1100,16 +1163,16 @@ class AstBuilder {
         object.setLineNumber(caller.getLineNumber())
 
         final name = caller instanceof VariableExpression
-            ? constX(caller.text)
+            ? ast( constX(caller.text), caller )
             : caller
 
-        return callX( object, name, arguments )
+        return ast( callX(object, name, arguments), caller, arguments )
     }
 
     private Expression callMethodCall(Expression caller, Expression arguments) {
         final call = callX(caller, CALL_STR, arguments)
         call.setImplicitThis(false)
-        return call
+        return ast( call, caller, arguments )
     }
 
     private Expression argumentList(ArgumentListContext ctx) {
@@ -1142,7 +1205,7 @@ class AstBuilder {
         final value = expression(ctx.expression())
         final key = ctx.MUL()
             ? new SpreadMapExpression(value)
-            : namedArgLabel(ctx.namedArgLabel())
+            : ast( namedArgLabel(ctx.namedArgLabel()), ctx.namedArgLabel() )
         new MapEntryExpression(key, value)
     }
 
@@ -1417,19 +1480,35 @@ class IncludeNode extends ExpressionStatement {
 
 class ProcessNode extends ExpressionStatement {
     final String name
+    final Statement directives
+    final Statement inputs
+    final Statement outputs
+    final Statement exec
+    final Statement stub
 
-    ProcessNode(Expression expression, String name) {
+    ProcessNode(Expression expression, String name, Statement directives, Statement inputs, Statement outputs, Statement exec, Statement stub) {
         super(expression)
         this.name = name
+        this.directives = directives
+        this.inputs = inputs
+        this.outputs = outputs
+        this.exec = exec
+        this.stub = stub
     }
 }
 
 
 class WorkflowNode extends ExpressionStatement {
     final String name
+    final Statement takes
+    final Statement emits
+    final Statement main
 
-    WorkflowNode(Expression expression, String name) {
+    WorkflowNode(Expression expression, String name, Statement takes, Statement emits, Statement main) {
         super(expression)
         this.name = name
+        this.takes = takes
+        this.emits = emits
+        this.main = main
     }
 }

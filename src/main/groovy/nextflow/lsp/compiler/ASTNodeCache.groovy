@@ -4,6 +4,9 @@ import groovy.transform.CompileStatic
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Positions
 import nextflow.lsp.util.Ranges
+import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.ProcessNode
+import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
@@ -93,7 +96,49 @@ class ASTNodeCache {
      * @param uri
      */
     List<ASTNode> getNodes(URI uri) {
-        return nodesByURI.get(uri) ?: Collections.emptyList()
+        return nodesByURI[uri] ?: Collections.emptyList()
+    }
+
+    /**
+     * Get the tree of nodes at a given location in a file.
+     *
+     * @param uri
+     * @param line
+     * @param column
+     */
+    List<ASTNode> getNodesAtLineAndColumn(URI uri, int line, int column) {
+        final position = new Position(line, column)
+        final Map<ASTNode, Range> nodeToRange = [:]
+        final nodes = nodesByURI[uri]
+        if( nodes == null )
+            return []
+
+        return nodes
+            .findAll(node -> {
+                if( node.getLineNumber() == -1 )
+                    return false
+                final range = LanguageServerUtils.astNodeToRange(node)
+                if( !Ranges.contains(range, position) )
+                    return false
+                nodeToRange.put(node, range)
+                return true
+            })
+            .sort((n1, n2) -> {
+                // select node with higher start position
+                final cmp1 = Positions.COMPARATOR.compare(nodeToRange[n1].start, nodeToRange[n2].start)
+                if( cmp1 != 0 )
+                    return -cmp1
+                // select node with lower end position
+                final cmp2 = Positions.COMPARATOR.compare(nodeToRange[n1].end, nodeToRange[n2].end)
+                if( cmp2 != 0 )
+                    return cmp2
+                // select the most descendant node
+                if( contains(n1, n2) )
+                    return 1
+                if( contains(n2, n1) )
+                    return -1
+                return 0
+            })
     }
 
     /**
@@ -104,37 +149,7 @@ class ASTNodeCache {
      * @param column
      */
     ASTNode getNodeAtLineAndColumn(URI uri, int line, int column) {
-        final position = new Position(line, column)
-        final Map<ASTNode, Range> nodeToRange = [:]
-        final nodes = nodesByURI.get(uri)
-        if( nodes == null )
-            return null
-
-        final foundNodes = nodes
-            .findAll(node -> {
-                if( node.getLineNumber() == -1 )
-                    return false
-                final range = LanguageServerUtils.astNodeToRange(node)
-                final result = Ranges.contains(range, position)
-                if( result )
-                    nodeToRange.put(node, range)
-                return result
-            })
-            .sort((n1, n2) -> {
-                int result = Positions.COMPARATOR.reversed().compare(nodeToRange.get(n1).getStart(), nodeToRange.get(n2).getStart())
-                if( result != 0 )
-                    return result
-                result = Positions.COMPARATOR.compare(nodeToRange.get(n1).getEnd(), nodeToRange.get(n2).getEnd())
-                if( result != 0 )
-                    return result
-                // n1 and n2 have the same range
-                if( contains(n1, n2) )
-                    return 1
-                if( contains(n2, n1) )
-                    return -1
-                return 0
-            })
-
+        final foundNodes = getNodesAtLineAndColumn(uri, line, column)
         return foundNodes.size() > 0 ? foundNodes.first() : null
     }
 
@@ -159,7 +174,7 @@ class ASTNodeCache {
     boolean contains(ASTNode ancestor, ASTNode descendant) {
         ASTNode current = getParent(descendant)
         while( current != null ) {
-            if( current.equals(ancestor) )
+            if( current == ancestor )
                 return true
             current = getParent(current)
         }
@@ -245,14 +260,15 @@ class ASTNodeCache {
         }
 
         protected void visitModule(ModuleNode node) {
-            pushASTNode(node)
-            try {
-                for( final classNode : node.getClasses() )
+            for( final classNode : node.getClasses() ) {
+                if( classNode != node.getScriptClassDummy() )
                     visitClass(classNode)
             }
-            finally {
-                popASTNode()
+            for( final methodNode : node.getMethods() ) {
+                if( methodNode instanceof FunctionNode )
+                    visitFunction(methodNode)
             }
+            super.visitBlockStatement(node.getStatementBlock())
         }
 
         @Override
@@ -268,8 +284,7 @@ class ASTNodeCache {
             }
         }
 
-        @Override
-        void visitMethod(MethodNode node) {
+        protected void visitFunction(FunctionNode node) {
             pushASTNode(node)
             try {
                 super.visitMethod(node)
@@ -336,9 +351,43 @@ class ASTNodeCache {
 
         @Override
         void visitExpressionStatement(ExpressionStatement node) {
+            if( node instanceof ProcessNode ) {
+                visitProcess(node)
+                return
+            }
+            if( node instanceof WorkflowNode ) {
+                visitWorkflow(node)
+                return
+            }
             pushASTNode(node)
             try {
                 super.visitExpressionStatement(node)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        protected void visitProcess(ProcessNode node) {
+            pushASTNode(node)
+            try {
+                visit(node.directives)
+                visit(node.inputs)
+                visit(node.outputs)
+                visit(node.exec)
+                visit(node.stub)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        protected void visitWorkflow(WorkflowNode node) {
+            pushASTNode(node)
+            try {
+                visit(node.takes)
+                visit(node.emits)
+                visit(node.main)
             }
             finally {
                 popASTNode()

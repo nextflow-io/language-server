@@ -5,6 +5,9 @@ import nextflow.lsp.compiler.ASTNodeCache
 import nextflow.lsp.compiler.ASTUtils
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
+import nextflow.lsp.util.Ranges
+import nextflow.script.v2.ProcessNode
+import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.ClassHelper
@@ -12,6 +15,7 @@ import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.ast.VariableScope
+import org.codehaus.groovy.ast.expr.ClosureExpression
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
@@ -44,60 +48,436 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either
 @CompileStatic
 class CompletionProvider {
 
-    private static final CompletionItem NXF_PROCESS = new CompletionItem('process')
+    private static final List<CompletionItem> NXF_TOPLEVEL_ITEMS
+    
+    static {
+        NXF_TOPLEVEL_ITEMS = [
+            [
+                'include',
+                '''
+                Include statement:
+
+                ```groovy
+                include { HELLO } from './hello.nf'
+                ```
+
+                [Read more](https://nextflow.io/docs/latest/module.html#module-inclusion)
+                ''',
+                "include { \$1 } from './\$2'"
+            ],
+            [
+                'def',
+                '''
+                Function definition:
+
+                ```groovy
+                def hello(name) {
+                    println "Hello $name!"
+                }
+                ```
+
+                [Read more](https://nextflow.io/docs/latest/script.html#functions)
+                ''',
+                """
+                def \$1(\$2) {
+                    \$3
+                }
+                """
+            ],
+            [
+                'process',
+                '''
+                Process definition:
+
+                ```groovy
+                process HELLO {
+                    input: 
+                    val message
+
+                    output:
+                    stdout
+
+                    script:
+                    """
+                    echo '$message world!'
+                    """
+                }
+                ```
+
+                [Read more](https://nextflow.io/docs/latest/process.html)
+                ''',
+                """
+                process \$1 {
+                    input:
+                    \${2|val,path,env,stdin,tuple|} \${3:identifier}
+
+                    output:
+                    \${4|val,path,env,stdout,tuple|} \${5:identifier}
+
+                    script:
+                    \"\"\"
+                    \$6
+                    \"\"\"
+
+                    stub:
+                    \"\"\"
+                    \$7
+                    \"\"\"
+                }
+                """
+            ],
+            [
+                'workflow',
+                '''
+                Workflow definition:
+
+                ```groovy
+                workflow MY_FLOW {
+                    take:
+                    input
+
+                    main:
+                    input | view | output
+
+                    emit:
+                    output
+                }
+                ```
+
+                [Read more](https://nextflow.io/docs/latest/workflow.html)
+                ''',
+                """
+                workflow \$1 {
+                    take:
+                    \$2
+
+                    main:
+                    \$3
+
+                    emit:
+                    \$4
+                }
+                """
+            ],
+            [
+                'workflow <entry>',
+                '''
+                Entry workflow definition:
+
+                ```groovy
+                workflow {
+                    Channel.of('Bonjour', 'Ciao', 'Hello', 'Hola') | view { it -> '$it world!' }
+                }
+                ```
+
+                [Read more](https://nextflow.io/docs/latest/workflow.html)
+                ''',
+                """
+                workflow {
+                    \$1
+                }
+                """
+            ],
+        ].collect { name, documentation, insertText ->
+            final item = new CompletionItem(name)
+            item.setKind(CompletionItemKind.Snippet)
+            item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
+            item.setInsertText(insertText.stripIndent(true).trim())
+            item.setInsertTextFormat(InsertTextFormat.Snippet)
+            item.setInsertTextMode(InsertTextMode.AdjustIndentation)
+            return item
+        }
+    }
+
+    private static final List<CompletionItem> NXF_PROCESS_DIRECTIVES
 
     static {
-        NXF_PROCESS.setKind(CompletionItemKind.Method)
-        NXF_PROCESS.setInsertText(
-            """
-            process \${1:MY_PROCESS} {
-                input:
-                \${2|${NXF_INPUTS*.getLabel().join(',')}|} \${3:var_name}
+        NXF_PROCESS_DIRECTIVES = [
+            [
+                'clusterOptions',
+                '''
+                The `clusterOptions` directive allows the usage of any native configuration option accepted by your cluster submit command. You can use it to request non-standard resources or use settings that are specific to your cluster and not supported out of the box by Nextflow.
 
-                output:
-                \${4|${NXF_OUTPUTS*.getLabel().join(',')}|} \${5:var_name}
+                [Read more](https://nextflow.io/docs/latest/process.html#clusteroptions)
+                ''',
+                'clusterOptions \'$1\''
+            ],
+            [
+                'container',
+                '''
+                The `container` directive allows you to execute the process script in a container.
 
-                script:
-                \"\"\"
-                \${6:MY_SCRIPT}
-                \"\"\"
-            }
-            """.stripIndent(true).trim()
-        )
-        NXF_PROCESS.setInsertTextFormat(InsertTextFormat.Snippet)
-        NXF_PROCESS.setInsertTextMode(InsertTextMode.AdjustIndentation)
+                [Read more](https://nextflow.io/docs/latest/process.html#container)
+                ''',
+                'container \'$1\''
+            ],
+            [
+                'containerOptions',
+                '''
+                The `containerOptions` directive allows you to specify any container execution option supported by the underlying container engine (ie. Docker, Singularity, etc). This can be useful to provide container settings only for a specific process.
+
+                [Read more](https://nextflow.io/docs/latest/process.html#containeroptions)
+                ''',
+                'containerOptions \'$1\''
+            ],
+            [
+                'cpus',
+                '''
+                The `cpus` directive allows you to define the number of (logical) CPUs required by each task.
+
+                [Read more](https://nextflow.io/docs/latest/process.html#cpus)
+                ''',
+                'cpus $1'
+            ],
+            [
+                'debug',
+                '''
+                The `debug` directive allows you to print the process standard output to Nextflow\'s standard output, i.e. the console. By default this directive is disabled.
+
+                [Read more](https://nextflow.io/docs/latest/process.html#debug)
+                ''',
+                'debug true'
+            ],
+            [
+                'errorStrategy',
+                '''
+                The `errorStrategy` directive allows you to define how an error condition is managed by the process. By default when an error status is returned by the executed script, the process stops immediately. This in turn forces the entire pipeline to terminate.
+
+                [Read more](https://nextflow.io/docs/latest/process.html#errorstrategy)
+                ''',
+                'errorStrategy \'$1\''
+            ],
+            [
+                'maxErrors',
+                '''
+                The `maxErrors` directive allows you to specify the maximum number of times a process can fail when using the `retry` or `ignore` error strategy. By default this directive is disabled.
+
+                [Read more](https://nextflow.io/docs/latest/process.html#maxerrors)
+                ''',
+                'maxErrors $1'
+            ],
+            [
+                'maxRetries',
+                '''
+                The `maxRetries` directive allows you to define the maximum number of times a task can be retried when using the `retry` error strategy. By default only one retry is allowed.
+
+                [Read more](https://nextflow.io/docs/latest/process.html#maxretries)
+                ''',
+                'maxRetries $1'
+            ],
+            [
+                'memory',
+                '''
+                The `memory` directive allows you to define how much memory is required by each task. Can be a string (e.g. `\'8 GB\'`) or a memory unit (e.g. `8.GB`).
+
+                [Read more](https://nextflow.io/docs/latest/process.html#memory)
+                ''',
+                'memory $1'
+            ],
+            [
+                'tag',
+                '''
+                The `tag` directive allows you to associate each process execution with a custom label, so that it will be easier to identify in the log file or in a report.
+
+                [Read more](https://nextflow.io/docs/latest/process.html#tag)
+                ''',
+                'tag \'$1\''
+            ]
+        ].collect { name, documentation, insertText ->
+            final item = new CompletionItem(name)
+            item.setKind(CompletionItemKind.Method)
+            item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
+            item.setInsertText(insertText)
+            item.setInsertTextFormat(InsertTextFormat.Snippet)
+            item.setInsertTextMode(InsertTextMode.AdjustIndentation)
+            return item
+        }
     }
 
-    private static final CompletionItem NXF_DIRECTIVES_DEBUG = new CompletionItem('debug')
-    private static final CompletionItem[] NXF_DIRECTIVES = new CompletionItem[] {
-        NXF_DIRECTIVES_DEBUG,
-    }
+    private static final List<CompletionItem> NXF_PROCESS_INPUTS
 
     static {
-        NXF_DIRECTIVES_DEBUG.setInsertText('debug true')
-        NXF_DIRECTIVES_DEBUG.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN,
-            'By default the `stdout` produced by the commands executed in all processes is ignored. By setting the `debug` directive to `true`, you can forward the process `stdout` to the current top running process `stdout` file, showing it in the shell terminal.'
-        ))
+        NXF_PROCESS_INPUTS = [
+            [
+                'val',
+                '''
+                ```groovy
+                val <identifier>
+                ```
+                Declare a variable input. The received value can be any type, and it will be made available to the process body (i.e. `script`, `shell`, `exec`) as a variable with the given name.
+                ''',
+                'val ${1:identifier}'
+            ],
+            [
+                'path',
+                '''
+                ```groovy
+                path <identifier | stageName>
+                ```
+                Declare a file input. The received value should be a file or collection of files.
+
+                The argument can be an identifier or string. If an identifier, the received value will be made available to the process body as a variable. If a string, the received value will be staged into the task directory under the given alias.
+                ''',
+                'path ${1:identifier}'
+            ],
+            [
+                'env',
+                '''
+                ```groovy
+                env <identifier>
+                ```
+                Declare an environment variable input. The received value should be a string, and it will be exported to the task environment as an environment variable given by `identifier`.
+                ''',
+                'env ${1:identifier}'
+            ],
+            [
+                'stdin',
+                '''
+                ```groovy
+                stdin
+                ```
+                Declare a `stdin` input. The received value should be a string, and it will be provided as the standard input (i.e. `stdin`) to the task script. It should be declared only once for a process.
+                ''',
+                'stdin'
+            ],
+            [
+                'tuple',
+                '''
+                ```groovy
+                tuple <arg1>, <arg2>, ...
+                ```
+                Declare a tuple input. Each argument should be an input declaration such as `val`, `path`, `env`, or `stdin`.
+
+                The received value should be a tuple with the same number of elements as the `tuple` declaration, and each received element should be compatible with the corresponding `tuple` argument. Each tuple element is treated the same way as if it were a standalone input.
+                ''',
+                'tuple val(${1:identifier}), path(${2:identifier})'
+            ],
+        ].collect { name, documentation, insertText ->
+            final item = new CompletionItem(name)
+            item.setKind(CompletionItemKind.Method)
+            item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
+            item.setInsertText(insertText)
+            item.setInsertTextFormat(InsertTextFormat.Snippet)
+            item.setInsertTextMode(InsertTextMode.AdjustIndentation)
+            return item
+        }
     }
 
-    private static final CompletionItem NXF_INPUTS_VAL = new CompletionItem('val')
-    private static final CompletionItem[] NXF_INPUTS = new CompletionItem[] {
-        NXF_INPUTS_VAL,
-    }
+    private static final List<CompletionItem> NXF_PROCESS_OUTPUTS
 
     static {
-        NXF_INPUTS_VAL.setInsertText('val ${1:var_name}')
-        NXF_INPUTS_VAL.setDocumentation('Declare a variable input. The received value can be any type, and it will be made available to the process body (i.e. `script`, `shell`, `exec`) as a variable with the given name.')
+        NXF_PROCESS_OUTPUTS = [
+            [
+                'val',
+                '''
+                ```groovy
+                val <value>
+                ```
+                Declare a variable output. The argument can be any value, and it can reference any output variables defined in the process body (i.e. variables declared without the `def` keyword).
+                ''',
+                'val ${1:value}'
+            ],
+            [
+                'path',
+                '''
+                ```groovy
+                path <pattern>
+                ```
+                Declare a file output. It receives the output files from the task environment that match the given pattern.
+                ''',
+                'path ${1:identifier}'
+            ],
+            [
+                'env',
+                '''
+                ```groovy
+                env <identifier>
+                ```
+                Declare an environment variable output. It receives the value of the environment variable given by `identifier` from the task environment.
+                ''',
+                'env ${1:identifier}'
+            ],
+            [
+                'stdout',
+                '''
+                ```groovy
+                stdout
+                ```
+                Declare a `stdout` output. It receives the standard output of the task script.
+                ''',
+                'stdout'
+            ],
+            [
+                'eval',
+                '''
+                ```groovy
+                eval <command>
+                ```
+                Declare an `eval` output. It receives the standard output of the given command, which is executed in the task environment after the task script.
+                ''',
+                'eval ${1:command}'
+            ],
+            [
+                'tuple',
+                '''
+                ```groovy
+                tuple <arg1>, <arg2>, ...
+                ```
+                Declare a tuple output. Each argument should be an output declaration such as `val`, `path`, `env`, `stdin`, or `eval`. Each tuple element is treated the same way as if it were a standalone output.
+                ''',
+                'tuple val(${1:value}), path(${2:pattern})'
+            ],
+        ].collect { name, documentation, insertText ->
+            final item = new CompletionItem(name)
+            item.setKind(CompletionItemKind.Method)
+            item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
+            item.setInsertText(insertText.stripIndent(true).trim())
+            item.setInsertTextFormat(InsertTextFormat.Snippet)
+            item.setInsertTextMode(InsertTextMode.AdjustIndentation)
+            return item
+        }
     }
 
-    private static final CompletionItem NXF_OUTPUTS_VAL = new CompletionItem('val')
-    private static final CompletionItem[] NXF_OUTPUTS = new CompletionItem[] {
-            NXF_OUTPUTS_VAL,
-    }
+    private static final List<CompletionItem> NXF_OPERATORS
 
     static {
-        NXF_OUTPUTS_VAL.setInsertText('val ${1:var_name}')
-        NXF_OUTPUTS_VAL.setDocumentation('Declare a variable output. The argument can be any value, and it can reference any output variables defined in the process body (i.e. variables declared without the `def` keyword).')
+        NXF_OPERATORS = [
+            [
+                'filter',
+                '''
+                The `filter` operator emits the values from a source channel that satisfy a condition, discarding all other values. The filter condition can be a literal value, a regular expression, a type qualifier, or a boolean predicate.
+
+                [Read more](https://nextflow.io/docs/latest/operator.html#filter)
+                ''',
+                'filter { v -> $1 }'
+            ],
+            [
+                'map',
+                '''
+                The `map` operator applies a mapping function to each value from a source channel.
+
+                [Read more](https://nextflow.io/docs/latest/operator.html#map)
+                ''',
+                'map { v -> $1 }'
+            ],
+            [
+                'reduce',
+                '''
+                The `reduce` operator applies an accumulator function sequentially to each value in a source channel, and emits the final accumulated value. The accumulator function takes two parameters -- the accumulated value and the *i*-th emitted value -- and it should return the accumulated result, which is passed to the next invocation with the *i+1*-th value. This process is repeated for each value in the source channel.
+
+                [Read more](https://nextflow.io/docs/latest/operator.html#reduce)
+                ''',
+                'reduce { acc, v -> $1 }'
+            ],
+        ].collect { name, documentation, insertText ->
+            final item = new CompletionItem(name)
+            item.setKind(CompletionItemKind.Method)
+            item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
+            item.setInsertText(insertText.stripIndent(true).trim())
+            item.setInsertTextFormat(InsertTextFormat.Snippet)
+            item.setInsertTextMode(InsertTextMode.AdjustIndentation)
+            return item
+        }
     }
 
     private static Logger log = Logger.instance
@@ -117,51 +497,104 @@ class CompletionProvider {
      *
      * @param textDocument
      * @param position
-     * @param context
      */
-    Either<List<CompletionItem>, CompletionList> provideCompletion(TextDocumentIdentifier textDocument, Position position, CompletionContext context) {
+    Either<List<CompletionItem>, CompletionList> provideCompletion(TextDocumentIdentifier textDocument, Position position) {
         if( ast == null ) {
             log.error("ast cache is empty while peoviding completions")
             return Either.forLeft(Collections.emptyList())
         }
 
         final uri = URI.create(textDocument.getUri())
-        final offsetNode = ast.getNodeAtLineAndColumn(uri, position.getLine(), position.getCharacter())
-        if( offsetNode == null )
-            return Either.forLeft(Collections.emptyList())
+        final nodeTree = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter())
+        if( !nodeTree )
+            // TODO: need to confirm that position is in top level (no leading whitespace? no paren stack?)
+            return Either.forLeft(NXF_TOPLEVEL_ITEMS)
 
+        final offsetNode = nodeTree.first()
         final parentNode = ast.getParent(offsetNode)
 
         isIncomplete = false
         final List<CompletionItem> items = []
 
-        if( offsetNode instanceof PropertyExpression )
+        if( nodeTree.any { node -> node instanceof ProcessNode } ) {
+            log.debug "completion: populate from process definition"
+            populateItemsFromProcess(nodeTree, items)
+        }
+        else if( nodeTree.any { node -> node instanceof WorkflowNode } ) {
+            log.debug "completion: populate from workflow definition"
+            populateItemsFromWorkflow(nodeTree, items)
+        }
+        else if( offsetNode instanceof PropertyExpression ) {
+            log.debug "completion: populate from property expression"
             populateItemsFromPropertyExpression(offsetNode, position, items)
-
-        else if( parentNode instanceof PropertyExpression )
+        }
+        else if( parentNode instanceof PropertyExpression ) {
+            log.debug "completion: populate from property expression (parent)"
             populateItemsFromPropertyExpression(parentNode, position, items)
-
-        else if( offsetNode instanceof MethodCallExpression )
+        }
+        else if( offsetNode instanceof MethodCallExpression ) {
+            log.debug "completion: populate from method call"
             populateItemsFromMethodCallExpression(offsetNode, position, items)
-
-        else if( offsetNode instanceof ConstructorCallExpression )
+        }
+        else if( offsetNode instanceof ConstructorCallExpression ) {
+            log.debug "completion: populate from constructor call"
             populateItemsFromConstructorCallExpression(offsetNode, position, items)
-
-        else if( parentNode instanceof MethodCallExpression )
+        }
+        else if( parentNode instanceof MethodCallExpression ) {
+            log.debug "completion: populate from method call (parent)"
             populateItemsFromMethodCallExpression(parentNode, position, items)
-
-        else if( offsetNode instanceof VariableExpression )
+        }
+        else if( offsetNode instanceof VariableExpression ) {
+            log.debug "completion: populate from variable"
             populateItemsFromVariableExpression(offsetNode, position, items)
-
-        else if( offsetNode instanceof MethodNode )
+        }
+        else if( offsetNode instanceof MethodNode ) {
+            log.debug "completion: populate from method"
             populateItemsFromScope(offsetNode, '', items)
-
-        else if( offsetNode instanceof Statement )
+        }
+        else if( offsetNode instanceof Statement ) {
+            log.debug "completion: populate from statement"
             populateItemsFromScope(offsetNode, '', items)
+        }
 
         return isIncomplete
             ? Either.forRight(new CompletionList(true, items))
             : Either.forLeft(items)
+    }
+
+    private void populateItemsFromProcess(List<ASTNode> nodeTree, List<CompletionItem> items) {
+        String section
+        for( final node : nodeTree ) {
+            if( node instanceof Statement && node.statementLabels )
+                section = node.statementLabels.first()
+        }
+
+        final sectionItems = switch( section ) {
+            case 'directives' -> NXF_PROCESS_DIRECTIVES
+            case 'input' -> NXF_PROCESS_INPUTS
+            case 'output' -> NXF_PROCESS_OUTPUTS
+            default -> null
+        }
+        if( sectionItems )
+            items.addAll(sectionItems)
+    }
+
+    private void populateItemsFromWorkflow(List<ASTNode> nodeTree, List<CompletionItem> items) {
+        String section = 'main'
+        boolean inClosure = false
+        for( final node : nodeTree ) {
+            if( node instanceof Statement && node.statementLabels )
+                section = node.statementLabels.first()
+            if( node instanceof ClosureExpression )
+                inClosure = true
+        }
+
+        if( section != 'main' )
+            return
+
+        // TODO: function, process, workflow names 
+        if( !inClosure )
+            items.addAll(NXF_OPERATORS)
     }
 
     private void populateItemsFromPropertyExpression(PropertyExpression propX, Position position, List<CompletionItem> items) {
@@ -253,71 +686,20 @@ class CompletionProvider {
         }
     }
 
-    private void populateItemsFromProcess(CompletionItem[] values, String memberNamePrefix, Set<String> existingNames, List<CompletionItem> items) {
-        for( final item : values ) {
-            if( !item.getLabel().startsWith(memberNamePrefix) || existingNames.contains(item.getLabel()) )
-                continue
-            existingNames.add(item.getLabel())
-
-            item.setKind(CompletionItemKind.Method)
-            item.setInsertTextFormat(InsertTextFormat.Snippet)
-            item.setInsertTextMode(InsertTextMode.AdjustIndentation)
-            items.add(item)
-        }
-    }
-
     private void populateItemsFromScope(ASTNode node, String namePrefix, List<CompletionItem> items) {
-        boolean inProcess = false
-        String processLabel = null
-
         final Set<String> existingNames = []
         ASTNode current = node
         while( current != null ) {
-            if( current instanceof ClassNode ) {
-                populateItemsFromPropertiesAndFields(current.getProperties(), current.getFields(), namePrefix, existingNames, items)
-                populateItemsFromMethods(current.getMethods(), namePrefix, existingNames, items)
-            }
-            else if( current instanceof MethodNode ) {
+            if( current instanceof BlockStatement ) {
                 populateItemsFromVariableScope(current.getVariableScope(), namePrefix, existingNames, items)
-            }
-            else if( current instanceof BlockStatement ) {
-                populateItemsFromVariableScope(current.getVariableScope(), namePrefix, existingNames, items)
-                if( !inProcess )
-                    processLabel = findProcessLabel(node, current)
-            }
-            else if( current instanceof MethodCallExpression ) {
-                inProcess = current.getMethodAsString() == 'process'
             }
             current = ast.getParent(current)
         }
-
-        if( inProcess && processLabel != null && node instanceof VariableExpression ) {
-            if( processLabel == 'directives' )
-                populateItemsFromProcess(NXF_DIRECTIVES, namePrefix, existingNames, items)
-            else if( processLabel == 'input' )
-                populateItemsFromProcess(NXF_INPUTS, namePrefix, existingNames, items)
-            else if( processLabel == 'output' )
-                populateItemsFromProcess(NXF_OUTPUTS, namePrefix, existingNames, items)
-        }
-
-        if( !inProcess && 'process'.startsWith(namePrefix) )
-            items.add(NXF_PROCESS)
 
         if( namePrefix.length() == 0 )
             isIncomplete = true
         else
             populateTypes(node, namePrefix, existingNames, items)
-    }
-
-    private String findProcessLabel(ASTNode node, BlockStatement block) {
-        String result = 'directives'
-        for( Statement stmt : block.getStatements() ) {
-            if( stmt.getStatementLabel() != null )
-                result = stmt.getStatementLabel()
-            if( stmt instanceof ExpressionStatement && stmt.getExpression() == node )
-                return result
-        }
-        return null
     }
 
     private static final List<ClassNode> STANDARD_TYPES = [

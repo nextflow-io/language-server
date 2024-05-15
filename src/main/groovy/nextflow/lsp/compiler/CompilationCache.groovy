@@ -215,11 +215,11 @@ class CompilationCache extends CompilationUnit {
         catch( CompilationFailedException e ) {
         }
         catch( GroovyBugError e ) {
-            log.error 'Unexpected exception in language server when compiling Nextflow.'
+            log.error 'Unexpected exception while compiling source files'
             e.printStackTrace(System.err)
         }
         catch( Exception e ) {
-            log.error 'Unexpected exception in language server when compiling Nextflow.'
+            log.error 'Unexpected exception while compiling source files'
             e.printStackTrace(System.err)
         }
     }
