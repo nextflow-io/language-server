@@ -1,6 +1,6 @@
 # Nextflow Language Server
 
-A [language server](https://microsoft.github.io/language-server-protocol/) for [Nextflow](https://nextflow.io/). Based on [GroovyLanguageServer/groovy-language-server](https://github.com/GroovyLanguageServer/groovy-language-server).
+A [language server](https://microsoft.github.io/language-server-protocol/) for [Nextflow](https://nextflow.io/) scripts and config files. Based on [GroovyLanguageServer/groovy-language-server](https://github.com/GroovyLanguageServer/groovy-language-server).
 
 The following LSP requests are currently supported:
 

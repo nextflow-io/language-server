@@ -19,7 +19,7 @@ class ConfigCompilationCache extends CompilationCache {
 
     static protected CompilerConfiguration createConfiguration() {
         final config = new CompilerConfiguration()
-        config.setPluginFactory(new ConfigParserPluginFactory())
+        config.setPluginFactory(new ConfigParserPluginFactory(true))
 
         return config
     }

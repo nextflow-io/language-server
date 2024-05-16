@@ -99,14 +99,16 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 class ConfigAstBuilder {
 
     private SourceUnit sourceUnit
+    private boolean allowIncomplete
     private ModuleNode moduleNode
     private ConfigLexer lexer
     private ConfigParser parser
 
     private Tuple2<ParserRuleContext,Exception> numberFormatError
 
-    ConfigAstBuilder(SourceUnit sourceUnit) {
+    ConfigAstBuilder(SourceUnit sourceUnit, boolean allowIncomplete) {
         this.sourceUnit = sourceUnit
+        this.allowIncomplete = allowIncomplete
         this.moduleNode = new ModuleNode(sourceUnit)
 
         final charStream = createCharStream(sourceUnit)
@@ -209,7 +211,7 @@ class ConfigAstBuilder {
         if( ctx instanceof ConfigBlockStmtAltContext )
             return ast( configBlock(ctx.configBlock()), ctx )
 
-        if( ctx instanceof ConfigIncompleteStmtAltContext )
+        if( ctx instanceof ConfigIncompleteStmtAltContext && allowIncomplete )
             return ast( configIncomplete(ctx.configIncomplete()), ctx )
 
         throw createParsingFailedException("Invalid config statement: ${ctx.text}", ctx)
@@ -257,7 +259,7 @@ class ConfigAstBuilder {
         if( ctx instanceof ConfigSelectorBlockStmtAltContext )
             return ast( configSelector(ctx.configSelector()), ctx )
 
-        if( ctx instanceof ConfigIncompleteBlockStmtAltContext )
+        if( ctx instanceof ConfigIncompleteBlockStmtAltContext && allowIncomplete )
             return ast( configIncomplete(ctx.configIncomplete()), ctx )
 
         throw createParsingFailedException("Invalid statement in config block: ${ctx.text}", ctx)
