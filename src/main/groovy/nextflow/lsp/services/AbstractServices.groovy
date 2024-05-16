@@ -30,6 +30,7 @@ import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.SymbolInformation
+import org.eclipse.lsp4j.WorkspaceSymbolParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
@@ -50,19 +51,19 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
     private Map<URI, List<Diagnostic>> prevDiagnosticsByFile = [:]
 
     private CompletionProvider completionProvider
-    private DocumentSymbolProvider documentSymbolProvider
+    private SymbolProvider symbolProvider
     private HoverProvider hoverProvider
 
     AbstractServices() {
         this.compileCache = getCompilationCache()
         this.completionProvider = getCompletionProvider(astCache)
-        this.documentSymbolProvider = getDocumentSymbolProvider(astCache)
+        this.symbolProvider = getSymbolProvider(astCache)
         this.hoverProvider = getHoverProvider(astCache)
     }
 
     abstract protected CompilationCache getCompilationCache()
     protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) { null }
-    protected DocumentSymbolProvider getDocumentSymbolProvider(ASTNodeCache astCache) { null }
+    protected SymbolProvider getSymbolProvider(ASTNodeCache astCache) { null }
     protected HoverProvider getHoverProvider(ASTNodeCache astCache) { null }
 
     void setWorkspaceRoot(Path workspaceRoot) {
@@ -138,13 +139,13 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
 
     @Override
     CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
-        if( !documentSymbolProvider )
+        if( !symbolProvider )
             return CompletableFuture.completedFuture(Collections.emptyList())
 
         final uri = URI.create(params.getTextDocument().getUri())
         recompileIfContextChanged(uri)
 
-        final result = documentSymbolProvider.provideDocumentSymbols(params.getTextDocument())
+        final result = symbolProvider.provideDocumentSymbols(params.getTextDocument())
         return CompletableFuture.completedFuture(result)
     }
 
@@ -159,6 +160,15 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         final result = hoverProvider.provideHover(params.getTextDocument(), params.getPosition())
         return CompletableFuture.completedFuture(result)
     }
+
+	@Override
+	CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
+        if( !symbolProvider )
+            return CompletableFuture.completedFuture(Collections.emptyList())
+
+		final result = symbolProvider.provideWorkspaceSymbols(params.getQuery())
+        return CompletableFuture.completedFuture(result)
+	}
 
     // --- INTERNAL
 

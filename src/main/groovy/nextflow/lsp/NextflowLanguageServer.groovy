@@ -44,6 +44,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware {
         serverCapabilities.setDocumentSymbolProvider(true)
         serverCapabilities.setHoverProvider(true)
         serverCapabilities.setTextDocumentSync(TextDocumentSyncKind.Incremental)
+        serverCapabilities.setWorkspaceSymbolProvider(true)
 
         final initializeResult = new InitializeResult(serverCapabilities)
         return CompletableFuture.completedFuture(initializeResult)

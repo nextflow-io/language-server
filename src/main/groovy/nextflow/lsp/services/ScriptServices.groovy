@@ -24,7 +24,7 @@ class ScriptServices extends AbstractServices {
     }
 
     @Override
-    protected DocumentSymbolProvider getDocumentSymbolProvider(ASTNodeCache astCache) {
+    protected SymbolProvider getSymbolProvider(ASTNodeCache astCache) {
         new ScriptSymbolProvider(astCache)
     }
 

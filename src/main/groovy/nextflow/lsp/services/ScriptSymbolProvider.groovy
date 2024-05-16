@@ -22,7 +22,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ScriptSymbolProvider implements DocumentSymbolProvider {
+class ScriptSymbolProvider implements SymbolProvider {
 
     private static Logger log = Logger.instance
 
@@ -44,14 +44,44 @@ class ScriptSymbolProvider implements DocumentSymbolProvider {
 
         final List<Either<SymbolInformation, DocumentSymbol>> result = []
         for( final node : nodes ) {
-            if( !(node instanceof FunctionNode || node instanceof ProcessNode || node instanceof WorkflowNode) )
-                continue
-
             final symbolInfo = getSymbolInformation(node, uri)
             if( symbolInfo == null )
                 continue
 
             result << Either.<SymbolInformation, DocumentSymbol>forLeft(symbolInfo)
+        }
+
+        return result
+    }
+
+    @Override
+    List<? extends SymbolInformation> provideWorkspaceSymbols(String query) {
+        if( ast == null ) {
+            log.error("ast cache is empty while peoviding workspace symbols")
+            return Collections.emptyList()
+        }
+
+        final lowerCaseQuery = query.toLowerCase()
+        final nodes = ast.getNodes()
+        final List<SymbolInformation> result = []
+        for( final node : nodes ) {
+            String name = null
+            if( node instanceof FunctionNode )
+                name = node.name
+            else if( node instanceof ProcessNode )
+                name = node.name
+            else if( node instanceof WorkflowNode )
+                name = node.name
+
+            if( !name || !name.toLowerCase().contains(lowerCaseQuery) )
+                continue
+
+            final uri = ast.getURI(node)
+            final symbolInfo = getSymbolInformation(node, uri)
+            if( symbolInfo == null )
+                continue
+
+            result << symbolInfo
         }
 
         return result
@@ -68,7 +98,6 @@ class ScriptSymbolProvider implements DocumentSymbolProvider {
             return LanguageServerUtils.astNodeToSymbolInformation(node, uri)
         }
         else {
-            log.error("could not determine type of definition node: ${node}")
             return null
         }
     }
