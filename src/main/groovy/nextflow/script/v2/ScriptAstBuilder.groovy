@@ -19,8 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import nextflow.antlr.NextflowLexer
-import nextflow.antlr.NextflowParser
+import nextflow.antlr.ScriptLexer
+import nextflow.antlr.ScriptParser
 import nextflow.antlr.DescriptiveErrorStrategy
 import nextflow.script.BodyDef
 import nextflow.script.IncludeDef
@@ -98,34 +98,34 @@ import org.codehaus.groovy.syntax.SyntaxException
 import org.codehaus.groovy.syntax.Token
 import org.codehaus.groovy.syntax.Types
 
-import static nextflow.antlr.NextflowParser.*
+import static nextflow.antlr.ScriptParser.*
 import static nextflow.antlr.PositionConfigureUtils.configureAST as ast
 import static nextflow.ast.ASTHelpers.*
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 
 /**
- * Transform a Nextflow parse tree into a Groovy AST.
+ * Transform a Nextflow script parse tree into a Groovy AST.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @Slf4j
 @CompileStatic
-class AstBuilder {
+class ScriptAstBuilder {
 
     private SourceUnit sourceUnit
     private ModuleNode moduleNode
-    private NextflowLexer lexer
-    private NextflowParser parser
+    private ScriptLexer lexer
+    private ScriptParser parser
 
     private Tuple2<ParserRuleContext,Exception> numberFormatError
 
-    AstBuilder(SourceUnit sourceUnit) {
+    ScriptAstBuilder(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit
         this.moduleNode = new ModuleNode(sourceUnit)
 
         final charStream = createCharStream(sourceUnit)
-        this.lexer = new NextflowLexer(charStream)
-        this.parser = new NextflowParser(new CommonTokenStream(lexer))
+        this.lexer = new ScriptLexer(charStream)
+        this.parser = new ScriptParser(new CommonTokenStream(lexer))
         parser.setErrorHandler(new DescriptiveErrorStrategy(charStream))
     }
 
@@ -773,20 +773,20 @@ class AstBuilder {
     }
 
     private Expression unaryAdd(Expression expression, ParserToken op) {
-        if( op.type == NextflowParser.ADD )
+        if( op.type == ScriptParser.ADD )
             return new UnaryPlusExpression(expression)
 
-        if( op.type == NextflowParser.SUB )
+        if( op.type == ScriptParser.SUB )
             return new UnaryMinusExpression(expression)
 
         throw new IllegalStateException()
     }
 
     private Expression unaryNot(Expression expression, ParserToken op) {
-        if( op.type == NextflowParser.NOT )
+        if( op.type == ScriptParser.NOT )
             return new NotExpression(expression)
 
-        if( op.type == NextflowParser.BITNOT )
+        if( op.type == ScriptParser.BITNOT )
             return new BitwiseNegationExpression(expression)
 
         throw new IllegalStateException()
@@ -1458,6 +1458,7 @@ class AstBuilder {
 }
 
 
+@CompileStatic
 class FunctionNode extends MethodNode {
 
     FunctionNode(String name, ClassNode returnType, Parameter[] parameters, Statement code) {
@@ -1466,6 +1467,7 @@ class FunctionNode extends MethodNode {
 }
 
 
+@CompileStatic
 class IncludeNode extends ExpressionStatement {
     final String source
     final List<IncludeDef.Module> modules
@@ -1478,6 +1480,7 @@ class IncludeNode extends ExpressionStatement {
 }
 
 
+@CompileStatic
 class ProcessNode extends ExpressionStatement {
     final String name
     final Statement directives
@@ -1498,6 +1501,7 @@ class ProcessNode extends ExpressionStatement {
 }
 
 
+@CompileStatic
 class WorkflowNode extends ExpressionStatement {
     final String name
     final Statement takes

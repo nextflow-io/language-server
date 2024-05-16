@@ -3,13 +3,11 @@ package nextflow.lsp.compiler
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.security.CodeSource
 
 import groovy.lang.GroovyClassLoader
 import groovy.transform.CompileStatic
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.Logger
-import nextflow.script.v2.ScriptParserPluginFactory
 import org.antlr.v4.runtime.InputMismatchException
 import org.antlr.v4.runtime.NoViableAltException
 import org.codehaus.groovy.GroovyBugError
@@ -19,8 +17,6 @@ import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.Phases
 import org.codehaus.groovy.control.SourceUnit
-import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
-import org.codehaus.groovy.control.customizers.ImportCustomizer
 
 /**
  * Cache compiled sources and defer compilation errors to the
@@ -29,42 +25,14 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class CompilationCache extends CompilationUnit {
-
-    private static final String FILE_EXTENSION = '.nf'
+abstract class CompilationCache extends CompilationUnit {
 
     private static Logger log = Logger.instance
 
-    static CompilationCache create() {
-        final config = createConfiguration()
-        final classLoader = new GroovyClassLoader(ClassLoader.getSystemClassLoader().getParent(), config, true)
-        return new CompilationCache(config, null, classLoader)
-    }
+    abstract protected String getFileExtension()
 
-    static protected CompilerConfiguration createConfiguration() {
-        final importCustomizer = new ImportCustomizer()
-        importCustomizer.addImports( java.nio.file.Path.name )
-        // Channel
-        // Duration
-        // MemoryUnit
-
-        final Map<String, Boolean> optimizationOptions = [:]
-        optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true)
-
-        final config = new CompilerConfiguration()
-        config.addCompilationCustomizers( importCustomizer )
-        config.setOptimizationOptions(optimizationOptions)
-        config.setPluginFactory(new ScriptParserPluginFactory())
-
-        return config
-    }
-
-    CompilationCache(CompilerConfiguration config) {
-        this(config, null, null)
-    }
-
-    CompilationCache(CompilerConfiguration config, CodeSource security, GroovyClassLoader loader) {
-        super(config, security, loader)
+    CompilationCache(CompilerConfiguration config, GroovyClassLoader loader) {
+        super(config, null, loader)
         this.@errorCollector = new LanguageServerErrorCollector(config)
     }
 
@@ -161,7 +129,7 @@ class CompilationCache extends CompilationUnit {
                 return
 
             for( final filePath : Files.walk(dirPath) ) {
-                if( !filePath.toString().endsWith(FILE_EXTENSION) )
+                if( !filePath.toString().endsWith(getFileExtension()) )
                     continue
 
                 final fileUri = filePath.toUri()

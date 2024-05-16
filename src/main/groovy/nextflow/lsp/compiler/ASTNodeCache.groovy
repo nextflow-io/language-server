@@ -4,6 +4,9 @@ import groovy.transform.CompileStatic
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Positions
 import nextflow.lsp.util.Ranges
+import nextflow.config.v2.ConfigAssignmentNode
+import nextflow.config.v2.ConfigBlockNode
+import nextflow.config.v2.ConfigIncludeNode
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
@@ -351,6 +354,18 @@ class ASTNodeCache {
 
         @Override
         void visitExpressionStatement(ExpressionStatement node) {
+            if( node instanceof ConfigAssignmentNode ) {
+                visitConfigAssignment(node)
+                return
+            }
+            if( node instanceof ConfigBlockNode ) {
+                visitConfigBlock(node)
+                return
+            }
+            if( node instanceof ConfigIncludeNode ) {
+                visitConfigInclude(node)
+                return
+            }
             if( node instanceof ProcessNode ) {
                 visitProcess(node)
                 return
@@ -362,6 +377,36 @@ class ASTNodeCache {
             pushASTNode(node)
             try {
                 super.visitExpressionStatement(node)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        protected void visitConfigAssignment(ConfigAssignmentNode node) {
+            pushASTNode(node)
+            try {
+                visit(node.value)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        protected void visitConfigBlock(ConfigBlockNode node) {
+            pushASTNode(node)
+            try {
+                visit(node.block)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        protected void visitConfigInclude(ConfigIncludeNode node) {
+            pushASTNode(node)
+            try {
+                visit(node.source)
             }
             finally {
                 popASTNode()

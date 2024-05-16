@@ -33,7 +33,7 @@
  * Based on the official grammar for Groovy:
  * https://github.com/apache/groovy/blob/GROOVY_4_0_X/src/antlr/GroovyLexer.g4
  */
-lexer grammar NextflowLexer;
+lexer grammar ScriptLexer;
 
 options {
     superClass = AbstractLexer;
@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
 import org.antlr.v4.runtime.CharStream;
 import org.apache.groovy.parser.antlr4.GroovySyntaxError;
 
-import static nextflow.antlr.SemanticPredicates.*;
+import static nextflow.antlr.ScriptPredicates.*;
 }
 
 @members {

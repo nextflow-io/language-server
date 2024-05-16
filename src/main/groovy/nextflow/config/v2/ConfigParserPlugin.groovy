@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.v2
+package nextflow.config.v2
 
-import nextflow.exception.ScriptCompilationException
+import nextflow.exception.ConfigParseException
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.control.ParserPlugin
 import org.codehaus.groovy.control.SourceUnit
@@ -24,9 +24,9 @@ import org.codehaus.groovy.runtime.IOGroovyMethods
 import org.codehaus.groovy.syntax.Reduction
 
 /**
- * Parser plugin for the Nextflow parser.
+ * Parser plugin for the Nextflow config parser.
  */
-class ScriptParserPlugin implements ParserPlugin {
+class ConfigParserPlugin implements ParserPlugin {
 
     @Override
     Reduction parseCST(SourceUnit sourceUnit, Reader reader) {
@@ -37,7 +37,7 @@ class ScriptParserPlugin implements ParserPlugin {
                         sourceUnit.getConfiguration()
                 ))
             } catch (IOException e) {
-                throw new ScriptCompilationException("Failed to create StringReaderSource", e)
+                throw new ConfigParseException("Failed to create StringReaderSource", e)
             }
         }
         return null
@@ -45,6 +45,6 @@ class ScriptParserPlugin implements ParserPlugin {
 
     @Override
     ModuleNode buildAST(SourceUnit sourceUnit, ClassLoader classLoader, Reduction cst) {
-        return new ScriptAstBuilder(sourceUnit).buildAST()
+        return new ConfigAstBuilder(sourceUnit).buildAST()
     }
 }

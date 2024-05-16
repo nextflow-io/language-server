@@ -1,4 +1,4 @@
-package nextflow.lsp.providers
+package nextflow.lsp.services
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.ASTNodeCache
@@ -24,7 +24,6 @@ import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.Statement
-import org.eclipse.lsp4j.CompletionContext
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.CompletionList
@@ -46,7 +45,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either
  * @author Jordi Deu-Pons <jordi@jordeu.net>
  */
 @CompileStatic
-class CompletionProvider {
+class ScriptCompletionProvider implements CompletionProvider {
 
     private static final List<CompletionItem> NXF_TOPLEVEL_ITEMS
     
@@ -486,18 +485,11 @@ class CompletionProvider {
     private int maxItemCount = 100
     private boolean isIncomplete = false
 
-    CompletionProvider(ASTNodeCache ast) {
+    ScriptCompletionProvider(ASTNodeCache ast) {
         this.ast = ast
     }
 
-    /**
-     * Get a list of completions for a given completion context. An
-     * incomplete list may be returned if the full list exceeds the
-     * maximum size.
-     *
-     * @param textDocument
-     * @param position
-     */
+    @Override
     Either<List<CompletionItem>, CompletionList> provideCompletion(TextDocumentIdentifier textDocument, Position position) {
         if( ast == null ) {
             log.error("ast cache is empty while peoviding completions")

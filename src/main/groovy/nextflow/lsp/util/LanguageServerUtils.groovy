@@ -112,7 +112,7 @@ class LanguageServerUtils {
 
     static SymbolInformation astNodeToSymbolInformation(WorkflowNode node, URI uri) {
         return new SymbolInformation(
-                node.getName() ?: '<main>',
+                node.getName() ?: '<entry>',
                 astNodeToSymbolKind(node),
                 astNodeToLocation(node, uri),
                 null)

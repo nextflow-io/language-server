@@ -1,4 +1,4 @@
-package nextflow.lsp.providers
+package nextflow.lsp.services
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.ASTNodeCache
@@ -25,16 +25,17 @@ import org.eclipse.lsp4j.TextDocumentIdentifier
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class HoverProvider {
+class ScriptHoverProvider implements HoverProvider {
 
     private static Logger log = Logger.instance
 
     private ASTNodeCache ast
 
-    HoverProvider(ASTNodeCache ast) {
+    ScriptHoverProvider(ASTNodeCache ast) {
         this.ast = ast
     }
 
+    @Override
     Hover provideHover(TextDocumentIdentifier textDocument, Position position) {
         if( ast == null ) {
             log.error("ast cache is empty while providing hover hint")

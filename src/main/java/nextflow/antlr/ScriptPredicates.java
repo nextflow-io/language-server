@@ -23,16 +23,16 @@ import java.util.regex.Pattern;
 import org.antlr.v4.runtime.CharStream;
 import org.codehaus.groovy.GroovyBugError;
 
-import static nextflow.antlr.NextflowParser.ArgumentsPathExprAltContext;
-import static nextflow.antlr.NextflowParser.ClosurePathExprAltContext;
-import static nextflow.antlr.NextflowParser.ExpressionContext;
-import static nextflow.antlr.NextflowParser.PathExprAltContext;
+import static nextflow.antlr.ScriptParser.ArgumentsPathExprAltContext;
+import static nextflow.antlr.ScriptParser.ClosurePathExprAltContext;
+import static nextflow.antlr.ScriptParser.ExpressionContext;
+import static nextflow.antlr.ScriptParser.PathExprAltContext;
 import static org.apache.groovy.parser.antlr4.util.StringUtils.matches;
 
 /**
  * Some semantic predicates for altering the behaviour of the lexer and parser
  */
-public class SemanticPredicates {
+public class ScriptPredicates {
     private static final Pattern NONSPACES_PATTERN = Pattern.compile("\\S+?");
     private static final Pattern LETTER_AND_LEFTCURLY_PATTERN = Pattern.compile("[a-zA-Z_{]");
     private static final Pattern NONSURROGATE_PATTERN = Pattern.compile("[^\u0000-\u007F\uD800-\uDBFF]");

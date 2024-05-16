@@ -1,4 +1,4 @@
-package nextflow.lsp.providers
+package nextflow.lsp.services
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.ASTNodeCache
@@ -22,16 +22,17 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class DocumentSymbolProvider {
+class ScriptSymbolProvider implements DocumentSymbolProvider {
 
     private static Logger log = Logger.instance
 
     private ASTNodeCache ast
 
-    DocumentSymbolProvider(ASTNodeCache ast) {
+    ScriptSymbolProvider(ASTNodeCache ast) {
         this.ast = ast
     }
 
+    @Override
     List<Either<SymbolInformation, DocumentSymbol>> provideDocumentSymbols(TextDocumentIdentifier textDocument) {
         if( ast == null ) {
             log.error("ast cache is empty while peoviding document symbols")
