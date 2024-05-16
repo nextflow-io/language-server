@@ -25,3 +25,5 @@ java -jar build/libs/language-server-all.jar
 ```
 
 Protocol messages are exchanged using standard input/output.
+
+For additional debug information, set `NXF_DEBUG=true` in your environment.

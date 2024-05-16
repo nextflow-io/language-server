@@ -18,10 +18,17 @@ import org.eclipse.lsp4j.services.LanguageClient
 @CompileStatic
 public class Logger {
 
-    private static Logger INSTANCE
+    private static Logger instance
+    private static Boolean debugEnabled
 
     private LanguageClient client
     private boolean initialized
+
+    static boolean isDebugEnabled() {
+        if( debugEnabled == null )
+            debugEnabled = System.getenv('NXF_DEBUG')=='true'
+        return debugEnabled
+    }
 
     private Logger() {
     }
@@ -33,13 +40,13 @@ public class Logger {
     }
 
     public static Logger getInstance() {
-        if( INSTANCE == null )
-            INSTANCE = new Logger()
-        return INSTANCE
+        if( instance == null )
+            instance = new Logger()
+        return instance
     }
 
     public void debug(String message) {
-        if( !initialized )
+        if( !initialized || !debugEnabled )
             return
         client.logMessage(new MessageParams(MessageType.Log, message))
     }

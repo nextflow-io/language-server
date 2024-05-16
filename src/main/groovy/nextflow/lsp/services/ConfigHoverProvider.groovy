@@ -46,18 +46,20 @@ class ConfigHoverProvider implements HoverProvider {
 
         final builder = new StringBuilder()
 
-        builder.append('```\n')
-        nodeTree.reverse().eachWithIndex { node, i ->
-            builder.append('  ' * i)
-            builder.append(node.class.simpleName)
-            builder.append("(${node.getLineNumber()}:${node.getColumnNumber()}-${node.getLastLineNumber()}:${node.getLastColumnNumber()-1})")
-            if( node instanceof Statement && node.statementLabels ) {
-                builder.append(': ')
-                builder.append(node.statementLabels.join(', '))
+        if( Logger.isDebugEnabled() ) {
+            builder.append('```\n')
+            nodeTree.reverse().eachWithIndex { node, i ->
+                builder.append('  ' * i)
+                builder.append(node.class.simpleName)
+                builder.append("(${node.getLineNumber()}:${node.getColumnNumber()}-${node.getLastLineNumber()}:${node.getLastColumnNumber()-1})")
+                if( node instanceof Statement && node.statementLabels ) {
+                    builder.append(': ')
+                    builder.append(node.statementLabels.join(', '))
+                }
+                builder.append('\n')
             }
-            builder.append('\n')
+            builder.append('\n```')
         }
-        builder.append('\n```')
 
         if( content != null ) {
             builder.append('\n\n---\n\n')
@@ -65,9 +67,13 @@ class ConfigHoverProvider implements HoverProvider {
             builder.append('\n')
         }
 
+        final value = builder.toString()
+        if( !value )
+            return null
+
         final contents = new MarkupContent()
         contents.setKind(MarkupKind.MARKDOWN)
-        contents.setValue(builder.toString())
+        contents.setValue(value)
         final hover = new Hover()
         hover.setContents(contents)
         return hover
