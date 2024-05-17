@@ -14,7 +14,7 @@ import nextflow.lsp.compiler.ScriptCompilationCache
 class ScriptServices extends AbstractServices {
 
     @Override
-    protected CompilationCache getCompilationCache() {
+    protected CompilationCache getCompiler() {
         ScriptCompilationCache.create()
     }
 

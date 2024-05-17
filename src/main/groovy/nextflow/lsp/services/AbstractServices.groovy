@@ -1,7 +1,6 @@
 package nextflow.lsp.services
 
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.concurrent.CompletableFuture
 
 import groovy.transform.CompileStatic
@@ -10,8 +9,6 @@ import nextflow.lsp.compiler.CompilationCache
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
-import org.codehaus.groovy.control.ErrorCollector
-import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionList
 import org.eclipse.lsp4j.CompletionParams
@@ -43,32 +40,30 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
     private static Logger log = Logger.instance
 
     private LanguageClient languageClient
-    private Path workspaceRoot
     private FileCache fileCache = new FileCache()
-    private CompilationCache compileCache
-    private ASTNodeCache astCache = new ASTNodeCache()
+    private ASTNodeCache astCache
     private URI previousUri
-    private Map<URI, List<Diagnostic>> prevDiagnosticsByFile = [:]
 
     private CompletionProvider completionProvider
     private SymbolProvider symbolProvider
     private HoverProvider hoverProvider
 
     AbstractServices() {
-        this.compileCache = getCompilationCache()
+        this.astCache = new ASTNodeCache(getCompiler())
         this.completionProvider = getCompletionProvider(astCache)
         this.symbolProvider = getSymbolProvider(astCache)
         this.hoverProvider = getHoverProvider(astCache)
     }
 
-    abstract protected CompilationCache getCompilationCache()
+    abstract protected CompilationCache getCompiler()
     protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) { null }
     protected SymbolProvider getSymbolProvider(ASTNodeCache astCache) { null }
     protected HoverProvider getHoverProvider(ASTNodeCache astCache) { null }
 
     void setWorkspaceRoot(Path workspaceRoot) {
-        this.workspaceRoot = workspaceRoot
-        compileCache.initialize(workspaceRoot, fileCache)
+        astCache.initialize(workspaceRoot, fileCache)
+        publishDiagnostics()
+        previousUri = null
     }
 
     @Override
@@ -82,21 +77,21 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
     void didOpen(DidOpenTextDocumentParams params) {
         fileCache.didOpen(params)
         final uri = URI.create(params.getTextDocument().getUri())
-        compileAndUpdateAst(uri)
+        updateAst(uri)
     }
 
     @Override
     void didChange(DidChangeTextDocumentParams params) {
         fileCache.didChange(params)
         final uri = URI.create(params.getTextDocument().getUri())
-        compileAndUpdateAst(uri)
+        updateAst(uri)
     }
 
     @Override
     void didClose(DidCloseTextDocumentParams params) {
         fileCache.didClose(params)
         final uri = URI.create(params.getTextDocument().getUri())
-        compileAndUpdateAst(uri)
+        updateAst(uri)
     }
 
     @Override
@@ -105,18 +100,13 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
 
     @Override
     void didChangeConfiguration(DidChangeConfigurationParams params) {
-        updateCompilationSources()
-        compile()
-        updateAst()
-        previousUri = null
     }
 
     @Override
     void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
         final changedUris = params.getChanges().collect { fileEvent -> URI.create(fileEvent.getUri()) } as Set
-        updateCompilationSources()
-        compile()
-        updateAst(changedUris)
+        astCache.update(changedUris)
+        publishDiagnostics()
     }
 
     @Override
@@ -175,80 +165,33 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
     private void recompileIfContextChanged(URI uri) {
         if( previousUri != null && previousUri != uri ) {
             fileCache.markChanged(uri)
-            compileAndUpdateAst(uri)
+            updateAst(uri)
         }
     }
 
-    private void compileAndUpdateAst(URI uri) {
-        updateCompilationSources()
-        compile()
-        updateAst( Collections.singleton(uri) )
+    private void updateAst(URI uri) {
+        astCache.update(uri)
+        publishDiagnostics()
         previousUri = uri
     }
 
     /**
-     * Update the compilation cache with the current workspace files.
-     */
-    private void updateCompilationSources() {
-        compileCache.update(workspaceRoot, fileCache)
-    }
-
-    /**
-     * Compile all source files and publish any errors as diagnostics.
-     */
-    private void compile() {
-        compileCache.compile()
-        for( final diagnostics : getDiagnosticsForErrors(compileCache.getErrorCollector()) )
-            languageClient.publishDiagnostics(diagnostics)
-    }
-
-    /**
      * Get the set of diagnostics for compilation errors.
-     *
-     * @param collector
      */
-    private Set<PublishDiagnosticsParams> getDiagnosticsForErrors(ErrorCollector collector) {
-        // create diagnostics for each error
-        final Map<URI, List<Diagnostic>> diagnosticsByFile = [:]
-        for( final message : collector.getErrors() ?: [] ) {
-            if( message !instanceof SyntaxErrorMessage )
-                continue
-            final cause = ((SyntaxErrorMessage)message).getCause()
-            final range = LanguageServerUtils.syntaxExceptionToRange(cause)
-            final diagnostic = new Diagnostic()
-            diagnostic.setRange(range)
-            diagnostic.setSeverity(DiagnosticSeverity.Error)
-            diagnostic.setMessage(cause.getMessage())
-            final uri = Paths.get(cause.getSourceLocator()).toUri()
-            diagnosticsByFile.computeIfAbsent(uri, (key) -> []).add(diagnostic)
-        }
+    private void publishDiagnostics() {
+        astCache.getCompilerErrors().forEach((uri, errors) -> {
+            final List<Diagnostic> diagnostics = []
+            for( final error : errors ) {
+                final diagnostic = new Diagnostic()
+                diagnostic.setRange(LanguageServerUtils.syntaxExceptionToRange(error))
+                diagnostic.setSeverity(DiagnosticSeverity.Error)
+                diagnostic.setMessage(error.getMessage())
+                diagnostics << diagnostic
+            }
 
-        final result = diagnosticsByFile.collect { key, value -> new PublishDiagnosticsParams(key.toString(), value) } as Set
-
-        // reset diagnostics for previous files that no longer have any errors
-        for( final key : prevDiagnosticsByFile.keySet() ) {
-            if( !diagnosticsByFile.containsKey(key) )
-                result.add(new PublishDiagnosticsParams(key.toString(), []))
-        }
-        prevDiagnosticsByFile = diagnosticsByFile
-
-        return result
-    }
-
-    /**
-     * Update the AST cache for all compiled source files.
-     */
-    private void updateAst() {
-        astCache.update(compileCache)
-    }
-
-    /**
-     * Update the AST cache for a set of compiled source files.
-     *
-     * @param uris
-     */
-    private void updateAst(Set<URI> uris) {
-        astCache.update(compileCache, uris)
+            final params = new PublishDiagnosticsParams(uri.toString(), diagnostics)
+            languageClient.publishDiagnostics(params)
+        })
     }
 
 }

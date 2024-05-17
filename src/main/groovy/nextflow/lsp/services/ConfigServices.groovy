@@ -14,7 +14,7 @@ import nextflow.lsp.compiler.ConfigCompilationCache
 class ConfigServices extends AbstractServices {
 
     @Override
-    protected CompilationCache getCompilationCache() {
+    protected CompilationCache getCompiler() {
         ConfigCompilationCache.create()
     }
 

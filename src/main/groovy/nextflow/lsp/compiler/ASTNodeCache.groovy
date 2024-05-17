@@ -1,6 +1,10 @@
 package nextflow.lsp.compiler
 
+import java.nio.file.Path
+import java.nio.file.Paths
+
 import groovy.transform.CompileStatic
+import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Positions
 import nextflow.lsp.util.Ranges
@@ -55,6 +59,7 @@ import org.codehaus.groovy.ast.stmt.IfStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
+import org.codehaus.groovy.syntax.SyntaxException
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 
@@ -67,11 +72,100 @@ import org.eclipse.lsp4j.Range
 @CompileStatic
 class ASTNodeCache {
 
+    private CompilationCache compiler
+
+    private Map<URI, List<SyntaxException>> errorsByURI = [:]
+
     private Map<URI, List<ASTNode>> nodesByURI = [:]
 
     private Map<URI, List<ClassNode>> classNodesByURI = [:]
 
     private Map<LookupKey, LookupData> lookup = [:]
+
+    private volatile boolean initialized
+
+    ASTNodeCache(CompilationCache compiler) {
+        this.compiler = compiler
+    }
+
+    /**
+     * Initialize the cache with source files from the current workspace.
+     *
+     * @param workspaceRoot
+     * @param fileCache
+     */
+    void initialize(Path workspaceRoot, FileCache fileCache) {
+        // compile source files
+        compiler.initialize(workspaceRoot, fileCache)
+        compiler.compile()
+        updateErrors()
+
+        // initialize ast cache
+        nodesByURI.clear()
+        classNodesByURI.clear()
+        lookup.clear()
+        compiler.iterator().forEachRemaining(sourceUnit -> {
+            visitSourceUnit(sourceUnit)
+        })
+        initialized = true
+    }
+
+    /**
+     * Update the cache for a set of source files.
+     *
+     * @param unit
+     * @param uris
+     */
+    void update(Collection<URI> uris) {
+        if( !initialized )
+            return
+
+        // re-compile source files
+        compiler.update()
+        compiler.compile()
+        updateErrors()
+
+        // remove given files from ast cache
+        uris.forEach(uri -> {
+            final nodes = nodesByURI.remove(uri)
+            nodes?.forEach(node -> {
+                lookup.remove(new LookupKey(node))
+            })
+            classNodesByURI.remove(uri)
+        })
+
+        // update ast cache for given files
+        compiler.iterator().forEachRemaining(sourceUnit -> {
+            final uri = sourceUnit.getSource().getURI()
+            if( !uris.contains(uri) )
+                return
+            visitSourceUnit(sourceUnit)
+        })
+    }
+
+    void update(URI uri) {
+        update( Collections.singleton(uri) )
+    }
+
+    private void updateErrors() {
+        // reset error cache
+        for( final uri : errorsByURI.keySet() ) {
+            errorsByURI[uri].clear()
+        }
+
+        // add new errors to cache
+        for( final error : compiler.getErrors() ) {
+            final uri = Paths.get(error.getSourceLocator()).toUri()
+            errorsByURI.computeIfAbsent(uri, (key) -> []).add(error)
+        }
+    }
+
+    /**
+     * Get the list of compiler errors for each source file.
+     */
+    Map<URI, List<SyntaxException>> getCompilerErrors() {
+        return errorsByURI
+    }
 
     /**
      * Get the list of class nodes across all cached files.
@@ -191,47 +285,6 @@ class ASTNodeCache {
      */
     URI getURI(ASTNode node) {
         return lookup.get(new LookupKey(node))?.uri
-    }
-
-    /**
-     * Clear the cache and add all source files from a
-     * compilation unit.
-     *
-     * @param unit
-     */
-    void update(CompilationUnit unit) {
-        nodesByURI.clear()
-        classNodesByURI.clear()
-        lookup.clear()
-        unit.iterator().forEachRemaining(sourceUnit -> {
-            visitSourceUnit(sourceUnit)
-        })
-    }
-
-    /**
-     * Update the cache entries for a given set of files
-     * in a compilation unit.
-     *
-     * @param unit
-     * @param uris
-     */
-    void update(CompilationUnit unit, Collection<URI> uris) {
-        // remove given files from ast cache
-        uris.forEach(uri -> {
-            final nodes = nodesByURI.remove(uri)
-            nodes?.forEach(node -> {
-                lookup.remove(new LookupKey(node))
-            })
-            classNodesByURI.remove(uri)
-        })
-
-        // update cache entries for given files
-        unit.iterator().forEachRemaining(sourceUnit -> {
-            final uri = sourceUnit.getSource().getURI()
-            if( !uris.contains(uri) )
-                return
-            visitSourceUnit(sourceUnit)
-        })
     }
 
     protected void visitSourceUnit(SourceUnit sourceUnit) {

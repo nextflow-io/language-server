@@ -15,6 +15,8 @@ import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.Phases
 import org.codehaus.groovy.control.SourceUnit
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage
+import org.codehaus.groovy.syntax.SyntaxException
 
 /**
  * Cache compiled sources and defer compilation errors to the
@@ -26,6 +28,10 @@ import org.codehaus.groovy.control.SourceUnit
 abstract class CompilationCache extends CompilationUnit {
 
     private static Logger log = Logger.instance
+
+    private Path workspaceRoot
+
+    private FileCache fileCache
 
     abstract protected String getFileExtension()
 
@@ -45,16 +51,15 @@ abstract class CompilationCache extends CompilationUnit {
      * @param fileCache
      */
     void initialize(Path workspaceRoot, FileCache fileCache) {
-        addSources(workspaceRoot, fileCache, null)
+        this.workspaceRoot = workspaceRoot
+        this.fileCache = fileCache
+        addSources()
     }
 
     /**
      * Update the cache with source files from the current workspace.
-     *
-     * @param workspaceRoot
-     * @param fileCache
      */
-    void update(Path workspaceRoot, FileCache fileCache) {
+    void update() {
         // invalidate changed files
         final changedUris = fileCache.getChangedFiles()
         final changedSources = sources.values().findAll { sourceUnit ->
@@ -83,7 +88,7 @@ abstract class CompilationCache extends CompilationUnit {
         ((LanguageServerErrorCollector) errorCollector).clear()
 
         // add changed source files
-        addSources(workspaceRoot, fileCache, changedUris)
+        addSources(changedUris)
     }
 
     /**
@@ -92,41 +97,37 @@ abstract class CompilationCache extends CompilationUnit {
      * If the set of changed files is provided, only those files
      * are added. Otherwise, all workspace source files are added.
      *
-     * @param workspaceRoot
-     * @param fileCache
      * @param changedUris
      */
-    protected void addSources(Path workspaceRoot, FileCache fileCache, Set<URI> changedUris = null) {
+    protected void addSources(Set<URI> changedUris = null) {
         if( workspaceRoot != null ) {
             // add files from the workspace
-            addSourcesFromDirectory(workspaceRoot, fileCache, changedUris)
+            addSourcesFromWorkspace(changedUris)
         }
         else {
             // add open files from file cache
             for( final uri : fileCache.getOpenFiles() ) {
                 if( changedUris != null && !changedUris.contains(uri) )
                     continue
-                addSourceFromFileCache(uri, fileCache.getContents(uri))
+                addSourceFromFileCache(uri)
             }
         }
     }
 
     /**
-     * Add sources files from a directory tree.
+     * Add sources files from the current workspace.
      *
      * If the set of changed files is provided, only those files
      * are added. Otherwise, all available files are added.
      *
-     * @param dirPath
-     * @param fileCache
      * @param changedUris
      */
-    protected void addSourcesFromDirectory(Path dirPath, FileCache fileCache, Set<URI> changedUris) {
+    protected void addSourcesFromWorkspace(Set<URI> changedUris) {
         try {
-            if( !Files.exists(dirPath) )
+            if( !Files.exists(workspaceRoot) )
                 return
 
-            for( final filePath : Files.walk(dirPath) ) {
+            for( final filePath : Files.walk(workspaceRoot) ) {
                 if( !filePath.toString().endsWith(getFileExtension()) )
                     continue
 
@@ -136,13 +137,13 @@ abstract class CompilationCache extends CompilationUnit {
 
                 final file = filePath.toFile()
                 if( fileCache.isOpen(fileUri) )
-                    addSourceFromFileCache(fileUri, fileCache.getContents(fileUri))
+                    addSourceFromFileCache(fileUri)
                 else if( file.isFile() )
                     addSource(file)
             }
         }
         catch( IOException e ) {
-            log.error "Failed to walk directory for source files: ${dirPath}"
+            log.error "Failed to add files from workspace: ${workspaceRoot}"
         }
     }
 
@@ -150,9 +151,9 @@ abstract class CompilationCache extends CompilationUnit {
      * Add a source file from the file cache.
      *
      * @param uri
-     * @param contents
      */
-    protected void addSourceFromFileCache(URI uri, String contents) {
+    protected void addSourceFromFileCache(URI uri) {
+        final contents = fileCache.getContents(uri)
         final filePath = Paths.get(uri)
         final sourceUnit = new SourceUnit(
                 filePath.toString(),
@@ -184,6 +185,23 @@ abstract class CompilationCache extends CompilationUnit {
             log.error 'Unexpected exception while compiling source files'
             e.printStackTrace(System.err)
         }
+    }
+
+    /**
+     * Get the list of errors from the previous compilation.
+     */
+    List<SyntaxException> getErrors() {
+        final messages = getErrorCollector().getErrors()
+        if( !messages )
+            return Collections.emptyList()
+
+        final List<SyntaxException> result = []
+        for( final message : messages ) {
+            if( message instanceof SyntaxErrorMessage )
+                result << message.cause
+        }
+
+        return result
     }
 
 }
