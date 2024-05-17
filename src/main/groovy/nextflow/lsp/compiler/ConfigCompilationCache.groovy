@@ -9,7 +9,7 @@ import org.codehaus.groovy.control.CompilerConfiguration
 class ConfigCompilationCache extends CompilationCache {
 
     @Override
-    protected String getFileExtension() { 'config' }
+    protected String getFileExtension() { '.config' }
 
     static ConfigCompilationCache create() {
         final config = createConfiguration()

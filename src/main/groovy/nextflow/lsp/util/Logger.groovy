@@ -46,7 +46,7 @@ public class Logger {
     }
 
     public void debug(String message) {
-        if( !initialized || !debugEnabled )
+        if( !initialized || !isDebugEnabled() )
             return
         client.logMessage(new MessageParams(MessageType.Log, message))
     }

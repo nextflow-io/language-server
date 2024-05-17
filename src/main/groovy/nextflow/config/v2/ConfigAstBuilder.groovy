@@ -17,6 +17,7 @@ package nextflow.config.v2
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import com.google.common.hash.Hashing
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.antlr.ConfigLexer
@@ -122,7 +123,8 @@ class ConfigAstBuilder {
             return CharStreams.fromReader(
                     new BufferedReader(sourceUnit.getSource().getReader()),
                     sourceUnit.getName())
-        } catch (IOException e) {
+        }
+        catch( IOException e ) {
             throw new RuntimeException("Error occurred when reading source code.", e)
         }
     }
@@ -151,9 +153,8 @@ class ConfigAstBuilder {
     private CompilationUnitContext buildCST(PredictionMode predictionMode) {
         parser.getInterpreter().setPredictionMode(predictionMode)
 
-        if( predictionMode == PredictionMode.SLL )
-            removeErrorListeners()
-        else
+        removeErrorListeners()
+        if( predictionMode == PredictionMode.LL )
             addErrorListeners()
 
         return parser.compilationUnit()
@@ -171,7 +172,8 @@ class ConfigAstBuilder {
     ModuleNode buildAST(SourceUnit sourceUnit) {
         try {
             return compilationUnit(buildCST())
-        } catch (Throwable t) {
+        }
+        catch( Throwable t ) {
             throw convertException(t)
         }
     }
@@ -186,6 +188,8 @@ class ConfigAstBuilder {
             moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
 
         final scriptClassNode = moduleNode.getScriptClassDummy()
+        scriptClassNode.setName(getMainClassName())
+
         final statements = moduleNode.getStatementBlock().getStatements()
         if( scriptClassNode && !statements.isEmpty() ) {
             final first = statements.first()
@@ -199,6 +203,12 @@ class ConfigAstBuilder {
             throw createParsingFailedException(numberFormatError.getV2().getMessage(), numberFormatError.getV1())
 
         return moduleNode
+    }
+
+    private String getMainClassName() {
+        final text = sourceUnit.getSource().getReader().getText()
+        final hash = Hashing.sipHash24().newHasher().putUnencodedChars(text).hash()
+        return '_nf_config_' + hash.toString()
     }
 
     private Statement configStatement(ConfigStatementContext ctx) {
@@ -778,7 +788,8 @@ class ConfigAstBuilder {
         Number num
         try {
             num = Numbers.parseInteger(ctx.text)
-        } catch (Exception e) {
+        }
+        catch( Exception e ) {
             numberFormatError = new Tuple2(ctx, e)
         }
 
@@ -789,7 +800,8 @@ class ConfigAstBuilder {
         Number num
         try {
             num = Numbers.parseDecimal(ctx.text)
-        } catch (Exception e) {
+        }
+        catch( Exception e ) {
             numberFormatError = new Tuple2(ctx, e)
         }
 
@@ -1188,10 +1200,10 @@ class ConfigAstBuilder {
 
     private CompilationFailedException createParsingFailedException(Throwable t) {
         if( t instanceof SyntaxException )
-            this.collectSyntaxError(t)
+            collectSyntaxError(t)
 
         else if( t instanceof GroovySyntaxError )
-            this.collectSyntaxError(
+            collectSyntaxError(
                     new SyntaxException(
                             t.getMessage(),
                             t,
@@ -1199,11 +1211,11 @@ class ConfigAstBuilder {
                             t.getColumn()))
 
         else if( t instanceof Exception )
-            this.collectException(t)
+            collectException(t)
 
         return new CompilationFailedException(
                 CompilePhase.PARSING.getPhaseNumber(),
-                this.sourceUnit,
+                sourceUnit,
                 t)
     }
 
@@ -1212,7 +1224,7 @@ class ConfigAstBuilder {
     }
 
     private void collectException(Exception e) {
-        sourceUnit.getErrorCollector().addException(e, this.sourceUnit)
+        sourceUnit.getErrorCollector().addException(e, sourceUnit)
     }
 
     private void removeErrorListeners() {
@@ -1221,10 +1233,7 @@ class ConfigAstBuilder {
     }
 
     private void addErrorListeners() {
-        lexer.removeErrorListeners()
         lexer.addErrorListener(createANTLRErrorListener())
-
-        parser.removeErrorListeners()
         parser.addErrorListener(createANTLRErrorListener())
     }
 

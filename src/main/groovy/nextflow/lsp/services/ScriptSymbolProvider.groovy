@@ -71,7 +71,7 @@ class ScriptSymbolProvider implements SymbolProvider {
             else if( node instanceof ProcessNode )
                 name = node.name
             else if( node instanceof WorkflowNode )
-                name = node.name
+                name = node.name ?: '<entry>'
 
             if( !name || !name.toLowerCase().contains(lowerCaseQuery) )
                 continue

@@ -28,6 +28,12 @@ import org.codehaus.groovy.syntax.Reduction
  */
 class ScriptParserPlugin implements ParserPlugin {
 
+    private boolean allowIncomplete
+
+    ScriptParserPlugin(boolean allowIncomplete) {
+        this.allowIncomplete = allowIncomplete
+    }
+
     @Override
     Reduction parseCST(SourceUnit sourceUnit, Reader reader) {
         if (!sourceUnit.getSource().canReopenSource()) {
@@ -45,6 +51,6 @@ class ScriptParserPlugin implements ParserPlugin {
 
     @Override
     ModuleNode buildAST(SourceUnit sourceUnit, ClassLoader classLoader, Reduction cst) {
-        return new ScriptAstBuilder(sourceUnit).buildAST()
+        return new ScriptAstBuilder(sourceUnit, allowIncomplete).buildAST()
     }
 }

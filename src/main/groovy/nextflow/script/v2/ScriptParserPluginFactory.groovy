@@ -20,8 +20,14 @@ import org.codehaus.groovy.control.ParserPluginFactory
 
 class ScriptParserPluginFactory extends ParserPluginFactory {
 
+    private boolean allowIncomplete
+
+    ScriptParserPluginFactory(boolean allowIncomplete) {
+        this.allowIncomplete = allowIncomplete
+    }
+
     @Override
     ParserPlugin createParserPlugin() {
-        return new ScriptParserPlugin()
+        return new ScriptParserPlugin(allowIncomplete)
     }
 }

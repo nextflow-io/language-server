@@ -12,7 +12,7 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
 class ScriptCompilationCache extends CompilationCache {
 
     @Override
-    protected String getFileExtension() { 'nf' }
+    protected String getFileExtension() { '.nf' }
 
     static ScriptCompilationCache create() {
         final config = createConfiguration()
@@ -33,7 +33,7 @@ class ScriptCompilationCache extends CompilationCache {
         final config = new CompilerConfiguration()
         config.addCompilationCustomizers( importCustomizer )
         config.setOptimizationOptions(optimizationOptions)
-        config.setPluginFactory(new ScriptParserPluginFactory())
+        config.setPluginFactory(new ScriptParserPluginFactory(true))
 
         return config
     }

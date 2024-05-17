@@ -22,6 +22,7 @@ import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.SymbolInformation
+import org.eclipse.lsp4j.WorkspaceSymbolParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
@@ -155,6 +156,11 @@ class NextflowServices implements TextDocumentService, WorkspaceService, Languag
             return configServices.hover(params)
         else // if( filename.endsWith('.nf') )
             return scriptServices.hover(params)
+    }
+
+    @Override
+	CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
+        return scriptServices.symbol(params)
     }
 
     private String relativePath(String uri) {

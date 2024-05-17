@@ -85,10 +85,21 @@ compilationUnit
 // top-level statements
 //
 scriptStatement
-    :   includeStatement            #includeStmtAlt
+    :   featureFlag                 #featureFlagStmtAlt
+    |   includeStatement            #includeStmtAlt
     |   processDef                  #processDefAlt
     |   workflowDef                 #workflowDefAlt
     |   functionDef                 #functionDefAlt
+    |   incompleteStatement         #incompleteStmtAlt
+    ;
+
+// -- feature flag
+featureFlag
+    :   featureFlagPath nls ASSIGN nls literal
+    ;
+
+featureFlagPath
+    :   identifier (DOT identifier)*
     ;
 
 // -- include statement
@@ -201,6 +212,11 @@ workflowEmits
 functionDef
     :   (DEF | type | DEF type) nls identifier LPAREN formalParameterList? rparen nls LBRACE
         nls blockStatements? RBRACE
+    ;
+
+// -- incomplete statement
+incompleteStatement
+    :   identifier (DOT identifier)*
     ;
 
 
@@ -449,6 +465,7 @@ identifier
     :   Identifier
     |   CapitalizedIdentifier
     |   IN
+    |   WORKFLOW
     ;
 
 // -- primitive literals

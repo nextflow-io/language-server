@@ -78,7 +78,7 @@ import org.apache.groovy.parser.antlr4.GroovySyntaxError;
 
 
 compilationUnit
-    :   (nls configStatement)* nls EOF
+    :   nls (configStatement (sep configStatement)* sep?)? EOF
     ;
 
 //

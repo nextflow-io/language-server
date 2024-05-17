@@ -69,6 +69,10 @@ public class DescriptiveErrorStrategy extends BailErrorStrategy {
         return null;
     }
 
+    @Override
+    public void reportError(Parser recognizer, RecognitionException e) {
+    }
+
     protected String createNoViableAlternativeErrorMessage(Parser recognizer, NoViableAltException e) {
         TokenStream tokens = recognizer.getInputStream();
         String input;

@@ -17,6 +17,7 @@ package nextflow.script.v2
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import com.google.common.hash.Hashing
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.antlr.ScriptLexer
@@ -113,14 +114,16 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 class ScriptAstBuilder {
 
     private SourceUnit sourceUnit
+    private boolean allowIncomplete
     private ModuleNode moduleNode
     private ScriptLexer lexer
     private ScriptParser parser
 
     private Tuple2<ParserRuleContext,Exception> numberFormatError
 
-    ScriptAstBuilder(SourceUnit sourceUnit) {
+    ScriptAstBuilder(SourceUnit sourceUnit, boolean allowIncomplete) {
         this.sourceUnit = sourceUnit
+        this.allowIncomplete = allowIncomplete
         this.moduleNode = new ModuleNode(sourceUnit)
 
         final charStream = createCharStream(sourceUnit)
@@ -134,7 +137,8 @@ class ScriptAstBuilder {
             return CharStreams.fromReader(
                     new BufferedReader(sourceUnit.getSource().getReader()),
                     sourceUnit.getName())
-        } catch (IOException e) {
+        }
+        catch( IOException e ) {
             throw new RuntimeException("Error occurred when reading source code.", e)
         }
     }
@@ -163,9 +167,8 @@ class ScriptAstBuilder {
     private CompilationUnitContext buildCST(PredictionMode predictionMode) {
         parser.getInterpreter().setPredictionMode(predictionMode)
 
-        if( predictionMode == PredictionMode.SLL )
-            removeErrorListeners()
-        else
+        removeErrorListeners()
+        if( predictionMode == PredictionMode.LL )
             addErrorListeners()
 
         return parser.compilationUnit()
@@ -183,7 +186,8 @@ class ScriptAstBuilder {
     ModuleNode buildAST(SourceUnit sourceUnit) {
         try {
             return compilationUnit(buildCST())
-        } catch (Throwable t) {
+        }
+        catch( Throwable t ) {
             throw convertException(t)
         }
     }
@@ -198,6 +202,8 @@ class ScriptAstBuilder {
             moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
 
         final scriptClassNode = moduleNode.getScriptClassDummy()
+        scriptClassNode.setName(getMainClassName())
+
         final statements = moduleNode.getStatementBlock().getStatements()
         if( scriptClassNode && !statements.isEmpty() ) {
             final first = statements.first()
@@ -213,8 +219,17 @@ class ScriptAstBuilder {
         return moduleNode
     }
 
-    private Statement scriptStatement(ScriptStatementContext ctx) {
-        if( ctx instanceof FunctionDefAltContext )
+    private String getMainClassName() {
+        final text = sourceUnit.getSource().getReader().getText()
+        final hash = Hashing.sipHash24().newHasher().putUnencodedChars(text).hash()
+        return '_nf_script_' + hash.toString()
+    }
+
+    private void scriptStatement(ScriptStatementContext ctx) {
+        if( ctx instanceof FeatureFlagStmtAltContext )
+            moduleNode.addStatement(featureFlag(ctx.featureFlag()))
+
+        else if( ctx instanceof FunctionDefAltContext )
             moduleNode.addMethod(functionDef(ctx.functionDef()))
 
         else if( ctx instanceof IncludeStmtAltContext )
@@ -226,8 +241,20 @@ class ScriptAstBuilder {
         else if( ctx instanceof WorkflowDefAltContext )
             moduleNode.addStatement(workflowDef(ctx.workflowDef()))
 
+        else if( ctx instanceof IncompleteStmtAltContext && allowIncomplete )
+            moduleNode.addStatement(incompleteStatement(ctx.incompleteStatement()))
+
         else
             throw createParsingFailedException("Invalid script statement: ${ctx.text}", ctx)
+    }
+
+    private Statement featureFlag(FeatureFlagContext ctx) {
+        final names = ctx.featureFlagPath().identifier().collect( this.&identifier )
+        final left = constX(names.join('.'))
+        final right = literal(ctx.literal())
+        final call = callThisX('feature', args(left, right))
+
+        ast( new ExpressionStatement(call), ctx )
     }
 
     private Statement includeStatement(IncludeStatementContext ctx) {
@@ -482,6 +509,10 @@ class ScriptAstBuilder {
         final code = blockStatements(ctx.blockStatements())
 
         ast( new FunctionNode(name, returnType, params, code), ctx )
+    }
+
+    private Statement incompleteStatement(IncompleteStatementContext ctx) {
+        new IncompleteNode(ctx.text)
     }
 
     /// GROOVY STATEMENTS
@@ -978,7 +1009,8 @@ class ScriptAstBuilder {
         Number num
         try {
             num = Numbers.parseInteger(ctx.text)
-        } catch (Exception e) {
+        }
+        catch( Exception e ) {
             numberFormatError = new Tuple2(ctx, e)
         }
 
@@ -989,7 +1021,8 @@ class ScriptAstBuilder {
         Number num
         try {
             num = Numbers.parseDecimal(ctx.text)
-        } catch (Exception e) {
+        }
+        catch( Exception e ) {
             numberFormatError = new Tuple2(ctx, e)
         }
 
@@ -1388,10 +1421,10 @@ class ScriptAstBuilder {
 
     private CompilationFailedException createParsingFailedException(Throwable t) {
         if( t instanceof SyntaxException )
-            this.collectSyntaxError(t)
+            collectSyntaxError(t)
 
         else if( t instanceof GroovySyntaxError )
-            this.collectSyntaxError(
+            collectSyntaxError(
                     new SyntaxException(
                             t.getMessage(),
                             t,
@@ -1399,11 +1432,11 @@ class ScriptAstBuilder {
                             t.getColumn()))
 
         else if( t instanceof Exception )
-            this.collectException(t)
+            collectException(t)
 
         return new CompilationFailedException(
                 CompilePhase.PARSING.getPhaseNumber(),
-                this.sourceUnit,
+                sourceUnit,
                 t)
     }
 
@@ -1412,7 +1445,7 @@ class ScriptAstBuilder {
     }
 
     private void collectException(Exception e) {
-        sourceUnit.getErrorCollector().addException(e, this.sourceUnit)
+        sourceUnit.getErrorCollector().addException(e, sourceUnit)
     }
 
     private void removeErrorListeners() {
@@ -1421,10 +1454,7 @@ class ScriptAstBuilder {
     }
 
     private void addErrorListeners() {
-        lexer.removeErrorListeners()
         lexer.addErrorListener(createANTLRErrorListener())
-
-        parser.removeErrorListeners()
         parser.addErrorListener(createANTLRErrorListener())
     }
 
@@ -1514,5 +1544,16 @@ class WorkflowNode extends ExpressionStatement {
         this.takes = takes
         this.emits = emits
         this.main = main
+    }
+}
+
+
+@CompileStatic
+class IncompleteNode extends ExpressionStatement {
+    final String text
+
+    IncompleteNode(String text) {
+        super(EmptyExpression.INSTANCE)
+        this.text = text
     }
 }

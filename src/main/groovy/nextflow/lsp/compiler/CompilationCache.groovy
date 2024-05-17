@@ -8,11 +8,9 @@ import groovy.lang.GroovyClassLoader
 import groovy.transform.CompileStatic
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.Logger
-import org.antlr.v4.runtime.InputMismatchException
-import org.antlr.v4.runtime.NoViableAltException
+import org.antlr.v4.runtime.RecognitionException
 import org.codehaus.groovy.GroovyBugError
 import org.codehaus.groovy.ast.CompileUnit
-import org.codehaus.groovy.control.CompilationFailedException
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.Phases
@@ -176,11 +174,7 @@ abstract class CompilationCache extends CompilationUnit {
         try {
             compile(Phases.CANONICALIZATION)
         }
-        catch( InputMismatchException e ) {
-        }
-        catch( NoViableAltException e ) {
-        }
-        catch( CompilationFailedException e ) {
+        catch( RecognitionException e ) {
         }
         catch( GroovyBugError e ) {
             log.error 'Unexpected exception while compiling source files'
