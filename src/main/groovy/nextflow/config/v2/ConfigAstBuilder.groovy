@@ -291,7 +291,9 @@ class ConfigAstBuilder {
     }
 
     private Statement configIncomplete(ConfigIncompleteContext ctx) {
-        new ConfigIncompleteNode(ctx.text)
+        final result = ast( new ConfigIncompleteNode(ctx.text), ctx )
+        collectSyntaxError(new SyntaxException("Incomplete statement", result))
+        return result
     }
 
     /// GROOVY STATEMENTS

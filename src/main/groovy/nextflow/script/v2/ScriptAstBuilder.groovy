@@ -512,7 +512,9 @@ class ScriptAstBuilder {
     }
 
     private Statement incompleteStatement(IncompleteStatementContext ctx) {
-        new IncompleteNode(ctx.text)
+        final result = ast( new IncompleteNode(ctx.text), ctx )
+        collectSyntaxError(new SyntaxException("Incomplete statement", result))
+        return result
     }
 
     /// GROOVY STATEMENTS
