@@ -62,11 +62,9 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
     protected HoverProvider getHoverProvider(ASTNodeCache astCache) { null }
 
     void setWorkspaceRoot(Path workspaceRoot) {
-        synchronized (this) {
-            astCache.initialize(workspaceRoot, fileCache)
-            publishDiagnostics()
-            previousUri = null
-        }
+        astCache.initialize(workspaceRoot, fileCache)
+        publishDiagnostics()
+        previousUri = null
     }
 
     @Override
@@ -78,29 +76,23 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
 
     @Override
     void didOpen(DidOpenTextDocumentParams params) {
-        synchronized (this) {
-            fileCache.didOpen(params)
-            update()
-            previousUri = params.getTextDocument().getUri()
-        }
+        fileCache.didOpen(params)
+        update()
+        previousUri = params.getTextDocument().getUri()
     }
 
     @Override
     void didChange(DidChangeTextDocumentParams params) {
-        synchronized (this) {
-            fileCache.didChange(params)
-            update()
-            previousUri = params.getTextDocument().getUri()
-        }
+        fileCache.didChange(params)
+        update()
+        previousUri = params.getTextDocument().getUri()
     }
 
     @Override
     void didClose(DidCloseTextDocumentParams params) {
-        synchronized (this) {
-            fileCache.didClose(params)
-            update()
-            previousUri = params.getTextDocument().getUri()
-        }
+        fileCache.didClose(params)
+        update()
+        previousUri = params.getTextDocument().getUri()
     }
 
     @Override
@@ -113,14 +105,12 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
 
     @Override
     void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-        synchronized (this) {
-            for( final fileEvent : params.getChanges() ) {
-                final uri = fileEvent.getUri()
-                if( uri.endsWith('.nf') )
-                    fileCache.markChanged(uri)
-            }
-            update()
+        for( final fileEvent : params.getChanges() ) {
+            final uri = fileEvent.getUri()
+            if( uri.endsWith('.nf') )
+                fileCache.markChanged(uri)
         }
+        update()
     }
 
     @Override
@@ -134,10 +124,8 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         if( !completionProvider )
             return CompletableFuture.completedFuture(Either.forLeft(Collections.emptyList()))
 
-        synchronized (this) {
-            final uri = params.getTextDocument().getUri()
-            recompileIfContextChanged(uri)
-        }
+        final uri = params.getTextDocument().getUri()
+        recompileIfContextChanged(uri)
 
         final result = completionProvider.provideCompletion(params.getTextDocument(), params.getPosition())
         return CompletableFuture.completedFuture(result)
@@ -148,10 +136,8 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         if( !symbolProvider )
             return CompletableFuture.completedFuture(Collections.emptyList())
 
-        synchronized (this) {
-            final uri = params.getTextDocument().getUri()
-            recompileIfContextChanged(uri)
-        }
+        final uri = params.getTextDocument().getUri()
+        recompileIfContextChanged(uri)
 
         final result = symbolProvider.provideDocumentSymbols(params.getTextDocument())
         return CompletableFuture.completedFuture(result)
@@ -162,10 +148,8 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         if( !hoverProvider )
             return CompletableFuture.completedFuture(null)
 
-        synchronized (this) {
-            final uri = params.getTextDocument().getUri()
-            recompileIfContextChanged(uri)
-        }
+        final uri = params.getTextDocument().getUri()
+        recompileIfContextChanged(uri)
 
         final result = hoverProvider.provideHover(params.getTextDocument(), params.getPosition())
         return CompletableFuture.completedFuture(result)
@@ -190,6 +174,9 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         }
     }
 
+    /**
+     * Re-compile any changed files.
+     */
     private void update() {
         astCache.update(fileCache.getChangedFiles())
         fileCache.resetChangedFiles()
@@ -197,7 +184,7 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
     }
 
     /**
-     * Get the set of diagnostics for compilation errors.
+     * Publish diagnostics for compilation errors.
      */
     private void publishDiagnostics() {
         astCache.getCompilerErrors().forEach((uri, errors) -> {
