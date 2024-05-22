@@ -42,7 +42,7 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
     private LanguageClient languageClient
     private FileCache fileCache = new FileCache()
     private ASTNodeCache astCache
-    private URI previousUri
+    private String previousUri
 
     private CompletionProvider completionProvider
     private SymbolProvider symbolProvider
@@ -55,15 +55,18 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         this.hoverProvider = getHoverProvider(astCache)
     }
 
+    abstract String getFileExtension()
     abstract protected CompilationCache getCompiler()
     protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) { null }
     protected SymbolProvider getSymbolProvider(ASTNodeCache astCache) { null }
     protected HoverProvider getHoverProvider(ASTNodeCache astCache) { null }
 
     void setWorkspaceRoot(Path workspaceRoot) {
-        astCache.initialize(workspaceRoot, fileCache)
-        publishDiagnostics()
-        previousUri = null
+        synchronized (this) {
+            astCache.initialize(workspaceRoot, fileCache)
+            publishDiagnostics()
+            previousUri = null
+        }
     }
 
     @Override
@@ -75,23 +78,29 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
 
     @Override
     void didOpen(DidOpenTextDocumentParams params) {
-        fileCache.didOpen(params)
-        final uri = URI.create(params.getTextDocument().getUri())
-        updateAst(uri)
+        synchronized (this) {
+            fileCache.didOpen(params)
+            update()
+            previousUri = params.getTextDocument().getUri()
+        }
     }
 
     @Override
     void didChange(DidChangeTextDocumentParams params) {
-        fileCache.didChange(params)
-        final uri = URI.create(params.getTextDocument().getUri())
-        updateAst(uri)
+        synchronized (this) {
+            fileCache.didChange(params)
+            update()
+            previousUri = params.getTextDocument().getUri()
+        }
     }
 
     @Override
     void didClose(DidCloseTextDocumentParams params) {
-        fileCache.didClose(params)
-        final uri = URI.create(params.getTextDocument().getUri())
-        updateAst(uri)
+        synchronized (this) {
+            fileCache.didClose(params)
+            update()
+            previousUri = params.getTextDocument().getUri()
+        }
     }
 
     @Override
@@ -104,9 +113,14 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
 
     @Override
     void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-        final changedUris = params.getChanges().collect { fileEvent -> URI.create(fileEvent.getUri()) } as Set
-        astCache.update(changedUris)
-        publishDiagnostics()
+        synchronized (this) {
+            for( final fileEvent : params.getChanges() ) {
+                final uri = fileEvent.getUri()
+                if( uri.endsWith('.nf') )
+                    fileCache.markChanged(uri)
+            }
+            update()
+        }
     }
 
     @Override
@@ -120,8 +134,10 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         if( !completionProvider )
             return CompletableFuture.completedFuture(Either.forLeft(Collections.emptyList()))
 
-        final uri = URI.create(params.getTextDocument().getUri())
-        recompileIfContextChanged(uri)
+        synchronized (this) {
+            final uri = params.getTextDocument().getUri()
+            recompileIfContextChanged(uri)
+        }
 
         final result = completionProvider.provideCompletion(params.getTextDocument(), params.getPosition())
         return CompletableFuture.completedFuture(result)
@@ -132,8 +148,10 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         if( !symbolProvider )
             return CompletableFuture.completedFuture(Collections.emptyList())
 
-        final uri = URI.create(params.getTextDocument().getUri())
-        recompileIfContextChanged(uri)
+        synchronized (this) {
+            final uri = params.getTextDocument().getUri()
+            recompileIfContextChanged(uri)
+        }
 
         final result = symbolProvider.provideDocumentSymbols(params.getTextDocument())
         return CompletableFuture.completedFuture(result)
@@ -144,35 +162,38 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         if( !hoverProvider )
             return CompletableFuture.completedFuture(null)
 
-        final uri = URI.create(params.getTextDocument().getUri())
-        recompileIfContextChanged(uri)
+        synchronized (this) {
+            final uri = params.getTextDocument().getUri()
+            recompileIfContextChanged(uri)
+        }
 
         final result = hoverProvider.provideHover(params.getTextDocument(), params.getPosition())
         return CompletableFuture.completedFuture(result)
     }
 
-	@Override
-	CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
+    @Override
+    CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
         if( !symbolProvider )
             return CompletableFuture.completedFuture(Collections.emptyList())
 
-		final result = symbolProvider.provideWorkspaceSymbols(params.getQuery())
+        final result = symbolProvider.provideWorkspaceSymbols(params.getQuery())
         return CompletableFuture.completedFuture(result)
-	}
+    }
 
     // --- INTERNAL
 
-    private void recompileIfContextChanged(URI uri) {
+    private void recompileIfContextChanged(String uri) {
         if( previousUri != null && previousUri != uri ) {
             fileCache.markChanged(uri)
-            updateAst(uri)
+            update()
+            previousUri = uri
         }
     }
 
-    private void updateAst(URI uri) {
-        astCache.update(uri)
+    private void update() {
+        astCache.update(fileCache.getChangedFiles())
+        fileCache.resetChangedFiles()
         publishDiagnostics()
-        previousUri = uri
     }
 
     /**

@@ -74,8 +74,6 @@ class ASTNodeCache {
 
     private CompilationCache compiler
 
-    private Map<URI, List<SyntaxException>> errorsByURI = [:]
-
     private Map<URI, List<ASTNode>> nodesByURI = [:]
 
     private Map<URI, List<ClassNode>> classNodesByURI = [:]
@@ -97,16 +95,14 @@ class ASTNodeCache {
     void initialize(Path workspaceRoot, FileCache fileCache) {
         // compile source files
         compiler.initialize(workspaceRoot, fileCache)
-        compiler.compile()
-        updateErrors()
 
         // initialize ast cache
         nodesByURI.clear()
         classNodesByURI.clear()
         lookup.clear()
-        compiler.iterator().forEachRemaining(sourceUnit -> {
+        for( final sourceUnit : compiler.getSources().values() ) {
             visitSourceUnit(sourceUnit)
-        })
+        }
         initialized = true
     }
 
@@ -116,14 +112,12 @@ class ASTNodeCache {
      * @param unit
      * @param uris
      */
-    void update(Collection<URI> uris) {
+    void update(Set<URI> uris) {
         if( !initialized )
             return
 
         // re-compile source files
-        compiler.update()
-        compiler.compile()
-        updateErrors()
+        compiler.update(uris)
 
         // remove given files from ast cache
         uris.forEach(uri -> {
@@ -135,28 +129,9 @@ class ASTNodeCache {
         })
 
         // update ast cache for given files
-        compiler.iterator().forEachRemaining(sourceUnit -> {
-            final uri = sourceUnit.getSource().getURI()
-            if( !uris.contains(uri) )
-                return
+        for( final uri : uris ) {
+            final sourceUnit = compiler.getSources().get(uri)
             visitSourceUnit(sourceUnit)
-        })
-    }
-
-    void update(URI uri) {
-        update( Collections.singleton(uri) )
-    }
-
-    private void updateErrors() {
-        // reset error cache
-        for( final uri : errorsByURI.keySet() ) {
-            errorsByURI[uri].clear()
-        }
-
-        // add new errors to cache
-        for( final error : compiler.getErrors() ) {
-            final uri = Paths.get(error.getSourceLocator()).toUri()
-            errorsByURI.computeIfAbsent(uri, (key) -> []).add(error)
         }
     }
 
@@ -164,7 +139,7 @@ class ASTNodeCache {
      * Get the list of compiler errors for each source file.
      */
     Map<URI, List<SyntaxException>> getCompilerErrors() {
-        return errorsByURI
+        return compiler.getErrors()
     }
 
     /**

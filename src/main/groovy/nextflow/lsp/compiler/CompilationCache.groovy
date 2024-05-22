@@ -2,7 +2,6 @@ package nextflow.lsp.compiler
 
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 
 import groovy.lang.GroovyClassLoader
 import groovy.transform.CompileStatic
@@ -10,10 +9,7 @@ import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.Logger
 import org.antlr.v4.runtime.RecognitionException
 import org.codehaus.groovy.GroovyBugError
-import org.codehaus.groovy.ast.CompileUnit
-import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilerConfiguration
-import org.codehaus.groovy.control.Phases
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.codehaus.groovy.syntax.SyntaxException
@@ -25,23 +21,32 @@ import org.codehaus.groovy.syntax.SyntaxException
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-abstract class CompilationCache extends CompilationUnit {
+abstract class CompilationCache {
 
     private static Logger log = Logger.instance
+
+    private CompilerConfiguration config
+
+    private GroovyClassLoader classLoader
+
+    private LanguageServerErrorCollector errorCollector
 
     private Path workspaceRoot
 
     private FileCache fileCache
 
+    private Map<URI, SourceUnit> sources = [:]
+
+    private Map<URI, SourceUnit> queuedSources = [:]
+
+    private Map<URI, List<SyntaxException>> errorsByURI = [:]
+
     abstract protected String getFileExtension()
 
-    CompilationCache(CompilerConfiguration config, GroovyClassLoader loader) {
-        super(config, null, loader)
-        this.@errorCollector = new LanguageServerErrorCollector(config)
-    }
-
-    void setErrorCollector(LanguageServerErrorCollector errorCollector) {
-        this.@errorCollector = errorCollector
+    CompilationCache(CompilerConfiguration config, GroovyClassLoader classLoader) {
+        this.config = config
+        this.classLoader = classLoader
+        this.errorCollector = new LanguageServerErrorCollector(config)
     }
 
     /**
@@ -53,93 +58,26 @@ abstract class CompilationCache extends CompilationUnit {
     void initialize(Path workspaceRoot, FileCache fileCache) {
         this.workspaceRoot = workspaceRoot
         this.fileCache = fileCache
-        addSources()
+        if( workspaceRoot != null )
+            addSourcesFromWorkspace()
+        compile()
     }
 
     /**
-     * Update the cache with source files from the current workspace.
+     * Add all available sources files from the current workspace.
      */
-    void update() {
-        // invalidate changed files
-        final changedUris = fileCache.getChangedFiles()
-        final changedSources = sources.values().findAll { sourceUnit ->
-            changedUris.contains( sourceUnit.getSource().getURI() )
-        }
-
-        for( final sourceUnit : changedSources ) {
-            // remove class definitions from changed source files
-            if( sourceUnit.getAST() != null ) {
-                final changedClasses = sourceUnit.getAST().getClasses().collect { classNode -> classNode.getName() }
-                classes.removeIf(clazz -> changedClasses.contains(clazz.getName()))
-            }
-
-            sources.remove(sourceUnit.getName())
-        }
-
-        // remove modules from changed source files
-        final modules = ast.getModules()
-        ast = new CompileUnit(classLoader, null, configuration)
-        for( final module : modules ) {
-            if( !changedSources.contains(module.getContext()) )
-                ast.addModule(module)
-        }
-
-        // reset errors
-        ((LanguageServerErrorCollector) errorCollector).clear()
-
-        // add changed source files
-        addSources(changedUris)
-    }
-
-    /**
-     * Add source files to the cache.
-     *
-     * If the set of changed files is provided, only those files
-     * are added. Otherwise, all workspace source files are added.
-     *
-     * @param changedUris
-     */
-    protected void addSources(Set<URI> changedUris = null) {
-        if( workspaceRoot != null ) {
-            // add files from the workspace
-            addSourcesFromWorkspace(changedUris)
-        }
-        else {
-            // add open files from file cache
-            for( final uri : fileCache.getOpenFiles() ) {
-                if( changedUris != null && !changedUris.contains(uri) )
-                    continue
-                addSourceFromFileCache(uri)
-            }
-        }
-    }
-
-    /**
-     * Add sources files from the current workspace.
-     *
-     * If the set of changed files is provided, only those files
-     * are added. Otherwise, all available files are added.
-     *
-     * @param changedUris
-     */
-    protected void addSourcesFromWorkspace(Set<URI> changedUris) {
+    protected void addSourcesFromWorkspace() {
         try {
             if( !Files.exists(workspaceRoot) )
                 return
 
-            for( final filePath : Files.walk(workspaceRoot) ) {
-                if( !filePath.toString().endsWith(getFileExtension()) )
+            for( final path : Files.walk(workspaceRoot) ) {
+                if( path.isDirectory() )
+                    continue
+                if( !path.toString().endsWith(getFileExtension()) )
                     continue
 
-                final fileUri = filePath.toUri()
-                if( changedUris != null && !changedUris.contains(fileUri) )
-                    continue
-
-                final file = filePath.toFile()
-                if( fileCache.isOpen(fileUri) )
-                    addSourceFromFileCache(fileUri)
-                else if( file.isFile() )
-                    addSource(file)
+                addSource(path.toUri())
             }
         }
         catch( IOException e ) {
@@ -148,32 +86,70 @@ abstract class CompilationCache extends CompilationUnit {
     }
 
     /**
-     * Add a source file from the file cache.
+     * Update the cache for a set of source files.
      *
-     * @param uri
+     * @param changedUris
      */
-    protected void addSourceFromFileCache(URI uri) {
-        final contents = fileCache.getContents(uri)
-        final filePath = Paths.get(uri)
-        final sourceUnit = new SourceUnit(
-                filePath.toString(),
-                new StringReaderSourceWithURI(contents, uri, getConfiguration()),
-                getConfiguration(),
-                getClassLoader(),
-                getErrorCollector())
-        addSource(sourceUnit)
+    void update(Set<URI> changedUris) {
+        // invalidate changed files
+        for( final uri : changedUris ) {
+            sources.remove(uri)
+            addSource(uri)
+        }
+
+        // re-compile changed source files
+        compile()
     }
 
     /**
-     * Compile all source files enough to build the AST, deferring any errors
-     * to be handled later.
+     * Add a source file from the file cache, or the filesystem
+     * if it is not cached.
      *
-     * See: http://groovy-lang.org/metaprogramming.html#_compilation_phases_guide
+     * @param uri
      */
-    @Override
-    void compile() {
+    protected void addSource(URI uri) {
+        if( fileCache.isOpen(uri) )
+            addSourceFromFileCache(uri)
+        else
+            addSourceFromFileSystem(uri)
+    }
+
+    protected void addSourceFromFileCache(URI uri) {
+        final contents = fileCache.getContents(uri)
+        final sourceUnit = new SourceUnit(
+                uri.toString(),
+                new StringReaderSourceWithURI(contents, uri, config),
+                config,
+                classLoader,
+                errorCollector)
+        queuedSources.put(uri, sourceUnit)
+    }
+
+    protected void addSourceFromFileSystem(URI uri) {
+        final sourceUnit = new SourceUnit(new File(uri), config, classLoader, errorCollector)
+        queuedSources.put(uri, sourceUnit)
+    }
+
+    /**
+     * Compile queued source files enough to build the AST, collecting
+     * any errors to be handled later.
+     */
+    protected void compile() {
+        queuedSources.each { uri, sourceUnit ->
+            compile0(uri, sourceUnit)
+        }
+        queuedSources.clear()
+    }
+
+    protected void compile0(URI uri, SourceUnit sourceUnit) {
+        // reset errors
+        errorCollector.clear()
+        errorsByURI.computeIfAbsent(uri, (key) -> []).clear()
+
+        // compile source file
         try {
-            compile(Phases.CANONICALIZATION)
+            sourceUnit.parse()
+            sourceUnit.buildAST()
         }
         catch( RecognitionException e ) {
         }
@@ -185,23 +161,29 @@ abstract class CompilationCache extends CompilationUnit {
             log.error 'Unexpected exception while compiling source files'
             e.printStackTrace(System.err)
         }
+
+        // update sources
+        sources[uri] = sourceUnit
+
+        // update errors
+        for( final message : errorCollector.getErrors() ) {
+            if( message instanceof SyntaxErrorMessage )
+                errorsByURI[uri].add(message.cause)
+        }
     }
 
     /**
-     * Get the list of errors from the previous compilation.
+     * Get the compiled unit for each source file.
      */
-    List<SyntaxException> getErrors() {
-        final messages = getErrorCollector().getErrors()
-        if( !messages )
-            return Collections.emptyList()
+    Map<URI, SourceUnit> getSources() {
+        return sources
+    }
 
-        final List<SyntaxException> result = []
-        for( final message : messages ) {
-            if( message instanceof SyntaxErrorMessage )
-                result << message.cause
-        }
-
-        return result
+    /**
+     * Get the list of current errors for each source file.
+     */
+    Map<URI, List<SyntaxException>> getErrors() {
+        return errorsByURI
     }
 
 }

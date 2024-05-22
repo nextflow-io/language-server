@@ -14,6 +14,9 @@ import nextflow.lsp.compiler.ScriptCompilationCache
 class ScriptServices extends AbstractServices {
 
     @Override
+    String getFileExtension() { '.nf' }
+
+    @Override
     protected CompilationCache getCompiler() {
         ScriptCompilationCache.create()
     }

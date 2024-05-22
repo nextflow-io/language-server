@@ -33,6 +33,10 @@ class FileCache {
         changedFiles = new HashSet<>()
     }
 
+    void markChanged(String filename) {
+        changedFiles.add(URI.create(filename))
+    }
+
     void markChanged(URI uri) {
         changedFiles.add(uri)
     }

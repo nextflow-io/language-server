@@ -27,13 +27,12 @@ class ScriptCompilationCache extends CompilationCache {
         // Duration
         // MemoryUnit
 
-        final Map<String, Boolean> optimizationOptions = [:]
-        optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true)
-
         final config = new CompilerConfiguration()
         config.addCompilationCustomizers( importCustomizer )
-        config.setOptimizationOptions(optimizationOptions)
         config.setPluginFactory(new ScriptParserPluginFactory(true))
+
+        final optimizationOptions = config.getOptimizationOptions()
+        optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true)
 
         return config
     }

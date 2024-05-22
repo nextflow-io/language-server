@@ -66,9 +66,9 @@ class NextflowServices implements TextDocumentService, WorkspaceService, Languag
         final filename = relativePath(params.getTextDocument().getUri())
         log.debug "text/didOpen ${filename}"
 
-        if( filename.endsWith('.config') )
+        if( filename.endsWith(configServices.getFileExtension()) )
             configServices.didOpen(params)
-        else // if( filename.endsWith('.nf') )
+        else
             scriptServices.didOpen(params)
     }
 
@@ -77,9 +77,9 @@ class NextflowServices implements TextDocumentService, WorkspaceService, Languag
         final filename = relativePath(params.getTextDocument().getUri())
         log.debug "text/didChange ${filename}"
 
-        if( filename.endsWith('.config') )
+        if( filename.endsWith(configServices.getFileExtension()) )
             configServices.didChange(params)
-        else // if( filename.endsWith('.nf') )
+        else
             scriptServices.didChange(params)
     }
 
@@ -88,9 +88,9 @@ class NextflowServices implements TextDocumentService, WorkspaceService, Languag
         final filename = relativePath(params.getTextDocument().getUri())
         log.debug "text/didClose ${filename}"
 
-        if( filename.endsWith('.config') )
+        if( filename.endsWith(configServices.getFileExtension()) )
             configServices.didClose(params)
-        else // if( filename.endsWith('.nf') )
+        else
             scriptServices.didClose(params)
     }
 
@@ -99,9 +99,9 @@ class NextflowServices implements TextDocumentService, WorkspaceService, Languag
         final filename = relativePath(params.getTextDocument().getUri())
         log.debug "text/didSave ${filename}"
 
-        if( filename.endsWith('.config') )
+        if( filename.endsWith(configServices.getFileExtension()) )
             configServices.didSave(params)
-        else // if( filename.endsWith('.nf') )
+        else
             scriptServices.didSave(params)
     }
 
@@ -134,27 +134,27 @@ class NextflowServices implements TextDocumentService, WorkspaceService, Languag
     @Override
     CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
         final filename = relativePath(params.getTextDocument().getUri())
-        if( filename.endsWith('.config') )
+        if( filename.endsWith(configServices.getFileExtension()) )
             return configServices.completion(params)
-        else // if( filename.endsWith('.nf') )
+        else
             return scriptServices.completion(params)
     }
 
     @Override
     CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
         final filename = relativePath(params.getTextDocument().getUri())
-        if( filename.endsWith('.config') )
+        if( filename.endsWith(configServices.getFileExtension()) )
             return configServices.documentSymbol(params)
-        else // if( filename.endsWith('.nf') )
+        else
             return scriptServices.documentSymbol(params)
     }
 
     @Override
     CompletableFuture<Hover> hover(HoverParams params) {
         final filename = relativePath(params.getTextDocument().getUri())
-        if( filename.endsWith('.config') )
+        if( filename.endsWith(configServices.getFileExtension()) )
             return configServices.hover(params)
-        else // if( filename.endsWith('.nf') )
+        else
             return scriptServices.hover(params)
     }
 
