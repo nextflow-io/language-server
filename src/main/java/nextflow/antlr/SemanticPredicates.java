@@ -23,16 +23,12 @@ import java.util.regex.Pattern;
 import org.antlr.v4.runtime.CharStream;
 import org.codehaus.groovy.GroovyBugError;
 
-import static nextflow.antlr.ScriptParser.ArgumentsPathExprAltContext;
-import static nextflow.antlr.ScriptParser.ClosurePathExprAltContext;
-import static nextflow.antlr.ScriptParser.ExpressionContext;
-import static nextflow.antlr.ScriptParser.PathExprAltContext;
 import static org.apache.groovy.parser.antlr4.util.StringUtils.matches;
 
 /**
  * Some semantic predicates for altering the behaviour of the lexer and parser
  */
-public class ScriptPredicates {
+public class SemanticPredicates {
     private static final Pattern NONSPACES_PATTERN = Pattern.compile("\\S+?");
     private static final Pattern LETTER_AND_LEFTCURLY_PATTERN = Pattern.compile("[a-zA-Z_{]");
     private static final Pattern NONSURROGATE_PATTERN = Pattern.compile("[^\u0000-\u007F\uD800-\uDBFF]");
@@ -98,14 +94,33 @@ public class ScriptPredicates {
      *
      * @param context the preceding expression
      */
-    public static boolean isFollowingArgumentsOrClosure(ExpressionContext context) {
-        if (context instanceof PathExprAltContext)
+    public static boolean isFollowingArgumentsOrClosure(nextflow.antlr.ConfigParser.ExpressionContext context) {
+        if (context instanceof nextflow.antlr.ConfigParser.PathExprAltContext)
             return false;
 
         try {
-            var pathExpression = (PathExprAltContext) context;
+            var pathExpression = (nextflow.antlr.ConfigParser.PathExprAltContext) context;
             var pathElement = pathExpression.children.get(0);
-            return pathElement instanceof ClosurePathExprAltContext || pathElement instanceof ArgumentsPathExprAltContext;
+            return pathElement instanceof nextflow.antlr.ConfigParser.ClosurePathExprAltContext || pathElement instanceof nextflow.antlr.ConfigParser.ArgumentsPathExprAltContext;
+        } catch (IndexOutOfBoundsException | ClassCastException e) {
+            throw new GroovyBugError("Unexpected structure of expression context: " + context, e);
+        }
+    }
+
+    /**
+     * Check whether following a method name of command expression.
+     * Method name should not end with "2: arguments" or "3: closure"
+     *
+     * @param context the preceding expression
+     */
+    public static boolean isFollowingArgumentsOrClosure(nextflow.antlr.ScriptParser.ExpressionContext context) {
+        if (context instanceof nextflow.antlr.ScriptParser.PathExprAltContext)
+            return false;
+
+        try {
+            var pathExpression = (nextflow.antlr.ScriptParser.PathExprAltContext) context;
+            var pathElement = pathExpression.children.get(0);
+            return pathElement instanceof nextflow.antlr.ScriptParser.ClosurePathExprAltContext || pathElement instanceof nextflow.antlr.ScriptParser.ArgumentsPathExprAltContext;
         } catch (IndexOutOfBoundsException | ClassCastException e) {
             throw new GroovyBugError("Unexpected structure of expression context: " + context, e);
         }

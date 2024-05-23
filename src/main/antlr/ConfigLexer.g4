@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
 import org.antlr.v4.runtime.CharStream;
 import org.apache.groovy.parser.antlr4.GroovySyntaxError;
 
-import static nextflow.antlr.ConfigPredicates.*;
+import static nextflow.antlr.SemanticPredicates.*;
 }
 
 @members {

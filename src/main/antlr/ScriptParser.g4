@@ -304,7 +304,7 @@ assignmentStatement
 expressionStatement
     :   expression
         (
-            { !ScriptPredicates.isFollowingArgumentsOrClosure($expression.ctx) }?
+            { !SemanticPredicates.isFollowingArgumentsOrClosure($expression.ctx) }?
             argumentList
         |
             /* if expression is a method call, no need to have any more arguments */
