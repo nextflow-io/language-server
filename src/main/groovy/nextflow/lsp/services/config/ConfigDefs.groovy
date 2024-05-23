@@ -1,5 +1,6 @@
-package nextflow.lsp.services
+package nextflow.lsp.services.config
 
+@groovy.transform.CompileStatic
 class ConfigDefs {
 
     static final List<List<String>> SCOPES = [

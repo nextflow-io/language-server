@@ -33,9 +33,9 @@ public class Logger {
     private Logger() {
     }
 
-    public void initialize(LanguageClient languageClient) {
+    public void initialize(LanguageClient client) {
         if( !initialized )
-            this.client = languageClient
+            this.client = client
         initialized = true
     }
 

@@ -1,8 +1,9 @@
-package nextflow.lsp.services
+package nextflow.lsp.services.script
 
 import groovy.transform.CompileStatic
-import nextflow.lsp.compiler.ASTNodeCache
-import nextflow.lsp.compiler.ASTUtils
+import nextflow.lsp.ast.ASTNodeCache
+import nextflow.lsp.ast.ASTUtils
+import nextflow.lsp.services.SymbolProvider
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Positions

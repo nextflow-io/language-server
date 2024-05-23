@@ -20,6 +20,7 @@ package nextflow.script.v2
 
 import groovy.lang.groovydoc.Groovydoc
 import groovy.lang.groovydoc.GroovydocHolder
+import groovy.transform.CompileStatic
 import nextflow.antlr.ScriptParser
 import org.antlr.v4.runtime.ParserRuleContext
 import org.codehaus.groovy.GroovyBugError
@@ -34,6 +35,7 @@ import static org.apache.groovy.parser.antlr4.util.StringUtils.matches
  * Extract Groovydoc comments from source code and
  * add it as metadata to AST nodes.
  */
+@CompileStatic
 class GroovydocManager {
 
     private static final String GROOVYDOC_PREFIX = '/**'

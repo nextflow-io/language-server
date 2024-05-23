@@ -1,8 +1,8 @@
 package nextflow.lsp.util
 
 import groovy.transform.CompileStatic
-import nextflow.lsp.compiler.ASTNodeCache
-import nextflow.lsp.compiler.ASTUtils
+import nextflow.lsp.ast.ASTNodeCache
+import nextflow.lsp.ast.ASTUtils
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode

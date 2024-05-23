@@ -15,15 +15,17 @@ import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.codehaus.groovy.syntax.SyntaxException
 
 /**
- * Cache compiled sources and defer compilation errors to the
+ * Compile source files and defer compilation errors to the
  * language server.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-abstract class CompilationCache {
+class CompilationCache {
 
     private static Logger log = Logger.instance
+
+    private String fileExtension
 
     private CompilerConfiguration config
 
@@ -41,9 +43,8 @@ abstract class CompilationCache {
 
     private Map<URI, List<SyntaxException>> errorsByURI = [:]
 
-    abstract protected String getFileExtension()
-
-    CompilationCache(CompilerConfiguration config, GroovyClassLoader classLoader) {
+    CompilationCache(String fileExtension, CompilerConfiguration config, GroovyClassLoader classLoader) {
+        this.fileExtension = fileExtension
         this.config = config
         this.classLoader = classLoader
         this.errorCollector = new LanguageServerErrorCollector(config)
@@ -74,7 +75,7 @@ abstract class CompilationCache {
             for( final path : Files.walk(workspaceRoot) ) {
                 if( path.isDirectory() )
                     continue
-                if( !path.toString().endsWith(getFileExtension()) )
+                if( !path.toString().endsWith(fileExtension) )
                     continue
 
                 addSource(path.toUri())

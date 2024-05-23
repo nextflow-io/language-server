@@ -1,4 +1,4 @@
-package nextflow.lsp.compiler
+package nextflow.lsp.ast
 
 import groovy.lang.groovydoc.Groovydoc
 import groovy.transform.CompileStatic

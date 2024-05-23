@@ -4,7 +4,7 @@ import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 
 import groovy.transform.CompileStatic
-import nextflow.lsp.compiler.ASTNodeCache
+import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.CompilationCache
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.LanguageServerUtils
@@ -30,16 +30,13 @@ import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.WorkspaceSymbolParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
-import org.eclipse.lsp4j.services.LanguageClientAware
-import org.eclipse.lsp4j.services.TextDocumentService
-import org.eclipse.lsp4j.services.WorkspaceService
 
 @CompileStatic
-abstract class AbstractServices implements TextDocumentService, WorkspaceService, LanguageClientAware {
+abstract class LanguageService {
 
     private static Logger log = Logger.instance
 
-    private LanguageClient languageClient
+    private LanguageClient client
     private FileCache fileCache = new FileCache()
     private ASTNodeCache astCache
     private String previousUri
@@ -48,14 +45,14 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
     private SymbolProvider symbolProvider
     private HoverProvider hoverProvider
 
-    AbstractServices() {
+    LanguageService() {
         this.astCache = new ASTNodeCache(getCompiler())
         this.completionProvider = getCompletionProvider(astCache)
         this.symbolProvider = getSymbolProvider(astCache)
         this.hoverProvider = getHoverProvider(astCache)
     }
 
-    abstract String getFileExtension()
+    abstract boolean matchesFile(String uri)
     abstract protected CompilationCache getCompiler()
     protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) { null }
     protected SymbolProvider getSymbolProvider(ASTNodeCache astCache) { null }
@@ -67,59 +64,50 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         previousUri = null
     }
 
-    @Override
     void connect(LanguageClient client) {
-        this.languageClient = client
+        this.client = client
     }
 
     // -- NOTIFICATIONS
 
-    @Override
     void didOpen(DidOpenTextDocumentParams params) {
         fileCache.didOpen(params)
         update()
         previousUri = params.getTextDocument().getUri()
     }
 
-    @Override
     void didChange(DidChangeTextDocumentParams params) {
         fileCache.didChange(params)
         update()
         previousUri = params.getTextDocument().getUri()
     }
 
-    @Override
     void didClose(DidCloseTextDocumentParams params) {
         fileCache.didClose(params)
         update()
         previousUri = params.getTextDocument().getUri()
     }
 
-    @Override
     void didSave(DidSaveTextDocumentParams params) {
     }
 
-    @Override
     void didChangeConfiguration(DidChangeConfigurationParams params) {
     }
 
-    @Override
     void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
         for( final fileEvent : params.getChanges() ) {
             final uri = fileEvent.getUri()
-            if( uri.endsWith('.nf') )
+            if( matchesFile(uri) )
                 fileCache.markChanged(uri)
         }
         update()
     }
 
-    @Override
     void didRenameFiles(RenameFilesParams params) {
     }
 
     // --- REQUESTS
 
-    @Override
     CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
         if( !completionProvider )
             return CompletableFuture.completedFuture(Either.forLeft(Collections.emptyList()))
@@ -131,7 +119,6 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         return CompletableFuture.completedFuture(result)
     }
 
-    @Override
     CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
         if( !symbolProvider )
             return CompletableFuture.completedFuture(Collections.emptyList())
@@ -143,7 +130,6 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         return CompletableFuture.completedFuture(result)
     }
 
-    @Override
     CompletableFuture<Hover> hover(HoverParams params) {
         if( !hoverProvider )
             return CompletableFuture.completedFuture(null)
@@ -155,7 +141,6 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         return CompletableFuture.completedFuture(result)
     }
 
-    @Override
     CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
         if( !symbolProvider )
             return CompletableFuture.completedFuture(Collections.emptyList())
@@ -198,7 +183,7 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
             }
 
             final params = new PublishDiagnosticsParams(uri.toString(), diagnostics)
-            languageClient.publishDiagnostics(params)
+            client.publishDiagnostics(params)
         })
     }
 

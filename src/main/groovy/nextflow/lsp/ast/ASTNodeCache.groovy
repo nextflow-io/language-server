@@ -1,9 +1,10 @@
-package nextflow.lsp.compiler
+package nextflow.lsp.ast
 
 import java.nio.file.Path
 import java.nio.file.Paths
 
 import groovy.transform.CompileStatic
+import nextflow.lsp.compiler.CompilationCache
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Positions

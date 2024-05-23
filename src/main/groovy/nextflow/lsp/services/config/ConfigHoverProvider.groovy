@@ -1,9 +1,10 @@
-package nextflow.lsp.services
+package nextflow.lsp.services.config
 
 import groovy.transform.CompileStatic
 import nextflow.config.v2.ConfigAssignmentNode
 import nextflow.config.v2.ConfigBlockNode
-import nextflow.lsp.compiler.ASTNodeCache
+import nextflow.lsp.ast.ASTNodeCache
+import nextflow.lsp.services.HoverProvider
 import nextflow.lsp.util.Logger
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.stmt.Statement

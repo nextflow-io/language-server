@@ -1,4 +1,4 @@
-package nextflow.lsp.compiler
+package nextflow.lsp.ast
 
 import groovy.transform.CompileStatic
 import nextflow.script.v2.FunctionNode
