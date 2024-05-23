@@ -18,6 +18,7 @@ package nextflow.script.v2
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.google.common.hash.Hashing
+import groovy.lang.groovydoc.Groovydoc
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.antlr.ScriptLexer
@@ -120,10 +121,11 @@ class ScriptAstBuilder {
     private ModuleNode moduleNode
     private ScriptLexer lexer
     private ScriptParser parser
+    private final GroovydocManager groovydocManager
 
     private Tuple2<ParserRuleContext,Exception> numberFormatError
 
-    ScriptAstBuilder(SourceUnit sourceUnit, boolean allowIncomplete) {
+    ScriptAstBuilder(SourceUnit sourceUnit, boolean allowIncomplete, boolean groovydocEnabled) {
         this.sourceUnit = sourceUnit
         this.allowIncomplete = allowIncomplete
         this.moduleNode = new ModuleNode(sourceUnit)
@@ -132,6 +134,8 @@ class ScriptAstBuilder {
         this.lexer = new ScriptLexer(charStream)
         this.parser = new ScriptParser(new CommonTokenStream(lexer))
         parser.setErrorHandler(new DescriptiveErrorStrategy(charStream))
+
+        this.groovydocManager = new GroovydocManager(groovydocEnabled)
     }
 
     private CharStream createCharStream(SourceUnit sourceUnit) {
@@ -308,8 +312,10 @@ class ScriptAstBuilder {
             bodyDef
         ]))
         final methodCall = callThisX('process', args(constX(name), closure))
+        final result = ast( new ProcessNode(methodCall, name, directives, inputs, outputs, exec, stub), ctx )
 
-        ast( new ProcessNode(methodCall, name, directives, inputs, outputs, exec, stub), ctx )
+        groovydocManager.handle(result.expression, ctx)
+        return result
     }
 
     private Statement processDirectives(ProcessDirectivesContext ctx) {
@@ -476,8 +482,10 @@ class ScriptAstBuilder {
             ? args(constX(name), closure)
             : args(closure)
         final methodCall = callThisX('workflow', arguments)
+        final result = ast( new WorkflowNode(methodCall, name, takes, emits, main), ctx )
 
-        ast( new WorkflowNode(methodCall, name, takes, emits, main), ctx )
+        groovydocManager.handle(result.expression, ctx)
+        return result
     }
 
     private Statement workflowTakes(WorkflowTakesContext ctx) {
@@ -515,8 +523,10 @@ class ScriptAstBuilder {
         final returnType = type(ctx.type())
         final params = parameters(ctx.formalParameterList()) ?: [] as Parameter[]
         final code = blockStatements(ctx.blockStatements())
+        final result = ast( new FunctionNode(name, returnType, params, code), ctx )
 
-        ast( new FunctionNode(name, returnType, params, code), ctx )
+        groovydocManager.handle(result, ctx)
+        return result
     }
 
     private Statement incompleteStatement(IncompleteStatementContext ctx) {
@@ -1579,6 +1589,10 @@ class ProcessNode extends ExpressionStatement {
         this.exec = exec
         this.stub = stub
     }
+
+    Groovydoc getGroovydoc() {
+        return expression.getGroovydoc()
+    }
 }
 
 
@@ -1595,6 +1609,10 @@ class WorkflowNode extends ExpressionStatement {
         this.takes = takes
         this.emits = emits
         this.main = main
+    }
+
+    Groovydoc getGroovydoc() {
+        return expression.getGroovydoc()
     }
 }
 

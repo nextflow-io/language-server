@@ -10,7 +10,6 @@ import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.stmt.Statement
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.MarkupContent
@@ -50,9 +49,7 @@ class ScriptHoverProvider implements HoverProvider {
         final offsetNode = nodeTree.first()
         final definitionNode = ASTUtils.getDefinition(offsetNode, false, ast)
         final content = definitionNode ? getHoverContent(definitionNode) : null
-        final documentation = definitionNode instanceof AnnotatedNode
-            ? GroovydocUtils.groovydocToMarkdownDescription(definitionNode.getGroovydoc())
-            : null
+        final documentation = GroovydocUtils.getDocumentation(definitionNode)
 
         final builder = new StringBuilder()
 

@@ -2,6 +2,10 @@ package nextflow.lsp.compiler
 
 import groovy.lang.groovydoc.Groovydoc
 import groovy.transform.CompileStatic
+import nextflow.script.v2.ProcessNode
+import nextflow.script.v2.WorkflowNode
+import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.AnnotatedNode
 
 /**
  * Utility method to extract Groovydoc text from the AST.
@@ -11,7 +15,18 @@ import groovy.transform.CompileStatic
 @CompileStatic
 class GroovydocUtils {
 
-    static String groovydocToMarkdownDescription(Groovydoc groovydoc) {
+    static String getDocumentation(ASTNode node) {
+        if( node instanceof ProcessNode )
+            return groovydocToMarkdownDescription(node.getGroovydoc())
+        if( node instanceof WorkflowNode )
+            return groovydocToMarkdownDescription(node.getGroovydoc())
+        if( node instanceof AnnotatedNode )
+            return groovydocToMarkdownDescription(node.getGroovydoc())
+
+        return null
+    }
+
+    private static String groovydocToMarkdownDescription(Groovydoc groovydoc) {
         if( groovydoc == null || !groovydoc.isPresent() )
             return null
         final content = groovydoc.getContent()

@@ -51,6 +51,10 @@ class ScriptParserPlugin implements ParserPlugin {
 
     @Override
     ModuleNode buildAST(SourceUnit sourceUnit, ClassLoader classLoader, Reduction cst) {
-        return new ScriptAstBuilder(sourceUnit, allowIncomplete).buildAST()
+        return new ScriptAstBuilder(
+            sourceUnit,
+            allowIncomplete,
+            sourceUnit.getConfiguration().isGroovydocEnabled()
+        ).buildAST()
     }
 }
