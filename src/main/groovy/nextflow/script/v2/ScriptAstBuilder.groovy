@@ -460,9 +460,9 @@ class ScriptAstBuilder {
 
     private Statement workflowDef(WorkflowDefContext ctx) {
         final name = ctx.name?.text
-        final takes = workflowTakes(ctx.body.workflowTakes())
-        final emits = workflowEmits(ctx.body.workflowEmits())
-        final main = blockStatements(ctx.body.workflowMain().blockStatements())
+        final takes = workflowTakes(ctx.body?.workflowTakes())
+        final emits = workflowEmits(ctx.body?.workflowEmits())
+        final main = blockStatements(ctx.body?.workflowMain()?.blockStatements())
         main.addStatementLabel('main')
         final bodyDef = stmt(createX(
             BodyDef,
