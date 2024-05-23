@@ -149,10 +149,10 @@ statement
 
 // -- if/else statement
 ifElseStatement
-    :   IF parExpression nls tb=ifElseBranch (nls ELSE nls fb=ifElseBranch)?
+    :   IF parExpression nls tb=statementOrBlock (nls ELSE nls fb=statementOrBlock)?
     ;
 
-ifElseBranch
+statementOrBlock
     :   LBRACE nls blockStatements? RBRACE
     |   statement
     ;

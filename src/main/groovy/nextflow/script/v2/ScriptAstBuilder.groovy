@@ -85,10 +85,12 @@ import org.codehaus.groovy.ast.expr.UnaryMinusExpression
 import org.codehaus.groovy.ast.expr.UnaryPlusExpression
 import org.codehaus.groovy.ast.stmt.AssertStatement
 import org.codehaus.groovy.ast.stmt.BlockStatement
+import org.codehaus.groovy.ast.stmt.CatchStatement
 import org.codehaus.groovy.ast.stmt.EmptyStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
+import org.codehaus.groovy.ast.stmt.TryCatchStatement
 import org.codehaus.groovy.ast.tools.GeneralUtils
 import org.codehaus.groovy.control.CompilationFailedException
 import org.codehaus.groovy.control.CompilePhase
@@ -529,6 +531,9 @@ class ScriptAstBuilder {
         if( ctx instanceof IfElseStmtAltContext )
             return ast( ifElseStatement(ctx.ifElseStatement()), ctx )
 
+        if( ctx instanceof TryCatchStmtAltContext )
+            return ast( tryCatchStatement(ctx.tryCatchStatement()), ctx )
+
         if( ctx instanceof ReturnStmtAltContext )
             return ast( returnStatement(ctx.expression()), ctx )
 
@@ -559,14 +564,14 @@ class ScriptAstBuilder {
     private Statement ifElseStatement(IfElseStatementContext ctx) {
         final expression = ast( parExpression(ctx.parExpression()), ctx.parExpression() )
         final condition = ast( boolX(expression), expression )
-        final thenStmt = ifElseBranch(ctx.tb)
+        final thenStmt = statementOrBlock(ctx.tb)
         final elseStmt = ctx.ELSE()
-            ? ifElseBranch(ctx.fb)
+            ? statementOrBlock(ctx.fb)
             : EmptyStatement.INSTANCE
         ifElseS(condition, thenStmt, elseStmt)
     }
 
-    private Statement ifElseBranch(IfElseBranchContext ctx) {
+    private Statement statementOrBlock(StatementOrBlockContext ctx) {
         return ctx.statement()
             ? statement(ctx.statement())
             : blockStatements(ctx.blockStatements())
@@ -577,6 +582,33 @@ class ScriptAstBuilder {
             return block(new VariableScope(), List<Statement>.of())
         final code = ctx.statement().collect( this.&statement )
         ast( block(new VariableScope(), code), ctx )
+    }
+
+    private Statement tryCatchStatement(TryCatchStatementContext ctx) {
+        final tryStatement = statementOrBlock(ctx.statementOrBlock())
+        final catchClauses = ctx.catchClause().collect( this.&catchClause )
+        final result = tryCatchS(tryStatement)
+        for( final clause : catchClauses )
+            for( final stmt : clause )
+                result.addCatch(stmt)
+        return result
+    }
+
+    private List<CatchStatement> catchClause(CatchClauseContext ctx) {
+        final types = catchTypes(ctx.catchTypes())
+        return types.collect { type ->
+            final name = identifier(ctx.identifier())
+            final variable = param(type, name)
+            final code = statementOrBlock(ctx.statementOrBlock())
+            ast( new CatchStatement(variable, code), ctx )
+        }
+    }
+
+    private List<ClassNode> catchTypes(CatchTypesContext ctx) {
+        if( !ctx )
+            return Collections.emptyList()
+
+        return ctx.qualifiedClassName().collect( this.&qualifiedClassName )
     }
 
     private Statement returnStatement(ExpressionContext ctx) {
@@ -1334,17 +1366,18 @@ class ScriptAstBuilder {
             final classNode = qualifiedClassName(ctx.qualifiedClassName())
             if( ctx.typeArgumentsOrDiamond() )
                 classNode.setGenericsTypes( typeArguments(ctx.typeArgumentsOrDiamond()) )
-            return ast( classNode, ctx )
+            return classNode
         }
 
         if( ctx.primitiveType() )
-            return ast( primitiveType(ctx.primitiveType()), ctx )
+            return primitiveType(ctx.primitiveType())
 
         throw createParsingFailedException("Unrecognized created name: ${ctx.text}", ctx)
     }
 
     private ClassNode primitiveType(PrimitiveTypeContext ctx) {
-        ClassHelper.make(ctx.text).getPlainNodeReference(false)
+        final classNode = ClassHelper.make(ctx.text).getPlainNodeReference(false)
+        return ast( classNode, ctx )
     }
 
     private ClassNode qualifiedClassName(QualifiedClassNameContext ctx, boolean allowProxy=true) {
@@ -1356,7 +1389,7 @@ class ScriptAstBuilder {
             return proxy
         }
 
-        return classNode
+        return ast( classNode, ctx )
     }
 
     private ClassNode type(TypeContext ctx, boolean allowProxy=true) {
@@ -1367,11 +1400,11 @@ class ScriptAstBuilder {
             final classNode = qualifiedClassName(ctx.qualifiedClassName(), allowProxy)
             if( ctx.typeArguments() )
                 classNode.setGenericsTypes( typeArguments(ctx.typeArguments()) )
-            return ast( classNode, ctx )
+            return classNode
         }
 
         if( ctx.primitiveType() )
-            return ast( primitiveType(ctx.primitiveType()), ctx )
+            return primitiveType(ctx.primitiveType())
 
         throw createParsingFailedException("Unrecognized type: ${ctx.text}", ctx)
     }

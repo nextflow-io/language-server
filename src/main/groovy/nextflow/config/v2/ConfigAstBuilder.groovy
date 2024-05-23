@@ -329,14 +329,14 @@ class ConfigAstBuilder {
     private Statement ifElseStatement(IfElseStatementContext ctx) {
         final expression = ast( parExpression(ctx.parExpression()), ctx.parExpression() )
         final condition = ast( boolX(expression), expression )
-        final thenStmt = ifElseBranch(ctx.tb)
+        final thenStmt = statementOrBlock(ctx.tb)
         final elseStmt = ctx.ELSE()
-            ? ifElseBranch(ctx.fb)
+            ? statementOrBlock(ctx.fb)
             : EmptyStatement.INSTANCE
         ifElseS(condition, thenStmt, elseStmt)
     }
 
-    private Statement ifElseBranch(IfElseBranchContext ctx) {
+    private Statement statementOrBlock(StatementOrBlockContext ctx) {
         return ctx.statement()
             ? statement(ctx.statement())
             : blockStatements(ctx.blockStatements())
@@ -1097,17 +1097,18 @@ class ConfigAstBuilder {
             final classNode = qualifiedClassName(ctx.qualifiedClassName())
             if( ctx.typeArgumentsOrDiamond() )
                 classNode.setGenericsTypes( typeArguments(ctx.typeArgumentsOrDiamond()) )
-            return ast( classNode, ctx )
+            return classNode
         }
 
         if( ctx.primitiveType() )
-            return ast( primitiveType(ctx.primitiveType()), ctx )
+            return primitiveType(ctx.primitiveType())
 
         throw createParsingFailedException("Unrecognized created name: ${ctx.text}", ctx)
     }
 
     private ClassNode primitiveType(PrimitiveTypeContext ctx) {
-        ClassHelper.make(ctx.text).getPlainNodeReference(false)
+        final classNode = ClassHelper.make(ctx.text).getPlainNodeReference(false)
+        return ast( classNode, ctx )
     }
 
     private ClassNode qualifiedClassName(QualifiedClassNameContext ctx, boolean allowProxy=true) {
@@ -1119,7 +1120,7 @@ class ConfigAstBuilder {
             return proxy
         }
 
-        return classNode
+        return ast( classNode, ctx )
     }
 
     private ClassNode type(TypeContext ctx, boolean allowProxy=true) {
@@ -1130,11 +1131,11 @@ class ConfigAstBuilder {
             final classNode = qualifiedClassName(ctx.qualifiedClassName(), allowProxy)
             if( ctx.typeArguments() )
                 classNode.setGenericsTypes( typeArguments(ctx.typeArguments()) )
-            return ast( classNode, ctx )
+            return classNode
         }
 
         if( ctx.primitiveType() )
-            return ast( primitiveType(ctx.primitiveType()), ctx )
+            return primitiveType(ctx.primitiveType())
 
         throw createParsingFailedException("Unrecognized type: ${ctx.text}", ctx)
     }

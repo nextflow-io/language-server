@@ -251,7 +251,7 @@ fragment
 BYTE          : 'byte';
 
 // CASE          : 'case';
-// CATCH         : 'catch';
+CATCH         : 'catch';
 
 fragment
 CHAR          : 'char';
@@ -313,7 +313,7 @@ SHORT         : 'short';
 // THROW         : 'throw';
 // THROWS        : 'throws';
 // TRANSIENT     : 'transient';
-// TRY           : 'try';
+TRY           : 'try';
 // VOID          : 'void';
 // VOLATILE      : 'volatile';
 // WHILE         : 'while';

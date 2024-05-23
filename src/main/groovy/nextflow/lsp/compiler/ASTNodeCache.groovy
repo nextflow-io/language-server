@@ -53,10 +53,12 @@ import org.codehaus.groovy.ast.expr.UnaryPlusExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.AssertStatement
 import org.codehaus.groovy.ast.stmt.BlockStatement
+import org.codehaus.groovy.ast.stmt.CatchStatement
 import org.codehaus.groovy.ast.stmt.EmptyStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.IfStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
+import org.codehaus.groovy.ast.stmt.TryCatchStatement
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
@@ -536,6 +538,16 @@ class ASTNodeCache {
         }
 
         @Override
+        void visitTryCatchFinally(TryCatchStatement node) {
+            pushASTNode(node)
+            try {
+                super.visitTryCatchFinally(node)
+            } finally {
+                popASTNode()
+            }
+        }
+
+        @Override
         void visitEmptyStatement(EmptyStatement node) {
             pushASTNode(node)
             try {
@@ -850,6 +862,16 @@ class ASTNodeCache {
                 super.visitGStringExpression(node)
             }
             finally {
+                popASTNode()
+            }
+        }
+
+        @Override
+        void visitCatchStatement(CatchStatement node) {
+            pushASTNode(node)
+            try {
+                super.visitCatchStatement(node)
+            } finally {
                 popASTNode()
             }
         }
