@@ -486,6 +486,7 @@ identifier
     |   CapitalizedIdentifier
     |   IN
     |   FROM
+    |   PROCESS
     |   EXEC
     |   INPUT
     |   OUTPUT
