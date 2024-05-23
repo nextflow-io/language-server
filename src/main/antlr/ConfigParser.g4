@@ -158,7 +158,7 @@ ifElseBranch
     ;
 
 blockStatements
-    :   statement (sep statement)* nls
+    :   statement (sep statement)* sep?
     ;
 
 // -- assert statement
@@ -428,7 +428,7 @@ typeArgumentsOrDiamond
 
 // -- parenthetical expression
 parExpression
-    :   LPAREN expression rparen
+    :   LPAREN nls expression nls rparen
     ;
 
 // -- closure expression
@@ -446,7 +446,7 @@ formalParameter
 
 // -- list expression
 list
-    :   LBRACK expressionList? COMMA? RBRACK
+    :   LBRACK nls expressionList? COMMA? nls RBRACK
     ;
 
 expressionList
@@ -459,15 +459,12 @@ expressionListElement
 
 // -- map expression
 map
-    :   LBRACK
-        (   mapEntryList COMMA?
-        |   COLON
-        )
-        RBRACK
+    :   LBRACK nls mapEntryList COMMA? nls RBRACK
+    |   LBRACK COLON RBRACK
     ;
 
 mapEntryList
-    :   mapEntry (COMMA mapEntry)*
+    :   mapEntry (COMMA nls mapEntry)*
     ;
 
 mapEntry
@@ -487,7 +484,7 @@ builtInType
 
 // -- argument list
 arguments
-    :   LPAREN argumentList? COMMA? rparen
+    :   LPAREN nls argumentList? COMMA? nls rparen
     ;
 
 

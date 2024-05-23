@@ -324,19 +324,19 @@ FROM            : 'from';
 
 // -- process definition
 PROCESS         : 'process';
-PROCESS_EXEC    : 'exec:';
-PROCESS_INPUT   : 'input:';
-PROCESS_OUTPUT  : 'output:';
-PROCESS_SCRIPT  : 'script:';
-PROCESS_SHELL   : 'shell:';
-PROCESS_STUB    : 'stub:';
-PROCESS_WHEN    : 'when:';
+EXEC            : 'exec';
+INPUT           : 'input';
+OUTPUT          : 'output';
+SCRIPT          : 'script';
+SHELL           : 'shell';
+STUB            : 'stub';
+WHEN            : 'when';
 
 // -- workflow definition
 WORKFLOW        : 'workflow';
-WORKFLOW_EMIT   : 'emit:';
-WORKFLOW_MAIN   : 'main:';
-WORKFLOW_TAKE   : 'take:';
+EMIT            : 'emit';
+MAIN            : 'main';
+TAKE            : 'take';
 
 
 //

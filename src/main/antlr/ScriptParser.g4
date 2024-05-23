@@ -152,11 +152,11 @@ processDirectives
     ;
 
 processInputs
-    :   PROCESS_INPUT (sep processDirective)+
+    :   INPUT COLON (sep processDirective)+
     ;
 
 processOutputs
-    :   PROCESS_OUTPUT (sep processDirective)+
+    :   OUTPUT COLON (sep processDirective)+
     ;
 
 processDirective
@@ -164,19 +164,19 @@ processDirective
     ;
 
 processWhen
-    :   PROCESS_WHEN nls expression
+    :   WHEN COLON nls expression
     ;
 
 processExec
-    :   (   PROCESS_SCRIPT
-        |   PROCESS_SHELL
-        |   PROCESS_EXEC
-        )
+    :   (   SCRIPT
+        |   SHELL
+        |   EXEC
+        ) COLON
         sep? blockStatements
     ;
 
 processStub
-    :   PROCESS_STUB sep? blockStatements
+    :   STUB COLON sep? blockStatements
     ;
 
 // -- workflow definition
@@ -188,9 +188,9 @@ workflowDef
 
 workflowBody
     // explicit main block with optional take/emit blocks
-    :   (sep WORKFLOW_TAKE workflowTakes)?
-        sep WORKFLOW_MAIN sep? workflowMain
-        (sep WORKFLOW_EMIT workflowEmits)?
+    :   (sep TAKE COLON workflowTakes)?
+        sep MAIN COLON sep? workflowMain
+        (sep EMIT COLON workflowEmits)?
 
     // implicit main block
     |   sep? workflowMain
@@ -205,7 +205,11 @@ workflowMain
     ;
 
 workflowEmits
-    :   (sep identifier)+
+    :   (sep workflowEmit)+
+    ;
+
+workflowEmit
+    :   identifier (ASSIGN expression)?
     ;
 
 // -- function definition
@@ -214,7 +218,7 @@ functionDef
         nls blockStatements? RBRACE
     ;
 
-// -- incomplete statement
+// -- incomplete script statement
 incompleteStatement
     :   identifier (DOT identifier)*
     ;
@@ -224,14 +228,15 @@ incompleteStatement
 // statements
 //
 statement
-    :   ifElseStatement             #ifElseStmtAlt
-    |   RETURN expression?          #returnStmtAlt
-    |   assertStatement             #assertStmtAlt
-    |   variableDeclaration         #variableDeclarationStmtAlt
-    |   multipleAssignmentStatement #multipleAssignmentStmtAlt
-    |   assignmentStatement         #assignmentStmtAlt
-    |   expressionStatement         #expressionStmtAlt
-    |   SEMI                        #emptyStmtAlt
+    :   ifElseStatement                 #ifElseStmtAlt
+    |   RETURN expression?              #returnStmtAlt
+    |   identifier COLON nls statement  #labeledStmtAlt
+    |   assertStatement                 #assertStmtAlt
+    |   variableDeclaration             #variableDeclarationStmtAlt
+    |   multipleAssignmentStatement     #multipleAssignmentStmtAlt
+    |   assignmentStatement             #assignmentStmtAlt
+    |   expressionStatement             #expressionStmtAlt
+    |   SEMI                            #emptyStmtAlt
     ;
 
 // -- if/else statement
@@ -245,7 +250,7 @@ ifElseBranch
     ;
 
 blockStatements
-    :   statement (sep statement)* nls
+    :   statement (sep statement)* sep?
     ;
 
 // -- assert statement
@@ -465,7 +470,18 @@ identifier
     :   Identifier
     |   CapitalizedIdentifier
     |   IN
+    |   FROM
+    |   EXEC
+    |   INPUT
+    |   OUTPUT
+    |   SCRIPT
+    |   SHELL
+    |   STUB
+    |   WHEN
     |   WORKFLOW
+    |   EMIT
+    |   MAIN
+    |   TAKE
     ;
 
 // -- primitive literals
@@ -516,7 +532,7 @@ typeArgumentsOrDiamond
 
 // -- parenthetical expression
 parExpression
-    :   LPAREN expression rparen
+    :   LPAREN nls expression nls rparen
     ;
 
 // -- closure expression
@@ -534,7 +550,7 @@ formalParameter
 
 // -- list expression
 list
-    :   LBRACK expressionList? COMMA? RBRACK
+    :   LBRACK nls expressionList? COMMA? nls RBRACK
     ;
 
 expressionList
@@ -547,15 +563,12 @@ expressionListElement
 
 // -- map expression
 map
-    :   LBRACK
-        (   mapEntryList COMMA?
-        |   COLON
-        )
-        RBRACK
+    :   LBRACK nls mapEntryList COMMA? nls RBRACK
+    |   LBRACK COLON RBRACK
     ;
 
 mapEntryList
-    :   mapEntry (COMMA mapEntry)*
+    :   mapEntry (COMMA nls mapEntry)*
     ;
 
 mapEntry
@@ -575,7 +588,7 @@ builtInType
 
 // -- argument list
 arguments
-    :   LPAREN argumentList? COMMA? rparen
+    :   LPAREN nls argumentList? COMMA? nls rparen
     ;
 
 
@@ -627,7 +640,6 @@ qualifiedNameElement
     :   identifier
     |   AS
     |   DEF
-    |   FROM
     |   IN
     ;
 
@@ -646,13 +658,23 @@ typeArguments
 keywords
     :   AS
     |   DEF
-    |   FROM
     |   IN
-    |   INCLUDE
     |   INSTANCEOF
-    |   PROCESS
     |   RETURN
+    |   INCLUDE
+    |   FROM
+    |   PROCESS
+    |   EXEC
+    |   INPUT
+    |   OUTPUT
+    |   SCRIPT
+    |   SHELL
+    |   STUB
+    |   WHEN
     |   WORKFLOW
+    |   EMIT
+    |   MAIN
+    |   TAKE
     |   NullLiteral
     |   BooleanLiteral
     |   BuiltInPrimitiveType

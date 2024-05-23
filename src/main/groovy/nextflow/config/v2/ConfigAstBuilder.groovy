@@ -872,7 +872,7 @@ class ConfigAstBuilder {
     }
 
     private Expression creator(CreatorContext ctx) {
-        final type = type(ctx.createdName())
+        final type = createdName(ctx.createdName())
         final arguments = argumentList(ctx.arguments().argumentList())
         ctorX(type, arguments)
     }
@@ -1010,7 +1010,7 @@ class ConfigAstBuilder {
         // TODO: validate duplicate named arguments ?
         // TODO: only named arguments -> TupleExpression ?
         if( opts )
-            arguments.push( ast(mapX(opts), ctx) )
+            arguments.push( mapX(opts) )
 
         return ast( args(arguments), ctx )
     }
@@ -1020,7 +1020,7 @@ class ConfigAstBuilder {
         final key = ctx.MUL()
             ? new SpreadMapExpression(value)
             : ast( namedArgLabel(ctx.namedArgLabel()), ctx.namedArgLabel() )
-        new MapEntryExpression(key, value)
+        ast( new MapEntryExpression(key, value), ctx )
     }
 
     private Expression namedArgLabel(NamedArgLabelContext ctx) {
@@ -1092,25 +1092,25 @@ class ConfigAstBuilder {
         new Token( type, text, token.getLine(), token.getCharPositionInLine() + 1 )
     }
 
-    private ClassNode type(CreatedNameContext ctx) {
+    private ClassNode createdName(CreatedNameContext ctx) {
         if( ctx.qualifiedClassName() ) {
-            final classNode = type(ctx.qualifiedClassName())
+            final classNode = qualifiedClassName(ctx.qualifiedClassName())
             if( ctx.typeArgumentsOrDiamond() )
                 classNode.setGenericsTypes( typeArguments(ctx.typeArgumentsOrDiamond()) )
             return ast( classNode, ctx )
         }
 
         if( ctx.primitiveType() )
-            return ast( type(ctx.primitiveType()), ctx )
+            return ast( primitiveType(ctx.primitiveType()), ctx )
 
         throw createParsingFailedException("Unrecognized created name: ${ctx.text}", ctx)
     }
 
-    private ClassNode type(PrimitiveTypeContext ctx) {
+    private ClassNode primitiveType(PrimitiveTypeContext ctx) {
         ClassHelper.make(ctx.text).getPlainNodeReference(false)
     }
 
-    private ClassNode type(QualifiedClassNameContext ctx, boolean allowProxy=true) {
+    private ClassNode qualifiedClassName(QualifiedClassNameContext ctx, boolean allowProxy=true) {
         final classNode = ClassHelper.make(ctx.text)
 
         if( classNode.isUsingGenerics() && allowProxy ) {
@@ -1127,14 +1127,14 @@ class ConfigAstBuilder {
             return ClassHelper.dynamicType()
 
         if( ctx.qualifiedClassName() ) {
-            final classNode = type(ctx.qualifiedClassName(), allowProxy)
+            final classNode = qualifiedClassName(ctx.qualifiedClassName(), allowProxy)
             if( ctx.typeArguments() )
                 classNode.setGenericsTypes( typeArguments(ctx.typeArguments()) )
             return ast( classNode, ctx )
         }
 
         if( ctx.primitiveType() )
-            return ast( type(ctx.primitiveType()), ctx )
+            return ast( primitiveType(ctx.primitiveType()), ctx )
 
         throw createParsingFailedException("Unrecognized type: ${ctx.text}", ctx)
     }
@@ -1317,4 +1317,3 @@ class ConfigIncompleteNode extends ExpressionStatement {
         this.text = text
     }
 }
-

@@ -434,9 +434,9 @@ class ScriptAstBuilder {
         if( !ctx )
             return 'script'
 
-        if( ctx.PROCESS_EXEC() )
+        if( ctx.EXEC() )
             return 'exec'
-        else if( ctx.PROCESS_SHELL() )
+        else if( ctx.SHELL() )
             return 'shell'
         else
             return 'script'
@@ -483,7 +483,7 @@ class ScriptAstBuilder {
             return EmptyStatement.INSTANCE
 
         final statements = ctx.identifier().collect( take ->
-            stmt(callThisX("_take_${take.text}", new ArgumentListExpression()))
+            stmt(callThisX('_take_', args(constX(take.text))))
         )
         final result = ast( block(new VariableScope(), statements), ctx )
         result.addStatementLabel('take')
@@ -494,12 +494,18 @@ class ScriptAstBuilder {
         if( !ctx )
             return EmptyStatement.INSTANCE
 
-        final statements = ctx.identifier().collect( emit ->
-            stmt(callThisX("_emit_${emit.text}", new ArgumentListExpression()))
-        )
+        final statements = ctx.workflowEmit().collect( this.&workflowEmit )
         final result = ast( block(new VariableScope(), statements), ctx )
         result.addStatementLabel('emit')
         return result
+    }
+
+    private Statement workflowEmit(WorkflowEmitContext ctx) {
+        final name = identifier(ctx.identifier())
+        final arguments = ctx.expression()
+            ? args(constX(name), expression(ctx.expression()))
+            : args(constX(name))
+        return stmt(callThisX('_emit_', arguments))
     }
 
     private MethodNode functionDef(FunctionDefContext ctx) {
@@ -525,6 +531,9 @@ class ScriptAstBuilder {
 
         if( ctx instanceof ReturnStmtAltContext )
             return ast( returnStatement(ctx.expression()), ctx )
+
+        if( ctx instanceof LabeledStmtAltContext )
+            return ast( labeledStatement(ctx), ctx )
 
         if( ctx instanceof AssertStmtAltContext )
             return ast( assertStatement(ctx.assertStatement()), ctx )
@@ -575,6 +584,13 @@ class ScriptAstBuilder {
             ? expression(ctx)
             : ConstantExpression.EMPTY_EXPRESSION
         returnS(result)
+    }
+
+    private Statement labeledStatement(LabeledStmtAltContext ctx) {
+        final label = identifier(ctx.identifier())
+        final result = statement(ctx.statement())
+        result.addStatementLabel(label)
+        return result
     }
 
     private Statement assertStatement(AssertStatementContext ctx) {
@@ -1093,7 +1109,7 @@ class ScriptAstBuilder {
     }
 
     private Expression creator(CreatorContext ctx) {
-        final type = type(ctx.createdName())
+        final type = createdName(ctx.createdName())
         final arguments = argumentList(ctx.arguments().argumentList())
         ctorX(type, arguments)
     }
@@ -1231,7 +1247,7 @@ class ScriptAstBuilder {
         // TODO: validate duplicate named arguments ?
         // TODO: only named arguments -> TupleExpression ?
         if( opts )
-            arguments.push( ast(mapX(opts), ctx) )
+            arguments.push( mapX(opts) )
 
         return ast( args(arguments), ctx )
     }
@@ -1241,7 +1257,7 @@ class ScriptAstBuilder {
         final key = ctx.MUL()
             ? new SpreadMapExpression(value)
             : ast( namedArgLabel(ctx.namedArgLabel()), ctx.namedArgLabel() )
-        new MapEntryExpression(key, value)
+        ast( new MapEntryExpression(key, value), ctx )
     }
 
     private Expression namedArgLabel(NamedArgLabelContext ctx) {
@@ -1313,25 +1329,25 @@ class ScriptAstBuilder {
         new Token( type, text, token.getLine(), token.getCharPositionInLine() + 1 )
     }
 
-    private ClassNode type(CreatedNameContext ctx) {
+    private ClassNode createdName(CreatedNameContext ctx) {
         if( ctx.qualifiedClassName() ) {
-            final classNode = type(ctx.qualifiedClassName())
+            final classNode = qualifiedClassName(ctx.qualifiedClassName())
             if( ctx.typeArgumentsOrDiamond() )
                 classNode.setGenericsTypes( typeArguments(ctx.typeArgumentsOrDiamond()) )
             return ast( classNode, ctx )
         }
 
         if( ctx.primitiveType() )
-            return ast( type(ctx.primitiveType()), ctx )
+            return ast( primitiveType(ctx.primitiveType()), ctx )
 
         throw createParsingFailedException("Unrecognized created name: ${ctx.text}", ctx)
     }
 
-    private ClassNode type(PrimitiveTypeContext ctx) {
+    private ClassNode primitiveType(PrimitiveTypeContext ctx) {
         ClassHelper.make(ctx.text).getPlainNodeReference(false)
     }
 
-    private ClassNode type(QualifiedClassNameContext ctx, boolean allowProxy=true) {
+    private ClassNode qualifiedClassName(QualifiedClassNameContext ctx, boolean allowProxy=true) {
         final classNode = ClassHelper.make(ctx.text)
 
         if( classNode.isUsingGenerics() && allowProxy ) {
@@ -1348,14 +1364,14 @@ class ScriptAstBuilder {
             return ClassHelper.dynamicType()
 
         if( ctx.qualifiedClassName() ) {
-            final classNode = type(ctx.qualifiedClassName(), allowProxy)
+            final classNode = qualifiedClassName(ctx.qualifiedClassName(), allowProxy)
             if( ctx.typeArguments() )
                 classNode.setGenericsTypes( typeArguments(ctx.typeArguments()) )
             return ast( classNode, ctx )
         }
 
         if( ctx.primitiveType() )
-            return ast( type(ctx.primitiveType()), ctx )
+            return ast( primitiveType(ctx.primitiveType()), ctx )
 
         throw createParsingFailedException("Unrecognized type: ${ctx.text}", ctx)
     }
