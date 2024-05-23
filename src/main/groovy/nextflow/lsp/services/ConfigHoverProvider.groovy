@@ -71,12 +71,7 @@ class ConfigHoverProvider implements HoverProvider {
         if( !value )
             return null
 
-        final contents = new MarkupContent()
-        contents.setKind(MarkupKind.MARKDOWN)
-        contents.setValue(value)
-        final hover = new Hover()
-        hover.setContents(contents)
-        return hover
+        return new Hover(new MarkupContent(MarkupKind.MARKDOWN, value))
     }
 
     String getHoverContent(List<ASTNode> nodeTree) {

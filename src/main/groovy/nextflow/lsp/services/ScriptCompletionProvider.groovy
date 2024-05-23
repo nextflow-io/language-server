@@ -3,10 +3,12 @@ package nextflow.lsp.services
 import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.ASTNodeCache
 import nextflow.lsp.compiler.ASTUtils
+import nextflow.lsp.compiler.GroovydocUtils
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Ranges
 import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.IncompleteNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
@@ -502,7 +504,7 @@ class ScriptCompletionProvider implements CompletionProvider {
         final uri = URI.create(textDocument.getUri())
         final nodeTree = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter())
         if( !nodeTree )
-            return Either.forLeft(TOPLEVEL_ITEMS)
+            return Either.forLeft(Collections.emptyList())
 
         final offsetNode = nodeTree.first()
         final parentNode = ast.getParent(offsetNode)
@@ -529,7 +531,10 @@ class ScriptCompletionProvider implements CompletionProvider {
             }
         }
 
-        if( offsetNode instanceof PropertyExpression ) {
+        if( offsetNode instanceof IncompleteNode ) {
+            items.addAll(TOPLEVEL_ITEMS)
+        }
+        else if( offsetNode instanceof PropertyExpression ) {
             // e.g. "foo."
             log.debug "completion: populate from property expression"
             populateItemsFromPropertyExpression(offsetNode, position, items)
@@ -618,6 +623,11 @@ class ScriptCompletionProvider implements CompletionProvider {
             final item = new CompletionItem(name)
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(functionNode))
             item.setDetail('function')
+
+            final documentation = GroovydocUtils.getDocumentation(functionNode)
+            if( documentation != null )
+                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
+
             items.add(item)
         }
     }
@@ -640,6 +650,11 @@ class ScriptCompletionProvider implements CompletionProvider {
             final item = new CompletionItem(name)
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(processNode))
             item.setDetail('process')
+
+            final documentation = GroovydocUtils.getDocumentation(processNode)
+            if( documentation != null )
+                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
+
             items.add(item)
         }
     }
@@ -653,6 +668,11 @@ class ScriptCompletionProvider implements CompletionProvider {
             final item = new CompletionItem(name)
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(workflowNode))
             item.setDetail('workflow')
+
+            final documentation = GroovydocUtils.getDocumentation(workflowNode)
+            if( documentation != null )
+                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
+
             items.add(item)
         }
     }
