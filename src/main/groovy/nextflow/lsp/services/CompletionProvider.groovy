@@ -16,6 +16,6 @@ interface CompletionProvider {
      * @param textDocument
      * @param position
      */
-    Either<List<CompletionItem>, CompletionList> provideCompletion(TextDocumentIdentifier textDocument, Position position)
+    Either<List<CompletionItem>, CompletionList> completion(TextDocumentIdentifier textDocument, Position position)
 
 }

@@ -7,8 +7,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either
 
 interface SymbolProvider {
 
-    List<Either<SymbolInformation, DocumentSymbol>> provideDocumentSymbols(TextDocumentIdentifier textDocument)
+    List<Either<SymbolInformation, DocumentSymbol>> documentSymbol(TextDocumentIdentifier textDocument)
 
-    List<? extends SymbolInformation> provideWorkspaceSymbols(String query)
+    List<? extends SymbolInformation> symbol(String query)
 
 }

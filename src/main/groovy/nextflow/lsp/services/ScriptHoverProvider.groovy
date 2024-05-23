@@ -35,7 +35,7 @@ class ScriptHoverProvider implements HoverProvider {
     }
 
     @Override
-    Hover provideHover(TextDocumentIdentifier textDocument, Position position) {
+    Hover hover(TextDocumentIdentifier textDocument, Position position) {
         if( ast == null ) {
             log.error("ast cache is empty while providing hover hint")
             return null

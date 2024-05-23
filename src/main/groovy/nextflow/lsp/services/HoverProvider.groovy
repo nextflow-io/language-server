@@ -6,6 +6,6 @@ import org.eclipse.lsp4j.TextDocumentIdentifier
 
 interface HoverProvider {
 
-    Hover provideHover(TextDocumentIdentifier textDocument, Position position)
+    Hover hover(TextDocumentIdentifier textDocument, Position position)
 
 }

@@ -127,7 +127,7 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         final uri = params.getTextDocument().getUri()
         recompileIfContextChanged(uri)
 
-        final result = completionProvider.provideCompletion(params.getTextDocument(), params.getPosition())
+        final result = completionProvider.completion(params.getTextDocument(), params.getPosition())
         return CompletableFuture.completedFuture(result)
     }
 
@@ -139,7 +139,7 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         final uri = params.getTextDocument().getUri()
         recompileIfContextChanged(uri)
 
-        final result = symbolProvider.provideDocumentSymbols(params.getTextDocument())
+        final result = symbolProvider.documentSymbol(params.getTextDocument())
         return CompletableFuture.completedFuture(result)
     }
 
@@ -151,7 +151,7 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         final uri = params.getTextDocument().getUri()
         recompileIfContextChanged(uri)
 
-        final result = hoverProvider.provideHover(params.getTextDocument(), params.getPosition())
+        final result = hoverProvider.hover(params.getTextDocument(), params.getPosition())
         return CompletableFuture.completedFuture(result)
     }
 
@@ -160,7 +160,7 @@ abstract class AbstractServices implements TextDocumentService, WorkspaceService
         if( !symbolProvider )
             return CompletableFuture.completedFuture(Collections.emptyList())
 
-        final result = symbolProvider.provideWorkspaceSymbols(params.getQuery())
+        final result = symbolProvider.symbol(params.getQuery())
         return CompletableFuture.completedFuture(result)
     }
 

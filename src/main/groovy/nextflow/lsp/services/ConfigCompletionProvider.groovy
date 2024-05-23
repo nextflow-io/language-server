@@ -56,7 +56,7 @@ class ConfigCompletionProvider implements CompletionProvider {
     }
 
     @Override
-    Either<List<CompletionItem>, CompletionList> provideCompletion(TextDocumentIdentifier textDocument, Position position) {
+    Either<List<CompletionItem>, CompletionList> completion(TextDocumentIdentifier textDocument, Position position) {
         if( ast == null ) {
             log.error("ast cache is empty while peoviding completions")
             return Either.forLeft(Collections.emptyList())
