@@ -450,12 +450,6 @@ class ConfigAstBuilder {
         if( ctx instanceof BitwiseOrExprAltContext )
             return ast( binary(ctx.left, ctx.op, ctx.right), ctx )
 
-        if( ctx instanceof CastExprAltContext ) {
-            final type = type(ctx.type())
-            final operand = castOperand(ctx.castOperandExpression())
-            return ast( castX(type, operand), ctx )
-        }
-
         if( ctx instanceof ConditionalExprAltContext )
             return ast( ternary(ctx), ctx )
 
@@ -475,10 +469,10 @@ class ConfigAstBuilder {
             return ast( binary(ctx.left, ctx.op, ctx.right), ctx )
 
         if( ctx instanceof PathExprAltContext )
-            return path(ctx.pathExpression())
+            return ast( pathExpression(ctx), ctx )
 
         if( ctx instanceof PostfixExprAltContext )
-            return ast( postfix(ctx.pathExpression(), ctx.op), ctx )
+            return ast( postfix(primary(ctx.primary()), ctx.op), ctx )
 
         if( ctx instanceof PowerExprAltContext )
             return ast( binary(ctx.left, ctx.op, ctx.right), ctx )
@@ -523,33 +517,8 @@ class ConfigAstBuilder {
         binX(expression(left), token(op), right)
     }
 
-    private Expression castOperand(CastOperandExpressionContext ctx) {
-        if( ctx instanceof CastCastExprAltContext ) {
-            final type = type(ctx.type())
-            final operand = castOperand(ctx.castOperandExpression())
-            return ast( castX(type, operand), ctx )
-        }
-
-        if( ctx instanceof PathCastExprAltContext )
-            return path(ctx.pathExpression())
-
-        if( ctx instanceof PostfixCastExprAltContext )
-            return ast( postfix(ctx.pathExpression(), ctx.op), ctx )
-
-        if( ctx instanceof PrefixCastExprAltContext )
-            return ast( prefix(castOperand(ctx.castOperandExpression()), ctx.op), ctx )
-
-        if( ctx instanceof UnaryAddCastExprAltContext )
-            return ast( unaryAdd(castOperand(ctx.castOperandExpression()), ctx.op), ctx )
-
-        if( ctx instanceof UnaryNotCastExprAltContext )
-            return ast( unaryNot(castOperand(ctx.castOperandExpression()), ctx.op), ctx )
-
-        throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
-    }
-
-    private Expression postfix(PathExpressionContext ctx, ParserToken op) {
-        new PostfixExpression(path(ctx), token(op))
+    private Expression postfix(Expression expression, ParserToken op) {
+        new PostfixExpression(expression, token(op))
     }
 
     private Expression prefix(Expression expression, ParserToken op) {
@@ -606,7 +575,7 @@ class ConfigAstBuilder {
 
     /// -- PATH EXPRESSIONS
 
-    private Expression path(PathExpressionContext ctx) {
+    private Expression pathExpression(PathExprAltContext ctx) {
         try {
             final primary = primary(ctx.primary())
             return ctx.pathElement().inject(primary, (acc, el) -> pathElement(acc, el))

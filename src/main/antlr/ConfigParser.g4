@@ -193,6 +193,10 @@ multipleAssignmentStatement
         right=expression
     ;
 
+variableNames
+    :   LPAREN identifier (COMMA identifier)+ rparen
+    ;
+
 assignmentStatement
     :   left=expression nls
         op=(ASSIGN
@@ -229,14 +233,11 @@ expressionStatement
 // expressions
 //
 expression
-    // must come before postfix expression to resolve the ambiguities between casting and call on parentheses expression, e.g. (int)(1 / 2)
-    :   LPAREN type rparen castOperandExpression                                            #castExprAlt
-
     // postfix (++/--)
-    |   pathExpression op=(INC | DEC)                                                       #postfixExprAlt
+    :   primary op=(INC | DEC)                                                              #postfixExprAlt
 
-    // qualified name, list/map element, method invocation
-    |   pathExpression                                                                      #pathExprAlt
+    // identifiers, literals, list/map element, method invocation
+    |   primary pathElement*                                                                #pathExprAlt
 
     // bitwise not (~) / logical not (!) (level 1)
     |   op=(BITNOT | NOT) nls expression                                                    #unaryNotExprAlt
@@ -305,31 +306,6 @@ expression
         |   ELVIS nls
         )
         fb=expression                                                                       #conditionalExprAlt
-    ;
-
-castOperandExpression
-    :   LPAREN type rparen castOperandExpression            #castCastExprAlt
-
-    |   pathExpression op=(INC | DEC)                       #postfixCastExprAlt
-    |   pathExpression                                      #pathCastExprAlt
-
-    // bitwise not (~) / logical not (!)
-    |   op=(BITNOT | NOT) nls castOperandExpression         #unaryNotCastExprAlt
-
-    // prefix (++/--)
-    |   op=(INC | DEC) castOperandExpression                #prefixCastExprAlt
-
-    // unary (+/-)
-    |   op=(ADD | SUB) castOperandExpression                #unaryAddCastExprAlt
-    ;
-
-variableNames
-    :   LPAREN identifier (COMMA identifier)+ rparen
-    ;
-
-// -- path expression
-pathExpression
-    :   primary pathElement*
     ;
 
 primary
