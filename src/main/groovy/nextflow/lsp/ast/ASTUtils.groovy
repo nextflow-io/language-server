@@ -61,11 +61,10 @@ class ASTUtils {
     static ASTNode getDefinition(ASTNode node, boolean strict, ASTNodeCache ast) {
         if( node == null )
             return null
+        if( node instanceof FunctionNode || node instanceof ProcessNode || node instanceof WorkflowNode )
+            return null
 
         final parentNode = ast.getParent(node)
-
-        if( node instanceof ProcessNode || node instanceof WorkflowNode )
-            return node
 
         if( node instanceof ExpressionStatement )
             node = node.getExpression()
@@ -82,9 +81,6 @@ class ASTUtils {
         }
         else if( node instanceof ClassExpression ) {
             return tryToResolveOriginalClassNode(node.getType(), strict, ast)
-        }
-        else if( node instanceof MethodNode ) {
-            return node
         }
         else if( node instanceof ConstantExpression && parentNode != null ) {
             if( parentNode instanceof MethodCallExpression ) {

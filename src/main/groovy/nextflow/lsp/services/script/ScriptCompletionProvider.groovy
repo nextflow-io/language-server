@@ -587,7 +587,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             items.addAll(PROCESS_DIRECTIVES)
         else if( section == 'input' )
             items.addAll(PROCESS_INPUTS)
-        else if( section == 'outout' )
+        else if( section == 'output' )
             items.addAll(PROCESS_OUTPUTS)
         else
             populateFunctionNames(prefix, items)

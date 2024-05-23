@@ -80,7 +80,7 @@ class ConfigHoverProvider implements HoverProvider {
         if( offsetNode instanceof ConfigAssignmentNode ) {
             final names = []
             for( final node : nodeTree.asReversed() )
-                if( node instanceof ConfigBlockNode )
+                if( node instanceof ConfigBlockNode && node.kind == null )
                     names << node.name
             names.addAll(offsetNode.names)
 
@@ -104,7 +104,7 @@ class ConfigHoverProvider implements HoverProvider {
         if( offsetNode instanceof ConfigBlockNode ) {
             final names = []
             for( final node : nodeTree.asReversed() )
-                if( node instanceof ConfigBlockNode )
+                if( node instanceof ConfigBlockNode && node.kind == null )
                     names << node.name
 
             final fqName = names.join('.')

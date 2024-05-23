@@ -239,7 +239,7 @@ class ConfigAstBuilder {
         final namesX = listX( identifiers.collect( this.&configPathElement ) )
         final right = expression(ctx.expression())
         final call = callThisX('assign', args(namesX, right))
-        new ConfigAssignmentNode(call, names, right)
+        ast( new ConfigAssignmentNode(call, names, right), ctx )
     }
 
     private Expression configPathElement(IdentifierContext ctx) {
