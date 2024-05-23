@@ -6,6 +6,7 @@ import nextflow.lsp.compiler.ASTUtils
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Ranges
+import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
@@ -47,10 +48,10 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either
 @CompileStatic
 class ScriptCompletionProvider implements CompletionProvider {
 
-    private static final List<CompletionItem> NXF_TOPLEVEL_ITEMS
+    private static final List<CompletionItem> TOPLEVEL_ITEMS
     
     static {
-        NXF_TOPLEVEL_ITEMS = [
+        TOPLEVEL_ITEMS = [
             [
                 'include',
                 '''
@@ -188,10 +189,10 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
-    private static final List<CompletionItem> NXF_PROCESS_DIRECTIVES
+    private static final List<CompletionItem> PROCESS_DIRECTIVES
 
     static {
-        NXF_PROCESS_DIRECTIVES = [
+        PROCESS_DIRECTIVES = [
             [
                 'clusterOptions',
                 '''
@@ -285,6 +286,7 @@ class ScriptCompletionProvider implements CompletionProvider {
         ].collect { name, documentation, insertText ->
             final item = new CompletionItem(name)
             item.setKind(CompletionItemKind.Method)
+            item.setDetail('directive')
             item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
             item.setInsertText(insertText)
             item.setInsertTextFormat(InsertTextFormat.Snippet)
@@ -293,10 +295,10 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
-    private static final List<CompletionItem> NXF_PROCESS_INPUTS
+    private static final List<CompletionItem> PROCESS_INPUTS
 
     static {
-        NXF_PROCESS_INPUTS = [
+        PROCESS_INPUTS = [
             [
                 'val',
                 '''
@@ -362,10 +364,10 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
-    private static final List<CompletionItem> NXF_PROCESS_OUTPUTS
+    private static final List<CompletionItem> PROCESS_OUTPUTS
 
     static {
-        NXF_PROCESS_OUTPUTS = [
+        PROCESS_OUTPUTS = [
             [
                 'val',
                 '''
@@ -437,10 +439,10 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
-    private static final List<CompletionItem> NXF_OPERATORS
+    private static final List<CompletionItem> OPERATORS
 
     static {
-        NXF_OPERATORS = [
+        OPERATORS = [
             [
                 'filter',
                 '''
@@ -471,6 +473,7 @@ class ScriptCompletionProvider implements CompletionProvider {
         ].collect { name, documentation, insertText ->
             final item = new CompletionItem(name)
             item.setKind(CompletionItemKind.Method)
+            item.setDetail('operator')
             item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
             item.setInsertText(insertText.stripIndent(true).trim())
             item.setInsertTextFormat(InsertTextFormat.Snippet)
@@ -499,50 +502,59 @@ class ScriptCompletionProvider implements CompletionProvider {
         final uri = URI.create(textDocument.getUri())
         final nodeTree = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter())
         if( !nodeTree )
-            // TODO: need to confirm that position is in top level (no leading whitespace? no paren stack?)
-            return Either.forLeft(NXF_TOPLEVEL_ITEMS)
+            return Either.forLeft(TOPLEVEL_ITEMS)
 
         final offsetNode = nodeTree.first()
         final parentNode = ast.getParent(offsetNode)
+        final prefix = offsetNode instanceof VariableExpression ? offsetNode.name : ''
 
         isIncomplete = false
         final List<CompletionItem> items = []
 
-        if( nodeTree.any { node -> node instanceof ProcessNode } ) {
-            log.debug "completion: populate from process definition"
-            populateItemsFromProcess(nodeTree, items)
+        for( final node : nodeTree ) {
+            if( node instanceof FunctionNode ) {
+                log.debug "completion: populate from function definition"
+                populateItemsFromFunction(prefix, nodeTree, items)
+                break
+            }
+            if( node instanceof ProcessNode ) {
+                log.debug "completion: populate from process definition"
+                populateItemsFromProcess(prefix, nodeTree, items)
+                break
+            }
+            if( node instanceof WorkflowNode ) {
+                log.debug "completion: populate from workflow definition"
+                populateItemsFromWorkflow(prefix, nodeTree, items)
+                break
+            }
         }
-        else if( nodeTree.any { node -> node instanceof WorkflowNode } ) {
-            log.debug "completion: populate from workflow definition"
-            populateItemsFromWorkflow(nodeTree, items)
-        }
-        else if( offsetNode instanceof PropertyExpression ) {
+
+        if( offsetNode instanceof PropertyExpression ) {
+            // e.g. "foo."
             log.debug "completion: populate from property expression"
             populateItemsFromPropertyExpression(offsetNode, position, items)
         }
         else if( parentNode instanceof PropertyExpression ) {
+            // e.g. "foo.bar"
             log.debug "completion: populate from property expression (parent)"
             populateItemsFromPropertyExpression(parentNode, position, items)
         }
-        else if( offsetNode instanceof MethodCallExpression ) {
-            log.debug "completion: populate from method call"
-            populateItemsFromMethodCallExpression(offsetNode, position, items)
-        }
         else if( offsetNode instanceof ConstructorCallExpression ) {
+            // e.g. "new Foo ()"
+            //              ^
             log.debug "completion: populate from constructor call"
             populateItemsFromConstructorCallExpression(offsetNode, position, items)
         }
         else if( parentNode instanceof MethodCallExpression ) {
+            // e.g. "foo ()"
+            //          ^
             log.debug "completion: populate from method call (parent)"
             populateItemsFromMethodCallExpression(parentNode, position, items)
         }
         else if( offsetNode instanceof VariableExpression ) {
+            // e.g. "foo"
             log.debug "completion: populate from variable"
             populateItemsFromVariableExpression(offsetNode, position, items)
-        }
-        else if( offsetNode instanceof MethodNode ) {
-            log.debug "completion: populate from method"
-            populateItemsFromScope(offsetNode, '', items)
         }
         else if( offsetNode instanceof Statement ) {
             log.debug "completion: populate from statement"
@@ -554,24 +566,28 @@ class ScriptCompletionProvider implements CompletionProvider {
             : Either.forLeft(items)
     }
 
-    private void populateItemsFromProcess(List<ASTNode> nodeTree, List<CompletionItem> items) {
+    private void populateItemsFromFunction(String prefix, List<ASTNode> nodeTree, List<CompletionItem> items) {
+        populateFunctionNames(prefix, items)
+    }
+
+    private void populateItemsFromProcess(String prefix, List<ASTNode> nodeTree, List<CompletionItem> items) {
         String section
         for( final node : nodeTree ) {
             if( node instanceof Statement && node.statementLabels )
                 section = node.statementLabels.first()
         }
 
-        final sectionItems = switch( section ) {
-            case 'directives' -> NXF_PROCESS_DIRECTIVES
-            case 'input' -> NXF_PROCESS_INPUTS
-            case 'output' -> NXF_PROCESS_OUTPUTS
-            default -> null
-        }
-        if( sectionItems )
-            items.addAll(sectionItems)
+        if( section == 'directives' )
+            items.addAll(PROCESS_DIRECTIVES)
+        else if( section == 'input' )
+            items.addAll(PROCESS_INPUTS)
+        else if( section == 'outout' )
+            items.addAll(PROCESS_OUTPUTS)
+        else
+            populateFunctionNames(prefix, items)
     }
 
-    private void populateItemsFromWorkflow(List<ASTNode> nodeTree, List<CompletionItem> items) {
+    private void populateItemsFromWorkflow(String prefix, List<ASTNode> nodeTree, List<CompletionItem> items) {
         String section = 'main'
         boolean inClosure = false
         for( final node : nodeTree ) {
@@ -581,12 +597,64 @@ class ScriptCompletionProvider implements CompletionProvider {
                 inClosure = true
         }
 
-        if( section != 'main' )
-            return
+        if( section == 'main' ) {
+            populateFunctionNames(prefix, items)
+            if( !inClosure ) {
+                populateOperatorNames(prefix, items)
+                populateProcessNames(prefix, items)
+                populateWorkflowNames(prefix, items)
+            }
+        }
 
-        // TODO: function, process, workflow names 
-        if( !inClosure )
-            items.addAll(NXF_OPERATORS)
+        // TODO: variables in 'take:' section
+    }
+
+    private void populateFunctionNames(String prefix, List<CompletionItem> items) {
+        for( final functionNode : ast.getFunctionNodes() ) {
+            final name = functionNode.getName()
+            if( !name.startsWith(prefix) )
+                continue
+
+            final item = new CompletionItem(name)
+            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(functionNode))
+            item.setDetail('function')
+            items.add(item)
+        }
+    }
+
+    private void populateOperatorNames(String prefix, List<CompletionItem> items) {
+        for( final item : OPERATORS ) {
+            if( !item.getLabel().startsWith(prefix) )
+                continue
+
+            items.add(item)
+        }
+    }
+
+    private void populateProcessNames(String prefix, List<CompletionItem> items) {
+        for( final processNode : ast.getProcessNodes() ) {
+            final name = processNode.getName()
+            if( !name.startsWith(prefix) )
+                continue
+
+            final item = new CompletionItem(name)
+            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(processNode))
+            item.setDetail('process')
+            items.add(item)
+        }
+    }
+
+    private void populateWorkflowNames(String prefix, List<CompletionItem> items) {
+        for( final workflowNode : ast.getWorkflowNodes() ) {
+            final name = workflowNode.getName()
+            if( !name || !name.startsWith(prefix) )
+                continue
+
+            final item = new CompletionItem(name)
+            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(workflowNode))
+            item.setDetail('workflow')
+            items.add(item)
+        }
     }
 
     private void populateItemsFromPropertyExpression(PropertyExpression propX, Position position, List<CompletionItem> items) {
@@ -604,7 +672,7 @@ class ScriptCompletionProvider implements CompletionProvider {
     private void populateItemsFromConstructorCallExpression(ConstructorCallExpression ctorX, Position position, List<CompletionItem> items) {
         final typeRange = LanguageServerUtils.astNodeToRange(ctorX.getType())
         final typeName = getMemberName(ctorX.getType().getNameWithoutPackage(), typeRange, position)
-        populateTypes(ctorX, typeName, new HashSet<>(), items)
+        populateTypes(typeName, new HashSet<>(), items)
     }
 
     private void populateItemsFromVariableExpression(VariableExpression varX, Position position, List<CompletionItem> items) {
@@ -613,7 +681,20 @@ class ScriptCompletionProvider implements CompletionProvider {
         populateItemsFromScope(varX, memberName, items)
     }
 
-    private void populateItemsFromPropertiesAndFields(List<PropertyNode> properties, List<FieldNode> fields, String memberNamePrefix, Set<String> existingNames, List<CompletionItem> items) {
+    private void populateItemsFromExpression(Expression leftSide, String memberNamePrefix, List<CompletionItem> items) {
+        final Set<String> existingNames = []
+
+        final properties = ASTUtils.getPropertiesForLeftSideOfPropertyExpression(leftSide, ast)
+        populateItemsFromProperties(properties, memberNamePrefix, existingNames, items)
+
+        final fields = ASTUtils.getFieldsForLeftSideOfPropertyExpression(leftSide, ast)
+        populateItemsFromFields(fields, memberNamePrefix, existingNames, items)
+
+        final methods = ASTUtils.getMethodsForLeftSideOfPropertyExpression(leftSide, ast)
+        populateItemsFromMethods(methods, memberNamePrefix, existingNames, items)
+    }
+
+    private void populateItemsFromProperties(List<PropertyNode> properties, String memberNamePrefix, Set<String> existingNames, List<CompletionItem> items) {
         for( final property : properties ) {
             final name = property.getName()
             if( !name.startsWith(memberNamePrefix) || existingNames.contains(name) )
@@ -625,7 +706,9 @@ class ScriptCompletionProvider implements CompletionProvider {
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(property))
             items.add(item)
         }
+    }
 
+    private void populateItemsFromFields(List<FieldNode> fields, String memberNamePrefix, Set<String> existingNames, List<CompletionItem> items) {
         for( final field : fields ) {
             final name = field.getName()
             if( !name.startsWith(memberNamePrefix) || existingNames.contains(name) )
@@ -653,15 +736,20 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
-    private void populateItemsFromExpression(Expression leftSide, String memberNamePrefix, List<CompletionItem> items) {
+    private void populateItemsFromScope(ASTNode node, String namePrefix, List<CompletionItem> items) {
         final Set<String> existingNames = []
+        ASTNode current = node
+        while( current != null ) {
+            if( current instanceof BlockStatement ) {
+                populateItemsFromVariableScope(current.getVariableScope(), namePrefix, existingNames, items)
+            }
+            current = ast.getParent(current)
+        }
 
-        final properties = ASTUtils.getPropertiesForLeftSideOfPropertyExpression(leftSide, ast)
-        final fields = ASTUtils.getFieldsForLeftSideOfPropertyExpression(leftSide, ast)
-        populateItemsFromPropertiesAndFields(properties, fields, memberNamePrefix, existingNames, items)
-
-        final methods = ASTUtils.getMethodsForLeftSideOfPropertyExpression(leftSide, ast)
-        populateItemsFromMethods(methods, memberNamePrefix, existingNames, items)
+        if( namePrefix.length() == 0 )
+            isIncomplete = true
+        else
+            populateTypes(namePrefix, existingNames, items)
     }
 
     private void populateItemsFromVariableScope(VariableScope variableScope, String memberNamePrefix, Set<String> existingNames, List<CompletionItem> items) {
@@ -678,22 +766,6 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
-    private void populateItemsFromScope(ASTNode node, String namePrefix, List<CompletionItem> items) {
-        final Set<String> existingNames = []
-        ASTNode current = node
-        while( current != null ) {
-            if( current instanceof BlockStatement ) {
-                populateItemsFromVariableScope(current.getVariableScope(), namePrefix, existingNames, items)
-            }
-            current = ast.getParent(current)
-        }
-
-        if( namePrefix.length() == 0 )
-            isIncomplete = true
-        else
-            populateTypes(node, namePrefix, existingNames, items)
-    }
-
     private static final List<ClassNode> STANDARD_TYPES = [
         ClassHelper.make('java.nio.file.Path'),
         ClassHelper.make('nextflow.Channel'),
@@ -701,7 +773,7 @@ class ScriptCompletionProvider implements CompletionProvider {
         ClassHelper.make('nextflow.util.MemoryUnit'),
     ]
 
-    private void populateTypes(ASTNode offsetNode, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
+    private void populateTypes(String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
         // add types defined in the current module
         populateTypes0(ast.getClassNodes(), namePrefix, existingNames, items)
 
@@ -724,16 +796,14 @@ class ScriptCompletionProvider implements CompletionProvider {
             final item = new CompletionItem()
             item.setLabel(classNameWithoutPackage)
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(classNode))
-            item.setDetail(classNode.getPackageName())
             items.add(item)
         }
     }
 
     private String getMemberName(String memberName, Range range, Position position) {
-        if (position.getLine() == range.getStart().getLine()
-                && position.getCharacter() > range.getStart().getCharacter()) {
-            int length = position.getCharacter() - range.getStart().getCharacter()
-            if (length > 0 && length <= memberName.length())
+        if( position.getLine() == range.getStart().getLine() && position.getCharacter() > range.getStart().getCharacter() ) {
+            final length = position.getCharacter() - range.getStart().getCharacter()
+            if( length > 0 && length <= memberName.length() )
                 return memberName.substring(0, length).trim()
         }
         return ''

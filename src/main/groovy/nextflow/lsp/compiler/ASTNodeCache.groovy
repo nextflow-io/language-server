@@ -76,6 +76,12 @@ class ASTNodeCache {
 
     private Map<URI, List<ASTNode>> nodesByURI = [:]
 
+    private Map<URI, List<FunctionNode>> functionNodesByURI = [:]
+
+    private Map<URI, List<ProcessNode>> processNodesByURI = [:]
+
+    private Map<URI, List<WorkflowNode>> workflowNodesByURI = [:]
+
     private Map<URI, List<ClassNode>> classNodesByURI = [:]
 
     private Map<LookupKey, LookupData> lookup = [:]
@@ -120,13 +126,16 @@ class ASTNodeCache {
         compiler.update(uris)
 
         // remove given files from ast cache
-        uris.forEach(uri -> {
+        for( final uri : uris ) {
             final nodes = nodesByURI.remove(uri)
             nodes?.forEach(node -> {
                 lookup.remove(new LookupKey(node))
             })
+            functionNodesByURI.remove(uri)
+            processNodesByURI.remove(uri)
+            workflowNodesByURI.remove(uri)
             classNodesByURI.remove(uri)
-        })
+        }
 
         // update ast cache for given files
         for( final uri : uris ) {
@@ -140,6 +149,36 @@ class ASTNodeCache {
      */
     Map<URI, List<SyntaxException>> getCompilerErrors() {
         return compiler.getErrors()
+    }
+
+    /**
+     * Get the list of function nodes across all cached files.
+     */
+    List<FunctionNode> getFunctionNodes() {
+        final List<FunctionNode> result = []
+        for( final nodes : functionNodesByURI.values() )
+            result.addAll(nodes)
+        return result
+    }
+
+    /**
+     * Get the list of process nodes across all cached files.
+     */
+    List<ProcessNode> getProcessNodes() {
+        final List<ProcessNode> result = []
+        for( final nodes : processNodesByURI.values() )
+            result.addAll(nodes)
+        return result
+    }
+
+    /**
+     * Get the list of workflow nodes across all cached files.
+     */
+    List<WorkflowNode> getWorkflowNodes() {
+        final List<WorkflowNode> result = []
+        for( final nodes : workflowNodesByURI.values() )
+            result.addAll(nodes)
+        return result
     }
 
     /**
@@ -270,10 +309,13 @@ class ASTNodeCache {
 
         private SourceUnit sourceUnit
 
+        private URI uri
+
         private Stack<ASTNode> stack = []
 
         Visitor(SourceUnit sourceUnit) {
             this.sourceUnit = sourceUnit
+            this.uri = sourceUnit.getSource().getURI()
         }
 
         @Override
@@ -282,8 +324,10 @@ class ASTNodeCache {
         }
 
         void visit() {
-            final uri = sourceUnit.getSource().getURI()
             nodesByURI.put(uri, [])
+            functionNodesByURI.put(uri, [])
+            processNodesByURI.put(uri, [])
+            workflowNodesByURI.put(uri, [])
             classNodesByURI.put(uri, [])
             final moduleNode = sourceUnit.getAST()
             if( moduleNode != null )
@@ -304,7 +348,6 @@ class ASTNodeCache {
 
         @Override
         void visitClass(ClassNode node) {
-            final uri = sourceUnit.getSource().getURI()
             classNodesByURI.get(uri).add(node)
             pushASTNode(node)
             try {
@@ -316,6 +359,7 @@ class ASTNodeCache {
         }
 
         protected void visitFunction(FunctionNode node) {
+            functionNodesByURI.get(uri).add(node)
             pushASTNode(node)
             try {
                 super.visitMethod(node)
@@ -442,6 +486,7 @@ class ASTNodeCache {
         }
 
         protected void visitProcess(ProcessNode node) {
+            processNodesByURI.get(uri).add(node)
             pushASTNode(node)
             try {
                 visit(node.directives)
@@ -456,6 +501,7 @@ class ASTNodeCache {
         }
 
         protected void visitWorkflow(WorkflowNode node) {
+            workflowNodesByURI.get(uri).add(node)
             pushASTNode(node)
             try {
                 visit(node.takes)
