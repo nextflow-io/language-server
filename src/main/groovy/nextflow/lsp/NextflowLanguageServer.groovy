@@ -11,6 +11,8 @@ import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionList
 import org.eclipse.lsp4j.CompletionOptions
 import org.eclipse.lsp4j.CompletionParams
+import org.eclipse.lsp4j.CreateFilesParams
+import org.eclipse.lsp4j.DeleteFilesParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams
@@ -154,11 +156,6 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     void didSave(DidSaveTextDocumentParams params) {
         final uri = params.getTextDocument().getUri()
         log.debug "textDocument/didSave ${relativePath(uri)}"
-
-        if( configService.matchesFile(uri) )
-            configService.didSave(params)
-        if( scriptService.matchesFile(uri) )
-            scriptService.didSave(params)
     }
 
     @Override
@@ -193,25 +190,26 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     @Override
     void didChangeConfiguration(DidChangeConfigurationParams params) {
         log.debug "workspace/didChangeConfiguration ${params.getSettings()}"
-
-        configService.didChangeConfiguration(params)
-        scriptService.didChangeConfiguration(params)
     }
 
     @Override
     void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
         log.debug "workspace/didChangeWatchedFiles ${params}"
+    }
 
-        configService.didChangeWatchedFiles(params)
-        scriptService.didChangeWatchedFiles(params)
+    @Override
+    void didCreateFiles(CreateFilesParams params) {
+        log.debug "workspace/didCreateFiles ${params}"
+    }
+
+    @Override
+    void didDeleteFiles(DeleteFilesParams params) {
+        log.debug "workspace/didDeleteFiles ${params}"
     }
 
     @Override
     void didRenameFiles(RenameFilesParams params) {
         log.debug "workspace/didRenameFiles ${params}"
-
-        configService.didRenameFiles(params)
-        scriptService.didRenameFiles(params)
     }
 
     @Override

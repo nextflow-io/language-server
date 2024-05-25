@@ -14,18 +14,14 @@ import org.eclipse.lsp4j.CompletionList
 import org.eclipse.lsp4j.CompletionParams
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
-import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
-import org.eclipse.lsp4j.DidChangeWatchedFilesParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
-import org.eclipse.lsp4j.DidSaveTextDocumentParams
 import org.eclipse.lsp4j.DocumentSymbol
 import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.PublishDiagnosticsParams
-import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.WorkspaceSymbolParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
@@ -86,24 +82,6 @@ abstract class LanguageService {
         fileCache.didClose(params)
         update()
         previousUri = params.getTextDocument().getUri()
-    }
-
-    void didSave(DidSaveTextDocumentParams params) {
-    }
-
-    void didChangeConfiguration(DidChangeConfigurationParams params) {
-    }
-
-    void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-        for( final fileEvent : params.getChanges() ) {
-            final uri = fileEvent.getUri()
-            if( matchesFile(uri) )
-                fileCache.markChanged(uri)
-        }
-        update()
-    }
-
-    void didRenameFiles(RenameFilesParams params) {
     }
 
     // --- REQUESTS
