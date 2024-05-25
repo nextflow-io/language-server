@@ -11,6 +11,7 @@ import nextflow.script.v2.OperatorNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.ast.stmt.Statement
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.MarkupContent

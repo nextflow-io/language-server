@@ -146,6 +146,10 @@ class ASTNodeCache {
         return result
     }
 
+    List<FunctionNode> getFunctionNodes(URI uri) {
+        return functionNodesByURI[uri]
+    }
+
     /**
      * Get the list of process nodes across all cached files.
      */
@@ -156,6 +160,10 @@ class ASTNodeCache {
         return result
     }
 
+    List<ProcessNode> getProcessNodes(URI uri) {
+        return processNodesByURI[uri]
+    }
+
     /**
      * Get the list of workflow nodes across all cached files.
      */
@@ -164,6 +172,10 @@ class ASTNodeCache {
         for( final nodes : workflowNodesByURI.values() )
             result.addAll(nodes)
         return result
+    }
+
+    List<WorkflowNode> getWorkflowNodes(URI uri) {
+        return workflowNodesByURI[uri]
     }
 
     /**
