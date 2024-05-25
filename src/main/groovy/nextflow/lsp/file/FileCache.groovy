@@ -25,12 +25,10 @@ class FileCache {
         return openFiles.keySet()
     }
 
-    Set<URI> getChangedFiles() {
-        return changedFiles
-    }
-
-    void resetChangedFiles() {
+    Set<URI> removeChangedFiles() {
+        final result = changedFiles
         changedFiles = new HashSet<>()
+        return result
     }
 
     void markChanged(String filename) {

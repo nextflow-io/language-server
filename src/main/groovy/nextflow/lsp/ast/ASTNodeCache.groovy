@@ -4,7 +4,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 import groovy.transform.CompileStatic
-import nextflow.lsp.compiler.CompilationCache
+import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Positions
@@ -62,6 +62,7 @@ import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.TryCatchStatement
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.codehaus.groovy.syntax.SyntaxException
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
@@ -75,7 +76,7 @@ import org.eclipse.lsp4j.Range
 @CompileStatic
 class ASTNodeCache {
 
-    private CompilationCache compiler
+    private Compiler compiler
 
     private Map<URI, List<ASTNode>> nodesByURI = [:]
 
@@ -89,69 +90,50 @@ class ASTNodeCache {
 
     private Map<LookupKey, LookupData> lookup = [:]
 
-    private volatile boolean initialized
-
-    ASTNodeCache(CompilationCache compiler) {
+    ASTNodeCache(Compiler compiler) {
         this.compiler = compiler
-    }
-
-    /**
-     * Initialize the cache with source files from the current workspace.
-     *
-     * @param workspaceRoot
-     * @param fileCache
-     */
-    void initialize(Path workspaceRoot, FileCache fileCache) {
-        // compile source files
-        compiler.initialize(workspaceRoot, fileCache)
-
-        // initialize ast cache
-        nodesByURI.clear()
-        classNodesByURI.clear()
-        lookup.clear()
-        for( final sourceUnit : compiler.getSources().values() ) {
-            visitSourceUnit(sourceUnit)
-        }
-        initialized = true
     }
 
     /**
      * Update the cache for a set of source files.
      *
-     * @param unit
      * @param uris
+     * @param fileCache
      */
-    void update(Set<URI> uris) {
-        if( !initialized )
-            return
+    Map<URI, List<SyntaxException>> update(Set<URI> uris, FileCache fileCache) {
+        final sources = compiler.compile(uris, fileCache)
+        final Map<URI, List<SyntaxException>> errorsByUri = [:]
 
-        // re-compile source files
-        compiler.update(uris)
-
-        // remove given files from ast cache
         for( final uri : uris ) {
+            // remove any existing cache entries
             final nodes = nodesByURI.remove(uri)
-            nodes?.forEach(node -> {
-                lookup.remove(new LookupKey(node))
-            })
+            if( nodes ) {
+                for( final node : nodes )
+                    lookup.remove(new LookupKey(node))
+            }
             functionNodesByURI.remove(uri)
             processNodesByURI.remove(uri)
             workflowNodesByURI.remove(uri)
             classNodesByURI.remove(uri)
+
+            final sourceUnit = sources[uri]
+            if( !sourceUnit )
+                continue
+
+            // update cache
+            new Visitor(sourceUnit).visit()
+
+            // collect errors
+            final List<SyntaxException> errors = []
+            final messages = sourceUnit.getErrorCollector().getErrors() ?: []
+            for( final message : messages ) {
+                if( message instanceof SyntaxErrorMessage )
+                    errors.add(message.cause)
+            }
+            errorsByUri[uri] = errors
         }
 
-        // update ast cache for given files
-        for( final uri : uris ) {
-            final sourceUnit = compiler.getSources().get(uri)
-            visitSourceUnit(sourceUnit)
-        }
-    }
-
-    /**
-     * Get the list of compiler errors for each source file.
-     */
-    Map<URI, List<SyntaxException>> getCompilerErrors() {
-        return compiler.getErrors()
+        return errorsByUri
     }
 
     /**
@@ -304,10 +286,6 @@ class ASTNodeCache {
         return lookup.get(new LookupKey(node))?.uri
     }
 
-    protected void visitSourceUnit(SourceUnit sourceUnit) {
-        new Visitor(sourceUnit).visit()
-    }
-
     private class Visitor extends ClassCodeVisitorSupport {
 
         private SourceUnit sourceUnit
@@ -351,7 +329,7 @@ class ASTNodeCache {
 
         @Override
         void visitClass(ClassNode node) {
-            classNodesByURI.get(uri).add(node)
+            classNodesByURI[uri].add(node)
             pushASTNode(node)
             try {
                 super.visitClass(node)
@@ -362,7 +340,7 @@ class ASTNodeCache {
         }
 
         protected void visitFunction(FunctionNode node) {
-            functionNodesByURI.get(uri).add(node)
+            functionNodesByURI[uri].add(node)
             pushASTNode(node)
             try {
                 super.visitMethod(node)
@@ -489,7 +467,7 @@ class ASTNodeCache {
         }
 
         protected void visitProcess(ProcessNode node) {
-            processNodesByURI.get(uri).add(node)
+            processNodesByURI[uri].add(node)
             pushASTNode(node)
             try {
                 visit(node.directives)
@@ -504,7 +482,7 @@ class ASTNodeCache {
         }
 
         protected void visitWorkflow(WorkflowNode node) {
-            workflowNodesByURI.get(uri).add(node)
+            workflowNodesByURI[uri].add(node)
             pushASTNode(node)
             try {
                 visit(node.takes)
@@ -881,7 +859,7 @@ class ASTNodeCache {
             final isSynthetic = node instanceof AnnotatedNode && node.isSynthetic()
             if( !isSynthetic ) {
                 final uri = sourceUnit.getSource().getURI()
-                nodesByURI.get(uri).add(node)
+                nodesByURI[uri].add(node)
 
                 final data = new LookupData()
                 data.uri = uri

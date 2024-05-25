@@ -1,14 +1,16 @@
 package nextflow.lsp.services
 
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
-import nextflow.lsp.compiler.CompilationCache
+import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
+import org.codehaus.groovy.syntax.SyntaxException
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionList
 import org.eclipse.lsp4j.CompletionParams
@@ -27,6 +29,12 @@ import org.eclipse.lsp4j.WorkspaceSymbolParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
 
+/**
+ * Base language service which handles document updates,
+ * publishes diagnostics, and provides language features.
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
 @CompileStatic
 abstract class LanguageService {
 
@@ -49,15 +57,38 @@ abstract class LanguageService {
     }
 
     abstract boolean matchesFile(String uri)
-    abstract protected CompilationCache getCompiler()
+    abstract protected Compiler getCompiler()
     protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) { null }
     protected SymbolProvider getSymbolProvider(ASTNodeCache astCache) { null }
     protected HoverProvider getHoverProvider(ASTNodeCache astCache) { null }
 
-    void setWorkspaceRoot(Path workspaceRoot) {
-        astCache.initialize(workspaceRoot, fileCache)
-        publishDiagnostics()
+    void initialize(Path workspaceRoot) {
+        final uris = workspaceRoot != null
+            ? getWorkspaceFiles(workspaceRoot)
+            : fileCache.getOpenFiles()
+        final errors = astCache.update(uris, fileCache)
+        publishDiagnostics(errors)
         previousUri = null
+    }
+
+    protected Set<URI> getWorkspaceFiles(Path workspaceRoot) {
+        try {
+            final Set<URI> result = []
+            for( final path : Files.walk(workspaceRoot) ) {
+                if( path.isDirectory() )
+                    continue
+                if( !matchesFile(path.toString()) )
+                    continue
+
+                result << path.toUri()
+            }
+
+            return result
+        }
+        catch( IOException e ) {
+            log.error "Failed to query workspace files: ${workspaceRoot} -- cause: ${e}"
+            return Collections.emptySet()
+        }
     }
 
     void connect(LanguageClient client) {
@@ -141,16 +172,18 @@ abstract class LanguageService {
      * Re-compile any changed files.
      */
     private void update() {
-        astCache.update(fileCache.getChangedFiles())
-        fileCache.resetChangedFiles()
-        publishDiagnostics()
+        final uris = fileCache.removeChangedFiles()
+        final errors = astCache.update(uris, fileCache)
+        publishDiagnostics(errors)
     }
 
     /**
-     * Publish diagnostics for compilation errors.
+     * Publish diagnostics for a set of compilation errors.
+     *
+     * @param errorsByUri
      */
-    private void publishDiagnostics() {
-        astCache.getCompilerErrors().forEach((uri, errors) -> {
+    private void publishDiagnostics(Map<URI, List<SyntaxException>> errorsByUri) {
+        errorsByUri.forEach((uri, errors) -> {
             final List<Diagnostic> diagnostics = []
             for( final error : errors ) {
                 final diagnostic = new Diagnostic()

@@ -67,8 +67,8 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         final root = params.getRootUri()
         if( root != null ) {
             this.workspaceRoot = Path.of(URI.create(root))
-            configService.setWorkspaceRoot(workspaceRoot)
-            scriptService.setWorkspaceRoot(workspaceRoot)
+            configService.initialize(workspaceRoot)
+            scriptService.initialize(workspaceRoot)
         }
 
         final completionOptions = new CompletionOptions(false, List.of('.'))
