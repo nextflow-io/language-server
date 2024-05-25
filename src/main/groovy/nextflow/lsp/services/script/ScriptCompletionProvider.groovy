@@ -2,8 +2,8 @@ package nextflow.lsp.services.script
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
+import nextflow.lsp.ast.ASTNodeStringUtils
 import nextflow.lsp.ast.ASTUtils
-import nextflow.lsp.ast.GroovydocUtils
 import nextflow.lsp.services.CompletionProvider
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
@@ -445,35 +445,7 @@ class ScriptCompletionProvider implements CompletionProvider {
     private static final List<CompletionItem> OPERATORS
 
     static {
-        OPERATORS = [
-            [
-                'filter',
-                '''
-                The `filter` operator emits the values from a source channel that satisfy a condition, discarding all other values. The filter condition can be a literal value, a regular expression, a type qualifier, or a boolean predicate.
-
-                [Read more](https://nextflow.io/docs/latest/operator.html#filter)
-                ''',
-                'filter { v -> $1 }'
-            ],
-            [
-                'map',
-                '''
-                The `map` operator applies a mapping function to each value from a source channel.
-
-                [Read more](https://nextflow.io/docs/latest/operator.html#map)
-                ''',
-                'map { v -> $1 }'
-            ],
-            [
-                'reduce',
-                '''
-                The `reduce` operator applies an accumulator function sequentially to each value in a source channel, and emits the final accumulated value. The accumulator function takes two parameters -- the accumulated value and the *i*-th emitted value -- and it should return the accumulated result, which is passed to the next invocation with the *i+1*-th value. This process is repeated for each value in the source channel.
-
-                [Read more](https://nextflow.io/docs/latest/operator.html#reduce)
-                ''',
-                'reduce { acc, v -> $1 }'
-            ],
-        ].collect { name, documentation, insertText ->
+        OPERATORS = ScriptDefs.OPERATORS.collect { name, documentation, insertText ->
             final item = new CompletionItem(name)
             item.setKind(CompletionItemKind.Method)
             item.setDetail('operator')
@@ -625,7 +597,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(functionNode))
             item.setDetail('function')
 
-            final documentation = GroovydocUtils.getDocumentation(functionNode)
+            final documentation = ASTNodeStringUtils.getDocumentation(functionNode)
             if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
 
@@ -652,7 +624,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(processNode))
             item.setDetail('process')
 
-            final documentation = GroovydocUtils.getDocumentation(processNode)
+            final documentation = ASTNodeStringUtils.getDocumentation(processNode)
             if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
 
@@ -670,7 +642,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(workflowNode))
             item.setDetail('workflow')
 
-            final documentation = GroovydocUtils.getDocumentation(workflowNode)
+            final documentation = ASTNodeStringUtils.getDocumentation(workflowNode)
             if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
 

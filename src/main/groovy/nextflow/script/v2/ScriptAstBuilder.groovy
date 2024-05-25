@@ -1526,6 +1526,15 @@ class FunctionNode extends MethodNode {
     }
 }
 
+@CompileStatic
+class OperatorNode extends MethodNode {
+    final String documentation
+
+    OperatorNode(String name, String documentation) {
+        super(name, 0, null, Parameter.EMPTY_ARRAY, [] as ClassNode[], EmptyStatement.INSTANCE)
+        this.documentation = documentation
+    }
+}
 
 @CompileStatic
 class IncludeNode extends ExpressionStatement {

@@ -1,7 +1,9 @@
 package nextflow.lsp.ast
 
 import groovy.transform.CompileStatic
+import nextflow.lsp.services.script.ScriptDefs
 import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.OperatorNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
@@ -84,7 +86,10 @@ class ASTUtils {
         }
         else if( node instanceof ConstantExpression && parentNode != null ) {
             if( parentNode instanceof MethodCallExpression ) {
-                return ASTUtils.getMethodFromCallExpression(parentNode, ast)
+                final object = parentNode.objectExpression
+                return object instanceof VariableExpression && object.name == 'this'
+                    ? getComponentFromCallExpression(parentNode, ast)
+                    : getMethodFromCallExpression(parentNode, ast)
             }
             else if( parentNode instanceof PropertyExpression ) {
                 final propertyNode = ASTUtils.getPropertyFromExpression(parentNode, ast)
@@ -281,6 +286,35 @@ class ASTUtils {
         return node instanceof Expression
             ? node.getType()
             : null
+    }
+
+    private static ASTNode getComponentFromCallExpression(MethodCallExpression call, ASTNodeCache ast) {
+        final name = call.methodAsString
+        final uri = ast.getURI(call)
+
+        // TODO: add function imports
+        // TODO: handle function overloads
+        final functionNode = ast.getFunctionNodes(uri).find { node -> node.name == name }
+        if( functionNode )
+            return functionNode
+
+        // TODO: add process, workflow imports
+        final inWorkflow = getEnclosingNodeOfType(call, WorkflowNode.class, ast) != null
+        if( inWorkflow ) {
+            final operator = ScriptDefs.OPERATORS.find { vals -> vals[0] == name }
+            if( operator )
+                return new OperatorNode(operator[0], operator[1].stripIndent(true).trim())
+
+            final processNode = ast.getProcessNodes(uri).find { node -> node.name == name }
+            if( processNode )
+                return processNode
+
+            final workflowNode = ast.getWorkflowNodes(uri).find { node -> node.name == name }
+            if( workflowNode )
+                return workflowNode
+        }
+
+        return null
     }
 
     /**

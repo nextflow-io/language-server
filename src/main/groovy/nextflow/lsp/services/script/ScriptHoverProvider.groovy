@@ -2,12 +2,12 @@ package nextflow.lsp.services.script
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
+import nextflow.lsp.ast.ASTNodeStringUtils
 import nextflow.lsp.ast.ASTUtils
-import nextflow.lsp.ast.GroovydocUtils
 import nextflow.lsp.services.HoverProvider
-import nextflow.lsp.util.ASTNodeToStringUtils
 import nextflow.lsp.util.Logger
 import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.OperatorNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
@@ -49,8 +49,8 @@ class ScriptHoverProvider implements HoverProvider {
 
         final offsetNode = nodeTree.first()
         final definitionNode = ASTUtils.getDefinition(offsetNode, false, ast)
-        final content = definitionNode ? getHoverContent(definitionNode) : null
-        final documentation = GroovydocUtils.getDocumentation(definitionNode)
+        final label = definitionNode ? getHoverLabel(definitionNode) : null
+        final detail = ASTNodeStringUtils.getDocumentation(definitionNode)
 
         final builder = new StringBuilder()
 
@@ -69,16 +69,16 @@ class ScriptHoverProvider implements HoverProvider {
             builder.append('\n```')
         }
 
-        if( content != null ) {
+        if( label != null ) {
             builder.append('\n\n---\n\n')
             builder.append('```groovy\n')
-            builder.append(content)
+            builder.append(label)
             builder.append('\n```')
         }
 
-        if( documentation != null ) {
+        if( detail != null ) {
             builder.append('\n\n---\n\n')
-            builder.append(documentation)
+            builder.append(detail)
         }
 
         final value = builder.toString()
@@ -88,15 +88,21 @@ class ScriptHoverProvider implements HoverProvider {
         return new Hover(new MarkupContent(MarkupKind.MARKDOWN, value))
     }
 
-    private String getHoverContent(ASTNode node) {
+    private String getHoverLabel(ASTNode node) {
         if( node instanceof FunctionNode ) {
-            return ASTNodeToStringUtils.functionToString(node, ast)
+            return ASTNodeStringUtils.toString(node, ast)
+        }
+        else if( node instanceof OperatorNode ) {
+            return ASTNodeStringUtils.toString(node, ast)
         }
         else if( node instanceof ProcessNode ) {
-            return ASTNodeToStringUtils.processToString(node, ast)
+            return ASTNodeStringUtils.toString(node, ast)
         }
         else if( node instanceof WorkflowNode ) {
-            return ASTNodeToStringUtils.workflowToString(node, ast)
+            return ASTNodeStringUtils.toString(node, ast)
+        }
+        else if( node instanceof Variable ) {
+            return ASTNodeStringUtils.toString(node, ast)
         }
         else {
             return null
