@@ -87,6 +87,8 @@ class ASTNodeStringUtils {
     }
 
     static String getDocumentation(ASTNode node) {
+        if( node instanceof FunctionNode )
+            return node.documentation ?: groovydocToMarkdown(node.getGroovydoc())
         if( node instanceof OperatorNode )
             return node.documentation
         if( node instanceof ProcessNode )

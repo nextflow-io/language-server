@@ -294,6 +294,10 @@ class ASTUtils {
 
         // TODO: add function imports
         // TODO: handle function overloads
+        final function = ScriptDefs.FUNCTIONS.find { vals -> vals[0] == name }
+        if( function )
+            return new FunctionNode(function[0], function[1].stripIndent(true).trim())
+
         final functionNode = ast.getFunctionNodes(uri).find { node -> node.name == name }
         if( functionNode )
             return functionNode

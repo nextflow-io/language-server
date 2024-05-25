@@ -14,7 +14,6 @@ import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.PropertyNode
@@ -186,6 +185,21 @@ class ScriptCompletionProvider implements CompletionProvider {
             item.setKind(CompletionItemKind.Snippet)
             item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
             item.setInsertText(insertText.stripIndent(true).trim())
+            item.setInsertTextFormat(InsertTextFormat.Snippet)
+            item.setInsertTextMode(InsertTextMode.AdjustIndentation)
+            return item
+        }
+    }
+
+    private static final List<CompletionItem> FUNCTIONS
+
+    static {
+        FUNCTIONS = ScriptDefs.FUNCTIONS.collect { name, documentation, insertText ->
+            final item = new CompletionItem(name)
+            item.setKind(CompletionItemKind.Snippet)
+            item.setDetail('function')
+            item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
+            item.setInsertText(insertText)
             item.setInsertTextFormat(InsertTextFormat.Snippet)
             item.setInsertTextMode(InsertTextMode.AdjustIndentation)
             return item
@@ -588,6 +602,14 @@ class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateFunctionNames(String prefix, List<CompletionItem> items) {
+        for( final item : FUNCTIONS ) {
+            final name = item.label
+            if( !name.startsWith(prefix) )
+                continue
+
+            items.add(item)
+        }
+
         for( final functionNode : ast.getFunctionNodes() ) {
             final name = functionNode.getName()
             if( !name.startsWith(prefix) )
@@ -759,19 +781,12 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
-    private static final List<ClassNode> STANDARD_TYPES = [
-        ClassHelper.make('java.nio.file.Path'),
-        ClassHelper.make('nextflow.Channel'),
-        ClassHelper.make('nextflow.util.Duration'),
-        ClassHelper.make('nextflow.util.MemoryUnit'),
-    ]
-
     private void populateTypes(String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
         // add types defined in the current module
         populateTypes0(ast.getClassNodes(), namePrefix, existingNames, items)
 
         // add built-in types
-        populateTypes0(STANDARD_TYPES, namePrefix, existingNames, items)
+        populateTypes0(ScriptDefs.TYPES, namePrefix, existingNames, items)
     }
 
     private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {

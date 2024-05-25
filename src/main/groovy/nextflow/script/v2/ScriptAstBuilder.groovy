@@ -1520,11 +1520,18 @@ class ScriptAstBuilder {
 
 @CompileStatic
 class FunctionNode extends MethodNode {
+    final String documentation
 
     FunctionNode(String name, ClassNode returnType, Parameter[] parameters, Statement code) {
         super(name, 0, returnType, parameters, [] as ClassNode[], code)
     }
+
+    FunctionNode(String name, String documentation) {
+        this(name, null, Parameter.EMPTY_ARRAY, EmptyStatement.INSTANCE)
+        this.documentation = documentation
+    }
 }
+
 
 @CompileStatic
 class OperatorNode extends MethodNode {
@@ -1535,6 +1542,7 @@ class OperatorNode extends MethodNode {
         this.documentation = documentation
     }
 }
+
 
 @CompileStatic
 class IncludeNode extends ExpressionStatement {

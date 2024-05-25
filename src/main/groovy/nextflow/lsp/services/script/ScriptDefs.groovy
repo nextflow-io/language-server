@@ -1,7 +1,28 @@
 package nextflow.lsp.services.script
 
-@groovy.transform.CompileStatic
+import groovy.transform.CompileStatic
+import org.codehaus.groovy.ast.ClassHelper
+import org.codehaus.groovy.ast.ClassNode
+
+@CompileStatic
 class ScriptDefs {
+
+    static final List<List<String>> FUNCTIONS = [
+        [
+            'error',
+            '''
+            Throw a script runtime error with an optional error message.
+            ''',
+            'error ${1:message}'
+        ],
+        [
+            'file',
+            '''
+            Get one or more files from a path or glob pattern. Returns a Path or list of Paths if there are multiple files.
+            ''',
+            'file( ${1:filePattern} )'
+        ],
+    ]
 
     static final List<List<String>> OPERATORS = [
         [
@@ -29,8 +50,15 @@ class ScriptDefs {
 
             [Read more](https://nextflow.io/docs/latest/operator.html#reduce)
             ''',
-            'reduce { acc, v -> $1 }'
+            'reduce( ${1:seed} ) { acc, v -> $2 }'
         ],
+    ]
+
+    static final List<ClassNode> TYPES = [
+        ClassHelper.make( java.nio.file.Path ),
+        ClassHelper.make( nextflow.Channel ),
+        ClassHelper.make( nextflow.util.Duration ),
+        ClassHelper.make( nextflow.util.MemoryUnit ),
     ]
 
 }
