@@ -10,6 +10,7 @@ import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
+import nextflow.lsp.util.Positions
 import org.codehaus.groovy.syntax.SyntaxException
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionList
@@ -186,10 +187,16 @@ abstract class LanguageService {
         errorsByUri.forEach((uri, errors) -> {
             final List<Diagnostic> diagnostics = []
             for( final error : errors ) {
+                final range = LanguageServerUtils.syntaxExceptionToRange(error)
+                if( !Positions.isValid(range.start) || !Positions.isValid(range.end) ) {
+                    log.error "${uri}: invalid range for error: ${error.message}"
+                    continue
+                }
+
                 final diagnostic = new Diagnostic()
-                diagnostic.setRange(LanguageServerUtils.syntaxExceptionToRange(error))
+                diagnostic.setRange(range)
                 diagnostic.setSeverity(DiagnosticSeverity.Error)
-                diagnostic.setMessage(error.getMessage())
+                diagnostic.setMessage(error.message)
                 diagnostics << diagnostic
             }
 

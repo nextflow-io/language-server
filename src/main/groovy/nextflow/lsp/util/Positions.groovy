@@ -12,7 +12,7 @@ class Positions {
             : p1.getCharacter() - p2.getCharacter()
     }
 
-    static boolean valid(Position p) {
+    static boolean isValid(Position p) {
         return p.getLine() >= 0 || p.getCharacter() >= 0
     }
 

@@ -117,8 +117,10 @@ class ASTNodeCache {
             classNodesByURI.remove(uri)
 
             final sourceUnit = sources[uri]
-            if( !sourceUnit )
+            if( !sourceUnit ) {
+                errorsByUri[uri] = []
                 continue
+            }
 
             // update cache
             new Visitor(sourceUnit).visit()
@@ -608,7 +610,8 @@ class ASTNodeCache {
         void visitShortTernaryExpression(ElvisOperatorExpression node) {
             pushASTNode(node)
             try {
-                super.visitShortTernaryExpression(node)
+                // see CodeVisitorSupport::visitShortTernaryExpression()
+                super.visitTernaryExpression(node)
             }
             finally {
                 popASTNode()
