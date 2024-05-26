@@ -24,6 +24,10 @@ class ConfigService extends LanguageService {
     }
 
     @Override
+    protected ASTNodeCache getAstCache() {
+        return new ASTNodeCache(getCompiler())
+    }
+
     protected Compiler getCompiler() {
         final config = createConfiguration()
         final classLoader = new GroovyClassLoader(ClassLoader.getSystemClassLoader().getParent(), config, true)

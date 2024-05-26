@@ -1,8 +1,5 @@
 package nextflow.lsp.ast
 
-import java.nio.file.Path
-import java.nio.file.Paths
-
 import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.file.FileCache
@@ -20,7 +17,6 @@ import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
-import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.ast.PropertyNode

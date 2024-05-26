@@ -57,7 +57,7 @@ class ScriptHoverProvider implements HoverProvider {
 
         if( Logger.isDebugEnabled() ) {
             builder.append('```\n')
-            nodeTree.reverse().eachWithIndex { node, i ->
+            nodeTree.asReversed().eachWithIndex { node, i ->
                 builder.append('  ' * i)
                 builder.append(node.class.simpleName)
                 builder.append("(${node.getLineNumber()}:${node.getColumnNumber()}-${node.getLastLineNumber()}:${node.getLastColumnNumber()-1})")

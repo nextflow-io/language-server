@@ -51,14 +51,14 @@ abstract class LanguageService {
     private HoverProvider hoverProvider
 
     LanguageService() {
-        this.astCache = new ASTNodeCache(getCompiler())
+        this.astCache = getAstCache()
         this.completionProvider = getCompletionProvider(astCache)
         this.symbolProvider = getSymbolProvider(astCache)
         this.hoverProvider = getHoverProvider(astCache)
     }
 
     abstract boolean matchesFile(String uri)
-    abstract protected Compiler getCompiler()
+    abstract protected ASTNodeCache getAstCache()
     protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) { null }
     protected SymbolProvider getSymbolProvider(ASTNodeCache astCache) { null }
     protected HoverProvider getHoverProvider(ASTNodeCache astCache) { null }
