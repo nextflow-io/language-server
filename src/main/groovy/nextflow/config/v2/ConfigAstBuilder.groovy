@@ -221,6 +221,9 @@ class ConfigAstBuilder {
         if( ctx instanceof ConfigBlockStmtAltContext )
             return ast( configBlock(ctx.configBlock()), ctx )
 
+        if( ctx instanceof ConfigBlockAltStmtAltContext )
+            return ast( configBlockAlt(ctx.configBlockAlt()), ctx )
+
         if( ctx instanceof ConfigIncompleteStmtAltContext && allowIncomplete )
             return ast( configIncomplete(ctx.configIncomplete()), ctx )
 
@@ -288,6 +291,24 @@ class ConfigAstBuilder {
         ctx.identifier()
             ? identifier(ctx.identifier())
             : stringLiteral(ctx.stringLiteral())
+    }
+
+    private Statement configBlockAlt(ConfigBlockAltContext ctx) {
+        final name = identifier(ctx.identifier())
+        final statements = ctx.configBlockAltStatement().collect( this.&configBlockAltStatement )
+        final block = block(new VariableScope(), statements)
+        final call = ast( callThisX('block', args(constX(name), closureX(block))), ctx )
+        if( name != 'plugins' )
+            collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (omit the equals sign)", call))
+        new ConfigBlockNode(call, name, block)
+    }
+
+    private Statement configBlockAltStatement(ConfigBlockAltStatementContext ctx) {
+        final name = identifier(ctx.identifier())
+        final namesX = listX( List.of(constX(name)) as List<Expression> )
+        final right = literal(ctx.literal())
+        final call = callThisX('append', args(namesX, right))
+        ast( new ConfigAppendNode(call, List.of(name), right), ctx )
     }
 
     private Statement configIncomplete(ConfigIncompleteContext ctx) {
@@ -369,7 +390,7 @@ class ConfigAstBuilder {
             final variables = ctx.typeNamePairs().typeNamePair().collect { pair ->
                 final name = identifier(pair.identifier())
                 final type = type(pair.type())
-                ast( varX(name, type), pair )
+                ast( varX(name, type), pair.identifier() )
             }
             final target = variables.size() > 1
                 ? new ArgumentListExpression(variables as List<Expression>)
@@ -382,7 +403,7 @@ class ConfigAstBuilder {
             final type = type(ctx.type())
             final decl = ctx.variableDeclarator()
             final name = identifier(decl.identifier())
-            final target = ast( varX(name, type), ctx )
+            final target = ast( varX(name, type), decl.identifier() )
             final initializer = decl.initializer
                 ? expression(decl.initializer)
                 : EmptyExpression.INSTANCE
@@ -391,10 +412,14 @@ class ConfigAstBuilder {
     }
 
     private Statement assignment(MultipleAssignmentStatementContext ctx) {
-        final vars = ctx.variableNames().identifier().collect( this.&variableName )
-        final left = ast( new TupleExpression(vars), ctx.variableNames() )
+        final left = variableNames(ctx.variableNames())
         final right = expression(ctx.right)
-        return stmt(assignX(left, right))
+        return stmt(ast( assignX(left, right), ctx ))
+    }
+
+    private Expression variableNames(VariableNamesContext ctx) {
+        final vars = ctx.identifier().collect( this.&variableName )
+        return ast( new TupleExpression(vars), ctx )
     }
 
     private Expression variableName(IdentifierContext ctx) {
@@ -1259,6 +1284,14 @@ class ConfigAssignmentNode extends ExpressionStatement {
         super(expression)
         this.names = names
         this.value = value
+    }
+}
+
+
+@CompileStatic
+class ConfigAppendNode extends ConfigAssignmentNode {
+    ConfigAppendNode(Expression expression, List<String> names, Expression value) {
+        super(expression, names, value)
     }
 }
 

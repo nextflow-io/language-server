@@ -88,6 +88,7 @@ configStatement
     :   configInclude               #configIncludeStmtAlt
     |   configAssignment            #configAssignmentStmtAlt
     |   configBlock                 #configBlockStmtAlt
+    |   configBlockAlt              #configBlockAltStmtAlt
     |   configIncomplete            #configIncompleteStmtAlt
     ;
 
@@ -125,6 +126,15 @@ configSelector
 configSelectorTarget
     :   identifier
     |   stringLiteral
+    ;
+
+// -- config block alternative (no '=')
+configBlockAlt
+    :   identifier nls LBRACE (nls configBlockAltStatement)* nls RBRACE
+    ;
+
+configBlockAltStatement
+    :   identifier literal
     ;
 
 // -- incomplete config statement

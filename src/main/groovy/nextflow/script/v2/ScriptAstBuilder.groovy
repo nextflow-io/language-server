@@ -260,7 +260,7 @@ class ScriptAstBuilder {
         final right = literal(ctx.literal())
         final call = callThisX('feature', args(left, right))
 
-        ast( new ExpressionStatement(call), ctx )
+        ast( new FeatureFlagNode(call, names, right), ctx )
     }
 
     private Statement includeStatement(IncludeStatementContext ctx) {
@@ -312,7 +312,7 @@ class ScriptAstBuilder {
             bodyDef
         ]))
         final methodCall = callThisX('process', args(constX(name), closure))
-        final result = ast( new ProcessNode(methodCall, name, directives, inputs, outputs, exec, stub), ctx )
+        final result = ast( new ProcessNode(methodCall, name, directives, inputs, outputs, when, exec, stub), ctx )
 
         groovydocManager.handle(result.expression, ctx)
         return result
@@ -461,8 +461,8 @@ class ScriptAstBuilder {
     private Statement workflowDef(WorkflowDefContext ctx) {
         final name = ctx.name?.text
         final takes = workflowTakes(ctx.body?.workflowTakes())
-        final emits = workflowEmits(ctx.body?.workflowEmits())
         final main = blockStatements(ctx.body?.workflowMain()?.blockStatements())
+        final emits = workflowEmits(ctx.body?.workflowEmits(), main)
         main.addStatementLabel('main')
         final bodyDef = stmt(createX(
             BodyDef,
@@ -500,22 +500,24 @@ class ScriptAstBuilder {
         return result
     }
 
-    private Statement workflowEmits(WorkflowEmitsContext ctx) {
+    private Statement workflowEmits(WorkflowEmitsContext ctx, BlockStatement main) {
         if( !ctx )
             return EmptyStatement.INSTANCE
 
-        final statements = ctx.workflowEmit().collect( this.&workflowEmit )
+        final statements = ctx.workflowEmit().collect( emit -> workflowEmit(emit, main) )
         final result = ast( block(new VariableScope(), statements), ctx )
         result.addStatementLabel('emit')
         return result
     }
 
-    private Statement workflowEmit(WorkflowEmitContext ctx) {
+    private Statement workflowEmit(WorkflowEmitContext ctx, BlockStatement main) {
         final name = identifier(ctx.identifier())
-        final arguments = ctx.expression()
-            ? args(constX(name), expression(ctx.expression()))
-            : args(constX(name))
-        return stmt(callThisX('_emit_', arguments))
+        if( ctx.expression() ) {
+            final left = ast( varX(name), ctx.identifier() )
+            final statement = stmt(ast( assignX(left, expression(ctx.expression())), ctx ))
+            main.addStatement(statement)
+        }
+        return stmt(callThisX('_emit_', args(constX(name))))
     }
 
     private MethodNode functionDef(FunctionDefContext ctx) {
@@ -608,7 +610,7 @@ class ScriptAstBuilder {
         final types = catchTypes(ctx.catchTypes())
         return types.collect { type ->
             final name = identifier(ctx.identifier())
-            final variable = param(type, name)
+            final variable = ast( param(type, name), ctx.identifier() )
             final code = statementOrBlock(ctx.statementOrBlock())
             ast( new CatchStatement(variable, code), ctx )
         }
@@ -616,7 +618,7 @@ class ScriptAstBuilder {
 
     private List<ClassNode> catchTypes(CatchTypesContext ctx) {
         if( !ctx )
-            return Collections.emptyList()
+            return Collections.singletonList( ClassHelper.dynamicType() )
 
         return ctx.qualifiedClassName().collect( this.&qualifiedClassName )
     }
@@ -648,7 +650,7 @@ class ScriptAstBuilder {
             final variables = ctx.typeNamePairs().typeNamePair().collect { pair ->
                 final name = identifier(pair.identifier())
                 final type = type(pair.type())
-                ast( varX(name, type), pair )
+                ast( varX(name, type), pair.identifier() )
             }
             final target = variables.size() > 1
                 ? new ArgumentListExpression(variables as List<Expression>)
@@ -661,7 +663,7 @@ class ScriptAstBuilder {
             final type = type(ctx.type())
             final decl = ctx.variableDeclarator()
             final name = identifier(decl.identifier())
-            final target = ast( varX(name, type), ctx )
+            final target = ast( varX(name, type), decl.identifier() )
             final initializer = decl.initializer
                 ? expression(decl.initializer)
                 : EmptyExpression.INSTANCE
@@ -670,10 +672,14 @@ class ScriptAstBuilder {
     }
 
     private Statement assignment(MultipleAssignmentStatementContext ctx) {
-        final vars = ctx.variableNames().identifier().collect( this.&variableName )
-        final left = ast( new TupleExpression(vars), ctx.variableNames() )
+        final left = variableNames(ctx.variableNames())
         final right = expression(ctx.right)
-        return stmt(assignX(left, right))
+        return stmt(ast( assignX(left, right), ctx ))
+    }
+
+    private Expression variableNames(VariableNamesContext ctx) {
+        final vars = ctx.identifier().collect( this.&variableName )
+        return ast( new TupleExpression(vars), ctx )
     }
 
     private Expression variableName(IdentifierContext ctx) {
@@ -1519,6 +1525,19 @@ class ScriptAstBuilder {
 
 
 @CompileStatic
+class FeatureFlagNode extends ExpressionStatement {
+    final List<String> names
+    final Expression value
+
+    FeatureFlagNode(Expression expression, List<String> names, Expression value) {
+        super(expression)
+        this.names = names
+        this.value = value
+    }
+}
+
+
+@CompileStatic
 class FunctionNode extends MethodNode {
     final String documentation
 
@@ -1563,15 +1582,17 @@ class ProcessNode extends ExpressionStatement {
     final Statement directives
     final Statement inputs
     final Statement outputs
+    final Statement when
     final Statement exec
     final Statement stub
 
-    ProcessNode(Expression expression, String name, Statement directives, Statement inputs, Statement outputs, Statement exec, Statement stub) {
+    ProcessNode(Expression expression, String name, Statement directives, Statement inputs, Statement outputs, Statement when, Statement exec, Statement stub) {
         super(expression)
         this.name = name
         this.directives = directives
         this.inputs = inputs
         this.outputs = outputs
+        this.when = when
         this.exec = exec
         this.stub = stub
     }
