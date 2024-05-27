@@ -20,12 +20,14 @@ import org.eclipse.lsp4j.DiagnosticSeverity
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
+import org.eclipse.lsp4j.DocumentFormattingParams
 import org.eclipse.lsp4j.DocumentSymbol
 import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.SymbolInformation
+import org.eclipse.lsp4j.TextEdit
 import org.eclipse.lsp4j.WorkspaceSymbolParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
@@ -48,12 +50,14 @@ abstract class LanguageService {
 
     private CompletionProvider completionProvider
     private SymbolProvider symbolProvider
+    private FormattingProvider formattingProvider
     private HoverProvider hoverProvider
 
     LanguageService() {
         this.astCache = getAstCache()
         this.completionProvider = getCompletionProvider(astCache)
         this.symbolProvider = getSymbolProvider(astCache)
+        this.formattingProvider = getFormattingProvider(astCache)
         this.hoverProvider = getHoverProvider(astCache)
     }
 
@@ -61,6 +65,7 @@ abstract class LanguageService {
     abstract protected ASTNodeCache getAstCache()
     protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) { null }
     protected SymbolProvider getSymbolProvider(ASTNodeCache astCache) { null }
+    protected FormattingProvider getFormattingProvider(ASTNodeCache astCache) { null }
     protected HoverProvider getHoverProvider(ASTNodeCache astCache) { null }
 
     void initialize(Path workspaceRoot) {
@@ -137,6 +142,14 @@ abstract class LanguageService {
         recompileIfContextChanged(uri)
 
         final result = symbolProvider.documentSymbol(params.getTextDocument())
+        return CompletableFuture.completedFuture(result)
+    }
+
+    CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
+        if( !formattingProvider )
+            return CompletableFuture.completedFuture(Collections.emptyList())
+
+        final result = formattingProvider.formatting(params.getTextDocument(), params.getOptions())
         return CompletableFuture.completedFuture(result)
     }
 

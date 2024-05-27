@@ -6,10 +6,10 @@ import org.eclipse.lsp4j.Position
 @CompileStatic
 class Positions {
 
-    static final Comparator<Position> COMPARATOR = (Position p1, Position p2) -> {
-        p1.getLine() != p2.getLine()
-            ? p1.getLine() - p2.getLine()
-            : p1.getCharacter() - p2.getCharacter()
+    static final Comparator<Position> COMPARATOR = (Position a, Position b) -> {
+        a.getLine() != b.getLine()
+            ? a.getLine() - b.getLine()
+            : a.getCharacter() - b.getCharacter()
     }
 
     static boolean isValid(Position p) {
@@ -17,7 +17,7 @@ class Positions {
     }
 
     /**
-     * Map a two-dimensional position (line and column) to a
+     * Map a two-dimensional position (line and character) to a
      * one-dimensional index in a string buffer.
      *
      * @param string
@@ -54,6 +54,46 @@ class Positions {
             }
         }
         return currentIndex + character
+    }
+
+    /**
+     * Map a one-dimensional index in a string buffer to a
+     * two-dimensional position (line and character).
+     *
+     * @param string
+     * @param offset
+     */
+    static Position getPosition(String string, int offset) {
+        int line = 0
+        int character = 0
+        if( offset > 0 ) {
+            final reader = new BufferedReader(new StringReader(string))
+            try {
+                while( true ) {
+                    final currentChar = (char) reader.read()
+                    if( currentChar == -1 )
+                        return new Position(-1, -1)
+                    offset--
+                    character++
+                    if( currentChar == '\n' ) {
+                        line++
+                        character = 0
+                    }
+                    if( offset == 0 )
+                        break
+                }
+            }
+            catch( IOException e ) {
+                return new Position(-1, -1)
+            }
+
+            try {
+                reader.close()
+            }
+            catch( IOException e ) {
+            }
+        }
+        return new Position(line, character)
     }
 
 }

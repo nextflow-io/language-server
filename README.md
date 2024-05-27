@@ -5,6 +5,7 @@ A [language server](https://microsoft.github.io/language-server-protocol/) for [
 The following LSP requests are currently supported:
 
 - completion
+- formatting
 - hover
 - symbols
 

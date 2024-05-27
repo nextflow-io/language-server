@@ -56,7 +56,6 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.IfStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.TryCatchStatement
-import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.codehaus.groovy.syntax.SyntaxException
@@ -73,6 +72,8 @@ import org.eclipse.lsp4j.Range
 class ASTNodeCache {
 
     private Compiler compiler
+
+    private Map<URI, SourceUnit> sourcesByUri = [:]
 
     private Map<URI, List<ASTNode>> nodesByURI = [:]
 
@@ -107,6 +108,7 @@ class ASTNodeCache {
                 for( final node : nodes )
                     lookup.remove(new LookupKey(node))
             }
+            sourcesByUri.remove(uri)
             functionNodesByURI.remove(uri)
             processNodesByURI.remove(uri)
             workflowNodesByURI.remove(uri)
@@ -120,6 +122,7 @@ class ASTNodeCache {
 
             // update cache
             new Visitor(sourceUnit).visit()
+            sourcesByUri[uri] = sourceUnit
 
             // collect errors
             final List<SyntaxException> errors = []
@@ -132,6 +135,10 @@ class ASTNodeCache {
         }
 
         return errorsByUri
+    }
+
+    SourceUnit getSourceUnit(URI uri) {
+        return sourcesByUri[uri]
     }
 
     /**
@@ -531,7 +538,8 @@ class ASTNodeCache {
             pushASTNode(node)
             try {
                 super.visitTryCatchFinally(node)
-            } finally {
+            }
+            finally {
                 popASTNode()
             }
         }
@@ -861,7 +869,8 @@ class ASTNodeCache {
             pushASTNode(node)
             try {
                 super.visitCatchStatement(node)
-            } finally {
+            }
+            finally {
                 popASTNode()
             }
         }

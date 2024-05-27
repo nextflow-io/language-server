@@ -6,6 +6,7 @@ import nextflow.config.v2.ConfigParserPluginFactory
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.services.CompletionProvider
+import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.services.HoverProvider
 import nextflow.lsp.services.LanguageService
 import org.codehaus.groovy.control.CompilerConfiguration
@@ -43,6 +44,11 @@ class ConfigService extends LanguageService {
     @Override
     protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) {
         new ConfigCompletionProvider(astCache)
+    }
+
+    @Override
+    protected FormattingProvider getFormattingProvider(ASTNodeCache astCache) {
+        new ConfigFormattingProvider(astCache)
     }
 
     @Override

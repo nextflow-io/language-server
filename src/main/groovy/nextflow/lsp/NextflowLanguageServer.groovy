@@ -20,6 +20,7 @@ import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DidSaveTextDocumentParams
 import org.eclipse.lsp4j.DocumentSymbol
+import org.eclipse.lsp4j.DocumentFormattingParams
 import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
@@ -30,6 +31,7 @@ import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.SetTraceParams
 import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.TextDocumentSyncKind
+import org.eclipse.lsp4j.TextEdit
 import org.eclipse.lsp4j.WorkspaceSymbolParams
 import org.eclipse.lsp4j.jsonrpc.Launcher
 import org.eclipse.lsp4j.jsonrpc.messages.Either
@@ -75,6 +77,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         final serverCapabilities = new ServerCapabilities()
         serverCapabilities.setCompletionProvider(completionOptions)
         serverCapabilities.setDocumentSymbolProvider(true)
+        serverCapabilities.setDocumentFormattingProvider(true)
         serverCapabilities.setHoverProvider(true)
         serverCapabilities.setTextDocumentSync(TextDocumentSyncKind.Incremental)
         serverCapabilities.setWorkspaceSymbolProvider(true)
@@ -165,6 +168,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             return configService.completion(params)
         if( scriptService.matchesFile(uri) )
             return scriptService.completion(params)
+        throw new IllegalStateException("File was not matched by any language service: ${uri}")
     }
 
     @Override
@@ -174,6 +178,17 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             return configService.documentSymbol(params)
         if( scriptService.matchesFile(uri) )
             return scriptService.documentSymbol(params)
+        throw new IllegalStateException("File was not matched by any language service: ${uri}")
+    }
+
+    @Override
+    CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
+        final uri = params.getTextDocument().getUri()
+        if( configService.matchesFile(uri) )
+            return configService.formatting(params)
+        if( scriptService.matchesFile(uri) )
+            return scriptService.formatting(params)
+        throw new IllegalStateException("File was not matched by any language service: ${uri}")
     }
 
     @Override
@@ -183,6 +198,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             return configService.hover(params)
         if( scriptService.matchesFile(uri) )
             return scriptService.hover(params)
+        throw new IllegalStateException("File was not matched by any language service: ${uri}")
     }
 
     // --- WorkspaceService

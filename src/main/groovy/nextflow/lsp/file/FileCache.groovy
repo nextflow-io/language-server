@@ -65,21 +65,23 @@ class FileCache {
         final uri = URI.create(params.getTextDocument().getUri())
         final oldText = openFiles.get(uri)
         final firstChange = params.getContentChanges().first()
-        if( firstChange.getRange() == null ) {
+        if( firstChange.range == null ) {
             // update entire file contents
-            openFiles.put(uri, firstChange.getText())
+            openFiles.put(uri, firstChange.text)
         }
         else {
             // update file contents with incremental changes
-            final sortedChanges = params.getContentChanges().sort { change -> change.getRange().getStart() }
+            final sortedChanges = params.getContentChanges().sort { a, b ->
+                Positions.COMPARATOR.compare( a.range.start, b.range.start )
+            }
             final builder = new StringBuilder()
             int previousEnd = 0
             for( final change : sortedChanges ) {
-                final range = change.getRange()
+                final range = change.range
                 final offsetStart = Positions.getOffset(oldText, range.start)
                 final offsetEnd = Positions.getOffset(oldText, range.end)
                 builder.append(oldText.substring(previousEnd, offsetStart))
-                builder.append(change.getText())
+                builder.append(change.text)
                 previousEnd = offsetEnd
             }
             builder.append(oldText.substring(previousEnd))
