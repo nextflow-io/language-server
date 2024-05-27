@@ -2,12 +2,12 @@ package nextflow.lsp.services
 
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.concurrent.CompletableFuture
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.file.FileCache
+import nextflow.lsp.util.DebouncingExecutor
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Positions
@@ -41,19 +41,23 @@ import org.eclipse.lsp4j.services.LanguageClient
 @CompileStatic
 abstract class LanguageService {
 
+    private static final int DEBOUNCE_MILLIS = 1_000
+
+    private static final Object DEBOUNCE_KEY = new Object()
+
     private static Logger log = Logger.instance
 
     private LanguageClient client
     private FileCache fileCache = new FileCache()
     private ASTNodeCache astCache
-    private String previousUri
-
+    private DebouncingExecutor updateExecutor
     private CompletionProvider completionProvider
     private SymbolProvider symbolProvider
     private FormattingProvider formattingProvider
     private HoverProvider hoverProvider
 
     LanguageService() {
+        this.updateExecutor = new DebouncingExecutor(DEBOUNCE_MILLIS, { key -> update() })
         this.astCache = getAstCache()
         this.completionProvider = getCompletionProvider(astCache)
         this.symbolProvider = getSymbolProvider(astCache)
@@ -69,12 +73,14 @@ abstract class LanguageService {
     protected HoverProvider getHoverProvider(ASTNodeCache astCache) { null }
 
     void initialize(Path workspaceRoot) {
-        final uris = workspaceRoot != null
-            ? getWorkspaceFiles(workspaceRoot)
-            : fileCache.getOpenFiles()
-        final errors = astCache.update(uris, fileCache)
-        publishDiagnostics(errors)
-        previousUri = null
+        synchronized (this) {
+            final uris = workspaceRoot != null
+                ? getWorkspaceFiles(workspaceRoot)
+                : fileCache.getOpenFiles()
+
+            final errors = astCache.update(uris, fileCache)
+            publishDiagnostics(errors)
+        }
     }
 
     protected Set<URI> getWorkspaceFiles(Path workspaceRoot) {
@@ -105,90 +111,69 @@ abstract class LanguageService {
 
     void didOpen(DidOpenTextDocumentParams params) {
         fileCache.didOpen(params)
-        update()
-        previousUri = params.getTextDocument().getUri()
+        updateExecutor.submit(DEBOUNCE_KEY)
     }
 
     void didChange(DidChangeTextDocumentParams params) {
         fileCache.didChange(params)
-        update()
-        previousUri = params.getTextDocument().getUri()
+        updateExecutor.submit(DEBOUNCE_KEY)
     }
 
     void didClose(DidCloseTextDocumentParams params) {
         fileCache.didClose(params)
-        update()
-        previousUri = params.getTextDocument().getUri()
+        updateExecutor.submit(DEBOUNCE_KEY)
     }
 
     // --- REQUESTS
 
-    CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
+    Either<List<CompletionItem>, CompletionList> completion(CompletionParams params) {
         if( !completionProvider )
-            return CompletableFuture.completedFuture(Either.forLeft(Collections.emptyList()))
+            return Either.forLeft(Collections.emptyList())
 
-        final uri = params.getTextDocument().getUri()
-        recompileIfContextChanged(uri)
-
-        final result = completionProvider.completion(params.getTextDocument(), params.getPosition())
-        return CompletableFuture.completedFuture(result)
+        return completionProvider.completion(params.getTextDocument(), params.getPosition())
     }
 
-    CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
+    List<Either<SymbolInformation, DocumentSymbol>> documentSymbol(DocumentSymbolParams params) {
         if( !symbolProvider )
-            return CompletableFuture.completedFuture(Collections.emptyList())
+            return Collections.emptyList()
 
-        final uri = params.getTextDocument().getUri()
-        recompileIfContextChanged(uri)
-
-        final result = symbolProvider.documentSymbol(params.getTextDocument())
-        return CompletableFuture.completedFuture(result)
+        return symbolProvider.documentSymbol(params.getTextDocument())
     }
 
-    CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
+    List<? extends TextEdit> formatting(DocumentFormattingParams params) {
         if( !formattingProvider )
-            return CompletableFuture.completedFuture(Collections.emptyList())
+            return Collections.emptyList()
 
-        final result = formattingProvider.formatting(params.getTextDocument(), params.getOptions())
-        return CompletableFuture.completedFuture(result)
+        return formattingProvider.formatting(params.getTextDocument(), params.getOptions())
     }
 
-    CompletableFuture<Hover> hover(HoverParams params) {
+    Hover hover(HoverParams params) {
         if( !hoverProvider )
-            return CompletableFuture.completedFuture(null)
+            return null
 
-        final uri = params.getTextDocument().getUri()
-        recompileIfContextChanged(uri)
-
-        final result = hoverProvider.hover(params.getTextDocument(), params.getPosition())
-        return CompletableFuture.completedFuture(result)
+        return hoverProvider.hover(params.getTextDocument(), params.getPosition())
     }
 
-    CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
+    List<? extends SymbolInformation> symbol(WorkspaceSymbolParams params) {
         if( !symbolProvider )
-            return CompletableFuture.completedFuture(Collections.emptyList())
+            return Collections.emptyList()
 
-        final result = symbolProvider.symbol(params.getQuery())
-        return CompletableFuture.completedFuture(result)
+        return symbolProvider.symbol(params.getQuery())
     }
 
     // --- INTERNAL
 
-    private void recompileIfContextChanged(String uri) {
-        if( previousUri != null && previousUri != uri ) {
-            fileCache.markChanged(uri)
-            update()
-            previousUri = uri
-        }
-    }
-
     /**
      * Re-compile any changed files.
      */
-    private void update() {
-        final uris = fileCache.removeChangedFiles()
-        final errors = astCache.update(uris, fileCache)
-        publishDiagnostics(errors)
+    protected void update() {
+        synchronized (this) {
+            final uris = fileCache.removeChangedFiles()
+
+            log.debug "update: ${uris}"
+            final errors = astCache.update(uris, fileCache)
+            publishDiagnostics(errors)
+        }
     }
 
     /**
@@ -196,7 +181,7 @@ abstract class LanguageService {
      *
      * @param errorsByUri
      */
-    private void publishDiagnostics(Map<URI, List<SyntaxException>> errorsByUri) {
+    protected void publishDiagnostics(Map<URI, List<SyntaxException>> errorsByUri) {
         errorsByUri.forEach((uri, errors) -> {
             final List<Diagnostic> diagnostics = []
             for( final error : errors ) {

@@ -33,6 +33,7 @@ import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.TextDocumentSyncKind
 import org.eclipse.lsp4j.TextEdit
 import org.eclipse.lsp4j.WorkspaceSymbolParams
+import org.eclipse.lsp4j.jsonrpc.CompletableFutures
 import org.eclipse.lsp4j.jsonrpc.Launcher
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
@@ -163,42 +164,50 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
 
     @Override
     CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
-        final uri = params.getTextDocument().getUri()
-        if( configService.matchesFile(uri) )
-            return configService.completion(params)
-        if( scriptService.matchesFile(uri) )
-            return scriptService.completion(params)
-        throw new IllegalStateException("File was not matched by any language service: ${uri}")
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            final uri = params.getTextDocument().getUri()
+            if( configService.matchesFile(uri) )
+                return configService.completion(params)
+            if( scriptService.matchesFile(uri) )
+                return scriptService.completion(params)
+            throw new IllegalStateException("File was not matched by any language service: ${uri}")
+        })
     }
 
     @Override
     CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
-        final uri = params.getTextDocument().getUri()
-        if( configService.matchesFile(uri) )
-            return configService.documentSymbol(params)
-        if( scriptService.matchesFile(uri) )
-            return scriptService.documentSymbol(params)
-        throw new IllegalStateException("File was not matched by any language service: ${uri}")
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            final uri = params.getTextDocument().getUri()
+            if( configService.matchesFile(uri) )
+                return configService.documentSymbol(params)
+            if( scriptService.matchesFile(uri) )
+                return scriptService.documentSymbol(params)
+            throw new IllegalStateException("File was not matched by any language service: ${uri}")
+        })
     }
 
     @Override
     CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
-        final uri = params.getTextDocument().getUri()
-        if( configService.matchesFile(uri) )
-            return configService.formatting(params)
-        if( scriptService.matchesFile(uri) )
-            return scriptService.formatting(params)
-        throw new IllegalStateException("File was not matched by any language service: ${uri}")
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            final uri = params.getTextDocument().getUri()
+            if( configService.matchesFile(uri) )
+                return configService.formatting(params)
+            if( scriptService.matchesFile(uri) )
+                return scriptService.formatting(params)
+            throw new IllegalStateException("File was not matched by any language service: ${uri}")
+        })
     }
 
     @Override
     CompletableFuture<Hover> hover(HoverParams params) {
-        final uri = params.getTextDocument().getUri()
-        if( configService.matchesFile(uri) )
-            return configService.hover(params)
-        if( scriptService.matchesFile(uri) )
-            return scriptService.hover(params)
-        throw new IllegalStateException("File was not matched by any language service: ${uri}")
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            final uri = params.getTextDocument().getUri()
+            if( configService.matchesFile(uri) )
+                return configService.hover(params)
+            if( scriptService.matchesFile(uri) )
+                return scriptService.hover(params)
+            throw new IllegalStateException("File was not matched by any language service: ${uri}")
+        })
     }
 
     // --- WorkspaceService
@@ -230,7 +239,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
 
     @Override
 	CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
-        return scriptService.symbol(params)
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            return scriptService.symbol(params)
+        })
     }
 
     // -- INTERNAL
