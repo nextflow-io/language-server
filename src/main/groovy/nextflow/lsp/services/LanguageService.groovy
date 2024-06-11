@@ -6,6 +6,7 @@ import java.nio.file.Path
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
+import nextflow.lsp.compiler.SyntaxWarning
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.DebouncingExecutor
 import nextflow.lsp.util.LanguageServerUtils
@@ -186,9 +187,13 @@ abstract class LanguageService {
                     continue
                 }
 
+                final severity = error instanceof SyntaxWarning
+                    ? DiagnosticSeverity.Warning
+                    : DiagnosticSeverity.Error
+
                 final diagnostic = new Diagnostic()
                 diagnostic.setRange(range)
-                diagnostic.setSeverity(DiagnosticSeverity.Error)
+                diagnostic.setSeverity(severity)
                 diagnostic.setMessage(error.message)
                 diagnostics << diagnostic
             }
