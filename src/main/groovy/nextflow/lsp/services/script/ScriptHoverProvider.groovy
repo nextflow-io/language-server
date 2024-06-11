@@ -54,7 +54,19 @@ class ScriptHoverProvider implements HoverProvider {
 
         final builder = new StringBuilder()
 
+        if( label != null ) {
+            builder.append('```groovy\n')
+            builder.append(label)
+            builder.append('\n```')
+        }
+
+        if( detail != null ) {
+            builder.append('\n\n---\n\n')
+            builder.append(detail)
+        }
+
         if( Logger.isDebugEnabled() ) {
+            builder.append('\n\n---\n\n')
             builder.append('```\n')
             nodeTree.asReversed().eachWithIndex { node, i ->
                 builder.append('  ' * i)
@@ -69,22 +81,9 @@ class ScriptHoverProvider implements HoverProvider {
             builder.append('\n```')
         }
 
-        if( label != null ) {
-            builder.append('\n\n---\n\n')
-            builder.append('```groovy\n')
-            builder.append(label)
-            builder.append('\n```')
-        }
-
-        if( detail != null ) {
-            builder.append('\n\n---\n\n')
-            builder.append(detail)
-        }
-
         final value = builder.toString()
         if( !value )
             return null
-
         return new Hover(new MarkupContent(MarkupKind.MARKDOWN, value))
     }
 

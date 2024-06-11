@@ -47,7 +47,13 @@ class ConfigHoverProvider implements HoverProvider {
 
         final builder = new StringBuilder()
 
+        if( content != null ) {
+            builder.append(content)
+            builder.append('\n')
+        }
+
         if( Logger.isDebugEnabled() ) {
+            builder.append('\n\n---\n\n')
             builder.append('```\n')
             nodeTree.asReversed().eachWithIndex { node, i ->
                 builder.append('  ' * i)
@@ -62,16 +68,9 @@ class ConfigHoverProvider implements HoverProvider {
             builder.append('\n```')
         }
 
-        if( content != null ) {
-            builder.append('\n\n---\n\n')
-            builder.append(content)
-            builder.append('\n')
-        }
-
         final value = builder.toString()
         if( !value )
             return null
-
         return new Hover(new MarkupContent(MarkupKind.MARKDOWN, value))
     }
 
