@@ -760,13 +760,13 @@ class ScriptCompletionProvider implements CompletionProvider {
     private void populateItemsFromExpression(Expression leftSide, String memberNamePrefix, List<CompletionItem> items) {
         final Set<String> existingNames = []
 
-        final properties = ASTUtils.getPropertiesForLeftSideOfPropertyExpression(leftSide, ast)
+        final properties = ASTUtils.getPropertiesForObjectExpression(leftSide, ast)
         populateItemsFromProperties(properties, memberNamePrefix, existingNames, items)
 
-        final fields = ASTUtils.getFieldsForLeftSideOfPropertyExpression(leftSide, ast)
+        final fields = ASTUtils.getFieldsForObjectExpression(leftSide, ast)
         populateItemsFromFields(fields, memberNamePrefix, existingNames, items)
 
-        final methods = ASTUtils.getMethodsForLeftSideOfPropertyExpression(leftSide, ast)
+        final methods = ASTUtils.getMethodsForObjectExpression(leftSide, ast)
         populateItemsFromMethods(methods, memberNamePrefix, existingNames, items)
     }
 

@@ -29,7 +29,7 @@ class ASTNodeStringUtils {
             builder.append('enum ')
         else
             builder.append('class ')
-        builder.append(classNode.getNameWithoutPackage())
+        builder.append(classNode.toString(false))
         return builder.toString()
     }
 
@@ -43,7 +43,7 @@ class ASTNodeStringUtils {
         final returnType = node.getReturnType()
         if( returnType != ClassHelper.OBJECT_TYPE ) {
             builder.append(' -> ')
-            builder.append(returnType.getNameWithoutPackage())
+            builder.append(returnType.toString(false))
         }
         return builder.toString()
     }

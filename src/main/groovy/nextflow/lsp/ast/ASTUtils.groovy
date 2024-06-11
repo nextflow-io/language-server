@@ -1,6 +1,7 @@
 package nextflow.lsp.ast
 
 import groovy.transform.CompileStatic
+import nextflow.lsp.services.script.ScriptAstCache
 import nextflow.lsp.services.script.ScriptDefs
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.OperatorNode
@@ -68,34 +69,22 @@ class ASTUtils {
 
         final parentNode = ast.getParent(node)
 
-        if( node instanceof ExpressionStatement )
-            node = node.getExpression()
-
-        if( node instanceof ClassNode ) {
-            return tryToResolveOriginalClassNode(node, strict, ast)
+        if( node instanceof ClassExpression ) {
+            return getOriginalClassNode(node.type, strict, ast)
         }
         else if( node instanceof ConstructorCallExpression ) {
-            return ASTUtils.getMethodFromCallExpression(node, ast)
-        }
-        else if( node instanceof DeclarationExpression && !node.isMultipleAssignmentDeclaration() ) {
-            final originType = node.getVariableExpression().getOriginType()
-            return tryToResolveOriginalClassNode(originType, strict, ast)
-        }
-        else if( node instanceof ClassExpression ) {
-            return tryToResolveOriginalClassNode(node.getType(), strict, ast)
+            return getMethodFromCallExpression(node, ast)
         }
         else if( node instanceof ConstantExpression && parentNode != null ) {
             if( parentNode instanceof MethodCallExpression ) {
                 final object = parentNode.objectExpression
-                return object instanceof VariableExpression && object.name == 'this'
+                return object instanceof VariableExpression && object.name == 'this' && ast instanceof ScriptAstCache
                     ? getComponentFromCallExpression(parentNode, ast)
                     : getMethodFromCallExpression(parentNode, ast)
             }
             else if( parentNode instanceof PropertyExpression ) {
-                final propertyNode = ASTUtils.getPropertyFromExpression(parentNode, ast)
-                return propertyNode != null
-                    ? propertyNode
-                    : ASTUtils.getFieldFromExpression(parentNode, ast)
+                return getPropertyFromExpression(parentNode, ast)
+                    ?: getFieldFromExpression(parentNode, ast)
             }
         }
         else if( node instanceof VariableExpression ) {
@@ -124,10 +113,10 @@ class ASTUtils {
             return null
 
         if( defNode instanceof MethodNode ) {
-            return tryToResolveOriginalClassNode(defNode.getReturnType(), true, ast)
+            return getOriginalClassNode(defNode.getReturnType(), true, ast)
         }
         else if( defNode instanceof Variable ) {
-            return tryToResolveOriginalClassNode(defNode.getOriginType(), true, ast)
+            return getOriginalClassNode(defNode.getOriginType(), true, ast)
         }
         return null
     }
@@ -148,34 +137,19 @@ class ASTUtils {
         }
     }
 
-    private static ClassNode tryToResolveOriginalClassNode(ClassNode node, boolean strict, ASTNodeCache ast) {
-        for( final originalNode : ast.getClassNodes() ) {
-            if( originalNode == node )
-                return originalNode
-        }
+    private static ClassNode getOriginalClassNode(ClassNode node, boolean strict, ASTNodeCache ast) {
+        // TODO: built-in types
         return strict ? null : node
     }
 
-    /**
-     * Get the property definition for a property expression.
-     *
-     * @param node
-     * @param ast
-     */
-    static PropertyNode getPropertyFromExpression(PropertyExpression node, ASTNodeCache ast) {
+    private static PropertyNode getPropertyFromExpression(PropertyExpression node, ASTNodeCache ast) {
         final classNode = getTypeOfNode(node.getObjectExpression(), ast)
         if( classNode == null )
             return null
         return classNode.getProperty(node.getProperty().getText())
     }
 
-    /**
-     * Get the field definition for a property expression.
-     *
-     * @param node
-     * @param ast
-     */
-    static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
+    private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
         final classNode = getTypeOfNode(node.getObjectExpression(), ast)
         if( classNode == null )
             return null
@@ -189,7 +163,7 @@ class ASTUtils {
      * @param node
      * @param ast
      */
-    static List<FieldNode> getFieldsForLeftSideOfPropertyExpression(Expression node, ASTNodeCache ast) {
+    static List<FieldNode> getFieldsForObjectExpression(Expression node, ASTNodeCache ast) {
         final classNode = getTypeOfNode(node, ast)
         if( classNode == null )
             return Collections.emptyList()
@@ -204,7 +178,7 @@ class ASTUtils {
      * @param node
      * @param ast
      */
-    static List<PropertyNode> getPropertiesForLeftSideOfPropertyExpression(Expression node, ASTNodeCache ast) {
+    static List<PropertyNode> getPropertiesForObjectExpression(Expression node, ASTNodeCache ast) {
         final classNode = getTypeOfNode(node, ast)
         if( classNode == null )
             return Collections.emptyList()
@@ -219,7 +193,7 @@ class ASTUtils {
      * @param node
      * @param ast
      */
-    static List<MethodNode> getMethodsForLeftSideOfPropertyExpression(Expression node, ASTNodeCache ast) {
+    static List<MethodNode> getMethodsForObjectExpression(Expression node, ASTNodeCache ast) {
         final classNode = getTypeOfNode(node, ast)
         if( classNode == null )
             return Collections.emptyList()
@@ -234,12 +208,7 @@ class ASTUtils {
      * @param ast
      */
     static ClassNode getTypeOfNode(ASTNode node, ASTNodeCache ast) {
-        if( node instanceof BinaryExpression ) {
-            final leftExpr = node.getLeftExpression()
-            if( node.getOperation().getText().equals("[") && leftExpr.getType().isArray() )
-                return leftExpr.getType().getComponentType()
-        }
-        else if( node instanceof ClassExpression ) {
+        if( node instanceof ClassExpression ) {
             // SomeClass.someProp -> SomeClass
             return node.getType()
         }
@@ -248,25 +217,20 @@ class ASTUtils {
             return node.getType()
         }
         else if( node instanceof MethodCallExpression ) {
-            final methodNode = ASTUtils.getMethodFromCallExpression(node, ast)
+            final methodNode = getMethodFromCallExpression(node, ast)
             return methodNode != null
                 ? methodNode.getReturnType()
                 : node.getType()
         }
         else if( node instanceof PropertyExpression ) {
-            final propertyNode = ASTUtils.getPropertyFromExpression(node, ast)
+            final propertyNode = getPropertyFromExpression(node, ast)
             return propertyNode != null
                 ? getTypeOfNode(propertyNode, ast)
                 : node.getType()
         }
         else if( node instanceof Variable ) {
-            if( node.getName() == 'this' ) {
-                final enclosingClass = (ClassNode) getEnclosingNodeOfType(node, ClassNode.class, ast)
-                if( enclosingClass != null )
-                    return enclosingClass
-            }
-            else if( node.isDynamicTyped() ) {
-                final defNode = ASTUtils.getDefinition(node, false, ast)
+            if( node.isDynamicTyped() ) {
+                final defNode = getDefinition(node, false, ast)
                 if( defNode instanceof Variable ) {
                     if( defNode.hasInitialExpression() ) {
                         return getTypeOfNode(defNode.getInitialExpression(), ast)
@@ -288,7 +252,7 @@ class ASTUtils {
             : null
     }
 
-    private static ASTNode getComponentFromCallExpression(MethodCallExpression call, ASTNodeCache ast) {
+    private static ASTNode getComponentFromCallExpression(MethodCallExpression call, ScriptAstCache ast) {
         final name = call.methodAsString
         final uri = ast.getURI(call)
 
