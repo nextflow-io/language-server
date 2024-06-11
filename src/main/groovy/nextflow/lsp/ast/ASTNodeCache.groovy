@@ -6,20 +6,12 @@ import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Positions
 import nextflow.lsp.util.Ranges
-import nextflow.config.v2.ConfigAssignmentNode
-import nextflow.config.v2.ConfigBlockNode
-import nextflow.config.v2.ConfigIncludeNode
-import nextflow.script.v2.FunctionNode
-import nextflow.script.v2.IncludeNode
-import nextflow.script.v2.ProcessNode
-import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
-import org.codehaus.groovy.ast.ModuleNode
-import org.codehaus.groovy.ast.Parameter
+import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.BitwiseNegationExpression
@@ -79,16 +71,6 @@ class ASTNodeCache {
 
     private Map<URI, List<ASTNode>> nodesByURI = [:]
 
-    private Map<URI, List<IncludeNode>> includeNodesByURI = [:]
-
-    private Map<URI, List<FunctionNode>> functionNodesByURI = [:]
-
-    private Map<URI, List<ProcessNode>> processNodesByURI = [:]
-
-    private Map<URI, List<WorkflowNode>> workflowNodesByURI = [:]
-
-    private Map<URI, List<ClassNode>> classNodesByURI = [:]
-
     private Map<LookupKey, LookupData> lookup = [:]
 
     ASTNodeCache(Compiler compiler) {
@@ -113,21 +95,20 @@ class ASTNodeCache {
                     lookup.remove(new LookupKey(node))
             }
             sourcesByUri.remove(uri)
-            includeNodesByURI.remove(uri)
-            functionNodesByURI.remove(uri)
-            processNodesByURI.remove(uri)
-            workflowNodesByURI.remove(uri)
-            classNodesByURI.remove(uri)
 
             final sourceUnit = sources[uri]
             if( !sourceUnit ) {
-                errorsByUri[uri] = []
+                errorsByUri.put(uri, [])
                 continue
             }
 
             // update cache
-            new Visitor(sourceUnit).visit()
-            sourcesByUri[uri] = sourceUnit
+            final visitor = createVisitor(sourceUnit)
+            visitor.visit()
+
+            sourcesByUri.put(uri, sourceUnit)
+            nodesByURI.put(uri, visitor.getNodes())
+            lookup.putAll(visitor.getLookupEntries())
 
             // collect errors
             final List<SyntaxException> errors = []
@@ -136,73 +117,30 @@ class ASTNodeCache {
                 if( message instanceof SyntaxErrorMessage )
                     errors.add(message.cause)
             }
-            errorsByUri[uri] = errors
+            errorsByUri.put(uri, errors)
         }
 
         return errorsByUri
     }
 
+    protected Visitor createVisitor(SourceUnit sourceUnit) {
+        return new Visitor(sourceUnit)
+    }
+
+    /**
+     * Get the list of source units for all cached files.
+     */
+    Collection<SourceUnit> getSourceUnits() {
+        return sourcesByUri.values()
+    }
+
+    /**
+     * Get the source unit for a given file.
+     *
+     * @param uri
+     */
     SourceUnit getSourceUnit(URI uri) {
         return sourcesByUri[uri]
-    }
-
-    /**
-     * Get the list of include nodes in a given file.
-     */
-    List<IncludeNode> getIncludeNodes(URI uri) {
-        return includeNodesByURI[uri]
-    }
-
-    /**
-     * Get the list of function nodes across all cached files.
-     */
-    List<FunctionNode> getFunctionNodes() {
-        final List<FunctionNode> result = []
-        for( final nodes : functionNodesByURI.values() )
-            result.addAll(nodes)
-        return result
-    }
-
-    List<FunctionNode> getFunctionNodes(URI uri) {
-        return functionNodesByURI[uri]
-    }
-
-    /**
-     * Get the list of process nodes across all cached files.
-     */
-    List<ProcessNode> getProcessNodes() {
-        final List<ProcessNode> result = []
-        for( final nodes : processNodesByURI.values() )
-            result.addAll(nodes)
-        return result
-    }
-
-    List<ProcessNode> getProcessNodes(URI uri) {
-        return processNodesByURI[uri]
-    }
-
-    /**
-     * Get the list of workflow nodes across all cached files.
-     */
-    List<WorkflowNode> getWorkflowNodes() {
-        final List<WorkflowNode> result = []
-        for( final nodes : workflowNodesByURI.values() )
-            result.addAll(nodes)
-        return result
-    }
-
-    List<WorkflowNode> getWorkflowNodes(URI uri) {
-        return workflowNodesByURI[uri]
-    }
-
-    /**
-     * Get the list of class nodes across all cached files.
-     */
-    List<ClassNode> getClassNodes() {
-        final List<ClassNode> result = []
-        for( final nodes : classNodesByURI.values() )
-            result.addAll(nodes)
-        return result
     }
 
     /**
@@ -315,11 +253,15 @@ class ASTNodeCache {
         return lookup.get(new LookupKey(node))?.uri
     }
 
-    private class Visitor extends ClassCodeVisitorSupport {
+    static class Visitor extends ClassCodeVisitorSupport {
 
         private SourceUnit sourceUnit
 
         private URI uri
+
+        private List<ASTNode> nodes = []
+
+        private Map<LookupKey, LookupData> lookupEntries = [:]
 
         private Stack<ASTNode> stack = []
 
@@ -334,32 +276,29 @@ class ASTNodeCache {
         }
 
         void visit() {
-            nodesByURI.put(uri, [])
-            includeNodesByURI.put(uri, [])
-            functionNodesByURI.put(uri, [])
-            processNodesByURI.put(uri, [])
-            workflowNodesByURI.put(uri, [])
-            classNodesByURI.put(uri, [])
             final moduleNode = sourceUnit.getAST()
-            if( moduleNode != null )
-                visitModule(moduleNode)
-        }
-
-        protected void visitModule(ModuleNode node) {
-            for( final classNode : node.getClasses() ) {
-                if( classNode != node.getScriptClassDummy() )
+            if( moduleNode == null )
+                return
+            for( final classNode : moduleNode.getClasses() ) {
+                if( classNode != moduleNode.getScriptClassDummy() )
                     visitClass(classNode)
             }
-            for( final methodNode : node.getMethods() ) {
-                if( methodNode instanceof FunctionNode )
-                    visitFunction(methodNode)
+            for( final methodNode : moduleNode.getMethods() ) {
+                visitMethod(methodNode)
             }
-            super.visitBlockStatement(node.getStatementBlock())
+            super.visitBlockStatement(moduleNode.getStatementBlock())
+        }
+
+        List<ASTNode> getNodes() {
+            return nodes
+        }
+
+        Map<LookupKey, LookupData> getLookupEntries() {
+            return lookupEntries
         }
 
         @Override
         void visitClass(ClassNode node) {
-            classNodesByURI[uri].add(node)
             pushASTNode(node)
             try {
                 super.visitClass(node)
@@ -369,22 +308,11 @@ class ASTNodeCache {
             }
         }
 
-        protected void visitFunction(FunctionNode node) {
-            functionNodesByURI[uri].add(node)
+        @Override
+        void visitMethod(MethodNode node) {
             pushASTNode(node)
             try {
                 super.visitMethod(node)
-                for( final parameter : node.getParameters() )
-                    visitParameter(parameter)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        protected void visitParameter(Parameter node) {
-            pushASTNode(node)
-            try {
             }
             finally {
                 popASTNode()
@@ -437,102 +365,9 @@ class ASTNodeCache {
 
         @Override
         void visitExpressionStatement(ExpressionStatement node) {
-            if( node instanceof ConfigAssignmentNode ) {
-                visitConfigAssignment(node)
-                return
-            }
-            if( node instanceof ConfigBlockNode ) {
-                visitConfigBlock(node)
-                return
-            }
-            if( node instanceof ConfigIncludeNode ) {
-                visitConfigInclude(node)
-                return
-            }
-            if( node instanceof IncludeNode ) {
-                visitInclude(node)
-                return
-            }
-            if( node instanceof ProcessNode ) {
-                visitProcess(node)
-                return
-            }
-            if( node instanceof WorkflowNode ) {
-                visitWorkflow(node)
-                return
-            }
             pushASTNode(node)
             try {
                 super.visitExpressionStatement(node)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        protected void visitConfigAssignment(ConfigAssignmentNode node) {
-            pushASTNode(node)
-            try {
-                visit(node.value)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        protected void visitConfigBlock(ConfigBlockNode node) {
-            pushASTNode(node)
-            try {
-                visit(node.block)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        protected void visitConfigInclude(ConfigIncludeNode node) {
-            pushASTNode(node)
-            try {
-                visit(node.source)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        protected void visitInclude(IncludeNode node) {
-            includeNodesByURI[uri].add(node)
-            pushASTNode(node)
-            try {
-                visit(node.expression)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        protected void visitProcess(ProcessNode node) {
-            processNodesByURI[uri].add(node)
-            pushASTNode(node)
-            try {
-                visit(node.directives)
-                visit(node.inputs)
-                visit(node.outputs)
-                visit(node.exec)
-                visit(node.stub)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        protected void visitWorkflow(WorkflowNode node) {
-            workflowNodesByURI[uri].add(node)
-            pushASTNode(node)
-            try {
-                visit(node.takes)
-                visit(node.emits)
-                visit(node.main)
             }
             finally {
                 popASTNode()
@@ -914,23 +749,22 @@ class ASTNodeCache {
             }
         }
 
-        private void pushASTNode(ASTNode node) {
+        protected void pushASTNode(ASTNode node) {
             final isSynthetic = node instanceof AnnotatedNode && node.isSynthetic()
             if( !isSynthetic ) {
-                final uri = sourceUnit.getSource().getURI()
-                nodesByURI[uri].add(node)
+                nodes.add(node)
 
                 final data = new LookupData()
                 data.uri = uri
                 if( stack.size() > 0 )
                     data.parent = stack.lastElement()
-                lookup.put(new LookupKey(node), data)
+                lookupEntries.put(new LookupKey(node), data)
             }
 
             stack.add(node)
         }
 
-        private void popASTNode() {
+        protected void popASTNode() {
             stack.pop()
         }
     }

@@ -19,6 +19,8 @@ import org.codehaus.groovy.control.CompilerConfiguration
 @CompileStatic
 class ConfigService extends LanguageService {
 
+    private ConfigAstCache astCache = new ConfigAstCache(getCompiler())
+
     @Override
     boolean matchesFile(String uri) {
         uri.endsWith('.config') && !uri.endsWith('nf-test.config')
@@ -26,7 +28,7 @@ class ConfigService extends LanguageService {
 
     @Override
     protected ASTNodeCache getAstCache() {
-        return new ASTNodeCache(getCompiler())
+        return astCache
     }
 
     protected Compiler getCompiler() {
@@ -42,17 +44,17 @@ class ConfigService extends LanguageService {
     }
 
     @Override
-    protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) {
+    protected CompletionProvider getCompletionProvider() {
         new ConfigCompletionProvider(astCache)
     }
 
     @Override
-    protected FormattingProvider getFormattingProvider(ASTNodeCache astCache) {
+    protected FormattingProvider getFormattingProvider() {
         new ConfigFormattingProvider(astCache)
     }
 
     @Override
-    protected HoverProvider getHoverProvider(ASTNodeCache astCache) {
+    protected HoverProvider getHoverProvider() {
         new ConfigHoverProvider(astCache)
     }
 

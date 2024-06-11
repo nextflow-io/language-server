@@ -22,6 +22,8 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
 @CompileStatic
 class ScriptService extends LanguageService {
 
+    private ScriptAstCache astCache = new ScriptAstCache(getCompiler())
+
     @Override
     boolean matchesFile(String uri) {
         uri.endsWith('.nf')
@@ -29,7 +31,7 @@ class ScriptService extends LanguageService {
 
     @Override
     protected ASTNodeCache getAstCache() {
-        return new ASTNodeCache(getCompiler())
+        return astCache
     }
 
     protected Compiler getCompiler() {
@@ -56,17 +58,17 @@ class ScriptService extends LanguageService {
     }
 
     @Override
-    protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) {
+    protected CompletionProvider getCompletionProvider() {
         new ScriptCompletionProvider(astCache)
     }
 
     @Override
-    protected SymbolProvider getSymbolProvider(ASTNodeCache astCache) {
+    protected SymbolProvider getSymbolProvider() {
         new ScriptSymbolProvider(astCache)
     }
 
     @Override
-    protected HoverProvider getHoverProvider(ASTNodeCache astCache) {
+    protected HoverProvider getHoverProvider() {
         new ScriptHoverProvider(astCache)
     }
 

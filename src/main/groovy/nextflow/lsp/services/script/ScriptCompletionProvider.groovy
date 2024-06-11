@@ -3,7 +3,6 @@ package nextflow.lsp.services.script
 import java.nio.file.Path
 
 import groovy.transform.CompileStatic
-import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.ast.ASTNodeStringUtils
 import nextflow.lsp.ast.ASTUtils
 import nextflow.lsp.services.CompletionProvider
@@ -476,12 +475,12 @@ class ScriptCompletionProvider implements CompletionProvider {
 
     private static Logger log = Logger.instance
 
-    private ASTNodeCache ast
+    private ScriptAstCache ast
     private URI uri
     private int maxItemCount = 100
     private boolean isIncomplete = false
 
-    ScriptCompletionProvider(ASTNodeCache ast) {
+    ScriptCompletionProvider(ScriptAstCache ast) {
         this.ast = ast
     }
 
@@ -841,9 +840,6 @@ class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateTypes(String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
-        // add types defined in the current module
-        populateTypes0(ast.getClassNodes(), namePrefix, existingNames, items)
-
         // add built-in types
         populateTypes0(ScriptDefs.TYPES, namePrefix, existingNames, items)
     }

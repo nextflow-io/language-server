@@ -1,7 +1,6 @@
 package nextflow.lsp.services.script
 
 import groovy.transform.CompileStatic
-import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.ast.ASTNodeStringUtils
 import nextflow.lsp.ast.ASTUtils
 import nextflow.lsp.services.HoverProvider
@@ -30,9 +29,9 @@ class ScriptHoverProvider implements HoverProvider {
 
     private static Logger log = Logger.instance
 
-    private ASTNodeCache ast
+    private ScriptAstCache ast
 
-    ScriptHoverProvider(ASTNodeCache ast) {
+    ScriptHoverProvider(ScriptAstCache ast) {
         this.ast = ast
     }
 

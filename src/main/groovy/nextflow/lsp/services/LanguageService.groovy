@@ -49,28 +49,18 @@ abstract class LanguageService {
 
     private LanguageClient client
     private FileCache fileCache = new FileCache()
-    private ASTNodeCache astCache
     private DebouncingExecutor updateExecutor
-    private CompletionProvider completionProvider
-    private SymbolProvider symbolProvider
-    private FormattingProvider formattingProvider
-    private HoverProvider hoverProvider
 
     LanguageService() {
         this.updateExecutor = new DebouncingExecutor(DEBOUNCE_MILLIS, { key -> update() })
-        this.astCache = getAstCache()
-        this.completionProvider = getCompletionProvider(astCache)
-        this.symbolProvider = getSymbolProvider(astCache)
-        this.formattingProvider = getFormattingProvider(astCache)
-        this.hoverProvider = getHoverProvider(astCache)
     }
 
     abstract boolean matchesFile(String uri)
     abstract protected ASTNodeCache getAstCache()
-    protected CompletionProvider getCompletionProvider(ASTNodeCache astCache) { null }
-    protected SymbolProvider getSymbolProvider(ASTNodeCache astCache) { null }
-    protected FormattingProvider getFormattingProvider(ASTNodeCache astCache) { null }
-    protected HoverProvider getHoverProvider(ASTNodeCache astCache) { null }
+    protected CompletionProvider getCompletionProvider() { null }
+    protected SymbolProvider getSymbolProvider() { null }
+    protected FormattingProvider getFormattingProvider() { null }
+    protected HoverProvider getHoverProvider() { null }
 
     void initialize(Path workspaceRoot) {
         synchronized (this) {
@@ -78,7 +68,7 @@ abstract class LanguageService {
                 ? getWorkspaceFiles(workspaceRoot)
                 : fileCache.getOpenFiles()
 
-            final errors = astCache.update(uris, fileCache)
+            final errors = getAstCache().update(uris, fileCache)
             publishDiagnostics(errors)
         }
     }
@@ -127,31 +117,35 @@ abstract class LanguageService {
     // --- REQUESTS
 
     Either<List<CompletionItem>, CompletionList> completion(CompletionParams params) {
-        if( !completionProvider )
+        final provider = getCompletionProvider()
+        if( !provider )
             return Either.forLeft(Collections.emptyList())
 
-        return completionProvider.completion(params.getTextDocument(), params.getPosition())
+        return provider.completion(params.getTextDocument(), params.getPosition())
     }
 
     List<Either<SymbolInformation, DocumentSymbol>> documentSymbol(DocumentSymbolParams params) {
-        if( !symbolProvider )
+        final provider = getSymbolProvider()
+        if( !provider )
             return Collections.emptyList()
 
-        return symbolProvider.documentSymbol(params.getTextDocument())
+        return provider.documentSymbol(params.getTextDocument())
     }
 
     List<? extends TextEdit> formatting(DocumentFormattingParams params) {
-        if( !formattingProvider )
+        final provider = getFormattingProvider()
+        if( !provider )
             return Collections.emptyList()
 
-        return formattingProvider.formatting(params.getTextDocument(), params.getOptions())
+        return provider.formatting(params.getTextDocument(), params.getOptions())
     }
 
     Hover hover(HoverParams params) {
-        if( !hoverProvider )
+        final provider = getHoverProvider()
+        if( !provider )
             return null
 
-        return hoverProvider.hover(params.getTextDocument(), params.getPosition())
+        return provider.hover(params.getTextDocument(), params.getPosition())
     }
 
     List<? extends SymbolInformation> symbol(WorkspaceSymbolParams params) {
@@ -171,7 +165,7 @@ abstract class LanguageService {
             final uris = fileCache.removeChangedFiles()
 
             log.debug "update: ${uris}"
-            final errors = astCache.update(uris, fileCache)
+            final errors = getAstCache().update(uris, fileCache)
             publishDiagnostics(errors)
         }
     }

@@ -117,7 +117,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 class ScriptAstBuilder {
 
     private SourceUnit sourceUnit
-    private ModuleNode moduleNode
+    private ScriptNode moduleNode
     private ScriptLexer lexer
     private ScriptParser parser
     private final GroovydocManager groovydocManager
@@ -126,7 +126,7 @@ class ScriptAstBuilder {
 
     ScriptAstBuilder(SourceUnit sourceUnit, boolean groovydocEnabled) {
         this.sourceUnit = sourceUnit
-        this.moduleNode = new ModuleNode(sourceUnit)
+        this.moduleNode = new ScriptNode(sourceUnit)
 
         final charStream = createCharStream(sourceUnit)
         this.lexer = new ScriptLexer(charStream)
@@ -230,20 +230,35 @@ class ScriptAstBuilder {
     }
 
     private void scriptStatement(ScriptStatementContext ctx) {
-        if( ctx instanceof FeatureFlagStmtAltContext )
-            moduleNode.addStatement(featureFlag(ctx.featureFlag()))
+        if( ctx instanceof FeatureFlagStmtAltContext ) {
+            final featureFlagNode = featureFlag(ctx.featureFlag())
+            moduleNode.addFeatureFlag(featureFlagNode)
+            moduleNode.addStatement(featureFlagNode)
+        }
 
-        else if( ctx instanceof FunctionDefAltContext )
-            moduleNode.addMethod(functionDef(ctx.functionDef()))
+        else if( ctx instanceof FunctionDefAltContext ) {
+            final functionNode = functionDef(ctx.functionDef())
+            moduleNode.addFunction(functionNode)
+            moduleNode.addMethod(functionNode)
+        }
 
-        else if( ctx instanceof IncludeStmtAltContext )
-            moduleNode.addStatement(includeStatement(ctx.includeStatement()))
+        else if( ctx instanceof IncludeStmtAltContext ) {
+            final includeNode = includeStatement(ctx.includeStatement())
+            moduleNode.addInclude(includeNode)
+            moduleNode.addStatement(includeNode)
+        }
 
-        else if( ctx instanceof ProcessDefAltContext )
-            moduleNode.addStatement(processDef(ctx.processDef()))
+        else if( ctx instanceof ProcessDefAltContext ) {
+            final processNode = processDef(ctx.processDef())
+            moduleNode.addProcess(processNode)
+            moduleNode.addStatement(processNode)
+        }
 
-        else if( ctx instanceof WorkflowDefAltContext )
-            moduleNode.addStatement(workflowDef(ctx.workflowDef()))
+        else if( ctx instanceof WorkflowDefAltContext ) {
+            final workflowNode = workflowDef(ctx.workflowDef())
+            moduleNode.addWorkflow(workflowNode)
+            moduleNode.addStatement(workflowNode)
+        }
 
         else if( ctx instanceof IncompleteStmtAltContext )
             moduleNode.addStatement(incompleteStatement(ctx.incompleteStatement()))
@@ -252,7 +267,7 @@ class ScriptAstBuilder {
             throw createParsingFailedException("Invalid script statement: ${ctx.text}", ctx)
     }
 
-    private Statement featureFlag(FeatureFlagContext ctx) {
+    private FeatureFlagNode featureFlag(FeatureFlagContext ctx) {
         final names = ctx.featureFlagPath().identifier().collect( this.&identifier )
         final left = constX(names.join('.'))
         final right = literal(ctx.literal())
@@ -261,7 +276,7 @@ class ScriptAstBuilder {
         ast( new FeatureFlagNode(call, names, right), ctx )
     }
 
-    private Statement includeStatement(IncludeStatementContext ctx) {
+    private IncludeNode includeStatement(IncludeStatementContext ctx) {
         final source = stringLiteral(ctx.stringLiteral())
         final modules = ctx.includeNames().includeName().collect { it ->
             final name = it.name.text
@@ -282,7 +297,7 @@ class ScriptAstBuilder {
         ast( new IncludeNode(load, source, modules), ctx )
     }
 
-    private Statement processDef(ProcessDefContext ctx) {
+    private ProcessNode processDef(ProcessDefContext ctx) {
         final name = ctx.name.text
         final directives = processDirectives(ctx.body.processDirectives())
         final inputs = processInputs(ctx.body.processInputs())
@@ -456,7 +471,7 @@ class ScriptAstBuilder {
         return result
     }
 
-    private Statement workflowDef(WorkflowDefContext ctx) {
+    private WorkflowNode workflowDef(WorkflowDefContext ctx) {
         final name = ctx.name?.text
         final takes = workflowTakes(ctx.body?.workflowTakes())
         final main = blockStatements(ctx.body?.workflowMain()?.blockStatements())
@@ -518,7 +533,7 @@ class ScriptAstBuilder {
         return stmt(callThisX('_emit_', args(constX(name))))
     }
 
-    private MethodNode functionDef(FunctionDefContext ctx) {
+    private FunctionNode functionDef(FunctionDefContext ctx) {
         final name = identifier(ctx.identifier())
         final returnType = type(ctx.type())
         final params = parameters(ctx.formalParameterList()) ?: [] as Parameter[]
@@ -1529,6 +1544,60 @@ class ScriptAstBuilder {
 
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
 
+}
+
+
+@CompileStatic
+class ScriptNode extends ModuleNode {
+    private List<FeatureFlagNode> featureFlags = []
+    private List<IncludeNode> includes = []
+    private List<FunctionNode> functions = []
+    private List<ProcessNode> processes = []
+    private List<WorkflowNode> workflows = []
+
+    ScriptNode(SourceUnit sourceUnit) {
+        super(sourceUnit)
+    }
+
+    List<FeatureFlagNode> getFeatureFlags() {
+        return featureFlags
+    }
+
+    List<IncludeNode> getIncludes() {
+        return includes
+    }
+
+    List<FunctionNode> getFunctions() {
+        return functions
+    }
+
+    List<ProcessNode> getProcesses() {
+        return processes
+    }
+
+    List<WorkflowNode> getWorkflows() {
+        return workflows
+    }
+
+    void addFeatureFlag(FeatureFlagNode featureFlag) {
+        featureFlags << featureFlag
+    }
+
+    void addInclude(IncludeNode includeNode) {
+        includes << includeNode
+    }
+
+    void addFunction(FunctionNode functionNode) {
+        functions << functionNode
+    }
+
+    void addProcess(ProcessNode processNode) {
+        processes << processNode
+    }
+
+    void addWorkflow(WorkflowNode workflowNode) {
+        workflows << workflowNode
+    }
 }
 
 
