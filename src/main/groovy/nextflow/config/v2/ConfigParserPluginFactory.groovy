@@ -20,14 +20,8 @@ import org.codehaus.groovy.control.ParserPluginFactory
 
 class ConfigParserPluginFactory extends ParserPluginFactory {
 
-    private boolean allowIncomplete
-
-    ConfigParserPluginFactory(boolean allowIncomplete) {
-        this.allowIncomplete = allowIncomplete
-    }
-
     @Override
     ParserPlugin createParserPlugin() {
-        return new ConfigParserPlugin(allowIncomplete)
+        return new ConfigParserPlugin()
     }
 }

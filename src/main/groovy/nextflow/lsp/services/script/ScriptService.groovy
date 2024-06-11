@@ -47,7 +47,7 @@ class ScriptService extends LanguageService {
 
         final config = new CompilerConfiguration()
         config.addCompilationCustomizers( importCustomizer )
-        config.setPluginFactory(new ScriptParserPluginFactory(true))
+        config.setPluginFactory(new ScriptParserPluginFactory())
 
         final optimizationOptions = config.getOptimizationOptions()
         optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true)

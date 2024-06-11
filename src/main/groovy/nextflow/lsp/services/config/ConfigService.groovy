@@ -37,7 +37,7 @@ class ConfigService extends LanguageService {
 
     protected CompilerConfiguration createConfiguration() {
         final config = new CompilerConfiguration()
-        config.setPluginFactory(new ConfigParserPluginFactory(true))
+        config.setPluginFactory(new ConfigParserPluginFactory())
         return config
     }
 

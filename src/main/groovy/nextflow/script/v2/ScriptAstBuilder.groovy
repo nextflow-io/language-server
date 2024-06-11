@@ -117,7 +117,6 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 class ScriptAstBuilder {
 
     private SourceUnit sourceUnit
-    private boolean allowIncomplete
     private ModuleNode moduleNode
     private ScriptLexer lexer
     private ScriptParser parser
@@ -125,9 +124,8 @@ class ScriptAstBuilder {
 
     private Tuple2<ParserRuleContext,Exception> numberFormatError
 
-    ScriptAstBuilder(SourceUnit sourceUnit, boolean allowIncomplete, boolean groovydocEnabled) {
+    ScriptAstBuilder(SourceUnit sourceUnit, boolean groovydocEnabled) {
         this.sourceUnit = sourceUnit
-        this.allowIncomplete = allowIncomplete
         this.moduleNode = new ModuleNode(sourceUnit)
 
         final charStream = createCharStream(sourceUnit)
@@ -247,7 +245,7 @@ class ScriptAstBuilder {
         else if( ctx instanceof WorkflowDefAltContext )
             moduleNode.addStatement(workflowDef(ctx.workflowDef()))
 
-        else if( ctx instanceof IncompleteStmtAltContext && allowIncomplete )
+        else if( ctx instanceof IncompleteStmtAltContext )
             moduleNode.addStatement(incompleteStatement(ctx.incompleteStatement()))
 
         else
