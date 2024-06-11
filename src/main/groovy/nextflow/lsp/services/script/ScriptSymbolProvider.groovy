@@ -1,12 +1,9 @@
 package nextflow.lsp.services.script
 
 import groovy.transform.CompileStatic
-import nextflow.lsp.ast.ASTNodeCache
-import nextflow.lsp.ast.ASTUtils
 import nextflow.lsp.services.SymbolProvider
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
-import nextflow.lsp.util.Positions
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
@@ -27,9 +24,9 @@ class ScriptSymbolProvider implements SymbolProvider {
 
     private static Logger log = Logger.instance
 
-    private ASTNodeCache ast
+    private ScriptAstCache ast
 
-    ScriptSymbolProvider(ASTNodeCache ast) {
+    ScriptSymbolProvider(ScriptAstCache ast) {
         this.ast = ast
     }
 
@@ -41,14 +38,14 @@ class ScriptSymbolProvider implements SymbolProvider {
         }
 
         final uri = URI.create(textDocument.getUri())
-        final nodes = ast.getNodes(uri)
+        final List<ASTNode> nodes = []
+        nodes.addAll(ast.getFunctionNodes(uri))
+        nodes.addAll(ast.getProcessNodes(uri))
+        nodes.addAll(ast.getWorkflowNodes(uri))
 
         final List<Either<SymbolInformation, DocumentSymbol>> result = []
         for( final node : nodes ) {
             final symbolInfo = getSymbolInformation(node, uri)
-            if( symbolInfo == null )
-                continue
-
             result << Either.<SymbolInformation, DocumentSymbol>forLeft(symbolInfo)
         }
 
@@ -63,7 +60,11 @@ class ScriptSymbolProvider implements SymbolProvider {
         }
 
         final lowerCaseQuery = query.toLowerCase()
-        final nodes = ast.getNodes()
+        final List<ASTNode> nodes = []
+        nodes.addAll(ast.getFunctionNodes())
+        nodes.addAll(ast.getProcessNodes())
+        nodes.addAll(ast.getWorkflowNodes())
+
         final List<SymbolInformation> result = []
         for( final node : nodes ) {
             String name = null
