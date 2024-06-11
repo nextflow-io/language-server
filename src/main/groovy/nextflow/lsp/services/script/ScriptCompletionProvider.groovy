@@ -712,7 +712,10 @@ class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private Range getAddIncludeRange(URI uri) {
-        final lastInclude = ast.getIncludeNodes(uri).last()
+        final includeNodes = ast.getIncludeNodes(uri)
+        if( !includeNodes )
+            return new Range(new Position(1, 0), new Position(1, 0))
+        final lastInclude = includeNodes.last()
         final lastIncludeRange = LanguageServerUtils.astNodeToRange(lastInclude)
         final includeLine = lastIncludeRange ? lastIncludeRange.getEnd().getLine() + 1 : 0
         return new Range(new Position(includeLine, 0), new Position(includeLine, 0))
