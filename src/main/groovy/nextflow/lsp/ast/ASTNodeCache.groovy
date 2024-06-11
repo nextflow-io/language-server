@@ -10,6 +10,7 @@ import nextflow.config.v2.ConfigAssignmentNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
 import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.IncludeNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
@@ -78,6 +79,8 @@ class ASTNodeCache {
 
     private Map<URI, List<ASTNode>> nodesByURI = [:]
 
+    private Map<URI, List<IncludeNode>> includeNodesByURI = [:]
+
     private Map<URI, List<FunctionNode>> functionNodesByURI = [:]
 
     private Map<URI, List<ProcessNode>> processNodesByURI = [:]
@@ -110,6 +113,7 @@ class ASTNodeCache {
                     lookup.remove(new LookupKey(node))
             }
             sourcesByUri.remove(uri)
+            includeNodesByURI.remove(uri)
             functionNodesByURI.remove(uri)
             processNodesByURI.remove(uri)
             workflowNodesByURI.remove(uri)
@@ -140,6 +144,13 @@ class ASTNodeCache {
 
     SourceUnit getSourceUnit(URI uri) {
         return sourcesByUri[uri]
+    }
+
+    /**
+     * Get the list of include nodes in a given file.
+     */
+    List<IncludeNode> getIncludeNodes(URI uri) {
+        return includeNodesByURI[uri]
     }
 
     /**
@@ -324,6 +335,7 @@ class ASTNodeCache {
 
         void visit() {
             nodesByURI.put(uri, [])
+            includeNodesByURI.put(uri, [])
             functionNodesByURI.put(uri, [])
             processNodesByURI.put(uri, [])
             workflowNodesByURI.put(uri, [])
@@ -437,6 +449,10 @@ class ASTNodeCache {
                 visitConfigInclude(node)
                 return
             }
+            if( node instanceof IncludeNode ) {
+                visitInclude(node)
+                return
+            }
             if( node instanceof ProcessNode ) {
                 visitProcess(node)
                 return
@@ -478,6 +494,17 @@ class ASTNodeCache {
             pushASTNode(node)
             try {
                 visit(node.source)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        protected void visitInclude(IncludeNode node) {
+            includeNodesByURI[uri].add(node)
+            pushASTNode(node)
+            try {
+                visit(node.expression)
             }
             finally {
                 popASTNode()

@@ -1,5 +1,7 @@
 package nextflow.lsp.services.script
 
+import java.nio.file.Path
+
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.ast.ASTNodeStringUtils
@@ -36,6 +38,7 @@ import org.eclipse.lsp4j.MarkupContent
 import org.eclipse.lsp4j.MarkupKind
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
+import org.eclipse.lsp4j.TextEdit
 import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 
@@ -474,6 +477,7 @@ class ScriptCompletionProvider implements CompletionProvider {
     private static Logger log = Logger.instance
 
     private ASTNodeCache ast
+    private URI uri
     private int maxItemCount = 100
     private boolean isIncomplete = false
 
@@ -488,7 +492,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             return Either.forLeft(Collections.emptyList())
         }
 
-        final uri = URI.create(textDocument.getUri())
+        this.uri = URI.create(textDocument.getUri())
         final nodeTree = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter())
         if( !nodeTree )
             return Either.forLeft(Collections.emptyList())
@@ -610,6 +614,10 @@ class ScriptCompletionProvider implements CompletionProvider {
             items.add(item)
         }
 
+        final includeNames = getIncludeNames(uri)
+        final localFunctionNodes = ast.getFunctionNodes(uri)
+        final addIncludeRange = getAddIncludeRange(uri)
+
         for( final functionNode : ast.getFunctionNodes() ) {
             final name = functionNode.getName()
             if( !name.startsWith(prefix) )
@@ -622,6 +630,11 @@ class ScriptCompletionProvider implements CompletionProvider {
             final documentation = ASTNodeStringUtils.getDocumentation(functionNode)
             if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
+
+            if( functionNode !in localFunctionNodes && name !in includeNames ) {
+                final textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, functionNode)
+                item.setAdditionalTextEdits( List.of(textEdit) )
+            }
 
             items.add(item)
         }
@@ -637,6 +650,10 @@ class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateProcessNames(String prefix, List<CompletionItem> items) {
+        final includeNames = getIncludeNames(uri)
+        final localProcessNodes = ast.getProcessNodes(uri)
+        final addIncludeRange = getAddIncludeRange(uri)
+
         for( final processNode : ast.getProcessNodes() ) {
             final name = processNode.getName()
             if( !name.startsWith(prefix) )
@@ -650,11 +667,20 @@ class ScriptCompletionProvider implements CompletionProvider {
             if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
 
+            if( processNode !in localProcessNodes && name !in includeNames ) {
+                final textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, processNode)
+                item.setAdditionalTextEdits( List.of(textEdit) )
+            }
+
             items.add(item)
         }
     }
 
     private void populateWorkflowNames(String prefix, List<CompletionItem> items) {
+        final includeNames = getIncludeNames(uri)
+        final localWorkflowNodes = ast.getWorkflowNodes(uri)
+        final addIncludeRange = getAddIncludeRange(uri)
+
         for( final workflowNode : ast.getWorkflowNodes() ) {
             final name = workflowNode.getName()
             if( !name || !name.startsWith(prefix) )
@@ -668,8 +694,41 @@ class ScriptCompletionProvider implements CompletionProvider {
             if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
 
+            if( workflowNode !in localWorkflowNodes && name !in includeNames ) {
+                final textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, workflowNode)
+                item.setAdditionalTextEdits( List.of(textEdit) )
+            }
+
             items.add(item)
         }
+    }
+
+    private List<String> getIncludeNames(URI uri) {
+        final List<String> result = []
+        for( final node : ast.getIncludeNodes(uri) ) {
+            for( final module : node.modules )
+                result.add(module.alias ?: module.name)
+        }
+        return result
+    }
+
+    private Range getAddIncludeRange(URI uri) {
+        final lastInclude = ast.getIncludeNodes(uri).last()
+        final lastIncludeRange = LanguageServerUtils.astNodeToRange(lastInclude)
+        final includeLine = lastIncludeRange ? lastIncludeRange.getEnd().getLine() + 1 : 0
+        return new Range(new Position(includeLine, 0), new Position(includeLine, 0))
+    }
+
+    private TextEdit createAddIncludeTextEdit(Range range, URI uri, String name, ASTNode node) {
+        final source = Path.of(uri).getParent().relativize(Path.of(ast.getURI(node)))
+        final newText = new StringBuilder()
+            .append("include { ")
+            .append(name)
+            .append(" } from './")
+            .append(source.toString())
+            .append("'\n")
+            .toString()
+        return new TextEdit(range, newText)
     }
 
     private void populateItemsFromPropertyExpression(PropertyExpression propX, Position position, List<CompletionItem> items) {
