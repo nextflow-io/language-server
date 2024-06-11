@@ -248,6 +248,14 @@ class ScriptAstBuilder {
             moduleNode.addStatement(includeNode)
         }
 
+        else if( ctx instanceof OutputDefAltContext ) {
+            final outputNode = outputDef(ctx.outputDef())
+            if( moduleNode.output != null )
+                collectSyntaxError(new SyntaxException('Output block defined more than once', outputNode))
+            moduleNode.setOutput(outputNode)
+            moduleNode.addStatement(outputNode)
+        }
+
         else if( ctx instanceof ProcessDefAltContext ) {
             final processNode = processDef(ctx.processDef())
             moduleNode.addProcess(processNode)
@@ -256,6 +264,11 @@ class ScriptAstBuilder {
 
         else if( ctx instanceof WorkflowDefAltContext ) {
             final workflowNode = workflowDef(ctx.workflowDef())
+            if( !workflowNode.name ) {
+                if( moduleNode.entry != null )
+                    collectSyntaxError(new SyntaxException('Entry workflow defined more than once', workflowNode))
+                moduleNode.setEntry(workflowNode)
+            }
             moduleNode.addWorkflow(workflowNode)
             moduleNode.addStatement(workflowNode)
         }
@@ -531,6 +544,13 @@ class ScriptAstBuilder {
             main.addStatement(statement)
         }
         return stmt(callThisX('_emit_', args(constX(name))))
+    }
+
+    private OutputNode outputDef(OutputDefContext ctx) {
+        final body = blockStatements(ctx.outputBody()?.blockStatements())
+        final closure = closureX(block(new VariableScope(), body))
+        final methodCall = callThisX('output', args(closure))
+        return ast( new OutputNode(methodCall, body), ctx )
     }
 
     private FunctionNode functionDef(FunctionDefContext ctx) {
@@ -1554,6 +1574,8 @@ class ScriptNode extends ModuleNode {
     private List<FunctionNode> functions = []
     private List<ProcessNode> processes = []
     private List<WorkflowNode> workflows = []
+    private WorkflowNode entry
+    private OutputNode output
 
     ScriptNode(SourceUnit sourceUnit) {
         super(sourceUnit)
@@ -1579,6 +1601,14 @@ class ScriptNode extends ModuleNode {
         return workflows
     }
 
+    WorkflowNode getEntry() {
+        return entry
+    }
+
+    OutputNode getOutput() {
+        return output
+    }
+
     void addFeatureFlag(FeatureFlagNode featureFlag) {
         featureFlags << featureFlag
     }
@@ -1597,6 +1627,14 @@ class ScriptNode extends ModuleNode {
 
     void addWorkflow(WorkflowNode workflowNode) {
         workflows << workflowNode
+    }
+
+    void setEntry(WorkflowNode entry) {
+        this.entry = entry
+    }
+
+    void setOutput(OutputNode output) {
+        this.output = output
     }
 }
 
@@ -1697,6 +1735,17 @@ class WorkflowNode extends ExpressionStatement {
 
     Groovydoc getGroovydoc() {
         return expression.getGroovydoc()
+    }
+}
+
+
+@CompileStatic
+class OutputNode extends ExpressionStatement {
+    final Statement body
+
+    OutputNode(Expression expression, Statement body) {
+        super(expression)
+        this.body = body
     }
 }
 

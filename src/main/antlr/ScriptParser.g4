@@ -89,6 +89,7 @@ scriptStatement
     |   includeStatement            #includeStmtAlt
     |   processDef                  #processDefAlt
     |   workflowDef                 #workflowDefAlt
+    |   outputDef                   #outputDefAlt
     |   functionDef                 #functionDefAlt
     |   incompleteStatement         #incompleteStmtAlt
     ;
@@ -210,6 +211,17 @@ workflowEmits
 
 workflowEmit
     :   identifier (ASSIGN expression)?
+    ;
+
+// -- output definition
+outputDef
+    :   OUTPUT nls LBRACE
+        outputBody?
+        sep? RBRACE
+    ;
+
+outputBody
+    :   sep? blockStatements
     ;
 
 // -- function definition

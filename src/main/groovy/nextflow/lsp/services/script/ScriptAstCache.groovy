@@ -5,6 +5,7 @@ import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.IncludeNode
+import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
 import nextflow.script.v2.WorkflowNode
@@ -95,6 +96,8 @@ class ScriptAstCache extends ASTNodeCache {
                 visitProcess(processNode)
             for( final workflowNode : moduleNode.getWorkflows() )
                 visitWorkflow(workflowNode)
+            if( moduleNode.getOutput() )
+                visitOutput(moduleNode.getOutput())
         }
 
         protected void visitInclude(IncludeNode node) {
@@ -148,6 +151,16 @@ class ScriptAstCache extends ASTNodeCache {
                 visit(node.takes)
                 visit(node.emits)
                 visit(node.main)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        protected void visitOutput(OutputNode node) {
+            pushASTNode(node)
+            try {
+                visit(node.body)
             }
             finally {
                 popASTNode()
