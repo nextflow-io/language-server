@@ -67,6 +67,17 @@ class ScriptCompletionProvider implements CompletionProvider {
     static {
         TOPLEVEL_ITEMS = [
             [
+                'shebang',
+                '''
+                Shebang declaration:
+
+                ```sh
+                #!/usr/bin/env nextflow
+                ```
+                ''',
+                '#!/usr/bin/env nextflow\n\n'
+            ],
+            [
                 'include',
                 '''
                 Include statement:
