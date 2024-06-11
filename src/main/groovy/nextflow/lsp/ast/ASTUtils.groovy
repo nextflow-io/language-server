@@ -2,7 +2,10 @@ package nextflow.lsp.ast
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.services.script.ScriptAstCache
-import nextflow.lsp.services.script.ScriptDefs
+import nextflow.script.dsl.Function
+import nextflow.script.dsl.Operator
+import nextflow.script.dsl.ScriptDsl
+import nextflow.script.dsl.WorkflowDsl
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.OperatorNode
 import nextflow.script.v2.ProcessNode
@@ -258,9 +261,15 @@ class ASTUtils {
 
         // TODO: add function imports
         // TODO: handle function overloads
-        final function = ScriptDefs.FUNCTIONS.find { vals -> vals[0] == name }
-        if( function )
-            return new FunctionNode(function[0], function[1].stripIndent(true).trim())
+        for( final method : ScriptDsl.getDeclaredMethods() ) {
+            final annot = method.getAnnotation(Function)
+            if( !annot )
+                continue
+            if( name != method.getName() )
+                continue
+            final documentation = annot.value()
+            return new FunctionNode(name, documentation.stripIndent(true).trim())
+        }
 
         final functionNode = ast.getFunctionNodes(uri).find { node -> node.name == name }
         if( functionNode )
@@ -269,9 +278,15 @@ class ASTUtils {
         // TODO: add process, workflow imports
         final inWorkflow = getEnclosingNodeOfType(call, WorkflowNode.class, ast) != null
         if( inWorkflow ) {
-            final operator = ScriptDefs.OPERATORS.find { vals -> vals[0] == name }
-            if( operator )
-                return new OperatorNode(operator[0], operator[1].stripIndent(true).trim())
+            for( final method : WorkflowDsl.getDeclaredMethods() ) {
+                final annot = method.getAnnotation(Operator)
+                if( !annot )
+                    continue
+                if( name != method.getName() )
+                    continue
+                final documentation = annot.value()
+                return new OperatorNode(name, documentation.stripIndent(true).trim())
+            }
 
             final processNode = ast.getProcessNodes(uri).find { node -> node.name == name }
             if( processNode )
