@@ -28,7 +28,7 @@ class ScriptAstCache extends ASTNodeCache {
     }
 
     List<IncludeNode> getIncludeNodes(URI uri) {
-        return getScriptNOde(uri).getIncludes()
+        return getScriptNode(uri).getIncludes()
     }
 
     List<FunctionNode> getFunctionNodes() {
@@ -39,7 +39,7 @@ class ScriptAstCache extends ASTNodeCache {
     }
 
     List<FunctionNode> getFunctionNodes(URI uri) {
-        return getScriptNOde(uri).getFunctions()
+        return getScriptNode(uri).getFunctions()
     }
 
     List<ProcessNode> getProcessNodes() {
@@ -50,7 +50,7 @@ class ScriptAstCache extends ASTNodeCache {
     }
 
     List<ProcessNode> getProcessNodes(URI uri) {
-        return getScriptNOde(uri).getProcesses()
+        return getScriptNode(uri).getProcesses()
     }
 
     List<WorkflowNode> getWorkflowNodes() {
@@ -61,7 +61,7 @@ class ScriptAstCache extends ASTNodeCache {
     }
 
     List<WorkflowNode> getWorkflowNodes(URI uri) {
-        return getScriptNOde(uri).getWorkflows()
+        return getScriptNode(uri).getWorkflows()
     }
 
     private List<ScriptNode> getScriptNodes() {
@@ -71,7 +71,7 @@ class ScriptAstCache extends ASTNodeCache {
         return result
     }
 
-    private ScriptNode getScriptNOde(URI uri) {
+    private ScriptNode getScriptNode(URI uri) {
         return (ScriptNode) getSourceUnit(uri).getAST()
     }
 
