@@ -549,6 +549,9 @@ class ScriptAstBuilder {
         if( ctx instanceof ReturnStmtAltContext )
             return ast( returnStatement(ctx.expression()), ctx )
 
+        if( ctx instanceof ThrowStmtAltContext )
+            return ast( throwStatement(ctx.expression()), ctx )
+
         if( ctx instanceof LabeledStmtAltContext )
             return ast( labeledStatement(ctx), ctx )
 
@@ -628,6 +631,13 @@ class ScriptAstBuilder {
             ? expression(ctx)
             : ConstantExpression.EMPTY_EXPRESSION
         returnS(result)
+    }
+
+    private Statement throwStatement(ExpressionContext ctx) {
+        final result = ctx
+            ? expression(ctx)
+            : ConstantExpression.EMPTY_EXPRESSION
+        throwS(result)
     }
 
     private Statement labeledStatement(LabeledStmtAltContext ctx) {

@@ -310,7 +310,7 @@ SHORT         : 'short';
 // SWITCH        : 'switch';
 // SYNCHRONIZED  : 'synchronized';
 // THIS          : 'this';
-// THROW         : 'throw';
+THROW         : 'throw';
 // THROWS        : 'throws';
 // TRANSIENT     : 'transient';
 TRY           : 'try';

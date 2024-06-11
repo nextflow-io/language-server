@@ -55,6 +55,7 @@ import org.codehaus.groovy.ast.stmt.EmptyStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.IfStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
+import org.codehaus.groovy.ast.stmt.ThrowStatement
 import org.codehaus.groovy.ast.stmt.TryCatchStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
@@ -549,6 +550,17 @@ class ASTNodeCache {
             pushASTNode(node)
             try {
                 super.visitEmptyStatement(node)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        @Override
+        void visitThrowStatement(ThrowStatement node) {
+            pushASTNode(node)
+            try {
+                super.visitThrowStatement(node)
             }
             finally {
                 popASTNode()

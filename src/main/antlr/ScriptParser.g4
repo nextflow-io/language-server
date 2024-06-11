@@ -231,6 +231,7 @@ statement
     :   ifElseStatement                 #ifElseStmtAlt
     |   tryCatchStatement               #tryCatchStmtAlt
     |   RETURN expression?              #returnStmtAlt
+    |   THROW expression                #throwStmtAlt
     |   identifier COLON nls statement  #labeledStmtAlt
     |   assertStatement                 #assertStmtAlt
     |   variableDeclaration             #variableDeclarationStmtAlt
