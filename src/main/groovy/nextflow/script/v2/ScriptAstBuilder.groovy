@@ -202,6 +202,13 @@ class ScriptAstBuilder {
         for( final stmt : ctx.scriptStatement() )
             scriptStatement(stmt)
 
+        if( ctx.workflowMain() ) {
+            final workflowNode = workflowDef(ctx.workflowMain())
+            moduleNode.addWorkflow(workflowNode)
+            moduleNode.setEntry(workflowNode)
+            moduleNode.addStatement(workflowNode)
+        }
+
         if( moduleNode.isEmpty() )
             moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
 
@@ -512,6 +519,29 @@ class ScriptAstBuilder {
 
         groovydocManager.handle(result.expression, ctx)
         return result
+    }
+
+    private WorkflowNode workflowDef(WorkflowMainContext ctx) {
+        final takes = EmptyStatement.INSTANCE
+        final main = blockStatements(ctx.blockStatements())
+        final emits = EmptyStatement.INSTANCE
+        main.addStatementLabel('main')
+        final bodyDef = stmt(createX(
+            BodyDef,
+            args(
+                closureX(main),
+                constX(ctx.text), // TODO: source code formatting
+                constX('workflow'),
+                new ListExpression() // TODO: variable references (see VariableVisitor)
+            )
+        ))
+        final closure = closureX(block(new VariableScope(), [
+            takes,
+            emits,
+            bodyDef
+        ]))
+        final methodCall = callThisX('workflow', args(closure))
+        return new WorkflowNode(methodCall, null, takes, emits, main)
     }
 
     private Statement workflowTakes(WorkflowTakesContext ctx) {

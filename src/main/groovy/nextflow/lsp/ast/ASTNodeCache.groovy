@@ -144,6 +144,15 @@ class ASTNodeCache {
     }
 
     /**
+     * Check whether an AST is defined for a given file.
+     *
+     * @param uri
+     */
+    boolean hasAST(URI uri) {
+        return sourcesByUri[uri].getAST()
+    }
+
+    /**
      * Get the list of ast nodes across all cached files.
      */
     List<ASTNode> getNodes() {

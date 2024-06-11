@@ -38,6 +38,9 @@ class ScriptSymbolProvider implements SymbolProvider {
         }
 
         final uri = URI.create(textDocument.getUri())
+        if( !ast.hasAST(uri) )
+            return Collections.emptyList()
+
         final List<ASTNode> nodes = []
         nodes.addAll(ast.getFunctionNodes(uri))
         nodes.addAll(ast.getProcessNodes(uri))
@@ -45,6 +48,8 @@ class ScriptSymbolProvider implements SymbolProvider {
 
         final List<Either<SymbolInformation, DocumentSymbol>> result = []
         for( final node : nodes ) {
+            if( node.getLineNumber() < 0 )
+                continue
             final symbolInfo = getSymbolInformation(node, uri)
             result << Either.<SymbolInformation, DocumentSymbol>forLeft(symbolInfo)
         }

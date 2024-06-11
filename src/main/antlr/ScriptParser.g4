@@ -79,6 +79,7 @@ import org.apache.groovy.parser.antlr4.GroovySyntaxError;
 
 compilationUnit
     :   nls (scriptStatement (sep scriptStatement)* sep?)? EOF
+    |   nls workflowMain EOF
     ;
 
 //
