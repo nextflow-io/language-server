@@ -1,11 +1,30 @@
 package nextflow.script.dsl
 
+import java.nio.file.Path
+
 import groovy.transform.CompileStatic
+import nextflow.processor.TaskConfig
 
 @CompileStatic
 class ProcessDsl {
 
-    @ProcessDirective('''
+    @Constant('''
+        Map of task properties, including directive values.
+    ''')
+    TaskConfig task
+
+    @Function('''
+        Define a script template.
+    ''')
+    Path template(path) {
+    }
+
+}
+
+@CompileStatic
+class ProcessDirectiveDsl {
+
+    @Function('''
         The `clusterOptions` directive allows the usage of any native configuration option accepted by your cluster submit command. You can use it to request non-standard resources or use settings that are specific to your cluster and not supported out of the box by Nextflow.
 
         [Read more](https://nextflow.io/docs/latest/process.html#clusteroptions)
@@ -13,7 +32,7 @@ class ProcessDsl {
     void clusterOptions(String value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
         The `conda` directive allows for the definition of the process dependencies using the [Conda](https://conda.io) package manager.
 
         [Read more](https://nextflow.io/docs/latest/process.html#conda)
@@ -21,7 +40,7 @@ class ProcessDsl {
     void conda(String value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
         The `container` directive allows you to execute the process script in a container.
 
         [Read more](https://nextflow.io/docs/latest/process.html#container)
@@ -29,7 +48,7 @@ class ProcessDsl {
     void container(String value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
         The `containerOptions` directive allows you to specify any container execution option supported by the underlying container engine (ie. Docker, Singularity, etc). This can be useful to provide container settings only for a specific process.
 
         [Read more](https://nextflow.io/docs/latest/process.html#containeroptions)
@@ -37,7 +56,7 @@ class ProcessDsl {
     void containerOptions(String value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
         The `cpus` directive allows you to define the number of (logical) CPUs required by each task.
 
         [Read more](https://nextflow.io/docs/latest/process.html#cpus)
@@ -45,7 +64,7 @@ class ProcessDsl {
     void cpus(value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
         The `debug` directive allows you to print the process standard output to Nextflow\'s standard output, i.e. the console. By default this directive is disabled.
 
         [Read more](https://nextflow.io/docs/latest/process.html#debug)
@@ -53,7 +72,7 @@ class ProcessDsl {
     void debug(boolean value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
         The `errorStrategy` directive allows you to define how an error condition is managed by the process. By default when an error status is returned by the executed script, the process stops immediately. This in turn forces the entire pipeline to terminate.
 
         [Read more](https://nextflow.io/docs/latest/process.html#errorstrategy)
@@ -61,7 +80,15 @@ class ProcessDsl {
     void errorStrategy(String value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
+        The `executor` defines the underlying system where tasks are executed.
+
+        [Read more](https://nextflow.io/docs/latest/process.html#executor)
+    ''')
+    void executor(String value) {
+    }
+
+    @Function('''
         The `label` directive allows the annotation of processes with a mnemonic identifier of your choice.
 
         [Read more](https://nextflow.io/docs/latest/process.html#label)
@@ -69,7 +96,7 @@ class ProcessDsl {
     void label(String value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
         The `maxErrors` directive allows you to specify the maximum number of times a process can fail when using the `retry` or `ignore` error strategy. By default this directive is disabled.
 
         [Read more](https://nextflow.io/docs/latest/process.html#maxerrors)
@@ -77,7 +104,7 @@ class ProcessDsl {
     void maxErrors(int value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
         The `maxRetries` directive allows you to define the maximum number of times a task can be retried when using the `retry` error strategy. By default only one retry is allowed.
 
         [Read more](https://nextflow.io/docs/latest/process.html#maxretries)
@@ -85,7 +112,7 @@ class ProcessDsl {
     void maxRetries(int value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
         The `memory` directive allows you to define how much memory is required by each task. Can be a string (e.g. `\'8 GB\'`) or a memory unit (e.g. `8.GB`).
 
         [Read more](https://nextflow.io/docs/latest/process.html#memory)
@@ -93,7 +120,7 @@ class ProcessDsl {
     void memory(value) {
     }
 
-    @ProcessDirective('''
+    @Function('''
         The `tag` directive allows you to associate each process execution with a custom label, so that it will be easier to identify in the log file or in a report.
 
         [Read more](https://nextflow.io/docs/latest/process.html#tag)
@@ -103,9 +130,10 @@ class ProcessDsl {
 
 }
 
+@CompileStatic
 class ProcessInputDsl {
 
-    @ProcessInput('''
+    @Function('''
         ```groovy
         val <identifier>
         ```
@@ -114,7 +142,7 @@ class ProcessInputDsl {
     void val(arg) {
     }
 
-    @ProcessInput('''
+    @Function('''
         ```groovy
         path <identifier | stageName>
         ```
@@ -125,7 +153,7 @@ class ProcessInputDsl {
     void path(arg) {
     }
 
-    @ProcessInput('''
+    @Function('''
         ```groovy
         env <identifier>
         ```
@@ -134,7 +162,7 @@ class ProcessInputDsl {
     void env(arg) {
     }
 
-    @ProcessInput('''
+    @Function('''
         ```groovy
         stdin
         ```
@@ -143,7 +171,7 @@ class ProcessInputDsl {
     void stdin() {
     }
 
-    @ProcessInput('''
+    @Function('''
         ```groovy
         tuple <arg1>, <arg2>, ...
         ```
@@ -156,9 +184,10 @@ class ProcessInputDsl {
 
 }
 
+@CompileStatic
 class ProcessOutputDsl {
 
-    @ProcessOutput('''
+    @Function('''
         ```groovy
         val <value>
         ```
@@ -167,7 +196,7 @@ class ProcessOutputDsl {
     void val(arg) {
     }
 
-    @ProcessOutput('''
+    @Function('''
         ```groovy
         path <pattern>
         ```
@@ -176,7 +205,7 @@ class ProcessOutputDsl {
     void path(arg) {
     }
 
-    @ProcessOutput('''
+    @Function('''
         ```groovy
         env <identifier>
         ```
@@ -185,7 +214,7 @@ class ProcessOutputDsl {
     void env(arg) {
     }
 
-    @ProcessOutput('''
+    @Function('''
         ```groovy
         stdout
         ```
@@ -194,7 +223,7 @@ class ProcessOutputDsl {
     void stdout() {
     }
 
-    @ProcessOutput('''
+    @Function('''
         ```groovy
         eval <command>
         ```
@@ -203,7 +232,7 @@ class ProcessOutputDsl {
     void eval(arg) {
     }
 
-    @ProcessOutput('''
+    @Function('''
         ```groovy
         tuple <arg1>, <arg2>, ...
         ```
@@ -212,28 +241,4 @@ class ProcessOutputDsl {
     void tuple(Object... args) {
     }
 
-}
-
-
-import java.lang.annotation.ElementType
-import java.lang.annotation.Retention
-import java.lang.annotation.RetentionPolicy
-import java.lang.annotation.Target
-
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
-@interface ProcessDirective {
-    String value()
-}
-
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
-@interface ProcessInput {
-    String value()
-}
-
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
-@interface ProcessOutput {
-    String value()
 }

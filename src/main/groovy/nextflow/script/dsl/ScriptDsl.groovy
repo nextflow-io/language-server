@@ -7,6 +7,7 @@ import nextflow.NextflowMeta
 import nextflow.script.WorkflowMetadata
 import nextflow.util.ArrayTuple
 import org.codehaus.groovy.ast.ClassNode
+import org.slf4j.Logger
 
 @CompileStatic
 class ScriptDsl {
@@ -17,6 +18,11 @@ class ScriptDsl {
         new ClassNode( nextflow.util.Duration ),
         new ClassNode( nextflow.util.MemoryUnit ),
     ]
+
+    @Constant('''
+        Logger which can be used to log messages to the console.
+    ''')
+    Logger log
 
     @Constant('''
         The directory where a module script is located (equivalent to `projectDir` if used in the main script).

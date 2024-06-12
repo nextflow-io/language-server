@@ -279,8 +279,8 @@ class ASTUtils {
         final inWorkflow = getEnclosingNodeOfType(call, WorkflowNode.class, ast) != null
         if( inWorkflow ) {
             for( final method : WorkflowDsl.getDeclaredMethods() ) {
-                final annot = method.getAnnotation(Operator)
-                if( !annot )
+                final annot = method.getAnnotation(Function)
+                if( !annot || !method.isAnnotationPresent(Operator) )
                     continue
                 if( name != method.getName() )
                     continue

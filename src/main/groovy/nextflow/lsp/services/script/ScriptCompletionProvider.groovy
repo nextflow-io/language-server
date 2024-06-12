@@ -11,11 +11,8 @@ import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Ranges
 import nextflow.script.dsl.Function
 import nextflow.script.dsl.Operator
-import nextflow.script.dsl.ProcessDirective
-import nextflow.script.dsl.ProcessDsl
-import nextflow.script.dsl.ProcessInput
+import nextflow.script.dsl.ProcessDirectiveDsl
 import nextflow.script.dsl.ProcessInputDsl
-import nextflow.script.dsl.ProcessOutput
 import nextflow.script.dsl.ProcessOutputDsl
 import nextflow.script.dsl.ScriptDsl
 import nextflow.script.dsl.WorkflowDsl
@@ -238,8 +235,8 @@ class ScriptCompletionProvider implements CompletionProvider {
     private static final List<CompletionItem> PROCESS_DIRECTIVES = []
 
     static {
-        for( final method : ProcessDsl.getDeclaredMethods() ) {
-            final annot = method.getAnnotation(ProcessDirective)
+        for( final method : ProcessDirectiveDsl.getDeclaredMethods() ) {
+            final annot = method.getAnnotation(Function)
             if( !annot )
                 continue
             final name = method.getName()
@@ -260,7 +257,7 @@ class ScriptCompletionProvider implements CompletionProvider {
 
     static {
         for( final method : ProcessInputDsl.getDeclaredMethods() ) {
-            final annot = method.getAnnotation(ProcessInput)
+            final annot = method.getAnnotation(Function)
             if( !annot )
                 continue
             final name = method.getName()
@@ -280,7 +277,7 @@ class ScriptCompletionProvider implements CompletionProvider {
 
     static {
         for( final method : ProcessOutputDsl.getDeclaredMethods() ) {
-            final annot = method.getAnnotation(ProcessOutput)
+            final annot = method.getAnnotation(Function)
             if( !annot )
                 continue
             final name = method.getName()
@@ -300,8 +297,8 @@ class ScriptCompletionProvider implements CompletionProvider {
 
     static {
         for( final method : WorkflowDsl.getDeclaredMethods() ) {
-            final annot = method.getAnnotation(Operator)
-            if( !annot )
+            final annot = method.getAnnotation(Function)
+            if( !annot || !method.isAnnotationPresent(Operator) )
                 continue
             final name = method.getName()
             final documentation = annot.value()
