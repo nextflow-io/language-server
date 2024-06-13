@@ -365,6 +365,27 @@ class ScriptAstBuilder {
         final takes = EmptyStatement.INSTANCE
         final emits = EmptyStatement.INSTANCE
         final main = blockStatements(ctx.blockStatements())
+        for( final statement : main.statements ) {
+            if( statement !instanceof ExpressionStatement )
+                continue
+            final stmtX = (ExpressionStatement)statement
+            if( stmtX.expression !instanceof MethodCallExpression )
+                continue
+            final call = (MethodCallExpression)stmtX.expression
+            final name = call.getMethodAsString()
+            if( name == 'process' ) {
+                collectSyntaxError(new SyntaxException("Process definition is not allowed with implicit workflow", statement))
+                stmtX.expression = EmptyExpression.INSTANCE
+            }
+            else if( name == 'workflow' ) {
+                collectSyntaxError(new SyntaxException("Workflow definition is not allowed with implicit workflow", statement))
+                stmtX.expression = EmptyExpression.INSTANCE
+            }
+            else if( name == 'output' ) {
+                collectSyntaxError(new SyntaxException("Output definition is not allowed with implicit workflow", statement))
+                stmtX.expression = EmptyExpression.INSTANCE
+            }
+        }
         return new WorkflowNode(null, takes, emits, main)
     }
 
