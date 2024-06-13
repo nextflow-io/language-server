@@ -35,7 +35,7 @@ class ConfigAstCache extends ASTNodeCache {
             final moduleNode = sourceUnit.getAST()
             if( moduleNode == null )
                 return
-            super.visitBlockStatement(moduleNode.getStatementBlock())
+            visit(moduleNode.getStatementBlock())
         }
 
         @Override

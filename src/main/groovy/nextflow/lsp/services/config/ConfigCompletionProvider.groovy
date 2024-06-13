@@ -66,7 +66,7 @@ class ConfigCompletionProvider implements CompletionProvider {
         final uri = URI.create(textDocument.getUri())
         final nodeTree = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter())
         if( !nodeTree )
-            return Either.forLeft(Collections.emptyList())
+            return Either.forLeft(SCOPES)
 
         final scope = getCurrentScope(nodeTree)
         final items = scope ? getConfigOptions(scope + '.') : SCOPES

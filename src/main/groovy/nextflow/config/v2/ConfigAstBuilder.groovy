@@ -230,21 +230,13 @@ class ConfigAstBuilder {
 
     private Statement configInclude(ConfigIncludeContext ctx) {
         final source = expression(ctx.expression())
-        final call = callThisX('includeConfig', args(source))
-        new ConfigIncludeNode(call, source)
+        new ConfigIncludeNode(source)
     }
 
     private Statement configAssignment(ConfigAssignmentContext ctx) {
-        final identifiers = ctx.configPathExpression().identifier()
-        final names = identifiers.collect( this.&identifier )
-        final namesX = listX( identifiers.collect( this.&configPathElement ) )
-        final right = expression(ctx.expression())
-        final call = callThisX('assign', args(namesX, right))
-        ast( new ConfigAssignmentNode(call, names, right), ctx )
-    }
-
-    private Expression configPathElement(IdentifierContext ctx) {
-        ast( constX(identifier(ctx)), ctx )
+        final names = ctx.configPathExpression().identifier().collect( this.&identifier )
+        final value = expression(ctx.expression())
+        ast( new ConfigAssignmentNode(names, value), ctx )
     }
 
     private Statement configBlock(ConfigBlockContext ctx) {
@@ -253,8 +245,7 @@ class ConfigAstBuilder {
             : stringLiteral(ctx.stringLiteral())
         final statements = ctx.configBlockStatement().collect( this.&configBlockStatement )
         final block = block(new VariableScope(), statements)
-        final call = callThisX('block', args(constX(name), closureX(block)))
-        new ConfigBlockNode(call, name, block)
+        new ConfigBlockNode(name, block)
     }
 
     private Statement configBlockStatement(ConfigBlockStatementContext ctx) {
@@ -281,8 +272,7 @@ class ConfigAstBuilder {
         final target = configSelectorTarget(ctx.target)
         final statements = ctx.configAssignment().collect( this.&configAssignment )
         final block = block(new VariableScope(), statements)
-        final call = callThisX(kind, args(constX(target), closureX(block)))
-        new ConfigBlockNode(call, kind, target, block)
+        new ConfigBlockNode(kind, target, block)
     }
 
     private String configSelectorTarget(ConfigSelectorTargetContext ctx) {
@@ -295,18 +285,16 @@ class ConfigAstBuilder {
         final name = identifier(ctx.identifier())
         final statements = ctx.configBlockAltStatement().collect( this.&configBlockAltStatement )
         final block = block(new VariableScope(), statements)
-        final call = ast( callThisX('block', args(constX(name), closureX(block))), ctx )
+        final result = ast( new ConfigBlockNode(name, block), ctx )
         if( name != 'plugins' )
-            collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (omit the equals sign)", call))
-        new ConfigBlockNode(call, name, block)
+            collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (i.e. omitting the equals sign)", result))
+        return result
     }
 
     private Statement configBlockAltStatement(ConfigBlockAltStatementContext ctx) {
         final name = identifier(ctx.identifier())
-        final namesX = listX( List.of(constX(name)) as List<Expression> )
-        final right = literal(ctx.literal())
-        final call = callThisX('append', args(namesX, right))
-        ast( new ConfigAppendNode(call, List.of(name), right), ctx )
+        final value = literal(ctx.literal())
+        ast( new ConfigAppendNode(List.of(name), value), ctx )
     }
 
     private Statement configIncomplete(ConfigIncompleteContext ctx) {
@@ -1266,8 +1254,8 @@ class ConfigAstBuilder {
 class ConfigIncludeNode extends ExpressionStatement {
     final Expression source
 
-    ConfigIncludeNode(Expression expression, Expression source) {
-        super(expression)
+    ConfigIncludeNode(Expression source) {
+        super(EmptyExpression.INSTANCE)
         this.source = source
     }
 }
@@ -1278,8 +1266,8 @@ class ConfigAssignmentNode extends ExpressionStatement {
     final List<String> names
     final Expression value
 
-    ConfigAssignmentNode(Expression expression, List<String> names, Expression value) {
-        super(expression)
+    ConfigAssignmentNode(List<String> names, Expression value) {
+        super(EmptyExpression.INSTANCE)
         this.names = names
         this.value = value
     }
@@ -1288,8 +1276,8 @@ class ConfigAssignmentNode extends ExpressionStatement {
 
 @CompileStatic
 class ConfigAppendNode extends ConfigAssignmentNode {
-    ConfigAppendNode(Expression expression, List<String> names, Expression value) {
-        super(expression, names, value)
+    ConfigAppendNode(List<String> names, Expression value) {
+        super(names, value)
     }
 }
 
@@ -1300,8 +1288,8 @@ class ConfigBlockNode extends ExpressionStatement {
     final String name
     final BlockStatement block
 
-    ConfigBlockNode(Expression expression, String kind = null, String name, BlockStatement block) {
-        super(expression)
+    ConfigBlockNode(String kind = null, String name, BlockStatement block) {
+        super(EmptyExpression.INSTANCE)
         this.kind = kind
         this.name = name
         this.block = block
