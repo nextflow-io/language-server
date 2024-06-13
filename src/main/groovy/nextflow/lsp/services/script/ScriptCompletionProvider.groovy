@@ -17,7 +17,6 @@ import nextflow.script.dsl.ProcessOutputDsl
 import nextflow.script.dsl.ScriptDsl
 import nextflow.script.dsl.WorkflowDsl
 import nextflow.script.v2.FunctionNode
-import nextflow.script.v2.IncompleteNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
@@ -335,7 +334,7 @@ class ScriptCompletionProvider implements CompletionProvider {
         this.uri = URI.create(textDocument.getUri())
         final nodeTree = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter())
         if( !nodeTree )
-            return Either.forLeft(Collections.emptyList())
+            return Either.forLeft(TOPLEVEL_ITEMS)
 
         final offsetNode = nodeTree.first()
         final parentNode = ast.getParent(offsetNode)
@@ -362,10 +361,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             }
         }
 
-        if( offsetNode instanceof IncompleteNode ) {
-            items.addAll(TOPLEVEL_ITEMS)
-        }
-        else if( offsetNode instanceof PropertyExpression ) {
+        if( offsetNode instanceof PropertyExpression ) {
             // e.g. "foo."
             log.debug "completion: populate from property expression"
             populateItemsFromPropertyExpression(offsetNode, position, items)

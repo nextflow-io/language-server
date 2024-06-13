@@ -3,6 +3,7 @@ package nextflow.lsp.services.script
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
+import nextflow.script.v2.FeatureFlagNode
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.IncludeNode
 import nextflow.script.v2.OutputNode
@@ -75,7 +76,7 @@ class ScriptAstCache extends ASTNodeCache {
         return (ScriptNode) getSourceUnit(uri).getAST()
     }
 
-    private class Visitor extends ASTNodeCache.Visitor {
+    private class Visitor extends ASTNodeCache.Visitor implements ScriptVisitor {
 
         Visitor(SourceUnit sourceUnit) {
             super(sourceUnit)
@@ -87,7 +88,7 @@ class ScriptAstCache extends ASTNodeCache {
             if( moduleNode == null )
                 return
             for( final featureFlag : moduleNode.getFeatureFlags() )
-                visit(featureFlag)
+                visitFeatureFlag(featureFlag)
             for( final includeNode : moduleNode.getIncludes() )
                 visitInclude(includeNode)
             for( final functionNode : moduleNode.getFunctions() )
@@ -100,17 +101,29 @@ class ScriptAstCache extends ASTNodeCache {
                 visitOutput(moduleNode.getOutput())
         }
 
-        protected void visitInclude(IncludeNode node) {
+        @Override
+        void visitFeatureFlag(FeatureFlagNode node) {
             pushASTNode(node)
             try {
-                visit(node.expression)
+                visit(node.value)
             }
             finally {
                 popASTNode()
             }
         }
 
-        protected void visitFunction(FunctionNode node) {
+        @Override
+        void visitInclude(IncludeNode node) {
+            pushASTNode(node)
+            try {
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        @Override
+        void visitFunction(FunctionNode node) {
             pushASTNode(node)
             try {
                 visit(node.code)
@@ -131,12 +144,14 @@ class ScriptAstCache extends ASTNodeCache {
             }
         }
 
-        protected void visitProcess(ProcessNode node) {
+        @Override
+        void visitProcess(ProcessNode node) {
             pushASTNode(node)
             try {
                 visit(node.directives)
                 visit(node.inputs)
                 visit(node.outputs)
+                visit(node.when)
                 visit(node.exec)
                 visit(node.stub)
             }
@@ -145,7 +160,8 @@ class ScriptAstCache extends ASTNodeCache {
             }
         }
 
-        protected void visitWorkflow(WorkflowNode node) {
+        @Override
+        void visitWorkflow(WorkflowNode node) {
             pushASTNode(node)
             try {
                 visit(node.takes)
@@ -157,7 +173,8 @@ class ScriptAstCache extends ASTNodeCache {
             }
         }
 
-        protected void visitOutput(OutputNode node) {
+        @Override
+        void visitOutput(OutputNode node) {
             pushASTNode(node)
             try {
                 visit(node.body)

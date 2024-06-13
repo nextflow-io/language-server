@@ -19,22 +19,13 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import com.google.common.hash.Hashing
 import groovy.lang.groovydoc.Groovydoc
+import groovy.lang.groovydoc.GroovydocHolder
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.antlr.ScriptLexer
 import nextflow.antlr.ScriptParser
 import nextflow.antlr.DescriptiveErrorStrategy
-import nextflow.script.BodyDef
 import nextflow.script.IncludeDef
-import nextflow.script.TaskClosure
-import nextflow.script.TokenEnvCall
-import nextflow.script.TokenFileCall
-import nextflow.script.TokenPathCall
-import nextflow.script.TokenStdinCall
-import nextflow.script.TokenStdoutCall
-import nextflow.script.TokenValCall
-import nextflow.script.TokenValRef
-import nextflow.script.TokenVar
 import org.antlr.v4.runtime.ANTLRErrorListener
 import org.antlr.v4.runtime.CharStream
 import org.antlr.v4.runtime.CharStreams
@@ -104,7 +95,6 @@ import org.codehaus.groovy.syntax.Types
 
 import static nextflow.antlr.ScriptParser.*
 import static nextflow.antlr.PositionConfigureUtils.configureAST as ast
-import static nextflow.ast.ASTHelpers.*
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 
 /**
@@ -238,21 +228,15 @@ class ScriptAstBuilder {
 
     private void scriptStatement(ScriptStatementContext ctx) {
         if( ctx instanceof FeatureFlagStmtAltContext ) {
-            final featureFlagNode = featureFlag(ctx.featureFlag())
-            moduleNode.addFeatureFlag(featureFlagNode)
-            moduleNode.addStatement(featureFlagNode)
+            moduleNode.addFeatureFlag(featureFlag(ctx.featureFlag()))
         }
 
         else if( ctx instanceof FunctionDefAltContext ) {
-            final functionNode = functionDef(ctx.functionDef())
-            moduleNode.addFunction(functionNode)
-            moduleNode.addMethod(functionNode)
+            moduleNode.addFunction(functionDef(ctx.functionDef()))
         }
 
         else if( ctx instanceof IncludeStmtAltContext ) {
-            final includeNode = includeStatement(ctx.includeStatement())
-            moduleNode.addInclude(includeNode)
-            moduleNode.addStatement(includeNode)
+            moduleNode.addInclude(includeStatement(ctx.includeStatement()))
         }
 
         else if( ctx instanceof OutputDefAltContext ) {
@@ -260,13 +244,10 @@ class ScriptAstBuilder {
             if( moduleNode.output != null )
                 collectSyntaxError(new SyntaxException('Output block defined more than once', outputNode))
             moduleNode.setOutput(outputNode)
-            moduleNode.addStatement(outputNode)
         }
 
         else if( ctx instanceof ProcessDefAltContext ) {
-            final processNode = processDef(ctx.processDef())
-            moduleNode.addProcess(processNode)
-            moduleNode.addStatement(processNode)
+            moduleNode.addProcess(processDef(ctx.processDef()))
         }
 
         else if( ctx instanceof WorkflowDefAltContext ) {
@@ -277,11 +258,11 @@ class ScriptAstBuilder {
                 moduleNode.setEntry(workflowNode)
             }
             moduleNode.addWorkflow(workflowNode)
-            moduleNode.addStatement(workflowNode)
         }
 
-        else if( ctx instanceof IncompleteStmtAltContext )
-            moduleNode.addStatement(incompleteStatement(ctx.incompleteStatement()))
+        else if( ctx instanceof IncompleteStmtAltContext ) {
+            incompleteStatement(ctx.incompleteStatement())
+        }
 
         else
             throw createParsingFailedException("Invalid script statement: ${ctx.text}", ctx)
@@ -289,11 +270,9 @@ class ScriptAstBuilder {
 
     private FeatureFlagNode featureFlag(FeatureFlagContext ctx) {
         final names = ctx.featureFlagPath().identifier().collect( this.&identifier )
-        final left = constX(names.join('.'))
-        final right = literal(ctx.literal())
-        final call = callThisX('feature', args(left, right))
+        final value = literal(ctx.literal())
 
-        ast( new FeatureFlagNode(call, names, right), ctx )
+        ast( new FeatureFlagNode(names, value), ctx )
     }
 
     private IncludeNode includeStatement(IncludeStatementContext ctx) {
@@ -304,17 +283,8 @@ class ScriptAstBuilder {
                 ? new IncludeDef.Module(name, it.alias.text)
                 : new IncludeDef.Module(name)
         }
-        final moduleArgs = modules.collect { module ->
-            final name = constX(module.name)
-            module.alias
-                ? createX(IncludeDef.Module, name, constX(module.alias))
-                : createX(IncludeDef.Module, name)
-        } as List<Expression>
-        final include = callThisX('include', args(createX(IncludeDef, args(moduleArgs))))
-        final from = callX(include, 'from', args(constX(source)))
-        final load = callX(from, 'load0', args(varX('params')))
 
-        ast( new IncludeNode(load, source, modules), ctx )
+        ast( new IncludeNode(source, modules), ctx )
     }
 
     private ProcessNode processDef(ProcessDefContext ctx) {
@@ -325,150 +295,41 @@ class ScriptAstBuilder {
         final when = processWhen(ctx.body.processWhen())
         final type = processType(ctx.body.processExec())
         final exec = blockStatements(ctx.body.blockStatements() ?: ctx.body.processExec().blockStatements())
-        exec.addStatementLabel(type)
-        final bodyDef = stmt(createX(
-            BodyDef,
-            args(
-                closureX(exec),
-                constX(ctx.text), // TODO: source code formatting
-                constX(type),
-                new ListExpression() // TODO: variable references (see VariableVisitor)
-            )
-        ))
         final stub = processStub(ctx.body.processStub())
-        final closure = closureX(block(new VariableScope(), [
-            directives,
-            inputs,
-            outputs,
-            when,
-            stub,
-            bodyDef
-        ]))
-        final methodCall = callThisX('process', args(constX(name), closure))
-        final result = ast( new ProcessNode(methodCall, name, directives, inputs, outputs, when, exec, stub), ctx )
 
-        groovydocManager.handle(result.expression, ctx)
+        final result = ast( new ProcessNode(name, directives, inputs, outputs, when, type, exec, stub), ctx )
+        groovydocManager.handle(result, ctx)
         return result
     }
 
     private Statement processDirectives(ProcessDirectivesContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        final result = ast( block(new VariableScope(), ctx.processDirective().collect(this.&processDirective)), ctx )
-        result.addStatementLabel('directives')
-        return result
-    }
-
-    private Statement processDirective(ProcessDirectiveContext ctx) {
-        stmt(ast( processMethodCall(ctx), ctx ))
+        return block(null, ctx.processDirective().collect(this.&processMethodCall))
     }
 
     private Statement processInputs(ProcessInputsContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        final result = ast( block(new VariableScope(), ctx.processDirective().collect(this.&processInput)), ctx )
-        result.addStatementLabel('input')
-        return result
-    }
-
-    private Statement processInput(ProcessDirectiveContext ctx) {
-        final result = processMethodCall(ctx, '_in_')
-        fixProcessInputOutputs(result)
-        return stmt(ast( result, ctx ))
+        return block(null, ctx.processDirective().collect(this.&processMethodCall))
     }
 
     private Statement processOutputs(ProcessOutputsContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        final result = ast( block(new VariableScope(), ctx.processDirective().collect(this.&processOutput)), ctx )
-        result.addStatementLabel('output')
-        return result
+        return block(null, ctx.processDirective().collect(this.&processMethodCall))
     }
 
-    private Statement processOutput(ProcessDirectiveContext ctx) {
-        final result = processMethodCall(ctx, '_out_')
-        fixProcessInputOutputs(result)
-        return stmt(ast( result, ctx ))
-    }
-
-    private MethodCallExpression processMethodCall(ProcessDirectiveContext ctx, String prefix = '') {
-        final name = prefix + identifier(ctx.identifier())
+    private Statement processMethodCall(ProcessDirectiveContext ctx) {
+        final name = identifier(ctx.identifier())
         final arguments = argumentList(ctx.argumentList())
-        return ast( callThisX(name, arguments), ctx )
+        return stmt(ast( callThisX(name, arguments), ctx ))
     }
 
-    private void fixProcessInputOutputs(MethodCallExpression methodCall) {
-        final name = methodCall.methodAsString
-        final withinTuple = name == '_in_tuple' || name == '_out_tuple'
-        final withinEach = name == '_in_each'
-        varToConstX(methodCall.arguments, withinTuple, withinEach)
-    }
-
-    private Expression varToConstX(Expression expr, boolean withinTuple, boolean withinEach) {
-        if( expr instanceof VariableExpression ) {
-            final name = ((VariableExpression) expr).getName()
-
-            if( name == 'stdin' && withinTuple )
-                return createX( TokenStdinCall )
-
-            if ( name == 'stdout' && withinTuple )
-                return createX( TokenStdoutCall )
-
-            return createX( TokenVar, constX(name) )
-        }
-
-        if( expr instanceof MethodCallExpression ) {
-            final methodCall = (MethodCallExpression)expr
-            final name = methodCall.methodAsString
-            final arguments = methodCall.arguments
-
-            if( name == 'env' && withinTuple )
-                return createX( TokenEnvCall, (TupleExpression) varToStrX(arguments) )
-
-            if( name == 'file' && (withinTuple || withinEach) )
-                return createX( TokenFileCall, (TupleExpression) varToConstX(arguments, withinTuple, withinEach) )
-
-            if( name == 'path' && (withinTuple || withinEach) )
-                return createX( TokenPathCall, (TupleExpression) varToConstX(arguments, withinTuple, withinEach) )
-
-            if( name == 'val' && withinTuple )
-                return createX( TokenValCall, (TupleExpression) varToStrX(arguments) )
-        }
-
-        if( expr instanceof TupleExpression ) {
-            final arguments = expr.getExpressions()
-            int i = 0
-            for( Expression item : arguments )
-                arguments[i++] = varToConstX(item, withinTuple, withinEach)
-            return expr
-        }
-
-        return expr
-    }
-
-    private Expression varToStrX(Expression expr) {
-        if( expr instanceof VariableExpression ) {
-            final name = ((VariableExpression) expr).getName()
-            return createX( TokenVar, constX(name) )
-        }
-
-        if( expr instanceof TupleExpression ) {
-            final arguments = expr.getExpressions()
-            int i = 0
-            for( Expression item : arguments )
-                arguments[i++] = varToStrX(item)
-            return expr
-        }
-
-        return expr
-    }
-
-    private Statement processWhen(ProcessWhenContext ctx) {
+    private Expression processWhen(ProcessWhenContext ctx) {
         if( !ctx )
-            return EmptyStatement.INSTANCE
-        final result = stmt(ast( callThisX('when', expression(ctx.expression())), ctx ))
-        result.addStatementLabel('when')
-        return result
+            return EmptyExpression.INSTANCE
+        return ast( expression(ctx.expression()), ctx )
     }
 
     private String processType(ProcessExecContext ctx) {
@@ -486,101 +347,57 @@ class ScriptAstBuilder {
     private Statement processStub(ProcessStubContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        final result = stmt(ast( callThisX('stub', closureX(blockStatements(ctx.blockStatements()))), ctx ))
-        result.addStatementLabel('stub')
-        return result
+        return ast( blockStatements(ctx.blockStatements()), ctx )
     }
 
     private WorkflowNode workflowDef(WorkflowDefContext ctx) {
         final name = ctx.name?.text
         final takes = workflowTakes(ctx.body?.workflowTakes())
+        final emits = workflowEmits(ctx.body?.workflowEmits())
         final main = blockStatements(ctx.body?.workflowMain()?.blockStatements())
-        final emits = workflowEmits(ctx.body?.workflowEmits(), main)
-        main.addStatementLabel('main')
-        final bodyDef = stmt(createX(
-            BodyDef,
-            args(
-                closureX(main),
-                constX(ctx.text), // TODO: source code formatting
-                constX('workflow'),
-                new ListExpression() // TODO: variable references (see VariableVisitor)
-            )
-        ))
-        final closure = closureX(block(new VariableScope(), [
-            takes,
-            emits,
-            bodyDef
-        ]))
-        final arguments = name
-            ? args(constX(name), closure)
-            : args(closure)
-        final methodCall = callThisX('workflow', arguments)
-        final result = ast( new WorkflowNode(methodCall, name, takes, emits, main), ctx )
 
-        groovydocManager.handle(result.expression, ctx)
+        final result = ast( new WorkflowNode(name, takes, emits, main), ctx )
+        groovydocManager.handle(result, ctx)
         return result
     }
 
     private WorkflowNode workflowDef(WorkflowMainContext ctx) {
         final takes = EmptyStatement.INSTANCE
-        final main = blockStatements(ctx.blockStatements())
         final emits = EmptyStatement.INSTANCE
-        main.addStatementLabel('main')
-        final bodyDef = stmt(createX(
-            BodyDef,
-            args(
-                closureX(main),
-                constX(ctx.text), // TODO: source code formatting
-                constX('workflow'),
-                new ListExpression() // TODO: variable references (see VariableVisitor)
-            )
-        ))
-        final closure = closureX(block(new VariableScope(), [
-            takes,
-            emits,
-            bodyDef
-        ]))
-        final methodCall = callThisX('workflow', args(closure))
-        return new WorkflowNode(methodCall, null, takes, emits, main)
+        final main = blockStatements(ctx.blockStatements())
+        return new WorkflowNode(null, takes, emits, main)
     }
 
     private Statement workflowTakes(WorkflowTakesContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
 
-        final statements = ctx.identifier().collect( take ->
-            stmt(callThisX('_take_', args(constX(take.text))))
-        )
-        final result = ast( block(new VariableScope(), statements), ctx )
-        result.addStatementLabel('take')
-        return result
+        final statements = ctx.identifier().collect( take -> stmt(varX(take.text)) )
+        return ast( block(null, statements), ctx )
     }
 
-    private Statement workflowEmits(WorkflowEmitsContext ctx, BlockStatement main) {
+    private Statement workflowEmits(WorkflowEmitsContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
 
-        final statements = ctx.workflowEmit().collect( emit -> workflowEmit(emit, main) )
-        final result = ast( block(new VariableScope(), statements), ctx )
-        result.addStatementLabel('emit')
-        return result
+        final statements = ctx.workflowEmit().collect(this.&workflowEmit)
+        return ast( block(null, statements), ctx )
     }
 
-    private Statement workflowEmit(WorkflowEmitContext ctx, BlockStatement main) {
+    private Statement workflowEmit(WorkflowEmitContext ctx) {
         final name = identifier(ctx.identifier())
         if( ctx.expression() ) {
             final left = ast( varX(name), ctx.identifier() )
-            final statement = stmt(ast( assignX(left, expression(ctx.expression())), ctx ))
-            main.addStatement(statement)
+            return stmt(ast( assignX(left, expression(ctx.expression())), ctx ))
         }
-        return stmt(callThisX('_emit_', args(constX(name))))
+        else {
+            return stmt(varX(name))
+        }
     }
 
     private OutputNode outputDef(OutputDefContext ctx) {
         final body = blockStatements(ctx.outputBody()?.blockStatements())
-        final closure = closureX(block(new VariableScope(), body))
-        final methodCall = callThisX('output', args(closure))
-        return ast( new OutputNode(methodCall, body), ctx )
+        return ast( new OutputNode(body), ctx )
     }
 
     private FunctionNode functionDef(FunctionDefContext ctx) {
@@ -588,8 +405,8 @@ class ScriptAstBuilder {
         final returnType = type(ctx.type())
         final params = parameters(ctx.formalParameterList()) ?: [] as Parameter[]
         final code = blockStatements(ctx.blockStatements())
-        final result = ast( new FunctionNode(name, returnType, params, code), ctx )
 
+        final result = ast( new FunctionNode(name, returnType, params, code), ctx )
         groovydocManager.handle(result, ctx)
         return result
     }
@@ -1096,19 +913,19 @@ class ScriptAstBuilder {
 
     private Expression literal(LiteralContext ctx) {
         if( ctx instanceof IntegerLiteralAltContext )
-            return integerLiteral( ctx )
+            return ast( integerLiteral(ctx), ctx )
 
         if( ctx instanceof FloatingPointLiteralAltContext )
-            return floatingPointLiteral( ctx )
+            return ast( floatingPointLiteral(ctx), ctx )
 
         if( ctx instanceof StringLiteralAltContext )
-            return constX( stringLiteral(ctx.stringLiteral()) )
+            return ast( constX(stringLiteral(ctx.stringLiteral())), ctx )
 
         if( ctx instanceof BooleanLiteralAltContext )
-            return constX( ctx.text=='true' )
+            return ast( constX(ctx.text == 'true'), ctx )
 
         if( ctx instanceof NullLiteralAltContext )
-            return constX( null )
+            return ast( constX(null), ctx )
 
         throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
     }
@@ -1674,8 +1491,8 @@ class FeatureFlagNode extends ExpressionStatement {
     final List<String> names
     final Expression value
 
-    FeatureFlagNode(Expression expression, List<String> names, Expression value) {
-        super(expression)
+    FeatureFlagNode(List<String> names, Expression value) {
+        super(EmptyExpression.INSTANCE)
         this.names = names
         this.value = value
     }
@@ -1713,8 +1530,8 @@ class IncludeNode extends ExpressionStatement {
     final String source
     final List<IncludeDef.Module> modules
 
-    IncludeNode(Expression expression, String source, List<IncludeDef.Module> modules) {
-        super(expression)
+    IncludeNode(String source, List<IncludeDef.Module> modules) {
+        super(EmptyExpression.INSTANCE)
         this.source = source
         this.modules = modules
     }
@@ -1722,49 +1539,65 @@ class IncludeNode extends ExpressionStatement {
 
 
 @CompileStatic
-class ProcessNode extends ExpressionStatement {
+class ProcessNode extends ExpressionStatement implements GroovydocHolder<ProcessNode> {
     final String name
     final Statement directives
     final Statement inputs
     final Statement outputs
-    final Statement when
+    final Expression when
+    final String type
     final Statement exec
     final Statement stub
 
-    ProcessNode(Expression expression, String name, Statement directives, Statement inputs, Statement outputs, Statement when, Statement exec, Statement stub) {
-        super(expression)
+    ProcessNode(String name, Statement directives, Statement inputs, Statement outputs, Expression when, String type, Statement exec, Statement stub) {
+        super(EmptyExpression.INSTANCE)
         this.name = name
         this.directives = directives
         this.inputs = inputs
         this.outputs = outputs
         this.when = when
+        this.type = type
         this.exec = exec
         this.stub = stub
     }
 
+    @Override
     Groovydoc getGroovydoc() {
-        return expression.getGroovydoc()
+        final Groovydoc groovydoc = getNodeMetaData(DOC_COMMENT)
+        return groovydoc != null ? groovydoc : Groovydoc.EMPTY_GROOVYDOC
+    }
+
+    @Override
+    ProcessNode getInstance() {
+        return this
     }
 }
 
 
 @CompileStatic
-class WorkflowNode extends ExpressionStatement {
+class WorkflowNode extends ExpressionStatement implements GroovydocHolder<WorkflowNode> {
     final String name
     final Statement takes
     final Statement emits
     final Statement main
 
-    WorkflowNode(Expression expression, String name, Statement takes, Statement emits, Statement main) {
-        super(expression)
+    WorkflowNode(String name, Statement takes, Statement emits, Statement main) {
+        super(EmptyExpression.INSTANCE)
         this.name = name
         this.takes = takes
         this.emits = emits
         this.main = main
     }
 
+    @Override
     Groovydoc getGroovydoc() {
-        return expression.getGroovydoc()
+        final Groovydoc groovydoc = getNodeMetaData(DOC_COMMENT)
+        return groovydoc != null ? groovydoc : Groovydoc.EMPTY_GROOVYDOC
+    }
+
+    @Override
+    WorkflowNode getInstance() {
+        return this
     }
 }
 
@@ -1773,8 +1606,8 @@ class WorkflowNode extends ExpressionStatement {
 class OutputNode extends ExpressionStatement {
     final Statement body
 
-    OutputNode(Expression expression, Statement body) {
-        super(expression)
+    OutputNode(Statement body) {
+        super(EmptyExpression.INSTANCE)
         this.body = body
     }
 }
