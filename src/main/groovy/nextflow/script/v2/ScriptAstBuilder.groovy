@@ -301,19 +301,19 @@ class ScriptAstBuilder {
     private Statement processDirectives(ProcessDirectivesContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        return block(null, ctx.processDirective().collect(this.&processMethodCall))
+        return ast( block(null, ctx.processDirective().collect(this.&processMethodCall)), ctx )
     }
 
     private Statement processInputs(ProcessInputsContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        return block(null, ctx.processDirective().collect(this.&processMethodCall))
+        return ast( block(null, ctx.processDirective().collect(this.&processMethodCall)), ctx )
     }
 
     private Statement processOutputs(ProcessOutputsContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        return block(null, ctx.processDirective().collect(this.&processMethodCall))
+        return ast( block(null, ctx.processDirective().collect(this.&processMethodCall)), ctx )
     }
 
     private Statement processMethodCall(ProcessDirectiveContext ctx) {
@@ -389,8 +389,12 @@ class ScriptAstBuilder {
         if( !ctx )
             return EmptyStatement.INSTANCE
 
-        final statements = ctx.identifier().collect( take -> stmt(varX(take.text)) )
+        final statements = ctx.identifier().collect(this.&workflowTake)
         return ast( block(null, statements), ctx )
+    }
+
+    private Statement workflowTake(IdentifierContext ctx) {
+        return stmt(ast( varX(ctx.text), ctx ))
     }
 
     private Statement workflowEmits(WorkflowEmitsContext ctx) {
@@ -402,14 +406,10 @@ class ScriptAstBuilder {
     }
 
     private Statement workflowEmit(WorkflowEmitContext ctx) {
-        final name = identifier(ctx.identifier())
-        if( ctx.expression() ) {
-            final left = ast( varX(name), ctx.identifier() )
-            return stmt(ast( assignX(left, expression(ctx.expression())), ctx ))
-        }
-        else {
-            return stmt(varX(name))
-        }
+        final var = variableName(ctx.identifier())
+        return ctx.expression()
+            ? stmt(ast( assignX(var, expression(ctx.expression())), ctx ))
+            : stmt(var)
     }
 
     private OutputNode outputDef(OutputDefContext ctx) {
