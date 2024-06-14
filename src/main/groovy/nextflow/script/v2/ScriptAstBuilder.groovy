@@ -453,9 +453,6 @@ class ScriptAstBuilder {
         if( ctx instanceof ThrowStmtAltContext )
             return ast( throwStatement(ctx.expression()), ctx )
 
-        if( ctx instanceof LabeledStmtAltContext )
-            return ast( labeledStatement(ctx), ctx )
-
         if( ctx instanceof AssertStmtAltContext )
             return ast( assertStatement(ctx.assertStatement()), ctx )
 
@@ -496,8 +493,8 @@ class ScriptAstBuilder {
     private BlockStatement blockStatements(BlockStatementsContext ctx) {
         if( !ctx )
             return block(new VariableScope(), List<Statement>.of())
-        final code = ctx.statement().collect( this.&statement )
-        ast( block(new VariableScope(), code), ctx )
+        final statements = ctx.statement().collect( this.&statement )
+        ast( block(new VariableScope(), statements), ctx )
     }
 
     private Statement tryCatchStatement(TryCatchStatementContext ctx) {
@@ -539,13 +536,6 @@ class ScriptAstBuilder {
             ? expression(ctx)
             : ConstantExpression.EMPTY_EXPRESSION
         throwS(result)
-    }
-
-    private Statement labeledStatement(LabeledStmtAltContext ctx) {
-        final label = identifier(ctx.identifier())
-        final result = statement(ctx.statement())
-        result.addStatementLabel(label)
-        return result
     }
 
     private Statement assertStatement(AssertStatementContext ctx) {
@@ -785,8 +775,15 @@ class ScriptAstBuilder {
         if( ctx instanceof PropertyPathExprAltContext )
             return ast( pathPropertyElement(expression, ctx), expression, ctx )
 
-        if( ctx instanceof ClosurePathExprAltContext )
-            return ast( pathClosureElement(expression, ctx.closure()), expression, ctx )
+        if( ctx instanceof ClosurePathExprAltContext ) {
+            final closure = closure(ctx.closure())
+            return ast( pathClosureElement(expression, closure), expression, ctx )
+        }
+
+        if( ctx instanceof ClosureWithLabelsPathExprAltContext ) {
+            final closure = closureWithLabels(ctx.closureWithLabels())
+            return ast( pathClosureElement(expression, closure), expression, ctx )
+        }
 
         if( ctx instanceof ArgumentsPathExprAltContext )
             return ast( pathArgumentsElement(expression, ctx.arguments()), expression, ctx )
@@ -819,9 +816,7 @@ class ScriptAstBuilder {
         throw new IllegalStateException()
     }
 
-    private Expression pathClosureElement(Expression expression, ClosureContext ctx) {
-        final closure = ast( closure(ctx), ctx )
-
+    private Expression pathClosureElement(Expression expression, Expression closure) {
         if( expression instanceof MethodCallExpression ) {
             // append closure to method call arguments
             final call = (MethodCallExpression)expression
@@ -1051,7 +1046,27 @@ class ScriptAstBuilder {
     private Expression closure(ClosureContext ctx) {
         final params = parameters(ctx.formalParameterList())
         final code = blockStatements(ctx.blockStatements())
-        closureX(params, code)
+        ast( closureX(params, code), ctx )
+    }
+
+    private Expression closureWithLabels(ClosureWithLabelsContext ctx) {
+        final params = parameters(ctx.formalParameterList())
+        final code = blockStatementsWithLabels(ctx.blockStatementsWithLabels())
+        ast( closureX(params, code), ctx )
+    }
+
+    private BlockStatement blockStatementsWithLabels(BlockStatementsWithLabelsContext ctx) {
+        final statements = ctx.statementOrLabeled().collect( this.&statementOrLabeled )
+        ast( block(new VariableScope(), statements), ctx )
+    }
+
+    private Statement statementOrLabeled(StatementOrLabeledContext ctx) {
+        final result = statement(ctx.statement())
+        if( ctx.identifier() ) {
+            final label = identifier(ctx.identifier())
+            result.addStatementLabel(label)
+        }
+        return result
     }
 
     private Expression list(ListContext ctx) {

@@ -245,7 +245,6 @@ statement
     |   tryCatchStatement               #tryCatchStmtAlt
     |   RETURN expression?              #returnStmtAlt
     |   THROW expression                #throwStmtAlt
-    |   identifier COLON nls statement  #labeledStmtAlt
     |   assertStatement                 #assertStmtAlt
     |   variableDeclaration             #variableDeclarationStmtAlt
     |   multipleAssignmentStatement     #multipleAssignmentStmtAlt
@@ -452,6 +451,7 @@ pathElement
 
     // method call expression (with closure)
     |   closure                                         #closurePathExprAlt
+    |   closureWithLabels                               #closureWithLabelsPathExprAlt
 
     // method call expression
     |   arguments                                       #argumentsPathExprAlt
@@ -552,6 +552,19 @@ formalParameterList
 
 formalParameter
     :   DEF? type? ELLIPSIS? identifier (nls ASSIGN nls expression)?
+    ;
+
+closureWithLabels
+    :   LBRACE (nls (formalParameterList nls)? ARROW)? nls blockStatementsWithLabels RBRACE
+    ;
+
+blockStatementsWithLabels
+    :   statementOrLabeled (sep statementOrLabeled)* sep?
+    ;
+
+statementOrLabeled
+    :   identifier COLON nls statement
+    |   statement
     ;
 
 // -- list expression
