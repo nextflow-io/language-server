@@ -29,6 +29,7 @@ import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.EmptyStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
+import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.SourceUnit
 
@@ -72,6 +73,9 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
             visitWorkflow(workflowNode)
         if( moduleNode.getOutput() )
             visitOutput(moduleNode.getOutput())
+
+        if( moduleNode.isEmpty() )
+            moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
     }
 
     @Override

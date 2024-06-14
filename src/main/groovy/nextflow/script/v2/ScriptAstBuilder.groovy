@@ -196,11 +196,7 @@ class ScriptAstBuilder {
             final workflowNode = workflowDef(ctx.workflowMain())
             moduleNode.addWorkflow(workflowNode)
             moduleNode.setEntry(workflowNode)
-            moduleNode.addStatement(workflowNode)
         }
-
-        if( moduleNode.isEmpty() )
-            moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
 
         final scriptClassNode = moduleNode.getScriptClassDummy()
         scriptClassNode.setName(getMainClassName())
