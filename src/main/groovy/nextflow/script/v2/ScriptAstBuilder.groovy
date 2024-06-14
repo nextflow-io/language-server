@@ -18,8 +18,6 @@ package nextflow.script.v2
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.google.common.hash.Hashing
-import groovy.lang.groovydoc.Groovydoc
-import groovy.lang.groovydoc.GroovydocHolder
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.antlr.ScriptLexer
@@ -319,7 +317,9 @@ class ScriptAstBuilder {
     private Statement processMethodCall(ProcessDirectiveContext ctx) {
         final name = identifier(ctx.identifier())
         final arguments = argumentList(ctx.argumentList())
-        return stmt(ast( callThisX(name, arguments), ctx ))
+        final call = ast( callThisX(name, arguments), ctx )
+        ast( call.method, ctx.identifier() )
+        return stmt(call)
     }
 
     private Expression processWhen(ProcessWhenContext ctx) {
@@ -1547,17 +1547,6 @@ class FunctionNode extends MethodNode {
 
 
 @CompileStatic
-class OperatorNode extends MethodNode {
-    final String documentation
-
-    OperatorNode(String name, String documentation) {
-        super(name, 0, null, Parameter.EMPTY_ARRAY, [] as ClassNode[], EmptyStatement.INSTANCE)
-        this.documentation = documentation
-    }
-}
-
-
-@CompileStatic
 class IncludeNode extends ExpressionStatement {
     final String source
     final List<IncludeDef.Module> modules
@@ -1571,8 +1560,7 @@ class IncludeNode extends ExpressionStatement {
 
 
 @CompileStatic
-class ProcessNode extends ExpressionStatement implements GroovydocHolder<ProcessNode> {
-    final String name
+class ProcessNode extends MethodNode {
     final Statement directives
     final Statement inputs
     final Statement outputs
@@ -1582,8 +1570,7 @@ class ProcessNode extends ExpressionStatement implements GroovydocHolder<Process
     final Statement stub
 
     ProcessNode(String name, Statement directives, Statement inputs, Statement outputs, Expression when, String type, Statement exec, Statement stub) {
-        super(EmptyExpression.INSTANCE)
-        this.name = name
+        super(name, 0, null, Parameter.EMPTY_ARRAY, [] as ClassNode[], EmptyStatement.INSTANCE)
         this.directives = directives
         this.inputs = inputs
         this.outputs = outputs
@@ -1592,44 +1579,20 @@ class ProcessNode extends ExpressionStatement implements GroovydocHolder<Process
         this.exec = exec
         this.stub = stub
     }
-
-    @Override
-    Groovydoc getGroovydoc() {
-        final Groovydoc groovydoc = getNodeMetaData(DOC_COMMENT)
-        return groovydoc != null ? groovydoc : Groovydoc.EMPTY_GROOVYDOC
-    }
-
-    @Override
-    ProcessNode getInstance() {
-        return this
-    }
 }
 
 
 @CompileStatic
-class WorkflowNode extends ExpressionStatement implements GroovydocHolder<WorkflowNode> {
-    final String name
+class WorkflowNode extends MethodNode {
     final Statement takes
     final Statement emits
     final Statement main
 
     WorkflowNode(String name, Statement takes, Statement emits, Statement main) {
-        super(EmptyExpression.INSTANCE)
-        this.name = name
+        super(name, 0, null, Parameter.EMPTY_ARRAY, [] as ClassNode[], EmptyStatement.INSTANCE)
         this.takes = takes
         this.emits = emits
         this.main = main
-    }
-
-    @Override
-    Groovydoc getGroovydoc() {
-        final Groovydoc groovydoc = getNodeMetaData(DOC_COMMENT)
-        return groovydoc != null ? groovydoc : Groovydoc.EMPTY_GROOVYDOC
-    }
-
-    @Override
-    WorkflowNode getInstance() {
-        return this
     }
 }
 

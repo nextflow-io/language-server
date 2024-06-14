@@ -134,18 +134,12 @@ class ProcessDirectiveDsl {
 class ProcessInputDsl {
 
     @Function('''
-        ```groovy
-        val <identifier>
-        ```
         Declare a variable input. The received value can be any type, and it will be made available to the process body (i.e. `script`, `shell`, `exec`) as a variable with the given name.
     ''')
     void val(arg) {
     }
 
     @Function('''
-        ```groovy
-        path <identifier | stageName>
-        ```
         Declare a file input. The received value should be a file or collection of files.
 
         The argument can be an identifier or string. If an identifier, the received value will be made available to the process body as a variable. If a string, the received value will be staged into the task directory under the given alias.
@@ -154,27 +148,18 @@ class ProcessInputDsl {
     }
 
     @Function('''
-        ```groovy
-        env <identifier>
-        ```
         Declare an environment variable input. The received value should be a string, and it will be exported to the task environment as an environment variable given by `identifier`.
     ''')
     void env(arg) {
     }
 
     @Function('''
-        ```groovy
-        stdin
-        ```
         Declare a `stdin` input. The received value should be a string, and it will be provided as the standard input (i.e. `stdin`) to the task script. It should be declared only once for a process.
     ''')
     void stdin() {
     }
 
     @Function('''
-        ```groovy
-        tuple <arg1>, <arg2>, ...
-        ```
         Declare a tuple input. Each argument should be an input declaration such as `val`, `path`, `env`, or `stdin`.
 
         The received value should be a tuple with the same number of elements as the `tuple` declaration, and each received element should be compatible with the corresponding `tuple` argument. Each tuple element is treated the same way as if it were a standalone input.
@@ -188,54 +173,36 @@ class ProcessInputDsl {
 class ProcessOutputDsl {
 
     @Function('''
-        ```groovy
-        val <value>
-        ```
         Declare a value output. The argument can be any value, and it can reference any output variables defined in the process body (i.e. variables declared without the `def` keyword).
     ''')
     void val(arg) {
     }
 
     @Function('''
-        ```groovy
-        path <pattern>
-        ```
         Declare a file output. It receives the output files from the task environment that match the given pattern.
     ''')
     void path(arg) {
     }
 
     @Function('''
-        ```groovy
-        env <identifier>
-        ```
         Declare an environment variable output. It receives the value of the environment variable given by `identifier` from the task environment.
     ''')
     void env(arg) {
     }
 
     @Function('''
-        ```groovy
-        stdout
-        ```
         Declare a `stdout` output. It receives the standard output of the task script.
     ''')
     void stdout() {
     }
 
     @Function('''
-        ```groovy
-        eval <command>
-        ```
         Declare an `eval` output. It receives the standard output of the given command, which is executed in the task environment after the task script.
     ''')
     void eval(arg) {
     }
 
     @Function('''
-        ```groovy
-        tuple <arg1>, <arg2>, ...
-        ```
         Declare a tuple output. Each argument should be an output declaration such as `val`, `path`, `env`, `stdin`, or `eval`. Each tuple element is treated the same way as if it were a standalone output.
     ''')
     void tuple(Object... args) {

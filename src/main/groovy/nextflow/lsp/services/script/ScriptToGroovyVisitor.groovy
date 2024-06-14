@@ -128,8 +128,8 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
             stub,
             bodyDef
         ]))
-        node.expression = callThisX('process', args(constX(node.name), closure))
-        moduleNode.addStatement(node)
+        final result = stmt(callThisX('process', args(constX(node.name), closure)))
+        moduleNode.addStatement(result)
     }
 
     private void convertProcessInputs(Statement inputs) {
@@ -277,8 +277,8 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
         final arguments = node.name
             ? args(constX(node.name), closure)
             : args(closure)
-        node.expression = callThisX('workflow', arguments)
-        moduleNode.addStatement(node)
+        final result = stmt(callThisX('workflow', arguments))
+        moduleNode.addStatement(result)
     }
 
     private void convertWorkflowTakes(Statement takes) {

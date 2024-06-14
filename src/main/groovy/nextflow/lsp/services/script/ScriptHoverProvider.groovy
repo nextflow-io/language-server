@@ -6,7 +6,6 @@ import nextflow.lsp.ast.ASTUtils
 import nextflow.lsp.services.HoverProvider
 import nextflow.lsp.util.Logger
 import nextflow.script.v2.FunctionNode
-import nextflow.script.v2.OperatorNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
@@ -88,24 +87,19 @@ class ScriptHoverProvider implements HoverProvider {
     }
 
     private String getHoverLabel(ASTNode node) {
-        if( node instanceof FunctionNode ) {
+        if( node instanceof FunctionNode )
             return ASTNodeStringUtils.toString(node, ast)
-        }
-        else if( node instanceof OperatorNode ) {
+
+        if( node instanceof ProcessNode )
             return ASTNodeStringUtils.toString(node, ast)
-        }
-        else if( node instanceof ProcessNode ) {
+
+        if( node instanceof WorkflowNode )
             return ASTNodeStringUtils.toString(node, ast)
-        }
-        else if( node instanceof WorkflowNode ) {
+
+        if( node instanceof Variable )
             return ASTNodeStringUtils.toString(node, ast)
-        }
-        else if( node instanceof Variable ) {
-            return ASTNodeStringUtils.toString(node, ast)
-        }
-        else {
-            return null
-        }
+
+        return null
     }
 
 }

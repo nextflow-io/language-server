@@ -5,7 +5,6 @@ import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.ast.ASTUtils
 import nextflow.script.v2.FunctionNode
-import nextflow.script.v2.OperatorNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.AnnotatedNode
@@ -34,6 +33,16 @@ class ASTNodeStringUtils {
     }
 
     static String toString(FunctionNode node, ASTNodeCache ast) {
+        final label = (String) node.getNodeMetaData('type.label')
+        if( label ) {
+            final builder = new StringBuilder()
+            builder.append('(')
+            builder.append(label)
+            builder.append(') ')
+            builder.append(node.getName())
+            return builder.toString()
+        }
+
         final builder = new StringBuilder()
         builder.append('def ')
         builder.append(node.getName())
@@ -50,13 +59,6 @@ class ASTNodeStringUtils {
 
     static String toString(Parameter[] params, ASTNodeCache ast) {
         return params.collect { param -> toString(param, ast) }.join(', ')
-    }
-
-    static String toString(OperatorNode node, ASTNodeCache ast) {
-        final builder = new StringBuilder()
-        builder.append('operator ')
-        builder.append(node.getName())
-        return builder.toString()
     }
 
     static String toString(ProcessNode node, ASTNodeCache ast) {
@@ -89,12 +91,13 @@ class ASTNodeStringUtils {
     static String getDocumentation(ASTNode node) {
         if( node instanceof FunctionNode )
             return node.documentation ?: groovydocToMarkdown(node.getGroovydoc())
-        if( node instanceof OperatorNode )
-            return node.documentation
+
         if( node instanceof ProcessNode )
             return groovydocToMarkdown(node.getGroovydoc())
+
         if( node instanceof WorkflowNode )
             return groovydocToMarkdown(node.getGroovydoc())
+
         if( node instanceof AnnotatedNode )
             return groovydocToMarkdown(node.getGroovydoc())
 

@@ -28,9 +28,12 @@ class Compiler {
 
     private GroovyClassLoader classLoader
 
-    Compiler(CompilerConfiguration config, GroovyClassLoader classLoader) {
+    private List<CompilerTransform> transforms
+
+    Compiler(CompilerConfiguration config, GroovyClassLoader classLoader, List<CompilerTransform> transforms) {
         this.config = config
         this.classLoader = classLoader
+        this.transforms = transforms
     }
 
     /**
@@ -101,6 +104,8 @@ class Compiler {
         try {
             sourceUnit.parse()
             sourceUnit.buildAST()
+            for( final transform : transforms )
+                transform.visit(sourceUnit)
         }
         catch( RecognitionException e ) {
         }

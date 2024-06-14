@@ -120,7 +120,6 @@ class LanguageServerUtils {
 
     static SymbolInformation astNodeToSymbolInformation(Variable node, URI uri, String parentName) {
         if( node !instanceof ASTNode ) {
-            // DynamicVariable isn't an ASTNode
             return null
         }
         return new SymbolInformation(

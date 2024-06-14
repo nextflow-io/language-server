@@ -34,7 +34,7 @@ class ConfigService extends LanguageService {
     protected Compiler getCompiler() {
         final config = createConfiguration()
         final classLoader = new GroovyClassLoader(ClassLoader.getSystemClassLoader().getParent(), config, true)
-        return new Compiler(config, classLoader)
+        return new Compiler(config, classLoader, List.of())
     }
 
     protected CompilerConfiguration createConfiguration() {
