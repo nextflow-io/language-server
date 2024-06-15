@@ -23,7 +23,6 @@ import groovy.util.logging.Slf4j
 import nextflow.antlr.ScriptLexer
 import nextflow.antlr.ScriptParser
 import nextflow.antlr.DescriptiveErrorStrategy
-import nextflow.script.IncludeDef
 import org.antlr.v4.runtime.ANTLRErrorListener
 import org.antlr.v4.runtime.CharStream
 import org.antlr.v4.runtime.CharStreams
@@ -48,6 +47,7 @@ import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.ast.NodeMetaDataHandler
 import org.codehaus.groovy.ast.Parameter
+import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.BinaryExpression
@@ -273,9 +273,8 @@ class ScriptAstBuilder {
         final source = stringLiteral(ctx.stringLiteral())
         final modules = ctx.includeNames().includeName().collect { it ->
             final name = it.name.text
-            it.alias
-                ? new IncludeDef.Module(name, it.alias.text)
-                : new IncludeDef.Module(name)
+            final alias = it.alias?.text
+            ast( new IncludeVariable(name, alias), it )
         }
 
         ast( new IncludeNode(source, modules), ctx )
@@ -1570,13 +1569,63 @@ class FunctionNode extends MethodNode {
 @CompileStatic
 class IncludeNode extends ExpressionStatement {
     final String source
-    final List<IncludeDef.Module> modules
+    final List<IncludeVariable> modules
 
-    IncludeNode(String source, List<IncludeDef.Module> modules) {
+    IncludeNode(String source, List<IncludeVariable> modules) {
         super(EmptyExpression.INSTANCE)
         this.source = source
         this.modules = modules
     }
+}
+
+
+@CompileStatic
+class IncludeVariable extends ASTNode implements Variable {
+    final String name
+    final String alias
+
+    IncludeVariable(String name, String alias=null) {
+        this.name = name
+        this.alias = alias
+    }
+
+    private MethodNode method
+
+    void setMethod(MethodNode method) {
+        this.method = method
+    }
+
+    MethodNode getMethod() { method }
+
+    @Override
+    ClassNode getType() { method.getReturnType() }
+
+    @Override
+    ClassNode getOriginType() { method.getReturnType() }
+
+    @Override
+    String getName() { alias ?: name }
+
+    @Override
+    Expression getInitialExpression() { null }
+
+    @Override
+    boolean hasInitialExpression() { false }
+
+    @Override
+    boolean isInStaticContext() { false }
+
+    @Override
+    boolean isDynamicTyped() { method.isDynamicReturnType() }
+
+    @Override
+    boolean isClosureSharedVariable() { false }
+
+    @Override
+    void setClosureSharedVariable(boolean inClosure) {}
+
+    @Override
+    int getModifiers() { method.getModifiers() }
 }
 
 

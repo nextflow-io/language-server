@@ -1,17 +1,25 @@
 package nextflow.lsp.services.script
 
+import java.nio.file.Path
+
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
+import nextflow.lsp.file.FileCache
 import nextflow.script.v2.FeatureFlagNode
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.IncludeNode
+import nextflow.script.v2.IncludeVariable
 import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
 import nextflow.script.v2.WorkflowNode
+import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.ClassCodeVisitorSupport
+import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.control.SourceUnit
+import org.codehaus.groovy.syntax.SyntaxException
 
 /**
  *
@@ -24,12 +32,44 @@ class ScriptAstCache extends ASTNodeCache {
         super(compiler)
     }
 
+    Map<URI, List<SyntaxException>> update(Set<URI> uris, FileCache fileCache) {
+        final errorsByUri = super.update(uris, fileCache)
+
+        for( final sourceUnit : getSourceUnits() ) {
+            final visitor = new ResolveIncludeVisitor(sourceUnit, this, uris)
+            visitor.visit()
+
+            final uri = sourceUnit.getSource().getURI()
+            if( !errorsByUri.containsKey(uri) )
+                errorsByUri.put(uri, [])
+            errorsByUri[uri].addAll(visitor.getErrors())
+        }
+
+        return errorsByUri
+    }
+
     protected ASTNodeCache.Visitor createVisitor(SourceUnit sourceUnit) {
         return new Visitor(sourceUnit)
     }
 
     List<IncludeNode> getIncludeNodes(URI uri) {
         return getScriptNode(uri).getIncludes()
+    }
+
+    List<MethodNode> getDefinitions() {
+        final List<MethodNode> result = []
+        result.addAll(getFunctionNodes())
+        result.addAll(getProcessNodes())
+        result.addAll(getWorkflowNodes())
+        return result
+    }
+
+    List<MethodNode> getDefinitions(URI uri) {
+        final List<MethodNode> result = []
+        result.addAll(getFunctionNodes(uri))
+        result.addAll(getProcessNodes(uri))
+        result.addAll(getWorkflowNodes(uri))
+        return result
     }
 
     List<FunctionNode> getFunctionNodes() {
@@ -117,6 +157,17 @@ class ScriptAstCache extends ASTNodeCache {
         void visitInclude(IncludeNode node) {
             pushASTNode(node)
             try {
+                for( final module : node.modules )
+                    visitIncludeVariable(module)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        void visitIncludeVariable(IncludeVariable node) {
+            pushASTNode(node)
+            try {
             }
             finally {
                 popASTNode()
@@ -184,6 +235,82 @@ class ScriptAstCache extends ASTNodeCache {
             finally {
                 popASTNode()
             }
+        }
+    }
+
+    private class ResolveIncludeVisitor extends ClassCodeVisitorSupport implements ScriptVisitor {
+
+        private SourceUnit sourceUnit
+
+        private URI uri
+
+        private ScriptAstCache astCache
+
+        private Set<URI> changedUris
+
+        private List<SyntaxException> errors = []
+
+        ResolveIncludeVisitor(SourceUnit sourceUnit, ScriptAstCache astCache, Set<URI> changedUris) {
+            this.sourceUnit = sourceUnit
+            this.uri = sourceUnit.getSource().getURI()
+            this.astCache = astCache
+            this.changedUris = changedUris
+        }
+
+        @Override
+        protected SourceUnit getSourceUnit() {
+            return sourceUnit
+        }
+
+        void visit() {
+            final moduleNode = sourceUnit.getAST()
+            if( moduleNode !instanceof ScriptNode )
+                return
+            final scriptNode = (ScriptNode) moduleNode
+            for( final node : scriptNode.getIncludes() )
+                visitInclude(node)
+        }
+
+        @Override
+        void visitInclude(IncludeNode node) {
+            final source = node.source
+            if( source.startsWith('plugin/') )
+                return
+            final includeUri = getIncludeUri(uri, source)
+            // resolve include node only if it is stale
+            if( uri !in changedUris && includeUri !in changedUris )
+                return
+            final includeUnit = astCache.getSourceUnit(includeUri)
+            if( !includeUnit ) {
+                addError("Invalid include source: '${includeUri}'", node)
+                return
+            }
+            final definitions = astCache.getDefinitions(includeUri)
+            for( final module : node.modules ) {
+                final includedName = module.@name
+                final includedNode = definitions.find { defNode -> defNode.name == includedName }
+                if( !includedNode )
+                    addError("Invalid include name: '${includedName}'", node)
+                module.setMethod(includedNode)
+            }
+        }
+
+        protected URI getIncludeUri(URI uri, String source) {
+            Path includePath = Path.of(uri).getParent().resolve(source)
+            if( includePath.isDirectory() )
+                includePath = includePath.resolve('main.nf')
+            else if( !source.endsWith('.nf') )
+                includePath = Path.of(includePath.toString() + '.nf')
+            return includePath.normalize().toUri()
+        }
+
+        List<SyntaxException> getErrors() {
+            return errors
+        }
+
+        @Override
+        void addError(String message, ASTNode node) {
+            errors.add(new SyntaxException(message, node))
         }
     }
 

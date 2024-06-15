@@ -27,16 +27,16 @@ interface ScriptVisitor {
             visitOutput(script.getOutput())
     }
 
-    void visitFeatureFlag(FeatureFlagNode node)
+    default void visitFeatureFlag(FeatureFlagNode node) {}
 
-    void visitFunction(FunctionNode node)
+    default void visitFunction(FunctionNode node) {}
 
-    void visitInclude(IncludeNode node)
+    default void visitInclude(IncludeNode node) {}
 
-    void visitProcess(ProcessNode node)
+    default void visitProcess(ProcessNode node) {}
 
-    void visitWorkflow(WorkflowNode node)
+    default void visitWorkflow(WorkflowNode node) {}
 
-    void visitOutput(OutputNode node)
+    default void visitOutput(OutputNode node) {}
 
 }

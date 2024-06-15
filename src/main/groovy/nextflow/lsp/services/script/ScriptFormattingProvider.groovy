@@ -5,10 +5,10 @@ import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Positions
-import nextflow.script.IncludeDef
 import nextflow.script.v2.FeatureFlagNode
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.IncludeNode
+import nextflow.script.v2.IncludeVariable
 import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
@@ -152,10 +152,10 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         return maxLength
     }
 
-    protected int getIncludeLength(IncludeDef.Module module) {
+    protected int getIncludeLength(IncludeVariable module) {
         return module.alias
-            ? module.name.size() + 4 + module.alias.size()
-            : module.name.size()
+            ? module.@name.size() + 4 + module.alias.size()
+            : module.@name.size()
     }
 
     protected void append(String value) {
@@ -196,7 +196,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         for( final module : node.modules ) {
             final padding = maxIncludeLength - getIncludeLength(module)
             append('include { ')
-            append(module.name)
+            append(module.@name)
             if( module.alias ) {
                 append(' as ')
                 append(module.alias)

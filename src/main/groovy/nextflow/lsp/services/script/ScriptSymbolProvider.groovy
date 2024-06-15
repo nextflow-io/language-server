@@ -41,13 +41,9 @@ class ScriptSymbolProvider implements SymbolProvider {
         if( !ast.hasAST(uri) )
             return Collections.emptyList()
 
-        final List<ASTNode> nodes = []
-        nodes.addAll(ast.getFunctionNodes(uri))
-        nodes.addAll(ast.getProcessNodes(uri))
-        nodes.addAll(ast.getWorkflowNodes(uri))
-
+        final definitions = ast.getDefinitions(uri)
         final List<Either<SymbolInformation, DocumentSymbol>> result = []
-        for( final node : nodes ) {
+        for( final node : definitions ) {
             if( node.getLineNumber() < 0 )
                 continue
             final symbolInfo = getSymbolInformation(node, uri)
@@ -65,13 +61,9 @@ class ScriptSymbolProvider implements SymbolProvider {
         }
 
         final lowerCaseQuery = query.toLowerCase()
-        final List<ASTNode> nodes = []
-        nodes.addAll(ast.getFunctionNodes())
-        nodes.addAll(ast.getProcessNodes())
-        nodes.addAll(ast.getWorkflowNodes())
-
+        final definitions = ast.getDefinitions()
         final List<SymbolInformation> result = []
-        for( final node : nodes ) {
+        for( final node : definitions ) {
             String name = null
             if( node instanceof FunctionNode )
                 name = node.name

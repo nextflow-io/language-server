@@ -2,6 +2,7 @@ package nextflow.lsp.ast
 
 import groovy.transform.CompileStatic
 import nextflow.script.v2.FeatureFlagNode
+import nextflow.script.v2.IncludeVariable
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
@@ -231,6 +232,10 @@ class ASTUtils {
         if( node instanceof MethodCallExpression ) {
             if( node.isImplicitThis() ) {
                 final defNode = getDefinitionFromScope(node, node.getMethodAsString(), ast)
+                if( defNode instanceof IncludeVariable ) {
+                    final methodNode = defNode.getMethod()
+                    return List.of(methodNode)
+                }
                 if( defNode instanceof PropertyNode ) {
                     final methodNode = (MethodNode) defNode.getNodeMetaData('access.method')
                     return List.of(methodNode)

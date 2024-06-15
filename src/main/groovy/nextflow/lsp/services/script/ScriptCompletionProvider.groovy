@@ -464,7 +464,7 @@ class ScriptCompletionProvider implements CompletionProvider {
         final List<String> result = []
         for( final node : ast.getIncludeNodes(uri) ) {
             for( final module : node.modules )
-                result.add(module.alias ?: module.name)
+                result.add(module.getName())
         }
         return result
     }

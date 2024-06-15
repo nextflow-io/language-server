@@ -88,7 +88,7 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
     @Override
     void visitInclude(IncludeNode node) {
         final moduleArgs = node.modules.collect { module ->
-            final name = constX(module.name)
+            final name = constX(module.@name)
             module.alias
                 ? createX(IncludeDef.Module, name, constX(module.alias))
                 : createX(IncludeDef.Module, name)

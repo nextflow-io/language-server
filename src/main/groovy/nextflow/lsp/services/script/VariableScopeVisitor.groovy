@@ -108,7 +108,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         VariableScope scope = currentScope
         while( scope != null ) {
             if( variable.name in scope.getDeclaredVariables() ) {
-                addError("The variable `${variable.name}` is already declared", context)
+                addError("`${variable.name}` is already declared", context)
                 break
             }
             scope = scope.parent
@@ -269,6 +269,13 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
     }
 
     @Override
+    void visitInclude(IncludeNode node) {
+        for( final module : node.modules ) {
+            declare(module, node)
+        }
+    }
+
+    @Override
     void visitFunction(FunctionNode node) {
         pushState()
         currentTopLevelNode = node
@@ -283,14 +290,6 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
         currentTopLevelNode = null
         popState()
-    }
-
-    @Override
-    void visitInclude(IncludeNode node) {
-        for( final module : node.modules ) {
-            final name = module.alias ?: module.name
-            declare(name)
-        }
     }
 
     @Override
