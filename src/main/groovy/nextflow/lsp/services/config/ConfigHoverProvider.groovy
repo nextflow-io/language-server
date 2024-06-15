@@ -1,6 +1,7 @@
 package nextflow.lsp.services.config
 
 import groovy.transform.CompileStatic
+import nextflow.config.dsl.ConfigSchema
 import nextflow.config.v2.ConfigAssignmentNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.lsp.ast.ASTNodeCache
@@ -63,6 +64,14 @@ class ConfigHoverProvider implements HoverProvider {
                     builder.append(': ')
                     builder.append(node.statementLabels.join(', '))
                 }
+                if( node instanceof ConfigBlockNode ) {
+                    final scope = ConfigSchema.SCOPES[node.name]
+                    if( scope ) {
+                        builder.append(' [')
+                        builder.append(scope.class.simpleName)
+                        builder.append(']')
+                    }
+                }
                 builder.append('\n')
             }
             builder.append('\n```')
@@ -84,9 +93,9 @@ class ConfigHoverProvider implements HoverProvider {
             names.addAll(offsetNode.names)
 
             final fqName = names.join('.')
-            final option = ConfigDefs.OPTIONS.find { name, description -> name == fqName }
+            final option = ConfigSchema.OPTIONS[fqName]
             if( option ) {
-                final description = option[1].stripIndent(true).trim()
+                final description = option.stripIndent(true).trim()
                 final builder = new StringBuilder()
                 builder.append("`${fqName}`")
                 builder.append('\n\n')
@@ -107,9 +116,9 @@ class ConfigHoverProvider implements HoverProvider {
                     names << node.name
 
             final fqName = names.join('.')
-            final scope = ConfigDefs.SCOPES.find { name, description -> name == fqName }
+            final scope = ConfigSchema.SCOPES[fqName]
             if( scope ) {
-                final description = scope[1].stripIndent(true).trim()
+                final description = scope.description().stripIndent(true).trim()
                 final builder = new StringBuilder()
                 description.eachLine { line ->
                     builder.append(line)

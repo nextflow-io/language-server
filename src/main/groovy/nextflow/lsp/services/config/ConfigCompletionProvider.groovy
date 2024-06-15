@@ -3,6 +3,7 @@ package nextflow.lsp.services.config
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import nextflow.config.v2.ConfigBlockNode
+import nextflow.config.dsl.ConfigSchema
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.services.CompletionProvider
 import nextflow.lsp.util.Logger
@@ -31,10 +32,10 @@ class ConfigCompletionProvider implements CompletionProvider {
     private static final List<CompletionItem> SCOPES
 
     static {
-        SCOPES = ConfigDefs.SCOPES.collect { name, documentation ->
+        SCOPES = ConfigSchema.SCOPES.collect { name, scope ->
             final item = new CompletionItem(name + ' {')
             item.setKind(CompletionItemKind.Property)
-            item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
+            item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, scope.description().stripIndent(true).trim()))
             item.setInsertText(
                 """
                 ${name} {
@@ -84,7 +85,7 @@ class ConfigCompletionProvider implements CompletionProvider {
 
     @Memoized(maxCacheSize = 10)
     List<CompletionItem> getConfigOptions(String prefix) {
-        ConfigDefs.OPTIONS
+        ConfigSchema.OPTIONS
             .findAll { name, documentation -> name.startsWith(prefix) }
             .collect { name, documentation ->
                 final relativeName = name.replace(prefix, '')
