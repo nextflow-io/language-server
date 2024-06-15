@@ -74,15 +74,13 @@ class ASTUtils {
      */
     static ASTNode getTypeDefinition(ASTNode node, ASTNodeCache ast) {
         final defNode = getDefinition(node, false, ast)
-        if( defNode == null )
-            return null
 
-        if( defNode instanceof MethodNode ) {
+        if( defNode instanceof MethodNode )
             return getOriginalClassNode(defNode.getReturnType(), true, ast)
-        }
-        else if( defNode instanceof Variable ) {
+
+        if( defNode instanceof Variable )
             return getOriginalClassNode(defNode.getOriginType(), true, ast)
-        }
+
         return null
     }
 
@@ -102,21 +100,9 @@ class ASTUtils {
         }
     }
 
-    private static ClassNode getOriginalClassNode(ClassNode node, boolean strict, ASTNodeCache ast) {
-        // TODO: built-in types
-        return strict ? null : node
-    }
-
-    private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
-        final classNode = getTypeOfNode(node.getObjectExpression(), ast)
-        if( classNode == null )
-            return null
-        return classNode.getField(node.getProperty().getText())
-    }
-
     /**
-     * Get the set of available fields for the left-hand side of a
-     * property expression (i.e. by inspecting the type of the left-hand side).
+     * Get the set of available fields for an object (i.e. by inspecting
+     * the type of the expression).
      *
      * @param node
      * @param ast
@@ -130,8 +116,8 @@ class ASTUtils {
     }
 
     /**
-     * Get the set of available methods for the left-hand side of a
-     * property expression (i.e. by inspecting the type of the left-hand side).
+     * Get the set of available methods for an object (i.e. by inspecting
+     * the type of the expression).
      *
      * @param node
      * @param ast
@@ -195,6 +181,18 @@ class ASTUtils {
         return node instanceof Expression
             ? node.getType()
             : null
+    }
+
+    private static ClassNode getOriginalClassNode(ClassNode node, boolean strict, ASTNodeCache ast) {
+        // TODO: built-in types
+        return strict ? null : node
+    }
+
+    private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
+        final classNode = getTypeOfNode(node.getObjectExpression(), ast)
+        if( classNode == null )
+            return null
+        return classNode.getField(node.getProperty().getText())
     }
 
     /**
