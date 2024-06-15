@@ -1,14 +1,18 @@
-package nextflow.lsp.services.config
+package nextflow.lsp.services.script
 
 import groovy.transform.CompileStatic
-import nextflow.config.v2.ConfigAppendNode
-import nextflow.config.v2.ConfigAssignmentNode
-import nextflow.config.v2.ConfigBlockNode
-import nextflow.config.v2.ConfigIncludeNode
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Positions
+import nextflow.script.IncludeDef
+import nextflow.script.v2.FeatureFlagNode
+import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.IncludeNode
+import nextflow.script.v2.OutputNode
+import nextflow.script.v2.ProcessNode
+import nextflow.script.v2.ScriptNode
+import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.Parameter
@@ -41,10 +45,12 @@ import org.codehaus.groovy.ast.expr.UnaryPlusExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.AssertStatement
 import org.codehaus.groovy.ast.stmt.BlockStatement
+import org.codehaus.groovy.ast.stmt.CatchStatement
 import org.codehaus.groovy.ast.stmt.EmptyStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.IfStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
+import org.codehaus.groovy.ast.stmt.TryCatchStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.Types
 import org.eclipse.lsp4j.FormattingOptions
@@ -54,18 +60,18 @@ import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.TextEdit
 
 /**
- * Provide formatting for a config file.
+ * Provide formatting for a script.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ConfigFormattingProvider implements FormattingProvider {
+class ScriptFormattingProvider implements FormattingProvider {
 
     private static Logger log = Logger.instance
 
     private ASTNodeCache ast
 
-    ConfigFormattingProvider(ASTNodeCache ast) {
+    ScriptFormattingProvider(ASTNodeCache ast) {
         this.ast = ast
     }
 
@@ -90,7 +96,7 @@ class ConfigFormattingProvider implements FormattingProvider {
 }
 
 @CompileStatic
-class FormattingVisitor extends ClassCodeVisitorSupport {
+class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor {
 
     private SourceUnit sourceUnit
 
@@ -99,6 +105,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
     private StringBuilder builder = new StringBuilder()
 
     private int indentCount = 0
+
+    private int maxIncludeLength
 
     FormattingVisitor(SourceUnit sourceUnit, FormattingOptions options) {
         this.sourceUnit = sourceUnit
@@ -112,9 +120,42 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     void visit() {
         final moduleNode = sourceUnit.getAST()
-        if( !moduleNode )
+        if( moduleNode !instanceof ScriptNode )
             return
-        moduleNode.statementBlock.visit(this)
+        final scriptNode = (ScriptNode) moduleNode
+        for( final featureFlag : scriptNode.getFeatureFlags() )
+            visitFeatureFlag(featureFlag)
+        maxIncludeLength = getMaxIncludeLength(scriptNode.getIncludes())
+        if( scriptNode.getIncludes().size() > 0 )
+            append('\n')
+        for( final includeNode : scriptNode.getIncludes() )
+            visitInclude(includeNode)
+        for( final workflowNode : scriptNode.getWorkflows() )
+            visitWorkflow(workflowNode)
+        for( final functionNode : scriptNode.getFunctions() )
+            visitFunction(functionNode)
+        for( final processNode : scriptNode.getProcesses() )
+            visitProcess(processNode)
+        if( scriptNode.getOutput() )
+            visitOutput(scriptNode.getOutput())
+    }
+
+    protected int getMaxIncludeLength(List<IncludeNode> includes) {
+        int maxLength = 0
+        for( final includeNode : includes ) {
+            for( final module : includeNode.modules ) {
+                final length = getIncludeLength(module)
+                if( maxLength < length )
+                    maxLength = length
+            }
+        }
+        return maxLength
+    }
+
+    protected int getIncludeLength(IncludeDef.Module module) {
+        return module.alias
+            ? module.name.size() + 4 + module.alias.size()
+            : module.name.size()
     }
 
     protected void append(String value) {
@@ -138,6 +179,146 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     String toString() {
         return builder.toString()
+    }
+
+    // script statements
+
+    @Override
+    void visitFeatureFlag(FeatureFlagNode node) {
+        append(node.names.join('.'))
+        append(' = ')
+        visit(node.value)
+        append('\n')
+    }
+
+    @Override
+    void visitInclude(IncludeNode node) {
+        for( final module : node.modules ) {
+            final padding = maxIncludeLength - getIncludeLength(module)
+            append('include { ')
+            append(module.name)
+            if( module.alias ) {
+                append(' as ')
+                append(module.alias)
+            }
+            append(' ' * padding)
+            append(' } from \'')
+            append(node.source)
+            append('\'\n')
+        }
+    }
+
+    @Override
+    void visitFunction(FunctionNode node) {
+        append('\n')
+        append('def ')
+        append(node.name)
+        append('(')
+        for( int i = 0; i < node.parameters.size(); i++ ) {
+            visitParameter(node.parameters[i])
+            if( i + 1 < node.parameters.size() )
+                append(', ')
+        }
+        append(') {\n')
+        incIndent()
+        visit(node.code)
+        decIndent()
+        append('}\n')
+    }
+
+    @Override
+    void visitProcess(ProcessNode node) {
+        append('\n')
+        append('process ')
+        append(node.name)
+        append(' {\n')
+        incIndent()
+        if( node.directives !instanceof EmptyStatement ) {
+            visit(node.directives)
+            append('\n')
+        }
+        if( node.inputs !instanceof EmptyStatement ) {
+            appendIndent()
+            append('input:\n')
+            visit(node.inputs)
+            append('\n')
+        }
+        if( node.outputs !instanceof EmptyStatement ) {
+            appendIndent()
+            append('output:\n')
+            visit(node.outputs)
+            append('\n')
+        }
+        if( node.when !instanceof EmptyStatement ) {
+            appendIndent()
+            append('when:\n')
+            appendIndent()
+            visit(node.when)
+            append('\n\n')
+        }
+        appendIndent()
+        append(node.type)
+        append(':\n')
+        visit(node.exec)
+        if( node.stub !instanceof EmptyStatement ) {
+            append('\n')
+            appendIndent()
+            append('stub:\n')
+            visit(node.stub)
+        }
+        decIndent()
+        append('}\n')
+    }
+
+    @Override
+    void visitWorkflow(WorkflowNode node) {
+        append('\n')
+        append('workflow')
+        if( node.name ) {
+            append(' ')
+            append(node.name)
+        }
+        append(' {\n')
+        incIndent()
+        if( node.takes instanceof BlockStatement ) {
+            appendIndent()
+            append('take:\n')
+            visit(node.takes)
+            append('\n')
+        }
+        if( node.main instanceof BlockStatement ) {
+            if( node.takes instanceof BlockStatement || node.emits instanceof BlockStatement || node.publishers instanceof BlockStatement ) {
+                appendIndent()
+                append('main:\n')
+            }
+            visit(node.main)
+        }
+        if( node.emits instanceof BlockStatement ) {
+            append('\n')
+            appendIndent()
+            append('emit:\n')
+            visit(node.emits)
+        }
+        if( node.publishers instanceof BlockStatement ) {
+            append('\n')
+            appendIndent()
+            append('publish:\n')
+            visit(node.publishers)
+        }
+        decIndent()
+        append('}\n')
+    }
+
+    @Override
+    void visitOutput(OutputNode node) {
+        append('\n')
+        append('output {\n')
+        incIndent()
+        if( node.body instanceof BlockStatement ) {
+            visit(node.body)
+        }
+        decIndent()
+        append('}\n')
     }
 
     // statements
@@ -171,53 +352,14 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     @Override
     void visitExpressionStatement(ExpressionStatement node) {
-        if( node instanceof ConfigAssignmentNode ) {
-            visitConfigAssignment(node)
-        }
-        else if( node instanceof ConfigBlockNode ) {
-            visitConfigBlock(node)
-        }
-        else if( node instanceof ConfigIncludeNode ) {
-            visitConfigInclude(node)
-        }
-        else {
-            appendIndent()
-            visit(node.expression)
-            append('\n')
-        }
-    }
-
-    protected void visitConfigAssignment(ConfigAssignmentNode node) {
         appendIndent()
-        append(node.names.join('.'))
-        append(node instanceof ConfigAppendNode ? ' ' : ' = ')
-        visit(node.value)
-        append('\n')
-    }
-
-    protected void visitConfigBlock(ConfigBlockNode node) {
-        append('\n')
-        appendIndent()
-        if( node.kind != null ) {
-            append(node.kind)
-            append(':')
+        if( node.statementLabels ) {
+            for( final label : node.statementLabels ) {
+                append(label)
+                append(': ')
+            }
         }
-        append(node.name)
-        append(' {')
-        append('\n')
-
-        incIndent()
-        visit(node.block)
-        decIndent()
-
-        appendIndent()
-        append('}\n')
-    }
-
-    protected void visitConfigInclude(ConfigIncludeNode node) {
-        appendIndent()
-        append('includeConfig ')
-        visit(node.source)
+        visit(node.expression)
         append('\n')
     }
 
@@ -239,6 +381,33 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
             visit(node.messageExpression)
         }
         append('\n')
+    }
+
+    @Override
+    void visitTryCatchFinally(TryCatchStatement node) {
+        appendIndent()
+        append('try {\n')
+        incIndent()
+        visit(node.tryStatement)
+        decIndent()
+        appendIndent()
+        append('}\n')
+        for( final catchStatement : node.catchStatements ) {
+            visit(catchStatement)
+        }
+    }
+
+    @Override
+    void visitCatchStatement(CatchStatement node) {
+        appendIndent()
+        append('catch (')
+        visitParameter(node.variable)
+        append(') {\n')
+        incIndent()
+        visit(node.code)
+        decIndent()
+        appendIndent()
+        append('}\n')
     }
 
     // expressions

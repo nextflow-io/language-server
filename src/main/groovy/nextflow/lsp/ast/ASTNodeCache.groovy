@@ -306,6 +306,8 @@ class ASTNodeCache {
             return lookupEntries
         }
 
+        // class statements
+
         @Override
         void visitClass(ClassNode node) {
             pushASTNode(node)
@@ -349,6 +351,8 @@ class ASTNodeCache {
                 popASTNode()
             }
         }
+
+        // statements
 
         @Override
         void visitBlockStatement(BlockStatement node) {
@@ -417,6 +421,17 @@ class ASTNodeCache {
         }
 
         @Override
+        void visitCatchStatement(CatchStatement node) {
+            pushASTNode(node)
+            try {
+                super.visitCatchStatement(node)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        @Override
         void visitEmptyStatement(EmptyStatement node) {
             pushASTNode(node)
             try {
@@ -437,6 +452,8 @@ class ASTNodeCache {
                 popASTNode()
             }
         }
+
+        // expressions
 
         @Override
         void visitMethodCallExpression(MethodCallExpression node) {
@@ -741,17 +758,6 @@ class ASTNodeCache {
             pushASTNode(node)
             try {
                 super.visitGStringExpression(node)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        @Override
-        void visitCatchStatement(CatchStatement node) {
-            pushASTNode(node)
-            try {
-                super.visitCatchStatement(node)
             }
             finally {
                 popASTNode()
