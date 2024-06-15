@@ -331,6 +331,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
             copyVariableScope(node.main.variableScope)
 
         visit(node.emits)
+        visit(node.publishers)
 
         currentTopLevelNode = null
         popState()

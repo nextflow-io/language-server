@@ -350,9 +350,10 @@ class ScriptAstBuilder {
         final name = ctx.name?.text
         final takes = workflowTakes(ctx.body?.workflowTakes())
         final emits = workflowEmits(ctx.body?.workflowEmits())
+        final publishers = workflowPublishers(ctx.body?.workflowPublishers())
         final main = blockStatements(ctx.body?.workflowMain()?.blockStatements())
 
-        final result = ast( new WorkflowNode(name, takes, emits, main), ctx )
+        final result = ast( new WorkflowNode(name, takes, emits, publishers, main), ctx )
         groovydocManager.handle(result, ctx)
         return result
     }
@@ -360,6 +361,7 @@ class ScriptAstBuilder {
     private WorkflowNode workflowDef(WorkflowMainContext ctx) {
         final takes = EmptyStatement.INSTANCE
         final emits = EmptyStatement.INSTANCE
+        final publishers = EmptyStatement.INSTANCE
         final main = blockStatements(ctx.blockStatements())
         for( final statement : main.statements ) {
             if( statement !instanceof ExpressionStatement )
@@ -382,7 +384,7 @@ class ScriptAstBuilder {
                 stmtX.expression = EmptyExpression.INSTANCE
             }
         }
-        return new WorkflowNode(null, takes, emits, main)
+        return new WorkflowNode(null, takes, emits, publishers, main)
     }
 
     private Statement workflowTakes(WorkflowTakesContext ctx) {
@@ -410,6 +412,21 @@ class ScriptAstBuilder {
         return ctx.expression()
             ? stmt(ast( assignX(var, expression(ctx.expression())), ctx ))
             : stmt(var)
+    }
+
+    private Statement workflowPublishers(WorkflowPublishersContext ctx) {
+        if( !ctx )
+            return EmptyStatement.INSTANCE
+
+        final statements = ctx.workflowPublish().collect(this.&workflowPublish)
+        return ast( block(null, statements), ctx )
+    }
+
+    private Statement workflowPublish(WorkflowPublishContext ctx) {
+        final source = expression(ctx.source)
+        final op = token(ctx.op, 2)
+        final target = expression(ctx.target)
+        return stmt(ast( binX(source, op, target), ctx ))
     }
 
     private OutputNode outputDef(OutputDefContext ctx) {
@@ -1586,12 +1603,14 @@ class ProcessNode extends MethodNode {
 class WorkflowNode extends MethodNode {
     final Statement takes
     final Statement emits
+    final Statement publishers
     final Statement main
 
-    WorkflowNode(String name, Statement takes, Statement emits, Statement main) {
+    WorkflowNode(String name, Statement takes, Statement emits, Statement publishers, Statement main) {
         super(name, 0, null, Parameter.EMPTY_ARRAY, [] as ClassNode[], EmptyStatement.INSTANCE)
         this.takes = takes
         this.emits = emits
+        this.publishers = publishers
         this.main = main
     }
 }

@@ -259,6 +259,7 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
     void visitWorkflow(WorkflowNode node) {
         convertWorkflowTakes(node.takes)
         convertWorkflowEmits(node.emits, node.main)
+        convertWorkflowPublishers(node.publishers, node.main)
 
         final bodyDef = stmt(createX(
             BodyDef,
@@ -308,6 +309,19 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
                 stmtX.expression = callThisX('_emit_', args(constX(left.name)))
                 mainCode.addStatement(stmtX)
             }
+        }
+    }
+
+    private void convertWorkflowPublishers(Statement publishers, Statement main) {
+        if( publishers !instanceof BlockStatement )
+            return
+        final mainCode = (BlockStatement)main
+        final publishCode = (BlockStatement)publishers
+        for( final stmt : publishCode.statements ) {
+            final stmtX = (ExpressionStatement)stmt
+            final publish = (BinaryExpression)stmtX.expression
+            stmtX.expression = callThisX('_publish_target', args(publish.leftExpression, publish.rightExpression))
+            mainCode.addStatement(stmtX)
         }
     }
 

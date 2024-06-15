@@ -166,6 +166,7 @@ class ScriptAstCache extends ASTNodeCache {
             try {
                 visit(node.takes)
                 visit(node.emits)
+                visit(node.publishers)
                 visit(node.main)
             }
             finally {

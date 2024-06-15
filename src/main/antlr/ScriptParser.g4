@@ -193,6 +193,7 @@ workflowBody
     :   (sep TAKE COLON workflowTakes)?
         sep MAIN COLON sep? workflowMain
         (sep EMIT COLON workflowEmits)?
+        (sep PUBLISH COLON workflowPublishers)?
 
     // implicit main block
     |   sep? workflowMain
@@ -212,6 +213,14 @@ workflowEmits
 
 workflowEmit
     :   identifier (ASSIGN expression)?
+    ;
+
+workflowPublishers
+    :   (sep workflowPublish)+
+    ;
+
+workflowPublish
+    :   source=expression (op=GT GT) target=expression
     ;
 
 // -- output definition
@@ -487,6 +496,7 @@ identifier
     |   WORKFLOW
     |   EMIT
     |   MAIN
+    |   PUBLISH
     |   TAKE
     ;
 
@@ -693,6 +703,7 @@ keywords
     |   WORKFLOW
     |   EMIT
     |   MAIN
+    |   PUBLISH
     |   TAKE
     |   NullLiteral
     |   BooleanLiteral

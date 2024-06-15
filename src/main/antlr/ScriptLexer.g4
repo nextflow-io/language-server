@@ -336,6 +336,7 @@ WHEN            : 'when';
 WORKFLOW        : 'workflow';
 EMIT            : 'emit';
 MAIN            : 'main';
+PUBLISH         : 'publish';
 TAKE            : 'take';
 
 
