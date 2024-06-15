@@ -237,12 +237,19 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
         else if( offsetNode instanceof ConstantExpression ) {
             final parentNode = ast.getParent(offsetNode)
-            if( parentNode instanceof MethodCallExpression && !parentNode.isImplicitThis() ) {
-                // e.g. "foo ()"
-                //          ^
+            if( parentNode instanceof MethodCallExpression ) {
                 final namePrefix = parentNode.getMethodAsString()
                 log.debug "completion method call -- '${namePrefix}'"
-                populateMethodsFromObjectScope(parentNode.getObjectExpression(), namePrefix, items)
+                if( parentNode.isImplicitThis() ) {
+                    // e.g. "foo ()"
+                    //          ^
+                    populateItemsFromScope(offsetNode, namePrefix, items)
+                }
+                else {
+                    // e.g. "foo.bar ()"
+                    //              ^
+                    populateMethodsFromObjectScope(parentNode.getObjectExpression(), namePrefix, items)
+                }
             }
             else if( parentNode instanceof PropertyExpression ) {
                 // e.g. "foo.bar "
@@ -456,11 +463,10 @@ class ScriptCompletionProvider implements CompletionProvider {
 
     private void populateItemsFromScope(ASTNode node, String namePrefix, List<CompletionItem> items) {
         final Set<String> existingNames = []
-        ASTNode current = node
-        while( current != null ) {
-            if( current instanceof BlockStatement )
-                populateItemsFromScope0(current.getVariableScope(), namePrefix, existingNames, items)
-            current = ast.getParent(current)
+        VariableScope scope = ASTUtils.getVariableScope(node, ast)
+        while( scope != null ) {
+            populateItemsFromScope0(scope, namePrefix, existingNames, items)
+            scope = scope.parent
         }
 
         if( namePrefix.length() == 0 )

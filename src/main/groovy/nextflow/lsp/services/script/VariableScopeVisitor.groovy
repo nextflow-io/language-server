@@ -224,8 +224,6 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
     void visit() {
         final moduleNode = sourceUnit.getAST()
-        if( moduleNode == null )
-            return
         if( moduleNode !instanceof ScriptNode )
             return
         final scriptNode = (ScriptNode) moduleNode

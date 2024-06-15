@@ -88,8 +88,6 @@ class ScriptAstCache extends ASTNodeCache {
             if( moduleNode !instanceof ScriptNode )
                 return
             final scriptNode = (ScriptNode) moduleNode
-            if( scriptNode == null )
-                return
             for( final featureFlag : scriptNode.getFeatureFlags() )
                 visitFeatureFlag(featureFlag)
             for( final includeNode : scriptNode.getIncludes() )

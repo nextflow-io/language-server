@@ -10,7 +10,6 @@ import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
-import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression
@@ -21,7 +20,6 @@ import org.codehaus.groovy.ast.expr.MethodCallExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.BlockStatement
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
 
 /**
  * Utility methods for querying an AST.
@@ -49,13 +47,10 @@ class ASTUtils {
 
         if( node instanceof ConstantExpression ) {
             final parentNode = ast.getParent(node)
-            if( parentNode instanceof MethodCallExpression ) {
+            if( parentNode instanceof MethodCallExpression )
                 return getMethodFromCallExpression(parentNode, ast)
-            }
-            if( parentNode instanceof PropertyExpression ) {
-                return getPropertyFromExpression(parentNode, ast)
-                    ?: getFieldFromExpression(parentNode, ast)
-            }
+            if( parentNode instanceof PropertyExpression )
+                return getFieldFromExpression(parentNode, ast)
         }
 
         if( node instanceof ClassExpression )
@@ -112,13 +107,6 @@ class ASTUtils {
         return strict ? null : node
     }
 
-    private static PropertyNode getPropertyFromExpression(PropertyExpression node, ASTNodeCache ast) {
-        final classNode = getTypeOfNode(node.getObjectExpression(), ast)
-        if( classNode == null )
-            return null
-        return classNode.getProperty(node.getProperty().getText())
-    }
-
     private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
         final classNode = getTypeOfNode(node.getObjectExpression(), ast)
         if( classNode == null )
@@ -164,12 +152,12 @@ class ASTUtils {
      */
     static ClassNode getTypeOfNode(ASTNode node, ASTNodeCache ast) {
         if( node instanceof ClassExpression ) {
-            // SomeClass.someProp -> SomeClass
+            // type(Foo.bar) -> type(Foo)
             return node.getType()
         }
 
         if( node instanceof ConstructorCallExpression ) {
-            // new SomeClass() -> SomeClass
+            // type(new Foo()) -> type(Foo)
             return node.getType()
         }
 
@@ -181,9 +169,9 @@ class ASTUtils {
         }
 
         if( node instanceof PropertyExpression ) {
-            final propertyNode = getPropertyFromExpression(node, ast)
-            return propertyNode != null
-                ? getTypeOfNode(propertyNode, ast)
+            final fieldNode = getFieldFromExpression(node, ast)
+            return fieldNode != null
+                ? getTypeOfNode(fieldNode, ast)
                 : node.getType()
         }
 
@@ -194,11 +182,9 @@ class ASTUtils {
                     if( defNode.hasInitialExpression() ) {
                         return getTypeOfNode(defNode.getInitialExpression(), ast)
                     }
-                    else {
-                        final declNode = ast.getParent(defNode)
-                        if( declNode instanceof DeclarationExpression )
-                            return getTypeOfNode(declNode.getRightExpression(), ast)
-                    }
+                    final declNode = ast.getParent(defNode)
+                    if( declNode instanceof DeclarationExpression )
+                        return getTypeOfNode(declNode.getRightExpression(), ast)
                 }
             }
 
