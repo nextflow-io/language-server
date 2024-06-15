@@ -69,6 +69,8 @@ class ASTNodeCache {
 
     private Map<URI, SourceUnit> sourcesByUri = [:]
 
+    private Map<URI, List<SyntaxException>> errorsByUri = [:]
+
     private Map<URI, List<ASTNode>> nodesByURI = [:]
 
     private Map<LookupKey, LookupData> lookup = [:]
@@ -85,7 +87,6 @@ class ASTNodeCache {
      */
     Map<URI, List<SyntaxException>> update(Set<URI> uris, FileCache fileCache) {
         final sources = compiler.compile(uris, fileCache)
-        final Map<URI, List<SyntaxException>> errorsByUri = [:]
 
         for( final uri : uris ) {
             // remove any existing cache entries

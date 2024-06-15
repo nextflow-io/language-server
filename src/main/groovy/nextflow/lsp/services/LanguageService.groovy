@@ -50,7 +50,6 @@ abstract class LanguageService {
 
     private LanguageClient client
     private FileCache fileCache = new FileCache()
-    private Map<URI, List<Diagnostic>> diagnosticCache = [:]
     private DebouncingExecutor updateExecutor
 
     LanguageService() {
@@ -199,10 +198,6 @@ abstract class LanguageService {
                 diagnostics << diagnostic
             }
 
-            diagnosticCache.put(uri, diagnostics)
-        })
-
-        diagnosticCache.forEach((uri, diagnostics) -> {
             final params = new PublishDiagnosticsParams(uri.toString(), diagnostics)
             client.publishDiagnostics(params)
         })
