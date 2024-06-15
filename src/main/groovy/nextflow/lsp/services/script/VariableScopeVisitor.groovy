@@ -6,6 +6,8 @@ import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.SyntaxWarning
 import nextflow.script.dsl.Constant
 import nextflow.script.dsl.EntryWorkflowDsl
+import nextflow.script.dsl.FeatureFlag
+import nextflow.script.dsl.FeatureFlagDsl
 import nextflow.script.dsl.Function
 import nextflow.script.dsl.Operator
 import nextflow.script.dsl.OutputDsl
@@ -227,8 +229,6 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         if( moduleNode !instanceof ScriptNode )
             return
         final scriptNode = (ScriptNode) moduleNode
-        for( final featureFlag : scriptNode.getFeatureFlags() )
-            visitFeatureFlag(featureFlag)
 
         // declare top-level names
         for( final includeNode : scriptNode.getIncludes() )
@@ -243,6 +243,8 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         }
 
         // visit top-level definitions
+        for( final featureFlag : scriptNode.getFeatureFlags() )
+            visitFeatureFlag(featureFlag)
         for( final functionNode : scriptNode.getFunctions() )
             visitFunction(functionNode)
         for( final processNode : scriptNode.getProcesses() )
@@ -255,6 +257,15 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
     @Override
     void visitFeatureFlag(FeatureFlagNode node) {
+        final clazz = FeatureFlagDsl.class
+        for( final field : clazz.getDeclaredFields() ) {
+            final annot = field.getAnnotation(FeatureFlag)
+            if( annot && annot.name() == node.name ) {
+                node.resolved = true
+                return
+            }
+        }
+        addError("Unrecognized feature flag '${node.name}'", node)
     }
 
     @Override

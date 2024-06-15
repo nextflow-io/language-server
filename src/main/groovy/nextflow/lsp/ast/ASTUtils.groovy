@@ -1,6 +1,7 @@
 package nextflow.lsp.ast
 
 import groovy.transform.CompileStatic
+import nextflow.script.v2.FeatureFlagNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
@@ -61,6 +62,9 @@ class ASTUtils {
 
         if( node instanceof Variable )
             return node
+
+        if( node instanceof FeatureFlagNode )
+            return node.resolved ? node : null
 
         return null
     }

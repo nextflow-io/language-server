@@ -80,7 +80,7 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
 
     @Override
     void visitFeatureFlag(FeatureFlagNode node) {
-        final left = constX(node.names.join('.'))
+        final left = constX(node.name)
         node.expression = callThisX('feature', args(left, node.value))
         moduleNode.addStatement(node)
     }

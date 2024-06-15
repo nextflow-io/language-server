@@ -4,6 +4,9 @@ import groovy.lang.groovydoc.Groovydoc
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.ast.ASTUtils
+import nextflow.script.dsl.FeatureFlag
+import nextflow.script.dsl.FeatureFlagDsl
+import nextflow.script.v2.FeatureFlagNode
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
@@ -23,6 +26,9 @@ import org.codehaus.groovy.ast.Variable
 class ASTNodeStringUtils {
 
     static String getLabel(ASTNode node, ASTNodeCache ast) {
+        if( node instanceof FeatureFlagNode )
+            return toString(node)
+
         if( node instanceof FunctionNode )
             return toString(node, ast)
 
@@ -45,6 +51,13 @@ class ASTNodeStringUtils {
         else
             builder.append('class ')
         builder.append(classNode.toString(false))
+        return builder.toString()
+    }
+
+    static String toString(FeatureFlagNode node) {
+        final builder = new StringBuilder()
+        builder.append('(feature flag) ')
+        builder.append(node.name)
         return builder.toString()
     }
 
@@ -105,6 +118,9 @@ class ASTNodeStringUtils {
     }
 
     static String getDocumentation(ASTNode node) {
+        if( node instanceof FeatureFlagNode )
+            return getFeatureFlagDescription(node)
+
         if( node instanceof FunctionNode )
             return node.documentation ?: groovydocToMarkdown(node.getGroovydoc())
 
@@ -118,6 +134,16 @@ class ASTNodeStringUtils {
             return groovydocToMarkdown(node.getGroovydoc())
 
         return null
+    }
+
+    private static String getFeatureFlagDescription(FeatureFlagNode node) {
+        final clazz = FeatureFlagDsl.class
+        for( final field : clazz.getDeclaredFields() ) {
+            final annot = field.getAnnotation(FeatureFlag)
+            if( annot && annot.name() == node.name )
+                return annot.description().stripIndent(true).trim()
+        }
+        throw new IllegalStateException()
     }
 
     private static String groovydocToMarkdown(Groovydoc groovydoc) {

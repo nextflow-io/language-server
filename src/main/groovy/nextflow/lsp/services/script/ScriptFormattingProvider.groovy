@@ -185,7 +185,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitFeatureFlag(FeatureFlagNode node) {
-        append(node.names.join('.'))
+        append(node.name)
         append(' = ')
         visit(node.value)
         append('\n')

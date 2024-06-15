@@ -10,6 +10,8 @@ import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
 import nextflow.script.dsl.Constant
 import nextflow.script.dsl.DslScope
+import nextflow.script.dsl.FeatureFlag
+import nextflow.script.dsl.FeatureFlagDsl
 import nextflow.script.dsl.Function
 import nextflow.script.dsl.ScriptDsl
 import nextflow.script.v2.FunctionNode
@@ -52,10 +54,10 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either
 @CompileStatic
 class ScriptCompletionProvider implements CompletionProvider {
 
-    private static final List<CompletionItem> TOPLEVEL_ITEMS
+    private static final List<CompletionItem> TOPLEVEL_ITEMS = []
     
     static {
-        TOPLEVEL_ITEMS = [
+        final List<List<String>> snippets = [
             [
                 'shebang',
                 '''
@@ -193,14 +195,28 @@ class ScriptCompletionProvider implements CompletionProvider {
                 }
                 """
             ],
-        ].collect { name, documentation, insertText ->
+        ]
+
+        final featureFlags = FeatureFlagDsl.class
+        for( final field : featureFlags.getDeclaredFields() ) {
+            final annot = field.getAnnotation(FeatureFlag)
+            if( !annot )
+                continue
+            snippets.add([
+                annot.name(),
+                annot.description(),
+                "${annot.name()} = ".toString()
+            ])
+        }
+
+        snippets.each { name, documentation, insertText ->
             final item = new CompletionItem(name)
             item.setKind(CompletionItemKind.Snippet)
             item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
             item.setInsertText(insertText.stripIndent(true).trim())
             item.setInsertTextFormat(InsertTextFormat.Snippet)
             item.setInsertTextMode(InsertTextMode.AdjustIndentation)
-            return item
+            TOPLEVEL_ITEMS.add(item)
         }
     }
 

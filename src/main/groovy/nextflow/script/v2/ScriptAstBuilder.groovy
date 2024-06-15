@@ -266,7 +266,7 @@ class ScriptAstBuilder {
         final names = ctx.featureFlagPath().identifier().collect( this.&identifier )
         final value = literal(ctx.literal())
 
-        ast( new FeatureFlagNode(names, value), ctx )
+        ast( new FeatureFlagNode(names.join('.'), value), ctx )
     }
 
     private IncludeNode includeStatement(IncludeStatementContext ctx) {
@@ -1540,12 +1540,13 @@ class ScriptNode extends ModuleNode {
 
 @CompileStatic
 class FeatureFlagNode extends ExpressionStatement {
-    final List<String> names
+    final String name
     final Expression value
+    boolean resolved
 
-    FeatureFlagNode(List<String> names, Expression value) {
+    FeatureFlagNode(String name, Expression value) {
         super(EmptyExpression.INSTANCE)
-        this.names = names
+        this.name = name
         this.value = value
     }
 }
