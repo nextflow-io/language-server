@@ -12,6 +12,10 @@ import nextflow.script.dsl.Constant
 import nextflow.script.dsl.DslScope
 import nextflow.script.dsl.Function
 import nextflow.script.dsl.ScriptDsl
+import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.OutputNode
+import nextflow.script.v2.ProcessNode
+import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
@@ -224,6 +228,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             return Either.forLeft(TOPLEVEL_ITEMS)
 
         final offsetNode = nodeTree.first()
+        final topNode = nodeTree.last()
 
         isIncomplete = false
         final List<CompletionItem> items = []
@@ -233,7 +238,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             //          ^
             final namePrefix = offsetNode.getName()
             log.debug "completion variable -- '${namePrefix}'"
-            populateItemsFromScope(offsetNode, namePrefix, items)
+            populateItemsFromScope(offsetNode, namePrefix, topNode, items)
         }
         else if( offsetNode instanceof ConstantExpression ) {
             final parentNode = ast.getParent(offsetNode)
@@ -243,7 +248,7 @@ class ScriptCompletionProvider implements CompletionProvider {
                 if( parentNode.isImplicitThis() ) {
                     // e.g. "foo ()"
                     //          ^
-                    populateItemsFromScope(offsetNode, namePrefix, items)
+                    populateItemsFromScope(offsetNode, namePrefix, topNode, items)
                 }
                 else {
                     // e.g. "foo.bar ()"
@@ -268,124 +273,12 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
         else {
             log.debug "completion ${offsetNode.class.simpleName} -- '${offsetNode.getText()}'"
-            populateItemsFromScope(offsetNode, '', items)
+            populateItemsFromScope(offsetNode, '', topNode, items)
         }
 
         return isIncomplete
             ? Either.forRight(new CompletionList(true, items))
             : Either.forLeft(items)
-    }
-
-    private void populateFunctionNames(String namePrefix, List<CompletionItem> items) {
-        final includeNames = getIncludeNames(uri)
-        final localFunctionNodes = ast.getFunctionNodes(uri)
-        final addIncludeRange = getAddIncludeRange(uri)
-
-        for( final functionNode : ast.getFunctionNodes() ) {
-            final name = functionNode.getName()
-            if( !name.startsWith(namePrefix) )
-                continue
-
-            final item = new CompletionItem(name)
-            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(functionNode))
-            item.setDetail('function')
-
-            final documentation = ASTNodeStringUtils.getDocumentation(functionNode)
-            if( documentation != null )
-                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
-
-            if( functionNode !in localFunctionNodes && name !in includeNames ) {
-                final textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, functionNode)
-                item.setAdditionalTextEdits( List.of(textEdit) )
-            }
-
-            items.add(item)
-        }
-    }
-
-    private void populateProcessNames(String namePrefix, List<CompletionItem> items) {
-        final includeNames = getIncludeNames(uri)
-        final localProcessNodes = ast.getProcessNodes(uri)
-        final addIncludeRange = getAddIncludeRange(uri)
-
-        for( final processNode : ast.getProcessNodes() ) {
-            final name = processNode.getName()
-            if( !name.startsWith(namePrefix) )
-                continue
-
-            final item = new CompletionItem(name)
-            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(processNode))
-            item.setDetail('process')
-
-            final documentation = ASTNodeStringUtils.getDocumentation(processNode)
-            if( documentation != null )
-                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
-
-            if( processNode !in localProcessNodes && name !in includeNames ) {
-                final textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, processNode)
-                item.setAdditionalTextEdits( List.of(textEdit) )
-            }
-
-            items.add(item)
-        }
-    }
-
-    private void populateWorkflowNames(String namePrefix, List<CompletionItem> items) {
-        final includeNames = getIncludeNames(uri)
-        final localWorkflowNodes = ast.getWorkflowNodes(uri)
-        final addIncludeRange = getAddIncludeRange(uri)
-
-        for( final workflowNode : ast.getWorkflowNodes() ) {
-            final name = workflowNode.getName()
-            if( !name || !name.startsWith(namePrefix) )
-                continue
-
-            final item = new CompletionItem(name)
-            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(workflowNode))
-            item.setDetail('workflow')
-
-            final documentation = ASTNodeStringUtils.getDocumentation(workflowNode)
-            if( documentation != null )
-                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
-
-            if( workflowNode !in localWorkflowNodes && name !in includeNames ) {
-                final textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, workflowNode)
-                item.setAdditionalTextEdits( List.of(textEdit) )
-            }
-
-            items.add(item)
-        }
-    }
-
-    private List<String> getIncludeNames(URI uri) {
-        final List<String> result = []
-        for( final node : ast.getIncludeNodes(uri) ) {
-            for( final module : node.modules )
-                result.add(module.alias ?: module.name)
-        }
-        return result
-    }
-
-    private Range getAddIncludeRange(URI uri) {
-        final includeNodes = ast.getIncludeNodes(uri)
-        if( !includeNodes )
-            return new Range(new Position(1, 0), new Position(1, 0))
-        final lastInclude = includeNodes.last()
-        final lastIncludeRange = LanguageServerUtils.astNodeToRange(lastInclude)
-        final includeLine = lastIncludeRange ? lastIncludeRange.getEnd().getLine() + 1 : 0
-        return new Range(new Position(includeLine, 0), new Position(includeLine, 0))
-    }
-
-    private TextEdit createAddIncludeTextEdit(Range range, URI uri, String name, ASTNode node) {
-        final source = Path.of(uri).getParent().relativize(Path.of(ast.getURI(node)))
-        final newText = new StringBuilder()
-            .append("include { ")
-            .append(name)
-            .append(" } from './")
-            .append(source.toString())
-            .append("'\n")
-            .toString()
-        return new TextEdit(range, newText)
     }
 
     private void populateItemsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
@@ -431,7 +324,8 @@ class ScriptCompletionProvider implements CompletionProvider {
             if( Logger.isDebugEnabled() )
                 item.setDetail(field.getDeclaringClass().getNameWithoutPackage())
 
-            items.add(item)
+            if( !addItem(item, items) )
+                break
         }
     }
 
@@ -457,11 +351,12 @@ class ScriptCompletionProvider implements CompletionProvider {
             if( Logger.isDebugEnabled() )
                 item.setDetail(method.getDeclaringClass().getNameWithoutPackage())
 
-            items.add(item)
+            if( !addItem(item, items) )
+                break
         }
     }
 
-    private void populateItemsFromScope(ASTNode node, String namePrefix, List<CompletionItem> items) {
+    private void populateItemsFromScope(ASTNode node, String namePrefix, ASTNode topNode, List<CompletionItem> items) {
         final Set<String> existingNames = []
         VariableScope scope = ASTUtils.getVariableScope(node, ast)
         while( scope != null ) {
@@ -469,10 +364,16 @@ class ScriptCompletionProvider implements CompletionProvider {
             scope = scope.parent
         }
 
-        if( namePrefix.length() == 0 )
-            isIncomplete = true
-        else
-            populateTypes(namePrefix, existingNames, items)
+        if( topNode instanceof FunctionNode || topNode instanceof ProcessNode || topNode instanceof OutputNode )
+            populateExternalFunctions(namePrefix, items)
+
+        if( topNode instanceof WorkflowNode ) {
+            populateExternalFunctions(namePrefix, items)
+            populateExternalProcesses(namePrefix, items)
+            populateExternalWorkflows(namePrefix, items)
+        }
+
+        populateTypes(namePrefix, existingNames, items)
     }
 
     private void populateItemsFromScope0(VariableScope scope, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
@@ -487,7 +388,8 @@ class ScriptCompletionProvider implements CompletionProvider {
             final item = new CompletionItem()
             item.setLabel(name)
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind((ASTNode) variable))
-            items.add(item)
+            if( !addItem(item, items) )
+                break
         }
 
         if( scope.isClassScope() ) {
@@ -497,6 +399,83 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
+    private void populateExternalFunctions(String namePrefix, List<CompletionItem> items) {
+        final localNodes = ast.getFunctionNodes(uri)
+        final allNodes = ast.getFunctionNodes()
+        populateExternalMethods(namePrefix, 'function', localNodes, allNodes, items)
+    }
+
+    private void populateExternalProcesses(String namePrefix, List<CompletionItem> items) {
+        final localNodes = ast.getProcessNodes(uri)
+        final allNodes = ast.getProcessNodes()
+        populateExternalMethods(namePrefix, 'process', localNodes, allNodes, items)
+    }
+
+    private void populateExternalWorkflows(String namePrefix, List<CompletionItem> items) {
+        final localNodes = ast.getWorkflowNodes(uri)
+        final allNodes = ast.getWorkflowNodes()
+        populateExternalMethods(namePrefix, 'workflow', localNodes, allNodes, items)
+    }
+
+    private void populateExternalMethods(String namePrefix, String label, List<? extends MethodNode> localNodes, List<? extends MethodNode> allNodes, List<CompletionItem> items) {
+        final includeNames = getIncludeNames(uri)
+        final addIncludeRange = getAddIncludeRange(uri)
+
+        for( final node : allNodes ) {
+            final name = node.getName()
+            if( !name || !name.startsWith(namePrefix) )
+                continue
+            if( node in localNodes || name in includeNames )
+                continue
+
+            final item = new CompletionItem(name)
+            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(node))
+            item.setDetail(label)
+
+            final documentation = ASTNodeStringUtils.getDocumentation(node)
+            if( documentation != null )
+                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
+
+            final textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, node)
+            item.setAdditionalTextEdits( List.of(textEdit) )
+
+            if( !addItem(item, items) )
+                break
+        }
+    }
+
+    private List<String> getIncludeNames(URI uri) {
+        final List<String> result = []
+        for( final node : ast.getIncludeNodes(uri) ) {
+            for( final module : node.modules )
+                result.add(module.alias ?: module.name)
+        }
+        return result
+    }
+
+    private Range getAddIncludeRange(URI uri) {
+        final includeNodes = ast.getIncludeNodes(uri)
+        if( !includeNodes )
+            return new Range(new Position(1, 0), new Position(1, 0))
+        final lastInclude = includeNodes.last()
+        final lastIncludeRange = LanguageServerUtils.astNodeToRange(lastInclude)
+        final includeLine = lastIncludeRange ? lastIncludeRange.getEnd().getLine() + 1 : 0
+        return new Range(new Position(includeLine, 0), new Position(includeLine, 0))
+    }
+
+    private TextEdit createAddIncludeTextEdit(Range range, URI uri, String name, ASTNode node) {
+        final source = Path.of(uri).getParent().relativize(Path.of(ast.getURI(node))).toString()
+        final newText = new StringBuilder()
+            .append("include { ")
+            .append(name)
+            .append(" } from '")
+            .append(!source.startsWith('.') ? './' : '')
+            .append(source)
+            .append("'\n")
+            .toString()
+        return new TextEdit(range, newText)
+    }
+
     private void populateTypes(String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
         // add built-in types
         populateTypes0(ScriptDsl.TYPES, namePrefix, existingNames, items)
@@ -504,10 +483,6 @@ class ScriptCompletionProvider implements CompletionProvider {
 
     private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
         for( final classNode : classNodes ) {
-            if( existingNames.size() >= maxItemCount ) {
-                isIncomplete = true
-                break
-            }
             final classNameWithoutPackage = classNode.getNameWithoutPackage()
             final className = classNode.getName()
             if( !classNameWithoutPackage.startsWith(namePrefix) || existingNames.contains(className) )
@@ -517,8 +492,18 @@ class ScriptCompletionProvider implements CompletionProvider {
             final item = new CompletionItem()
             item.setLabel(classNameWithoutPackage)
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(classNode))
-            items.add(item)
+            if( !addItem(item, items) )
+                break
         }
+    }
+
+    private boolean addItem(CompletionItem item, List<CompletionItem> items) {
+        if( items.size() >= maxItemCount ) {
+            isIncomplete = true
+            return false
+        }
+        items.add(item)
+        return true
     }
 
 }
