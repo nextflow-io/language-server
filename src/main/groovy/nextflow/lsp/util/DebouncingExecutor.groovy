@@ -40,6 +40,13 @@ class DebouncingExecutor <T> {
         } while( oldTask != null && !oldTask.extend() )
     }
 
+    void executeNow(T key) {
+        final task = delayedTasks.get(key)
+        if( task )
+            task.cancel()
+        onComplete.call(key)
+    }
+
     void shutdownNow() {
         executor.shutdownNow()
     }
@@ -63,6 +70,13 @@ class DebouncingExecutor <T> {
             }
         }
 
+        void cancel() {
+            synchronized (lock) {
+                dueTime = -1
+                delayedTasks.remove(key)
+            }
+        }
+
         void run() {
             synchronized (lock) {
                 final remaining = dueTime - System.currentTimeMillis()
@@ -70,7 +84,7 @@ class DebouncingExecutor <T> {
                     // re-schedule task
                     executor.schedule(this, remaining, TimeUnit.MILLISECONDS)
                 }
-                else {
+                else if( dueTime != -1 ) {
                     // mark task as terminated and invoke callback
                     dueTime = -1
                     try {

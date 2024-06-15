@@ -123,6 +123,7 @@ abstract class LanguageService {
         if( !provider )
             return Either.forLeft(Collections.emptyList())
 
+        updateExecutor.executeNow(DEBOUNCE_KEY)
         return provider.completion(params.getTextDocument(), params.getPosition())
     }
 
