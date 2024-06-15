@@ -149,7 +149,7 @@ class ASTNodeCache {
      * @param uri
      */
     boolean hasAST(URI uri) {
-        return sourcesByUri[uri].getAST()
+        return sourcesByUri[uri]?.getAST()
     }
 
     /**

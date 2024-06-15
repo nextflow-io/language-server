@@ -22,6 +22,22 @@ import org.codehaus.groovy.ast.Variable
 @CompileStatic
 class ASTNodeStringUtils {
 
+    static String getLabel(ASTNode node, ASTNodeCache ast) {
+        if( node instanceof FunctionNode )
+            return toString(node, ast)
+
+        if( node instanceof ProcessNode )
+            return toString(node, ast)
+
+        if( node instanceof WorkflowNode )
+            return toString(node, ast)
+
+        if( node instanceof Variable )
+            return toString(node, ast)
+
+        return null
+    }
+
     static String toString(ClassNode classNode, ASTNodeCache ast) {
         final builder = new StringBuilder()
         if( classNode.isEnum() )

@@ -9,7 +9,9 @@ import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.Variable
+import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.Statement
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.MarkupContent
@@ -48,7 +50,7 @@ class ScriptHoverProvider implements HoverProvider {
 
         final offsetNode = nodeTree.first()
         final definitionNode = ASTUtils.getDefinition(offsetNode, false, ast)
-        final label = definitionNode ? getHoverLabel(definitionNode) : null
+        final label = ASTNodeStringUtils.getLabel(definitionNode, ast)
         final detail = ASTNodeStringUtils.getDocumentation(definitionNode)
 
         final builder = new StringBuilder()
@@ -75,6 +77,15 @@ class ScriptHoverProvider implements HoverProvider {
                     builder.append(': ')
                     builder.append(node.statementLabels.join(', '))
                 }
+                final scope =
+                    node instanceof BlockStatement ? node.variableScope :
+                    node instanceof MethodNode ? node.variableScope :
+                    null
+                if( scope && scope.isClassScope() ) {
+                    builder.append(' [')
+                    builder.append(scope.getClassScope().getNameWithoutPackage())
+                    builder.append(']')
+                }
                 builder.append('\n')
             }
             builder.append('\n```')
@@ -84,22 +95,6 @@ class ScriptHoverProvider implements HoverProvider {
         if( !value )
             return null
         return new Hover(new MarkupContent(MarkupKind.MARKDOWN, value))
-    }
-
-    private String getHoverLabel(ASTNode node) {
-        if( node instanceof FunctionNode )
-            return ASTNodeStringUtils.toString(node, ast)
-
-        if( node instanceof ProcessNode )
-            return ASTNodeStringUtils.toString(node, ast)
-
-        if( node instanceof WorkflowNode )
-            return ASTNodeStringUtils.toString(node, ast)
-
-        if( node instanceof Variable )
-            return ASTNodeStringUtils.toString(node, ast)
-
-        return null
     }
 
 }

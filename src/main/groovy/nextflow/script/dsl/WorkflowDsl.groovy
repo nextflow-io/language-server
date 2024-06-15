@@ -5,7 +5,7 @@ import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
 
 @CompileStatic
-class WorkflowDsl {
+class WorkflowDsl implements DslScope {
 
     @Operator
     @Function('''

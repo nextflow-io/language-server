@@ -40,17 +40,15 @@ class ASTUtils {
      * @param ast
      */
     static ASTNode getDefinition(ASTNode node, boolean strict, ASTNodeCache ast) {
-        if( node == null )
-            return null
+        if( node instanceof VariableExpression ) {
+            final accessedVariable = node.getAccessedVariable()
+            return accessedVariable instanceof ASTNode
+                ? accessedVariable
+                : null
+        }
 
-        if( node instanceof ClassExpression )
-            return getOriginalClassNode(node.type, strict, ast)
-
-        if( node instanceof ConstructorCallExpression )
-            return getMethodFromCallExpression(node, ast)
-
-        final parentNode = ast.getParent(node)
         if( node instanceof ConstantExpression ) {
+            final parentNode = ast.getParent(node)
             if( parentNode instanceof MethodCallExpression ) {
                 return getMethodFromCallExpression(parentNode, ast)
             }
@@ -60,12 +58,11 @@ class ASTUtils {
             }
         }
 
-        if( node instanceof VariableExpression ) {
-            final accessedVariable = node.getAccessedVariable()
-            return accessedVariable instanceof ASTNode
-                ? accessedVariable
-                : null
-        }
+        if( node instanceof ClassExpression )
+            return getOriginalClassNode(node.type, strict, ast)
+
+        if( node instanceof ConstructorCallExpression )
+            return getMethodFromCallExpression(node, ast)
 
         if( node instanceof Variable )
             return node
@@ -145,21 +142,6 @@ class ASTUtils {
     }
 
     /**
-     * Get the set of available properties for the left-hand side of a
-     * property expression (i.e. by inspecting the type of the left-hand side).
-     *
-     * @param node
-     * @param ast
-     */
-    static List<PropertyNode> getPropertiesForObjectExpression(Expression node, ASTNodeCache ast) {
-        final classNode = getTypeOfNode(node, ast)
-        if( classNode == null )
-            return Collections.emptyList()
-        final isStatic = node instanceof ClassExpression
-        return classNode.getProperties().findAll { propertyNode -> isStatic ? propertyNode.isStatic() : !propertyNode.isStatic() }
-    }
-
-    /**
      * Get the set of available methods for the left-hand side of a
      * property expression (i.e. by inspecting the type of the left-hand side).
      *
@@ -185,23 +167,27 @@ class ASTUtils {
             // SomeClass.someProp -> SomeClass
             return node.getType()
         }
-        else if( node instanceof ConstructorCallExpression ) {
+
+        if( node instanceof ConstructorCallExpression ) {
             // new SomeClass() -> SomeClass
             return node.getType()
         }
-        else if( node instanceof MethodCallExpression ) {
+
+        if( node instanceof MethodCallExpression ) {
             final methodNode = getMethodFromCallExpression(node, ast)
             return methodNode != null
                 ? methodNode.getReturnType()
                 : node.getType()
         }
-        else if( node instanceof PropertyExpression ) {
+
+        if( node instanceof PropertyExpression ) {
             final propertyNode = getPropertyFromExpression(node, ast)
             return propertyNode != null
                 ? getTypeOfNode(propertyNode, ast)
                 : node.getType()
         }
-        else if( node instanceof Variable ) {
+
+        if( node instanceof Variable ) {
             if( node.isDynamicTyped() ) {
                 final defNode = getDefinition(node, false, ast)
                 if( defNode instanceof Variable ) {
@@ -223,6 +209,28 @@ class ASTUtils {
         return node instanceof Expression
             ? node.getType()
             : null
+    }
+
+    /**
+     * Find the method node which most closely matches a call expression.
+     *
+     * @param node
+     * @param ast
+     * @param argIndex
+     */
+    static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache ast, int argIndex=-1) {
+        final methods = getMethodOverloadsFromCallExpression(node, ast)
+        if( methods.isEmpty() || node.getArguments() !instanceof ArgumentListExpression )
+            return null
+
+        final callArguments = (ArgumentListExpression) node.getArguments()
+        final result = methods.max { MethodNode m1, MethodNode m2 ->
+            final score1 = getArgumentsScore(m1.getParameters(), callArguments, argIndex)
+            final score2 = getArgumentsScore(m2.getParameters(), callArguments, argIndex)
+            return score1 <=> score2
+        }
+
+        return result ?: null
     }
 
     /**
@@ -252,38 +260,6 @@ class ASTUtils {
         }
 
         return Collections.emptyList()
-    }
-
-    /**
-     * Get the method node for a method call expression.
-     *
-     * @param node
-     * @param ast
-     */
-    static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache ast) {
-        return getMethodFromCallExpression(node, ast, -1)
-    }
-
-    /**
-     * Find the method node which most closely matches a method call expression.
-     *
-     * @param node
-     * @param ast
-     * @param argIndex
-     */
-    static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache ast, int argIndex) {
-        final methods = getMethodOverloadsFromCallExpression(node, ast)
-        if( methods.isEmpty() || node.getArguments() !instanceof ArgumentListExpression )
-            return null
-
-        final callArguments = (ArgumentListExpression) node.getArguments()
-        final result = methods.max { MethodNode m1, MethodNode m2 ->
-            final score1 = getArgumentsScore(m1.getParameters(), callArguments, argIndex)
-            final score2 = getArgumentsScore(m2.getParameters(), callArguments, argIndex)
-            return score1 <=> score2
-        }
-
-        return result ?: null
     }
 
     private static int getArgumentsScore(Parameter[] parameters, ArgumentListExpression arguments, int argIndex) {

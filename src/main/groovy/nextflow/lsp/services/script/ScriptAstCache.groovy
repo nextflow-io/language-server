@@ -84,21 +84,24 @@ class ScriptAstCache extends ASTNodeCache {
 
         @Override
         void visit() {
-            final moduleNode = (ScriptNode) sourceUnit.getAST()
-            if( moduleNode == null )
+            final moduleNode = sourceUnit.getAST()
+            if( moduleNode !instanceof ScriptNode )
                 return
-            for( final featureFlag : moduleNode.getFeatureFlags() )
+            final scriptNode = (ScriptNode) moduleNode
+            if( scriptNode == null )
+                return
+            for( final featureFlag : scriptNode.getFeatureFlags() )
                 visitFeatureFlag(featureFlag)
-            for( final includeNode : moduleNode.getIncludes() )
+            for( final includeNode : scriptNode.getIncludes() )
                 visitInclude(includeNode)
-            for( final functionNode : moduleNode.getFunctions() )
+            for( final functionNode : scriptNode.getFunctions() )
                 visitFunction(functionNode)
-            for( final processNode : moduleNode.getProcesses() )
+            for( final processNode : scriptNode.getProcesses() )
                 visitProcess(processNode)
-            for( final workflowNode : moduleNode.getWorkflows() )
+            for( final workflowNode : scriptNode.getWorkflows() )
                 visitWorkflow(workflowNode)
-            if( moduleNode.getOutput() )
-                visitOutput(moduleNode.getOutput())
+            if( scriptNode.getOutput() )
+                visitOutput(scriptNode.getOutput())
         }
 
         @Override

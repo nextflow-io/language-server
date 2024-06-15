@@ -3,7 +3,7 @@ package nextflow.script.dsl
 import groovy.transform.CompileStatic
 
 @CompileStatic
-class OutputDsl {
+class OutputDsl implements DslScope {
 
     @Constant('''
         List of positional arguments specified on the command line.
@@ -69,7 +69,7 @@ class OutputDsl {
     void tags(Map value) {
     }
 
-    static class TargetDsl {
+    static class TargetDsl implements DslScope {
 
         @Function('''
             *Currently only supported for S3.*
@@ -133,7 +133,7 @@ class OutputDsl {
 
     }
 
-    static class IndexDsl {
+    static class IndexDsl implements DslScope {
 
         @Function('''
             When `true`, the keys of the first record are used as the column names (default: `false`). Can also be a list of column names.

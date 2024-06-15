@@ -6,7 +6,7 @@ import groovy.transform.CompileStatic
 import nextflow.processor.TaskConfig
 
 @CompileStatic
-class ProcessDsl {
+class ProcessDsl implements DslScope {
 
     @Constant('''
         Map of task properties, including directive values.
@@ -22,7 +22,7 @@ class ProcessDsl {
 }
 
 @CompileStatic
-class ProcessDirectiveDsl {
+class ProcessDirectiveDsl implements DslScope {
 
     @Function('''
         The `clusterOptions` directive allows the usage of any native configuration option accepted by your cluster submit command. You can use it to request non-standard resources or use settings that are specific to your cluster and not supported out of the box by Nextflow.
@@ -61,7 +61,7 @@ class ProcessDirectiveDsl {
 
         [Read more](https://nextflow.io/docs/latest/process.html#cpus)
     ''')
-    void cpus(value) {
+    void cpus(Integer value) {
     }
 
     @Function('''
@@ -131,7 +131,7 @@ class ProcessDirectiveDsl {
 }
 
 @CompileStatic
-class ProcessInputDsl {
+class ProcessInputDsl implements DslScope {
 
     @Function('''
         Declare a variable input. The received value can be any type, and it will be made available to the process body (i.e. `script`, `shell`, `exec`) as a variable with the given name.
@@ -170,7 +170,7 @@ class ProcessInputDsl {
 }
 
 @CompileStatic
-class ProcessOutputDsl {
+class ProcessOutputDsl implements DslScope {
 
     @Function('''
         Declare a value output. The argument can be any value, and it can reference any output variables defined in the process body (i.e. variables declared without the `def` keyword).

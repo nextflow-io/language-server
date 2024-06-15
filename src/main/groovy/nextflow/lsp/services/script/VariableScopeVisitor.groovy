@@ -1,5 +1,7 @@
 package nextflow.lsp.services.script
 
+import groovy.lang.groovydoc.Groovydoc
+import groovy.lang.groovydoc.GroovydocHolder
 import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.SyntaxWarning
 import nextflow.script.dsl.Constant
@@ -155,13 +157,19 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
     private Variable findClassMember(ClassNode cn, String name) {
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             for( final fn : cn.getFields() ) {
-                if( fn.getName() == name && findAnnotation(fn, Constant) )
-                    return fn
+                if( fn.getName() != name )
+                    continue
+                final annot = findAnnotation(fn, Constant)
+                if( !annot )
+                    continue
+                final description = annot.getMember('value').getText().stripIndent(true).trim()
+                final content = wrapDescriptionAsGroovydoc(description)
+                fn.putNodeMetaData(GroovydocHolder.DOC_COMMENT, new Groovydoc(content, fn))
+                return fn
             }
             for( final mn : cn.getMethods() ) {
                 if( mn.getName() != name )
                     continue
-
                 final annot = findAnnotation(mn, Function)
                 if( annot ) {
                     final documentation = annot.getMember('value').getText().stripIndent(true).trim()
@@ -178,7 +186,6 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
                         mnWithDocs.putNodeMetaData('type.label', 'output directive')
                     return wrapMethodAsVariable(mnWithDocs, cn)
                 }
-
                 if( mn instanceof FunctionNode || mn instanceof ProcessNode || mn instanceof WorkflowNode )
                     return wrapMethodAsVariable(mn, cn)
             }
@@ -203,34 +210,49 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         return pn
     }
 
+    private String wrapDescriptionAsGroovydoc(String description) {
+        final builder = new StringBuilder()
+        builder.append('/**\n')
+        for( final line : description.split('\n') ) {
+            builder.append(' * ')
+            builder.append(line)
+            builder.append('\n')
+        }
+        builder.append(' */\n')
+        return builder.toString()
+    }
+
     void visit() {
-        final moduleNode = (ScriptNode) sourceUnit.getAST()
+        final moduleNode = sourceUnit.getAST()
         if( moduleNode == null )
             return
-        for( final featureFlag : moduleNode.getFeatureFlags() )
+        if( moduleNode !instanceof ScriptNode )
+            return
+        final scriptNode = (ScriptNode) moduleNode
+        for( final featureFlag : scriptNode.getFeatureFlags() )
             visitFeatureFlag(featureFlag)
 
         // declare top-level names
-        for( final includeNode : moduleNode.getIncludes() )
+        for( final includeNode : scriptNode.getIncludes() )
             visitInclude(includeNode)
-        for( final functionNode : moduleNode.getFunctions() )
+        for( final functionNode : scriptNode.getFunctions() )
             declare(functionNode)
-        for( final processNode : moduleNode.getProcesses() )
+        for( final processNode : scriptNode.getProcesses() )
             declare(processNode)
-        for( final workflowNode : moduleNode.getWorkflows() ) {
-            if( workflowNode != moduleNode.getEntry() )
+        for( final workflowNode : scriptNode.getWorkflows() ) {
+            if( workflowNode != scriptNode.getEntry() )
                 declare(workflowNode)
         }
 
         // visit top-level definitions
-        for( final functionNode : moduleNode.getFunctions() )
+        for( final functionNode : scriptNode.getFunctions() )
             visitFunction(functionNode)
-        for( final processNode : moduleNode.getProcesses() )
+        for( final processNode : scriptNode.getProcesses() )
             visitProcess(processNode)
-        for( final workflowNode : moduleNode.getWorkflows() )
+        for( final workflowNode : scriptNode.getWorkflows() )
             visitWorkflow(workflowNode)
-        if( moduleNode.getOutput() )
-            visitOutput(moduleNode.getOutput())
+        if( scriptNode.getOutput() )
+            visitOutput(scriptNode.getOutput())
     }
 
     @Override
@@ -266,6 +288,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
     void visitProcess(ProcessNode node) {
         pushState(ProcessDsl)
         currentTopLevelNode = node
+        node.variableScope = currentScope
         new DeclareInputsVisitor().visit(node.inputs)
 
         pushState(ProcessDirectiveDsl)
@@ -324,6 +347,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
     void visitWorkflow(WorkflowNode node) {
         pushState(node.name ? WorkflowDsl : EntryWorkflowDsl)
         currentTopLevelNode = node
+        node.variableScope = currentScope
         new DeclareInputsVisitor().visit(node.takes)
 
         visit(node.main)
