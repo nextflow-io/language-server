@@ -165,6 +165,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     @Override
     CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
             if( configService.matchesFile(uri) )
                 return configService.completion(params)
@@ -177,6 +178,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     @Override
     CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
             if( configService.matchesFile(uri) )
                 return configService.documentSymbol(params)
@@ -189,6 +191,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     @Override
     CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
             if( configService.matchesFile(uri) )
                 return configService.formatting(params)
@@ -201,6 +204,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     @Override
     CompletableFuture<Hover> hover(HoverParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
             if( configService.matchesFile(uri) )
                 return configService.hover(params)
@@ -240,6 +244,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     @Override
 	CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled()
             return scriptService.symbol(params)
         })
     }
