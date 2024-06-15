@@ -171,7 +171,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
                 return configService.completion(params)
             if( scriptService.matchesFile(uri) )
                 return scriptService.completion(params)
-            throw new IllegalStateException("File was not matched by any language service: ${uri}")
+            log.debug("File was not matched by any language service: ${uri}")
         })
     }
 
@@ -184,7 +184,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
                 return configService.documentSymbol(params)
             if( scriptService.matchesFile(uri) )
                 return scriptService.documentSymbol(params)
-            throw new IllegalStateException("File was not matched by any language service: ${uri}")
+            log.debug("File was not matched by any language service: ${uri}")
         })
     }
 
@@ -197,7 +197,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
                 return configService.formatting(params)
             if( scriptService.matchesFile(uri) )
                 return scriptService.formatting(params)
-            throw new IllegalStateException("File was not matched by any language service: ${uri}")
+            log.debug("File was not matched by any language service: ${uri}")
         })
     }
 
@@ -210,7 +210,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
                 return configService.hover(params)
             if( scriptService.matchesFile(uri) )
                 return scriptService.hover(params)
-            throw new IllegalStateException("File was not matched by any language service: ${uri}")
+            log.debug("File was not matched by any language service: ${uri}")
         })
     }
 
