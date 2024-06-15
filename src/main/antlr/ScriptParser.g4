@@ -92,7 +92,7 @@ scriptStatement
     |   workflowDef                 #workflowDefAlt
     |   outputDef                   #outputDefAlt
     |   functionDef                 #functionDefAlt
-    |   incompleteStatement         #incompleteStmtAlt
+    |   incompleteStatement         #incompleteScriptStmtAlt
     ;
 
 // -- feature flag
@@ -242,7 +242,7 @@ functionDef
 
 // -- incomplete script statement
 incompleteStatement
-    :   identifier (DOT identifier)*
+    :   identifier (DOT identifier)* DOT?
     ;
 
 
@@ -260,6 +260,7 @@ statement
     |   assignmentStatement             #assignmentStmtAlt
     |   expressionStatement             #expressionStmtAlt
     |   SEMI                            #emptyStmtAlt
+    |   incompleteStatement             #incompleteStmtAlt
     ;
 
 // -- if/else statement

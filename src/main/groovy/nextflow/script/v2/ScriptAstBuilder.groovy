@@ -254,7 +254,7 @@ class ScriptAstBuilder {
             moduleNode.addWorkflow(workflowNode)
         }
 
-        else if( ctx instanceof IncompleteStmtAltContext ) {
+        else if( ctx instanceof IncompleteScriptStmtAltContext ) {
             incompleteStatement(ctx.incompleteStatement())
         }
 
@@ -483,6 +483,9 @@ class ScriptAstBuilder {
 
         if( ctx instanceof EmptyStmtAltContext )
             return EmptyStatement.INSTANCE
+
+        if( ctx instanceof IncompleteStmtAltContext )
+            return incompleteStatement(ctx.incompleteStatement())
 
         throw createParsingFailedException("Invalid Groovy statement: ${ctx.text}", ctx)
     }
