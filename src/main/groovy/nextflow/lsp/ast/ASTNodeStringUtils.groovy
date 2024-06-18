@@ -8,7 +8,6 @@ import nextflow.script.dsl.FeatureFlag
 import nextflow.script.dsl.FeatureFlagDsl
 import nextflow.script.v2.FeatureFlagNode
 import nextflow.script.v2.FunctionNode
-import nextflow.script.v2.IncludeVariable
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.AnnotatedNode
@@ -38,9 +37,6 @@ class ASTNodeStringUtils {
 
         if( node instanceof WorkflowNode )
             return toString(node, ast)
-
-        if( node instanceof IncludeVariable )
-            return getLabel(node.getMethod(), ast)
 
         if( node instanceof Variable )
             return toString(node, ast)
@@ -133,9 +129,6 @@ class ASTNodeStringUtils {
 
         if( node instanceof WorkflowNode )
             return groovydocToMarkdown(node.getGroovydoc())
-
-        if( node instanceof IncludeVariable )
-            return getDocumentation(node.getMethod())
 
         if( node instanceof AnnotatedNode )
             return groovydocToMarkdown(node.getGroovydoc())

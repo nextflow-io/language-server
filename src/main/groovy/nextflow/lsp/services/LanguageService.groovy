@@ -16,6 +16,7 @@ import org.codehaus.groovy.syntax.SyntaxException
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionList
 import org.eclipse.lsp4j.CompletionParams
+import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
@@ -26,7 +27,10 @@ import org.eclipse.lsp4j.DocumentSymbol
 import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
+import org.eclipse.lsp4j.Location
+import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.TextEdit
 import org.eclipse.lsp4j.WorkspaceSymbolParams
@@ -59,9 +63,11 @@ abstract class LanguageService {
     abstract boolean matchesFile(String uri)
     abstract protected ASTNodeCache getAstCache()
     protected CompletionProvider getCompletionProvider() { null }
-    protected SymbolProvider getSymbolProvider() { null }
+    protected DefinitionProvider getDefinitionProvider() { null }
     protected FormattingProvider getFormattingProvider() { null }
     protected HoverProvider getHoverProvider() { null }
+    protected ReferenceProvider getReferenceProvider() { null }
+    protected SymbolProvider getSymbolProvider() { null }
 
     void initialize(Path workspaceRoot) {
         synchronized (this) {
@@ -126,6 +132,14 @@ abstract class LanguageService {
         return provider.completion(params.getTextDocument(), params.getPosition())
     }
 
+    Either<List<? extends Location>, List<? extends LocationLink>> definition(DefinitionParams params) {
+        final provider = getDefinitionProvider()
+        if( !provider )
+            return Either.forLeft(Collections.emptyList())
+
+        return provider.definition(params.getTextDocument(), params.getPosition())
+    }
+
     List<Either<SymbolInformation, DocumentSymbol>> documentSymbol(DocumentSymbolParams params) {
         final provider = getSymbolProvider()
         if( !provider )
@@ -150,6 +164,14 @@ abstract class LanguageService {
         return provider.hover(params.getTextDocument(), params.getPosition())
     }
 
+    List<? extends Location> references(ReferenceParams params) {
+        final provider = getReferenceProvider()
+        if( !provider )
+            return Collections.emptyList()
+
+        return provider.references(params.getTextDocument(), params.getPosition())
+    }
+
     List<? extends SymbolInformation> symbol(WorkspaceSymbolParams params) {
         if( !symbolProvider )
             return Collections.emptyList()
@@ -166,7 +188,7 @@ abstract class LanguageService {
         synchronized (this) {
             final uris = fileCache.removeChangedFiles()
 
-            log.debug "update: ${uris}"
+            log.debug "update ${uris}"
             final errors = getAstCache().update(uris, fileCache)
             publishDiagnostics(errors)
         }

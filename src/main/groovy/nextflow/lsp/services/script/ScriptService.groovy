@@ -8,9 +8,11 @@ import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.compiler.CompilerTransform
 import nextflow.lsp.services.CompletionProvider
+import nextflow.lsp.services.DefinitionProvider
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.services.HoverProvider
 import nextflow.lsp.services.LanguageService
+import nextflow.lsp.services.ReferenceProvider
 import nextflow.lsp.services.SymbolProvider
 import nextflow.script.v2.ScriptParserPluginFactory
 import org.codehaus.groovy.control.CompilerConfiguration
@@ -72,18 +74,28 @@ class ScriptService extends LanguageService {
     }
 
     @Override
+    protected DefinitionProvider getDefinitionProvider() {
+        new ScriptDefinitionProvider(astCache)
+    }
+
+    @Override
     protected FormattingProvider getFormattingProvider() {
         new ScriptFormattingProvider(astCache)
     }
 
     @Override
-    protected SymbolProvider getSymbolProvider() {
-        new ScriptSymbolProvider(astCache)
+    protected HoverProvider getHoverProvider() {
+        new ScriptHoverProvider(astCache)
     }
 
     @Override
-    protected HoverProvider getHoverProvider() {
-        new ScriptHoverProvider(astCache)
+    protected ReferenceProvider getReferenceProvider() {
+        new ScriptReferenceProvider(astCache)
+    }
+
+    @Override
+    protected SymbolProvider getSymbolProvider() {
+        new ScriptSymbolProvider(astCache)
     }
 
 }

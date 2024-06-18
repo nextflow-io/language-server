@@ -41,10 +41,8 @@ class ASTUtils {
      */
     static ASTNode getDefinition(ASTNode node, boolean strict, ASTNodeCache ast) {
         if( node instanceof VariableExpression ) {
-            final accessedVariable = node.getAccessedVariable()
-            return accessedVariable instanceof ASTNode
-                ? accessedVariable
-                : null
+            final variable = node.getAccessedVariable()
+            return getDefinitionFromVariable(variable)
         }
 
         if( node instanceof ConstantExpression ) {
@@ -61,36 +59,23 @@ class ASTUtils {
         if( node instanceof ConstructorCallExpression )
             return getMethodFromCallExpression(node, ast)
 
-        if( node instanceof Variable )
-            return node
-
         if( node instanceof FeatureFlagNode )
             return node.resolved ? node : null
 
-        return null
-    }
+        if( node instanceof IncludeVariable )
+            return node.getMethod()
 
-    /**
-     * Get the ast node corresponding to the definition of the type of
-     * a given method or variable.
-     *
-     * @param node
-     * @param ast
-     */
-    static ASTNode getTypeDefinition(ASTNode node, ASTNodeCache ast) {
-        final defNode = getDefinition(node, false, ast)
+        if( node instanceof MethodNode )
+            return node
 
-        if( defNode instanceof MethodNode )
-            return getOriginalClassNode(defNode.getReturnType(), true, ast)
-
-        if( defNode instanceof Variable )
-            return getOriginalClassNode(defNode.getOriginType(), true, ast)
+        if( node instanceof Variable )
+            return node
 
         return null
     }
 
     /**
-     * Get the ast nodes corresponding to references of a definition node.
+     * Get the ast nodes corresponding to references of a node.
      *
      * @param node
      * @param ast
@@ -99,10 +84,7 @@ class ASTUtils {
         final defNode = getDefinition(node, true, ast)
         if( defNode == null )
             return Collections.emptyList()
-
-        return ast.getNodes().findAll { otherNode ->
-            return otherNode.getLineNumber() != -1 && otherNode.getColumnNumber() != -1 && defNode == getDefinition(otherNode, false, ast)
-        }
+        return ast.getNodes().findAll { otherNode -> otherNode.getLineNumber() != -1 && otherNode.getColumnNumber() != -1 && defNode == getDefinition(otherNode, false, ast) }
     }
 
     /**
@@ -232,18 +214,14 @@ class ASTUtils {
         if( node instanceof MethodCallExpression ) {
             if( node.isImplicitThis() ) {
                 final defNode = getDefinitionFromScope(node, node.getMethodAsString(), ast)
-                if( defNode instanceof IncludeVariable ) {
-                    final methodNode = defNode.getMethod()
-                    return List.of(methodNode)
-                }
-                if( defNode instanceof PropertyNode ) {
-                    final methodNode = (MethodNode) defNode.getNodeMetaData('access.method')
-                    return List.of(methodNode)
-                }
+                if( defNode instanceof MethodNode )
+                    return List.of(defNode)
             }
-            final leftType = getTypeOfNode(node.getObjectExpression(), ast)
-            if( leftType != null )
-                return leftType.getMethods(node.getMethod().getText())
+            else {
+                final leftType = getTypeOfNode(node.getObjectExpression(), ast)
+                if( leftType != null )
+                    return leftType.getMethods(node.getMethod().getText())
+            }
         }
 
         if( node instanceof ConstructorCallExpression ) {
@@ -301,7 +279,17 @@ class ASTUtils {
                 break
             scope = scope.parent
         }
-        return variable instanceof ASTNode ? variable : null
+        return getDefinitionFromVariable(variable)
+    }
+
+    private static ASTNode getDefinitionFromVariable(Variable variable) {
+        if( variable instanceof IncludeVariable )
+            return variable.getMethod()
+        if( variable instanceof PropertyNode )
+            return (MethodNode) variable.getNodeMetaData('access.method')
+        if( variable instanceof ASTNode )
+            return variable
+        return null
     }
 
     /**

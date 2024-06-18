@@ -12,6 +12,7 @@ import org.eclipse.lsp4j.CompletionList
 import org.eclipse.lsp4j.CompletionOptions
 import org.eclipse.lsp4j.CompletionParams
 import org.eclipse.lsp4j.CreateFilesParams
+import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DeleteFilesParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
@@ -27,6 +28,9 @@ import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.InitializeResult
+import org.eclipse.lsp4j.Location
+import org.eclipse.lsp4j.LocationLink
+import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.SetTraceParams
 import org.eclipse.lsp4j.SymbolInformation
@@ -74,13 +78,15 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             scriptService.initialize(workspaceRoot)
         }
 
-        final completionOptions = new CompletionOptions(false, List.of('.'))
         final serverCapabilities = new ServerCapabilities()
-        serverCapabilities.setCompletionProvider(completionOptions)
-        serverCapabilities.setDocumentSymbolProvider(true)
-        serverCapabilities.setDocumentFormattingProvider(true)
-        serverCapabilities.setHoverProvider(true)
         serverCapabilities.setTextDocumentSync(TextDocumentSyncKind.Incremental)
+        final completionOptions = new CompletionOptions(false, List.of('.'))
+        serverCapabilities.setCompletionProvider(completionOptions)
+        serverCapabilities.setDefinitionProvider(true)
+        serverCapabilities.setDocumentFormattingProvider(true)
+        serverCapabilities.setDocumentSymbolProvider(true)
+        serverCapabilities.setHoverProvider(true)
+        serverCapabilities.setReferencesProvider(true)
         serverCapabilities.setWorkspaceSymbolProvider(true)
 
         final initializeResult = new InitializeResult(serverCapabilities)
@@ -176,10 +182,26 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     }
 
     @Override
+    CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> definition(DefinitionParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled()
+            final uri = params.getTextDocument().getUri()
+            final position = params.getPosition()
+            log.debug "textDocument/definition ${uri} [ ${position.getLine()}, ${position.getCharacter()} ]"
+            if( configService.matchesFile(uri) )
+                return configService.definition(params)
+            if( scriptService.matchesFile(uri) )
+                return scriptService.definition(params)
+            log.debug("File was not matched by any language service: ${uri}")
+        })
+    }
+
+    @Override
     CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
+            log.debug "textDocument/symbol ${uri}"
             if( configService.matchesFile(uri) )
                 return configService.documentSymbol(params)
             if( scriptService.matchesFile(uri) )
@@ -192,6 +214,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
+            log.debug "textDocument/formatting ${params}"
             final uri = params.getTextDocument().getUri()
             if( configService.matchesFile(uri) )
                 return configService.formatting(params)
@@ -210,6 +233,21 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
                 return configService.hover(params)
             if( scriptService.matchesFile(uri) )
                 return scriptService.hover(params)
+            log.debug("File was not matched by any language service: ${uri}")
+        })
+    }
+
+    @Override
+    CompletableFuture<List<? extends Location>> references(ReferenceParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled()
+            final uri = params.getTextDocument().getUri()
+            final position = params.getPosition()
+            log.debug "textDocument/references ${uri} [ ${position.getLine()}, ${position.getCharacter()} ]"
+            if( configService.matchesFile(uri) )
+                return configService.references(params)
+            if( scriptService.matchesFile(uri) )
+                return scriptService.references(params)
             log.debug("File was not matched by any language service: ${uri}")
         })
     }
@@ -242,9 +280,10 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     }
 
     @Override
-	CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
+    CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
+            log.debug "workspace/symbol ${params}"
             return scriptService.symbol(params)
         })
     }

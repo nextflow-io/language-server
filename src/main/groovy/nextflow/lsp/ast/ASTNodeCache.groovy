@@ -12,6 +12,7 @@ import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.BitwiseNegationExpression
@@ -571,7 +572,18 @@ class ASTNodeCache {
         void visitClosureExpression(ClosureExpression node) {
             pushASTNode(node)
             try {
+                for( final parameter : node.getParameters() )
+                    visitParameter(parameter)
                 super.visitClosureExpression(node)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        protected void visitParameter(Parameter node) {
+            pushASTNode(node)
+            try {
             }
             finally {
                 popASTNode()

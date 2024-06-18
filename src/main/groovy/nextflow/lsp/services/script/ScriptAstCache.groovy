@@ -17,7 +17,6 @@ import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.MethodNode
-import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
 
@@ -178,18 +177,9 @@ class ScriptAstCache extends ASTNodeCache {
         void visitFunction(FunctionNode node) {
             pushASTNode(node)
             try {
-                visit(node.code)
                 for( final parameter : node.getParameters() )
                     visitParameter(parameter)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        protected void visitParameter(Parameter node) {
-            pushASTNode(node)
-            try {
+                visit(node.code)
             }
             finally {
                 popASTNode()
