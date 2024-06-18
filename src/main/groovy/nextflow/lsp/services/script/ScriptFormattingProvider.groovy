@@ -25,6 +25,7 @@ import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression
 import org.codehaus.groovy.ast.expr.DeclarationExpression
 import org.codehaus.groovy.ast.expr.ElvisOperatorExpression
+import org.codehaus.groovy.ast.expr.EmptyExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.GStringExpression
 import org.codehaus.groovy.ast.expr.ListExpression
@@ -79,11 +80,14 @@ class ScriptFormattingProvider implements FormattingProvider {
     List<? extends TextEdit> formatting(TextDocumentIdentifier textDocument, FormattingOptions options) {
         if( ast == null ) {
             log.error("ast cache is empty while providing formatting")
-            return null
+            return Collections.emptyList()
         }
 
         final uri = URI.create(textDocument.getUri())
         final sourceUnit = ast.getSourceUnit(uri)
+        if( !sourceUnit.getAST() )
+            return Collections.emptyList()
+
         final oldText = sourceUnit.getSource().getReader().getText()
         final range = new Range(new Position(0, 0), Positions.getPosition(oldText, oldText.size()))
         final visitor = new FormattingVisitor(sourceUnit, options)
@@ -233,23 +237,23 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         append(node.name)
         append(' {\n')
         incIndent()
-        if( node.directives !instanceof EmptyStatement ) {
-            visit(node.directives)
+        if( node.directives instanceof BlockStatement ) {
+            visitDirectives((BlockStatement) node.directives)
             append('\n')
         }
-        if( node.inputs !instanceof EmptyStatement ) {
+        if( node.inputs instanceof BlockStatement ) {
             appendIndent()
             append('input:\n')
-            visit(node.inputs)
+            visitDirectives((BlockStatement) node.inputs)
             append('\n')
         }
-        if( node.outputs !instanceof EmptyStatement ) {
+        if( node.outputs instanceof BlockStatement ) {
             appendIndent()
             append('output:\n')
-            visit(node.outputs)
+            visitDirectives((BlockStatement) node.outputs)
             append('\n')
         }
-        if( node.when !instanceof EmptyStatement ) {
+        if( node.when !instanceof EmptyExpression ) {
             appendIndent()
             append('when:\n')
             appendIndent()
@@ -268,6 +272,16 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         }
         decIndent()
         append('}\n')
+    }
+
+    protected void visitDirectives(BlockStatement code) {
+        for( final statement : code.statements ) {
+            final stmtX = (ExpressionStatement)statement
+            final methodCall = (MethodCallExpression)stmtX.expression
+            appendIndent()
+            visitMethodCallExpression(methodCall, true)
+            append('\n')
+        }
     }
 
     @Override
@@ -325,7 +339,12 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitIfElse(IfStatement node) {
-        appendIndent()
+        visitIfElse(node, true)
+    }
+
+    protected void visitIfElse(IfStatement node, boolean preIndent) {
+        if( preIndent )
+            appendIndent()
         append('if (')
         visit(node.booleanExpression)
         append(') {\n')
@@ -337,7 +356,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         if( node.elseBlock instanceof IfStatement ) {
             appendIndent()
             append('else ')
-            visit(node.elseBlock)
+            visitIfElse((IfStatement) node.elseBlock, false)
         }
         else if( node.elseBlock !instanceof EmptyStatement ) {
             appendIndent()
@@ -414,20 +433,32 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitMethodCallExpression(MethodCallExpression node) {
+        visitMethodCallExpression(node, false)
+    }
+
+    protected void visitMethodCallExpression(MethodCallExpression node, boolean directive) {
         if( !node.isImplicitThis() ) {
             visit(node.objectExpression)
             append('.')
         }
         visit(node.method, false)
-        final arguments = node.arguments as TupleExpression
-        if( arguments.size() == 1 && arguments.first() instanceof ClosureExpression ) {
-            append(' ')
-            visit(arguments)
+        final arguments = (TupleExpression) node.arguments
+        final lastClosureArg = arguments.size() > 0 && arguments.last() instanceof ClosureExpression
+        final parenArgs = lastClosureArg
+            ? new TupleExpression(arguments.expressions[0..<-1])
+            : arguments
+        if( !directive || (parenArgs.size() > 0 && lastClosureArg) ) {
+            append('(')
+            visit(parenArgs)
+            append(')')
         }
         else {
-            append('(')
-            visit(arguments)
-            append(')')
+            append(' ')
+            visit(parenArgs)
+        }
+        if( lastClosureArg ) {
+            append(' ')
+            visit(arguments.last())
         }
     }
 
@@ -506,12 +537,12 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             }
             append(' ->')
         }
-        final code = node.code as BlockStatement
+        final code = (BlockStatement) node.code
         if( code.statements.size() == 0 ) {
             append(' }')
         }
         else if( code.statements.size() == 1 && code.statements.first() instanceof ExpressionStatement ) {
-            final stmt = code.statements.first() as ExpressionStatement
+            final stmt = (ExpressionStatement) code.statements.first()
             append(' ')
             visit(stmt.expression)
             append(' }')
@@ -541,10 +572,23 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitTupleExpression(TupleExpression node) {
-        for( int i = 0; i < node.expressions.size(); i++ ) {
-            visit(node.expressions[i])
-            if( i + 1 < node.expressions.size() )
+        final hasNamedArgs = node.getNodeMetaData(HAS_NAMED_ARGS)
+        final positionalArgs = hasNamedArgs ? node.expressions.tail() : node.expressions
+        for( int i = 0; i < positionalArgs.size(); i++ ) {
+            visit(positionalArgs[i])
+            if( i + 1 < positionalArgs.size() )
                 append(', ')
+        }
+        if( hasNamedArgs ) {
+            if( positionalArgs )
+                append(', ')
+            final mapX = (MapExpression)node.expressions.first()
+            final namedArgs = mapX.mapEntryExpressions
+            for( int i = 0; i < namedArgs.size(); i++ ) {
+                visit(namedArgs[i])
+                if( i + 1 < namedArgs.size() )
+                    append(', ')
+            }
         }
     }
 
@@ -681,18 +725,20 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     }
 
     protected void visit(Expression node, boolean quote) {
-        final Number number = node.getNodeMetaData(INSIDE_PARENTHESES_LEVEL)
-        final k = number != null ? number.intValue() : 0
-        append('(' * k)
+        final number = (Number) node.getNodeMetaData(INSIDE_PARENTHESES_LEVEL)
+        if( number?.intValue() )
+            append('(')
         if( node instanceof ConstantExpression ) {
             visitConstantExpression(node, quote)
         }
         else {
             super.visit(node)
         }
-        append(')' * k)
+        if( number?.intValue() )
+            append(')')
     }
 
+    private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
 
 }

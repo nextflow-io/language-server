@@ -154,15 +154,16 @@ processDirectives
     ;
 
 processInputs
-    :   INPUT COLON (sep processDirective)+
+    :   INPUT COLON nls processDirective (sep processDirective)*
     ;
 
 processOutputs
-    :   OUTPUT COLON (sep processDirective)+
+    :   OUTPUT COLON nls processDirective (sep processDirective)*
     ;
 
 processDirective
-    :   identifier argumentList?
+    :   identifier LPAREN argumentList rparen
+    |   identifier argumentList?
     ;
 
 processWhen
@@ -170,15 +171,11 @@ processWhen
     ;
 
 processExec
-    :   (   SCRIPT
-        |   SHELL
-        |   EXEC
-        ) COLON
-        sep? blockStatements
+    :   (SCRIPT | SHELL | EXEC) COLON nls blockStatements
     ;
 
 processStub
-    :   STUB COLON sep? blockStatements
+    :   STUB COLON nls blockStatements
     ;
 
 // -- workflow definition
@@ -190,17 +187,17 @@ workflowDef
 
 workflowBody
     // explicit main block with optional take/emit blocks
-    :   (sep TAKE COLON workflowTakes)?
-        sep MAIN COLON sep? workflowMain
-        (sep EMIT COLON workflowEmits)?
-        (sep PUBLISH COLON workflowPublishers)?
+    :   (sep TAKE COLON nls workflowTakes)?
+        sep MAIN COLON nls workflowMain
+        (sep EMIT COLON nls workflowEmits)?
+        (sep PUBLISH COLON nls workflowPublishers)?
 
     // implicit main block
     |   sep? workflowMain
     ;
 
 workflowTakes
-    :   (sep identifier)+
+    :   identifier (sep identifier)*
     ;
 
 workflowMain
@@ -208,7 +205,7 @@ workflowMain
     ;
 
 workflowEmits
-    :   (sep workflowEmit)+
+    :   workflowEmit (sep workflowEmit)*
     ;
 
 workflowEmit
@@ -216,7 +213,7 @@ workflowEmit
     ;
 
 workflowPublishers
-    :   (sep workflowPublish)+
+    :   workflowPublish (sep workflowPublish)*
     ;
 
 workflowPublish

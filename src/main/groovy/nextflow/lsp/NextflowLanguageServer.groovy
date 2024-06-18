@@ -214,8 +214,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
-            log.debug "textDocument/formatting ${params}"
             final uri = params.getTextDocument().getUri()
+            final options = params.getOptions()
+            log.debug "textDocument/formatting ${uri} ${options.isInsertSpaces() ? 'spaces' : 'tabs'} ${options.getTabSize()}"
             if( configService.matchesFile(uri) )
                 return configService.formatting(params)
             if( scriptService.matchesFile(uri) )

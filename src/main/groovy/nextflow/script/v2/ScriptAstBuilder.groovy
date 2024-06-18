@@ -1207,7 +1207,10 @@ class ScriptAstBuilder {
         if( opts )
             arguments.push( mapX(opts) )
 
-        return ast( args(arguments), ctx )
+        final result = ast( args(arguments), ctx )
+        if( opts )
+            result.putNodeMetaData(HAS_NAMED_ARGS, true)
+        return result
     }
 
     private MapEntryExpression namedArg(NamedArgContext ctx) {
