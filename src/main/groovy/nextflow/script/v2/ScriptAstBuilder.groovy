@@ -1463,6 +1463,7 @@ class ScriptAstBuilder {
     private static final String SQ_STR = "'"
     private static final String DQ_STR = '"'
 
+    private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
 
 }
