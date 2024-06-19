@@ -6,6 +6,8 @@ import java.lang.annotation.RetentionPolicy
 import java.lang.annotation.Target
 
 import groovy.transform.CompileStatic
+import nextflow.script.dsl.Function
+import nextflow.script.dsl.ProcessDirectiveDsl
 
 interface ConfigScope {
     String name()
@@ -22,9 +24,21 @@ interface ConfigScope {
 class ConfigSchema {
 
     private static final List<ConfigScope> CLASSES = [
+        new nextflow.config.scopes.ApptainerConfig(),
+        new nextflow.config.scopes.CharliecloudConfig(),
+        new nextflow.config.scopes.CondaConfig(),
+        new nextflow.config.scopes.DagConfig(),
+        new nextflow.config.scopes.DockerConfig(),
         new nextflow.config.scopes.ExecutorConfig(),
         new nextflow.config.scopes.Manifest(),
-        new nextflow.config.scopes.ProcessConfig()
+        new nextflow.config.scopes.PodmanConfig(),
+        new nextflow.config.scopes.ProcessConfig(),
+        new nextflow.config.scopes.ReportConfig(),
+        new nextflow.config.scopes.ShifterConfig(),
+        new nextflow.config.scopes.SingularityConfig(),
+        new nextflow.config.scopes.TimelineConfig(),
+        new nextflow.config.scopes.TraceConfig(),
+        new nextflow.config.scopes.UnscopedConfig()
     ]
 
     static final Map<String, ConfigScope> SCOPES = getConfigScopes()
@@ -45,14 +59,28 @@ class ConfigSchema {
                 final annot = field.getAnnotation(ConfigOption)
                 if( !annot )
                     continue
-                result.put(scope.name() + '.' + field.getName(), annot.value())
+                final name = scope.name()
+                    ? scope.name() + '.' + field.getName()
+                    : field.getName()
+                result.put(name, annot.value())
             }
             for( def method : scope.getClass().getDeclaredMethods() ) {
                 final annot = method.getAnnotation(ConfigOption)
                 if( !annot )
                     continue
-                result.put(scope.name() + '.' + method.getName(), annot.value())
+                final name = scope.name()
+                    ? scope.name() + '.' + method.getName()
+                    : method.getName()
+                result.put(name, annot.value())
             }
+        }
+        // derive process config from process directives
+        for( final method : ProcessDirectiveDsl.class.getDeclaredMethods() ) {
+            final annot = method.getAnnotation(Function)
+            if( !annot )
+                continue
+            final name = 'process.' + method.getName()
+            result.put(name, annot.value())
         }
         return result
     }

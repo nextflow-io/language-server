@@ -5,11 +5,13 @@ import groovy.transform.CompileStatic
 import nextflow.config.v2.ConfigParserPluginFactory
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
+import nextflow.lsp.compiler.CompilerTransform
 import nextflow.lsp.services.CompletionProvider
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.services.HoverProvider
 import nextflow.lsp.services.LanguageService
 import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.SourceUnit
 
 /**
  * Implementation of language services for Nextflow config files.
@@ -34,7 +36,13 @@ class ConfigService extends LanguageService {
     protected Compiler getCompiler() {
         final config = createConfiguration()
         final classLoader = new GroovyClassLoader(ClassLoader.getSystemClassLoader().getParent(), config, true)
-        return new Compiler(config, classLoader, List.of())
+        final CompilerTransform transform = new CompilerTransform() {
+            @Override
+            void visit(SourceUnit sourceUnit) {
+                new ConfigSchemaVisitor(sourceUnit).visit()
+            }
+        }
+        return new Compiler(config, classLoader, List.of(transform))
     }
 
     protected CompilerConfiguration createConfiguration() {

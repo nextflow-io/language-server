@@ -4,7 +4,9 @@ import groovy.transform.CompileStatic
 import nextflow.config.dsl.ConfigOption
 import nextflow.config.dsl.ConfigScope
 import nextflow.util.Duration
+import nextflow.util.MemoryUnit
 
+@CompileStatic
 class ExecutorConfig implements ConfigScope {
 
     ExecutorConfig() {}
@@ -22,6 +24,20 @@ class ExecutorConfig implements ConfigScope {
         [Read more](https://nextflow.io/docs/latest/config.html#scope-executor)
         '''
     }
+
+    @ConfigOption('''
+        *Used only by the SLURM, LSF, PBS and PBS Pro executors.*
+
+        Specify the project or organisation account that should be charged for running the pipeline jobs.
+    ''')
+    String account
+
+    @ConfigOption('''
+        *Used only by the local executor.*
+
+        The maximum number of CPUs made available by the underlying system.
+    ''')
+    int cpus
 
     @ConfigOption('''
         Determines how often to log the executor status (default: `5 min`).
@@ -42,6 +58,35 @@ class ExecutorConfig implements ConfigScope {
         Determines the number of jobs that can be killed in a single command execution (default: `100`).
     ''')
     int killBatchSize = 100
+
+    @ConfigOption('''
+        *Used only by the local executor.*
+
+        The maximum amount of memory made available by the underlying system.
+    ''')
+    MemoryUnit memory
+
+    @ConfigOption('''
+        The name of the executor to be used (default: `local`).
+    ''')
+    String name
+
+    @ConfigOption('''
+        *Used only by the {ref}`slurm-executor` executor.*
+
+        When `true`, specifies memory allocations for SLURM jobs as `--mem-per-cpu <task.memory / task.cpus>` instead of `--mem <task.memory>`.
+    ''')
+    boolean perCpuMemAllocation
+
+    @ConfigOption('''
+        Specifies Platform LSF *per-job* memory limit mode.
+    ''')
+    boolean perJobMemLimit
+
+    @ConfigOption('''
+        Specifies Platform LSF *per-task* memory reserve mode.
+    ''')
+    boolean perTaskReserve
 
     @ConfigOption('''
         Determines how often to check for process termination. Default varies for each executor.

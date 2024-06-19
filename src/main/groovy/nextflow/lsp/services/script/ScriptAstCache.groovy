@@ -31,6 +31,7 @@ class ScriptAstCache extends ASTNodeCache {
         super(compiler)
     }
 
+    @Override
     Map<URI, List<SyntaxException>> update(Set<URI> uris, FileCache fileCache) {
         final errorsByUri = super.update(uris, fileCache)
 

@@ -1,7 +1,5 @@
 package nextflow.lsp.services.script
 
-import java.nio.file.Path
-
 import groovy.lang.GroovyClassLoader
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache

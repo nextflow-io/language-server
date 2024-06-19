@@ -4,6 +4,7 @@ import groovy.transform.CompileStatic
 import nextflow.config.dsl.ConfigOption
 import nextflow.config.dsl.ConfigScope
 
+@CompileStatic
 class Manifest implements ConfigScope {
 
     Manifest() {}

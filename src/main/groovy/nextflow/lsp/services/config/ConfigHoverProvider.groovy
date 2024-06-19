@@ -87,10 +87,16 @@ class ConfigHoverProvider implements HoverProvider {
         final offsetNode = nodeTree.first()
         if( offsetNode instanceof ConfigAssignmentNode ) {
             final names = []
-            for( final node : nodeTree.asReversed() )
+            for( final node : nodeTree.asReversed() ) {
                 if( node instanceof ConfigBlockNode && node.kind == null )
                     names << node.name
+            }
             names.addAll(offsetNode.names)
+
+            if( names.first() == 'profiles' ) {
+                if( names ) names.pop()
+                if( names ) names.pop()
+            }
 
             final fqName = names.join('.')
             final option = ConfigSchema.OPTIONS[fqName]
@@ -105,15 +111,24 @@ class ConfigHoverProvider implements HoverProvider {
                 }
                 return builder.toString()
             }
-            else {
+            else if( fqName && Logger.isDebugEnabled() ) {
                 return "`${fqName}`"
             }
         }
+
         if( offsetNode instanceof ConfigBlockNode ) {
             final names = []
-            for( final node : nodeTree.asReversed() )
+            for( final node : nodeTree.asReversed() ) {
                 if( node instanceof ConfigBlockNode && node.kind == null )
                     names << node.name
+            }
+
+            if( names.first() == 'profiles' ) {
+                if( names ) names.pop()
+                if( names ) names.pop()
+                if( !names )
+                    return null
+            }
 
             final fqName = names.join('.')
             final scope = ConfigSchema.SCOPES[fqName]
@@ -126,7 +141,7 @@ class ConfigHoverProvider implements HoverProvider {
                 }
                 return builder.toString()
             }
-            else {
+            else if( fqName && Logger.isDebugEnabled() ) {
                 return "`${fqName}`"
             }
         }
