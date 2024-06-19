@@ -163,6 +163,14 @@ class ProcessDirectiveDsl implements DslScope {
     }
 
     @Function('''
+        The `label` directive allows you to annotate a process with a mnemonic identifier of your choice.
+
+        [Read more](https://nextflow.io/docs/latest/process.html#label)
+    ''')
+    void label(String value) {
+    }
+
+    @Function('''
         The `machineType` directive can be used to specify a predefined Google Compute Platform [machine type](https://cloud.google.com/compute/docs/machine-types) when using the [Google Batch](https://nextflow.io/docs/latest/google.html#cloud-batch) executor.
 
         [Read more](https://nextflow.io/docs/latest/process.html#machinetype)
