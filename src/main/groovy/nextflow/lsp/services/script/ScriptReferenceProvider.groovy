@@ -26,7 +26,7 @@ class ScriptReferenceProvider implements ReferenceProvider {
     }
 
     @Override
-    List<? extends Location> references(TextDocumentIdentifier textDocument, Position position) {
+    List<? extends Location> references(TextDocumentIdentifier textDocument, Position position, boolean includeDeclaration) {
         if( ast == null ) {
             log.error("ast cache is empty while providing hover hint")
             return Collections.emptyList()
@@ -37,7 +37,7 @@ class ScriptReferenceProvider implements ReferenceProvider {
         if( !offsetNode )
             return Collections.emptyList()
 
-        final references = ASTUtils.getReferences(offsetNode, ast)
+        final references = ASTUtils.getReferences(offsetNode, ast, includeDeclaration)
         final List<Location> result = []
         for( final refNode : references ) {
             final refUri = ast.getURI(refNode)

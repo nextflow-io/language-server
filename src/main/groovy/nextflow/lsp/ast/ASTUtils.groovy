@@ -79,12 +79,19 @@ class ASTUtils {
      *
      * @param node
      * @param ast
+     * @param includeDeclaration
      */
-    static List<ASTNode> getReferences(ASTNode node, ASTNodeCache ast) {
+    static List<ASTNode> getReferences(ASTNode node, ASTNodeCache ast, boolean includeDeclaration) {
         final defNode = getDefinition(node, true, ast)
         if( defNode == null )
             return Collections.emptyList()
-        return ast.getNodes().findAll { otherNode -> otherNode.getLineNumber() != -1 && otherNode.getColumnNumber() != -1 && defNode == getDefinition(otherNode, false, ast) }
+        return ast.getNodes().findAll { otherNode ->
+            if( otherNode.getLineNumber() == -1 || otherNode.getColumnNumber() == -1 )
+                return false
+            if( !includeDeclaration && defNode == otherNode )
+                return false
+            return defNode == getDefinition(otherNode, false, ast)
+        }
     }
 
     /**

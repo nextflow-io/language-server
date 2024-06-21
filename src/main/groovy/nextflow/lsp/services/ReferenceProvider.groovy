@@ -6,6 +6,6 @@ import org.eclipse.lsp4j.TextDocumentIdentifier
 
 interface ReferenceProvider {
 
-    List<? extends Location> references(TextDocumentIdentifier textDocument, Position position)
+    List<? extends Location> references(TextDocumentIdentifier textDocument, Position position, boolean includeDeclaration)
 
 }

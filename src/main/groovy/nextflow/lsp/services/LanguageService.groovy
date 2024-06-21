@@ -169,7 +169,7 @@ abstract class LanguageService {
         if( !provider )
             return Collections.emptyList()
 
-        return provider.references(params.getTextDocument(), params.getPosition())
+        return provider.references(params.getTextDocument(), params.getPosition(), params.getContext().isIncludeDeclaration())
     }
 
     List<? extends SymbolInformation> symbol(WorkspaceSymbolParams params) {
