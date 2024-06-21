@@ -298,27 +298,41 @@ class ScriptAstBuilder {
     private Statement processDirectives(ProcessDirectivesContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        return ast( block(null, ctx.processDirective().collect(this.&processMethodCall)), ctx )
+        return ast( block(null, ctx.processDirective().collect(this.&processDirective)), ctx )
     }
 
     private Statement processInputs(ProcessInputsContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        return ast( block(null, ctx.processDirective().collect(this.&processMethodCall)), ctx )
+        return ast( block(null, ctx.processDirective().collect(this.&processDirective)), ctx )
     }
 
     private Statement processOutputs(ProcessOutputsContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        return ast( block(null, ctx.processDirective().collect(this.&processMethodCall)), ctx )
+        return ast( block(null, ctx.processDirective().collect(this.&processDirective)), ctx )
     }
 
-    private Statement processMethodCall(ProcessDirectiveContext ctx) {
-        final name = identifier(ctx.identifier())
-        final arguments = argumentList(ctx.argumentList())
-        final call = ast( callThisX(name, arguments), ctx )
-        ast( call.method, ctx.identifier() )
-        return stmt(call)
+    private Statement processDirective(ProcessDirectiveContext ctx) {
+        final stmt = statement(ctx.statement())
+        if( stmt !instanceof ExpressionStatement ) {
+            collectSyntaxError(new SyntaxException('Invalid process statement', stmt))
+            return ast( new EmptyStatement(), ctx )
+        }
+
+        final stmtX = (ExpressionStatement) stmt
+        if( stmtX.expression !instanceof MethodCallExpression ) {
+            collectSyntaxError(new SyntaxException('Invalid process statement', stmt))
+            return ast( new EmptyStatement(), ctx )
+        }
+
+        final call = (MethodCallExpression) stmtX.expression
+        if( !call.isImplicitThis() || call.getMethod() !instanceof ConstantExpression ) {
+            collectSyntaxError(new SyntaxException('Invalid process statement', stmt))
+            return ast( new EmptyStatement(), ctx )
+        }
+
+        return stmt
     }
 
     private Expression processWhen(ProcessWhenContext ctx) {

@@ -85,7 +85,7 @@ class ScriptFormattingProvider implements FormattingProvider {
 
         final uri = URI.create(textDocument.getUri())
         final sourceUnit = ast.getSourceUnit(uri)
-        if( !sourceUnit.getAST() )
+        if( !sourceUnit.getAST() || ast.hasErrors(uri) )
             return Collections.emptyList()
 
         final oldText = sourceUnit.getSource().getReader().getText()

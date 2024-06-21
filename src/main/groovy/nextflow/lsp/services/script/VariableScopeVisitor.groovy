@@ -47,7 +47,9 @@ import org.codehaus.groovy.ast.expr.TupleExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.CatchStatement
+import org.codehaus.groovy.ast.stmt.EmptyStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
+import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.codehaus.groovy.syntax.SyntaxException
@@ -176,16 +178,9 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
                 if( annot ) {
                     final documentation = annot.getMember('value').getText().stripIndent(true).trim()
                     final mnWithDocs = new FunctionNode(name, documentation)
-                    if( findAnnotation(mn, Operator) )
-                        mnWithDocs.putNodeMetaData('type.label', 'operator')
-                    if( cn.getTypeClass() == ProcessDirectiveDsl )
-                        mnWithDocs.putNodeMetaData('type.label', 'process directive')
-                    if( cn.getTypeClass() == ProcessInputDsl )
-                        mnWithDocs.putNodeMetaData('type.label', 'process input')
-                    if( cn.getTypeClass() == ProcessOutputDsl )
-                        mnWithDocs.putNodeMetaData('type.label', 'process output')
-                    if( cn.getTypeClass() == OutputDsl )
-                        mnWithDocs.putNodeMetaData('type.label', 'output directive')
+                    final methodTypeLabel = getMethodTypeLabel(mn, cn)
+                    if( methodTypeLabel )
+                        mnWithDocs.putNodeMetaData('type.label', methodTypeLabel)
                     return wrapMethodAsVariable(mnWithDocs, cn)
                 }
                 if( mn instanceof FunctionNode || mn instanceof ProcessNode || mn instanceof WorkflowNode )
@@ -199,6 +194,20 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
     private AnnotationNode findAnnotation(AnnotatedNode node, Class annotation) {
         return node.getAnnotations().find(an -> an.getClassNode().getName() == annotation.name)
+    }
+
+    private String getMethodTypeLabel(MethodNode mn, ClassNode cn) {
+        if( findAnnotation(mn, Operator) )
+            return 'operator'
+        if( cn.getTypeClass() == ProcessDirectiveDsl )
+            return 'process directive'
+        if( cn.getTypeClass() == ProcessInputDsl )
+            return 'process input'
+        if( cn.getTypeClass() == ProcessOutputDsl )
+            return 'process output'
+        if( cn.getTypeClass() == OutputDsl )
+            return 'output directive'
+        return null
     }
 
     private Variable wrapMethodAsVariable(MethodNode mn, ClassNode cn) {
@@ -300,10 +309,12 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         new DeclareInputsVisitor().visit(node.inputs)
 
         pushState(ProcessDirectiveDsl)
+        checkDirectives(node.directives, 'process directive')
         visit(node.directives)
         popState()
 
         pushState(ProcessInputDsl)
+        checkDirectives(node.inputs, 'process input')
         visit(node.inputs)
         popState()
 
@@ -314,6 +325,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         pushState(ProcessOutputDsl)
         if( node.exec instanceof BlockStatement )
             copyVariableScope(node.exec.variableScope)
+        checkDirectives(node.outputs, 'process output')
         visit(node.outputs)
         popState()
 
@@ -333,6 +345,21 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
             if( node.name == 'this' )
                 return
             declare(node)
+        }
+    }
+
+    private void checkDirectives(Statement node, String typeLabel) {
+        if( node !instanceof BlockStatement )
+            return
+        final block = (BlockStatement) node
+        for( final stmt : block.statements ) {
+            if( stmt instanceof EmptyStatement )
+                continue
+            final stmtX = (ExpressionStatement) stmt
+            final call = (MethodCallExpression) stmtX.expression
+            final name = call.getMethodAsString()
+            if( !findClassMember(currentScope.getClassScope(), name) )
+                addError("Invalid ${typeLabel} `${name}`", stmt)
         }
     }
 

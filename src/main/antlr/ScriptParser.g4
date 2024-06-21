@@ -162,8 +162,7 @@ processOutputs
     ;
 
 processDirective
-    :   identifier LPAREN argumentList rparen
-    |   identifier argumentList?
+    :   statement
     ;
 
 processWhen

@@ -2,6 +2,7 @@ package nextflow.lsp.ast
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.Compiler
+import nextflow.lsp.compiler.SyntaxWarning
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Positions
@@ -152,6 +153,38 @@ class ASTNodeCache {
      */
     boolean hasAST(URI uri) {
         return sourcesByUri[uri]?.getAST()
+    }
+
+    /**
+     * Check whether a source file has any errors.
+     *
+     * @param uri
+     */
+    boolean hasErrors(URI uri) {
+        final errors = errorsByUri[uri]
+        if( !errors )
+            return false
+        for( final error : errors ) {
+            if( error !instanceof SyntaxWarning )
+                return true
+        }
+        return false
+    }
+
+    /**
+     * Check whether a source file has any warnings.
+     *
+     * @param uri
+     */
+    boolean hasWarnings(URI uri) {
+        final errors = errorsByUri[uri]
+        if( !errors )
+            return false
+        for( final error : errors ) {
+            if( error instanceof SyntaxWarning )
+                return true
+        }
+        return false
     }
 
     /**
