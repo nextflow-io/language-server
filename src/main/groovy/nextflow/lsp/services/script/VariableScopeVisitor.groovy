@@ -40,6 +40,7 @@ import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.ClosureExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.DeclarationExpression
+import org.codehaus.groovy.ast.expr.EmptyExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.MapEntryExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
@@ -318,7 +319,10 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         visit(node.inputs)
         popState()
 
+        if( node.when !instanceof EmptyExpression )
+            addWarning('Process `when` section will be deprecated in a future version', node.when)
         visit(node.when)
+
         visit(node.exec)
         visit(node.stub)
 
