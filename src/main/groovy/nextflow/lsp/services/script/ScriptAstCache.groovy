@@ -53,7 +53,10 @@ class ScriptAstCache extends ASTNodeCache {
     }
 
     List<IncludeNode> getIncludeNodes(URI uri) {
-        return getScriptNode(uri).getIncludes()
+        final scriptNode = getScriptNode(uri)
+        if( !scriptNode )
+            return Collections.emptyList()
+        return scriptNode.getIncludes()
     }
 
     List<MethodNode> getDefinitions() {
@@ -80,7 +83,10 @@ class ScriptAstCache extends ASTNodeCache {
     }
 
     List<FunctionNode> getFunctionNodes(URI uri) {
-        return getScriptNode(uri).getFunctions()
+        final scriptNode = getScriptNode(uri)
+        if( !scriptNode )
+            return Collections.emptyList()
+        return scriptNode.getFunctions()
     }
 
     List<ProcessNode> getProcessNodes() {
@@ -91,7 +97,10 @@ class ScriptAstCache extends ASTNodeCache {
     }
 
     List<ProcessNode> getProcessNodes(URI uri) {
-        return getScriptNode(uri).getProcesses()
+        final scriptNode = getScriptNode(uri)
+        if( !scriptNode )
+            return Collections.emptyList()
+        return scriptNode.getProcesses()
     }
 
     List<WorkflowNode> getWorkflowNodes() {
@@ -102,7 +111,10 @@ class ScriptAstCache extends ASTNodeCache {
     }
 
     List<WorkflowNode> getWorkflowNodes(URI uri) {
-        return getScriptNode(uri).getWorkflows()
+        final scriptNode = getScriptNode(uri)
+        if( !scriptNode )
+            return Collections.emptyList()
+        return scriptNode.getWorkflows()
     }
 
     private List<ScriptNode> getScriptNodes() {
