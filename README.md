@@ -2,12 +2,13 @@
 
 A [language server](https://microsoft.github.io/language-server-protocol/) for [Nextflow](https://nextflow.io/) scripts and config files. Based on [GroovyLanguageServer/groovy-language-server](https://github.com/GroovyLanguageServer/groovy-language-server).
 
-The following LSP requests are currently supported:
+The following language features are currently supported:
 
+- code navigation (outline, go to definition, find references)
 - completion
+- diagnostics (errors, warnings)
 - formatting
-- hover
-- symbols
+- hover hints
 
 ## Build
 
