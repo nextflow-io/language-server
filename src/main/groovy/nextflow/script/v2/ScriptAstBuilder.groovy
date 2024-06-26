@@ -320,19 +320,44 @@ class ScriptAstBuilder {
             return ast( new EmptyStatement(), ctx )
         }
 
-        final stmtX = (ExpressionStatement) stmt
-        if( stmtX.expression !instanceof MethodCallExpression ) {
+        final expression = ((ExpressionStatement) stmt).expression
+        if( expression instanceof VariableExpression ) {
+            final method = ast( constX(expression.name), expression )
+            stmt.expression = ast( callX(varX('this'), method, new ArgumentListExpression()), ctx )
+            return stmt
+        }
+        if( isDirectiveWithNegativeValue(expression) ) {
+            final binary = (BinaryExpression) expression
+            final left = (VariableExpression) binary.leftExpression
+            final method = ast( constX(left.name), left )
+            final value = (Expression) ast( new UnaryMinusExpression(binary.rightExpression), binary.rightExpression )
+            final arguments = ast( args(value), value )
+            stmt.expression = ast( callX(varX('this'), method, arguments), ctx )
+            return stmt
+        }
+        if( expression !instanceof MethodCallExpression ) {
             collectSyntaxError(new SyntaxException('Invalid process statement', stmt))
             return ast( new EmptyStatement(), ctx )
         }
 
-        final call = (MethodCallExpression) stmtX.expression
+        final call = (MethodCallExpression) expression
         if( !call.isImplicitThis() || call.getMethod() !instanceof ConstantExpression ) {
             collectSyntaxError(new SyntaxException('Invalid process statement', stmt))
             return ast( new EmptyStatement(), ctx )
         }
 
         return stmt
+    }
+
+    private boolean isDirectiveWithNegativeValue(Expression expression) {
+        if( expression !instanceof BinaryExpression )
+            return false
+        final binary = (BinaryExpression) expression
+        if( binary.leftExpression !instanceof VariableExpression )
+            return false
+        if( binary.operation.type != Types.MINUS )
+            return false
+        return true
     }
 
     private Expression processWhen(ProcessWhenContext ctx) {
