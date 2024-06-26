@@ -222,20 +222,20 @@ class ASTNodeCache {
     }
 
     /**
-     * Get the tree of nodes at a given location in a file.
+     * Get the most specific ast node at a given location in a file.
      *
      * @param uri
      * @param line
      * @param column
      */
-    List<ASTNode> getNodesAtLineAndColumn(URI uri, int line, int column) {
+    ASTNode getNodeAtLineAndColumn(URI uri, int line, int column) {
         final position = new Position(line, column)
         final Map<ASTNode, Range> nodeToRange = [:]
         final nodes = nodesByURI[uri]
         if( nodes == null )
-            return []
+            return null
 
-        return nodes
+        final foundNodes = nodes
             .findAll(node -> {
                 if( node.getLineNumber() == -1 )
                     return false
@@ -261,18 +261,26 @@ class ASTNodeCache {
                     return -1
                 return 0
             })
+
+        return foundNodes.size() > 0 ? foundNodes.first() : null
     }
 
     /**
-     * Get the most specific ast node at a given location in a file.
+     * Get the tree of nodes at a given location in a file.
      *
      * @param uri
      * @param line
      * @param column
      */
-    ASTNode getNodeAtLineAndColumn(URI uri, int line, int column) {
-        final foundNodes = getNodesAtLineAndColumn(uri, line, column)
-        return foundNodes.size() > 0 ? foundNodes.first() : null
+    List<ASTNode> getNodesAtLineAndColumn(URI uri, int line, int column) {
+        final offsetNode = getNodeAtLineAndColumn(uri, line, column)
+        final List<ASTNode> result = []
+        ASTNode current = offsetNode
+        while( current != null ) {
+            result << current
+            current = getParent(current)
+        }
+        return result
     }
 
     /**
