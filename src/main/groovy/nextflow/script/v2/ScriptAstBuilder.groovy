@@ -648,11 +648,11 @@ class ScriptAstBuilder {
                 throw createParsingFailedException("Nested parenthesis is not allowed in multiple assignment, e.g. ((a)) = b", ctx)
 
             final tuple = ast( new TupleExpression(left), ctx.left )
-            return stmt(binX(tuple, token(ctx.op), expression(ctx.right)))
+            return stmt(ast( binX(tuple, token(ctx.op), expression(ctx.right)), ctx ))
         }
 
         if ( isAssignmentLhsValid(left) )
-            return stmt(binX(left, token(ctx.op), expression(ctx.right)))
+            return stmt(ast( binX(left, token(ctx.op), expression(ctx.right)), ctx ))
 
         throw createParsingFailedException("The left-hand side of an assignment should be a variable or a property expression", ctx)
     }
