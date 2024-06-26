@@ -23,6 +23,7 @@ import nextflow.config.v2.ConfigIncludeNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
+import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.control.SourceUnit
 
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*
@@ -50,6 +51,9 @@ class ConfigToGroovyVisitor extends ClassCodeVisitorSupport {
         if( moduleNode == null )
             return
         super.visitBlockStatement(moduleNode.getStatementBlock())
+
+        if( moduleNode.isEmpty() )
+            moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
     }
 
     @Override

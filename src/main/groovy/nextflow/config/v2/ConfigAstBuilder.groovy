@@ -87,7 +87,6 @@ import org.codehaus.groovy.syntax.Types
 
 import static nextflow.antlr.ConfigParser.*
 import static nextflow.antlr.PositionConfigureUtils.configureAST as ast
-import static nextflow.ast.ASTHelpers.*
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 
 /**
@@ -181,9 +180,6 @@ class ConfigAstBuilder {
     private ModuleNode compilationUnit(CompilationUnitContext ctx) {
         for( final stmt : ctx.configStatement() )
             moduleNode.addStatement(configStatement(stmt))
-
-        if( moduleNode.isEmpty() )
-            moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
 
         final scriptClassNode = moduleNode.getScriptClassDummy()
         scriptClassNode.setName(getMainClassName())
@@ -352,8 +348,8 @@ class ConfigAstBuilder {
     private BlockStatement blockStatements(BlockStatementsContext ctx) {
         if( !ctx )
             return block(new VariableScope(), List<Statement>.of())
-        final code = ctx.statement().collect( this.&statement )
-        ast( block(new VariableScope(), code), ctx )
+        final statements = ctx.statement().collect( this.&statement )
+        ast( block(new VariableScope(), statements), ctx )
     }
 
     private Statement returnStatement(ExpressionContext ctx) {
@@ -600,8 +596,10 @@ class ConfigAstBuilder {
         if( ctx instanceof PropertyPathExprAltContext )
             return ast( pathPropertyElement(expression, ctx), expression, ctx )
 
-        if( ctx instanceof ClosurePathExprAltContext )
-            return ast( pathClosureElement(expression, ctx.closure()), expression, ctx )
+        if( ctx instanceof ClosurePathExprAltContext ) {
+            final closure = closure(ctx.closure())
+            return ast( pathClosureElement(expression, closure), expression, ctx )
+        }
 
         if( ctx instanceof ArgumentsPathExprAltContext )
             return ast( pathArgumentsElement(expression, ctx.arguments()), expression, ctx )
@@ -634,9 +632,7 @@ class ConfigAstBuilder {
         throw new IllegalStateException()
     }
 
-    private Expression pathClosureElement(Expression expression, ClosureContext ctx) {
-        final closure = ast( closure(ctx), ctx )
-
+    private Expression pathClosureElement(Expression expression, Expression closure) {
         if( expression instanceof MethodCallExpression ) {
             // append closure to method call arguments
             final call = (MethodCallExpression)expression
@@ -749,19 +745,19 @@ class ConfigAstBuilder {
 
     private Expression literal(LiteralContext ctx) {
         if( ctx instanceof IntegerLiteralAltContext )
-            return integerLiteral( ctx )
+            return ast( integerLiteral(ctx), ctx )
 
         if( ctx instanceof FloatingPointLiteralAltContext )
-            return floatingPointLiteral( ctx )
+            return ast( floatingPointLiteral(ctx), ctx )
 
         if( ctx instanceof StringLiteralAltContext )
-            return constX( stringLiteral(ctx.stringLiteral()) )
+            return ast( constX(stringLiteral(ctx.stringLiteral())), ctx )
 
         if( ctx instanceof BooleanLiteralAltContext )
-            return constX( ctx.text=='true' )
+            return ast( constX(ctx.text == 'true'), ctx )
 
         if( ctx instanceof NullLiteralAltContext )
-            return constX( null )
+            return ast( constX(null), ctx )
 
         throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
     }
@@ -866,7 +862,7 @@ class ConfigAstBuilder {
     private Expression closure(ClosureContext ctx) {
         final params = parameters(ctx.formalParameterList())
         final code = blockStatements(ctx.blockStatements())
-        closureX(params, code)
+        ast( closureX(params, code), ctx )
     }
 
     private Expression list(ListContext ctx) {
@@ -992,7 +988,10 @@ class ConfigAstBuilder {
         if( opts )
             arguments.push( mapX(opts) )
 
-        return ast( args(arguments), ctx )
+        final result = ast( args(arguments), ctx )
+        if( opts )
+            result.putNodeMetaData(HAS_NAMED_ARGS, true)
+        return result
     }
 
     private MapEntryExpression namedArg(NamedArgContext ctx) {
@@ -1245,6 +1244,7 @@ class ConfigAstBuilder {
     private static final String SQ_STR = "'"
     private static final String DQ_STR = '"'
 
+    private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
 
 }
