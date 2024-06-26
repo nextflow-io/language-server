@@ -17,7 +17,7 @@ package nextflow.lsp.services.config
 
 import groovy.transform.CompileStatic
 import nextflow.config.v2.ConfigAppendNode
-import nextflow.config.v2.ConfigAssignmentNode
+import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
 import nextflow.lsp.ast.ASTNodeCache
@@ -186,8 +186,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     @Override
     void visitExpressionStatement(ExpressionStatement node) {
-        if( node instanceof ConfigAssignmentNode ) {
-            visitConfigAssignment(node)
+        if( node instanceof ConfigAssignNode ) {
+            visitConfigAssign(node)
         }
         else if( node instanceof ConfigBlockNode ) {
             visitConfigBlock(node)
@@ -202,7 +202,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
         }
     }
 
-    protected void visitConfigAssignment(ConfigAssignmentNode node) {
+    protected void visitConfigAssign(ConfigAssignNode node) {
         appendIndent()
         append(node.names.join('.'))
         append(node instanceof ConfigAppendNode ? ' ' : ' = ')

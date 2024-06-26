@@ -17,7 +17,7 @@ package nextflow.lsp.services.config
 
 import groovy.transform.CompileStatic
 import nextflow.config.v2.ConfigAppendNode
-import nextflow.config.v2.ConfigAssignmentNode
+import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
@@ -58,8 +58,8 @@ class ConfigToGroovyVisitor extends ClassCodeVisitorSupport {
 
     @Override
     void visitExpressionStatement(ExpressionStatement node) {
-        if( node instanceof ConfigAssignmentNode )
-            visitConfigAssignment(node)
+        if( node instanceof ConfigAssignNode )
+            visitConfigAssign(node)
         else if( node instanceof ConfigBlockNode )
             visitConfigBlock(node)
         else if( node instanceof ConfigIncludeNode )
@@ -68,7 +68,7 @@ class ConfigToGroovyVisitor extends ClassCodeVisitorSupport {
             super.visitExpressionStatement(node)
     }
 
-    protected void visitConfigAssignment(ConfigAssignmentNode node) {
+    protected void visitConfigAssign(ConfigAssignNode node) {
         final methodName = node instanceof ConfigAppendNode ? 'append' : 'assign'
         final names = listX( node.names.collect(name -> constX(name)) as List<Expression> )
         node.expression = callThisX(methodName, args(names, node.value))

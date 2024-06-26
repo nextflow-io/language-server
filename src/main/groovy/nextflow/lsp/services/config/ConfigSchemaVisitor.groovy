@@ -17,7 +17,7 @@ package nextflow.lsp.services.config
 
 import groovy.transform.CompileStatic
 import nextflow.config.dsl.ConfigSchema
-import nextflow.config.v2.ConfigAssignmentNode
+import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
 import nextflow.lsp.compiler.SyntaxWarning
@@ -56,8 +56,8 @@ class ConfigSchemaVisitor extends ClassCodeVisitorSupport {
 
     @Override
     void visitExpressionStatement(ExpressionStatement node) {
-        if( node instanceof ConfigAssignmentNode )
-            visitConfigAssignment(node)
+        if( node instanceof ConfigAssignNode )
+            visitConfigAssign(node)
         else if( node instanceof ConfigBlockNode )
             visitConfigBlock(node)
         else if( node instanceof ConfigIncludeNode )
@@ -66,7 +66,7 @@ class ConfigSchemaVisitor extends ClassCodeVisitorSupport {
             super.visitExpressionStatement(node)
     }
 
-    protected void visitConfigAssignment(ConfigAssignmentNode node) {
+    protected void visitConfigAssign(ConfigAssignNode node) {
         final names = scopes + node.names
         if( names.first() == 'profiles' ) {
             if( names ) names.pop()

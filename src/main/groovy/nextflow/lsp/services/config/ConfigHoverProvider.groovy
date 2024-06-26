@@ -17,7 +17,7 @@ package nextflow.lsp.services.config
 
 import groovy.transform.CompileStatic
 import nextflow.config.dsl.ConfigSchema
-import nextflow.config.v2.ConfigAssignmentNode
+import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.services.HoverProvider
@@ -100,7 +100,7 @@ class ConfigHoverProvider implements HoverProvider {
 
     String getHoverContent(List<ASTNode> nodeTree) {
         final offsetNode = nodeTree.first()
-        if( offsetNode instanceof ConfigAssignmentNode ) {
+        if( offsetNode instanceof ConfigAssignNode ) {
             final names = []
             for( final node : nodeTree.asReversed() ) {
                 if( node instanceof ConfigBlockNode && node.kind == null )

@@ -25,11 +25,11 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ConfigAssignmentNode extends ExpressionStatement {
+class ConfigAssignNode extends ExpressionStatement {
     final List<String> names
     final Expression value
 
-    ConfigAssignmentNode(List<String> names, Expression value) {
+    ConfigAssignNode(List<String> names, Expression value) {
         super(EmptyExpression.INSTANCE)
         this.names = names
         this.value = value
@@ -38,7 +38,7 @@ class ConfigAssignmentNode extends ExpressionStatement {
 
 
 @CompileStatic
-class ConfigAppendNode extends ConfigAssignmentNode {
+class ConfigAppendNode extends ConfigAssignNode {
     ConfigAppendNode(List<String> names, Expression value) {
         super(names, value)
     }

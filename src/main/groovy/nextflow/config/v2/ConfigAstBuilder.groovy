@@ -229,7 +229,7 @@ class ConfigAstBuilder {
     private Statement configAssignment(ConfigAssignmentContext ctx) {
         final names = ctx.configPathExpression().identifier().collect( this.&identifier )
         final value = expression(ctx.expression())
-        ast( new ConfigAssignmentNode(names, value), ctx )
+        ast( new ConfigAssignNode(names, value), ctx )
     }
 
     private Statement configBlock(ConfigBlockContext ctx) {

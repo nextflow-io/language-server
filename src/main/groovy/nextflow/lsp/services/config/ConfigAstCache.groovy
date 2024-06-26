@@ -21,7 +21,7 @@ import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.file.FileCache
-import nextflow.config.v2.ConfigAssignmentNode
+import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
 import org.codehaus.groovy.ast.ASTNode
@@ -79,8 +79,8 @@ class ConfigAstCache extends ASTNodeCache {
 
         @Override
         void visitExpressionStatement(ExpressionStatement node) {
-            if( node instanceof ConfigAssignmentNode )
-                visitConfigAssignment(node)
+            if( node instanceof ConfigAssignNode )
+                visitConfigAssign(node)
             else if( node instanceof ConfigBlockNode )
                 visitConfigBlock(node)
             else if( node instanceof ConfigIncludeNode )
@@ -89,7 +89,7 @@ class ConfigAstCache extends ASTNodeCache {
                 super.visitExpressionStatement(node)
         }
 
-        protected void visitConfigAssignment(ConfigAssignmentNode node) {
+        protected void visitConfigAssign(ConfigAssignNode node) {
             pushASTNode(node)
             try {
                 visit(node.value)
@@ -153,8 +153,8 @@ class ConfigAstCache extends ASTNodeCache {
 
         @Override
         void visitExpressionStatement(ExpressionStatement node) {
-            if( node instanceof ConfigAssignmentNode )
-                visitConfigAssignment(node)
+            if( node instanceof ConfigAssignNode )
+                visitConfigAssign(node)
             else if( node instanceof ConfigBlockNode )
                 visitConfigBlock(node)
             else if( node instanceof ConfigIncludeNode )
@@ -163,7 +163,7 @@ class ConfigAstCache extends ASTNodeCache {
                 super.visitExpressionStatement(node)
         }
 
-        protected void visitConfigAssignment(ConfigAssignmentNode node) {
+        protected void visitConfigAssign(ConfigAssignNode node) {
         }
 
         protected void visitConfigBlock(ConfigBlockNode node) {
