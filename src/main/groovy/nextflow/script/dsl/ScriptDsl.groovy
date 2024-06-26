@@ -13,11 +13,11 @@ import org.slf4j.Logger
 class ScriptDsl implements DslScope {
 
     static final List<ClassNode> TYPES = [
-        new ClassNode( java.nio.file.Path ),
-        new ClassNode( nextflow.Channel ),
-        new ClassNode( nextflow.util.Duration ),
-        new ClassNode( nextflow.util.MemoryUnit ),
-    ]
+        java.nio.file.Path,
+        nextflow.Channel,
+        nextflow.util.Duration,
+        nextflow.util.MemoryUnit,
+    ].collect { clazz -> new ClassNode(clazz) }
 
     @Constant('''
         Logger which can be used to log messages to the console.

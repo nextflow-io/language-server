@@ -30,6 +30,7 @@ import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.DynamicVariable
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.PropertyNode
@@ -296,7 +297,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
                 visit(parameter.initialExpression)
             declare(parameter, node)
         }
-        super.visitMethod(node)
+        visit(node.code)
 
         currentTopLevelNode = null
         popState()
@@ -320,7 +321,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         popState()
 
         if( node.when !instanceof EmptyExpression )
-            addWarning('Process `when` section will be deprecated in a future version', node.when)
+            addWarning('Process `when` section will not be supported in a future version', node.when)
         visit(node.when)
 
         visit(node.exec)
@@ -448,7 +449,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
     @Override
     void visitBinaryExpression(BinaryExpression node) {
-        if( Types.isAssignment(node.operation.type) ) {
+        if( node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
             visit(node.rightExpression)
             visitAssignment(node.leftExpression)
         }
@@ -475,7 +476,10 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
                     return
                 scope = scope.parent
             }
-            declare(left)
+            if( currentTopLevelNode instanceof ProcessNode || currentTopLevelNode instanceof WorkflowNode )
+                declare(left)
+            else
+                addError("`${left.name}` was assigned but not declared", left)
         }
     }
 
@@ -515,7 +519,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
      * Treat `set` operator as an assignment.
      */
     void visitAssignmentOperator(MethodCallExpression node) {
-        if( node.methodAsString !in ['set', 'tap'] )
+        if( node.getMethodAsString() !in ['set', 'tap'] )
             return
         final args = (ArgumentListExpression)node.arguments
         if( args.size() != 1 || args.first() !instanceof ClosureExpression )
@@ -538,23 +542,23 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         final name = node.name
         if( name == 'this' )
             return
-        final variable = findVariableDeclaration(name)
+        Variable variable = findVariableDeclaration(name)
         if( !variable ) {
             if( name == 'it' ) {
-                addWarning('Implicit variable `it` in closure will be deprecated in a future version', node)
+                addWarning('Implicit variable `it` in closure will not be supported in a future version', node)
             }
             else if( name == 'args' ) {
-                addWarning('The use of `args` outside the entry workflow will be deprecated in a future version', node)
+                addWarning('The use of `args` outside the entry workflow will not be supported in a future version', node)
             }
             else if( name == 'params' ) {
-                addWarning('The use of `params` outside the entry workflow will be deprecated in a future version', node)
+                addWarning('The use of `params` outside the entry workflow will not be supported in a future version', node)
             }
             else {
-                addError("`${name}` is not defined", node)
+                variable = new DynamicVariable(name, false)
             }
-            return
         }
-        node.setAccessedVariable(variable)
+        if( variable )
+            node.setAccessedVariable(variable)
     }
 
     @Override

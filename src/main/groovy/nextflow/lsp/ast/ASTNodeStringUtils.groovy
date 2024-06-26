@@ -26,6 +26,9 @@ import org.codehaus.groovy.ast.Variable
 class ASTNodeStringUtils {
 
     static String getLabel(ASTNode node, ASTNodeCache ast) {
+        if( node instanceof ClassNode )
+            return toString(node, ast)
+
         if( node instanceof FeatureFlagNode )
             return toString(node)
 

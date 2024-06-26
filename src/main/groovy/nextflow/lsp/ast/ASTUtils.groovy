@@ -57,7 +57,7 @@ class ASTUtils {
             return getOriginalClassNode(node.type, strict, ast)
 
         if( node instanceof ConstructorCallExpression )
-            return getMethodFromCallExpression(node, ast)
+            return getOriginalClassNode(node.type, strict, ast)
 
         if( node instanceof FeatureFlagNode )
             return node.resolved ? node : null

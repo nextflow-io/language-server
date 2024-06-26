@@ -39,11 +39,11 @@ class ScriptService extends LanguageService {
 
     protected Compiler getCompiler() {
         final config = createConfiguration()
-        final classLoader = new GroovyClassLoader(ClassLoader.getSystemClassLoader().getParent(), config, true)
+        final classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true)
         final CompilerTransform transform = new CompilerTransform() {
             @Override
             void visit(SourceUnit sourceUnit) {
-                new VariableScopeVisitor(sourceUnit).visit()
+                new ResolveVisitor(sourceUnit, config, classLoader).visit()
             }
         }
         return new Compiler(config, classLoader, List.of(transform))
