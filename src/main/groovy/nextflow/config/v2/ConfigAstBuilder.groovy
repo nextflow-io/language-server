@@ -50,7 +50,6 @@ import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.BitwiseNegationExpression
-import org.codehaus.groovy.ast.expr.BooleanExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.EmptyExpression
@@ -73,8 +72,6 @@ import org.codehaus.groovy.ast.expr.UnaryPlusExpression
 import org.codehaus.groovy.ast.stmt.AssertStatement
 import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.EmptyStatement
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
-import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.CompilationFailedException
 import org.codehaus.groovy.control.CompilePhase
@@ -1247,62 +1244,4 @@ class ConfigAstBuilder {
     private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
 
-}
-
-
-@CompileStatic
-class ConfigIncludeNode extends ExpressionStatement {
-    final Expression source
-
-    ConfigIncludeNode(Expression source) {
-        super(EmptyExpression.INSTANCE)
-        this.source = source
-    }
-}
-
-
-@CompileStatic
-class ConfigAssignmentNode extends ExpressionStatement {
-    final List<String> names
-    final Expression value
-
-    ConfigAssignmentNode(List<String> names, Expression value) {
-        super(EmptyExpression.INSTANCE)
-        this.names = names
-        this.value = value
-    }
-}
-
-
-@CompileStatic
-class ConfigAppendNode extends ConfigAssignmentNode {
-    ConfigAppendNode(List<String> names, Expression value) {
-        super(names, value)
-    }
-}
-
-
-@CompileStatic
-class ConfigBlockNode extends ExpressionStatement {
-    final String kind
-    final String name
-    final BlockStatement block
-
-    ConfigBlockNode(String kind = null, String name, BlockStatement block) {
-        super(EmptyExpression.INSTANCE)
-        this.kind = kind
-        this.name = name
-        this.block = block
-    }
-}
-
-
-@CompileStatic
-class ConfigIncompleteNode extends ExpressionStatement {
-    final String text
-
-    ConfigIncompleteNode(String text) {
-        super(EmptyExpression.INSTANCE)
-        this.text = text
-    }
 }

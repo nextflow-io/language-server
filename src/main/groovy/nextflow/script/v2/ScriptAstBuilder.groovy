@@ -43,22 +43,18 @@ import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.GenericsType
-import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.ast.NodeMetaDataHandler
 import org.codehaus.groovy.ast.Parameter
-import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.BitwiseNegationExpression
-import org.codehaus.groovy.ast.expr.BooleanExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.EmptyExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.GStringExpression
-import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.expr.MapExpression
 import org.codehaus.groovy.ast.expr.MapEntryExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
@@ -78,9 +74,7 @@ import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.CatchStatement
 import org.codehaus.groovy.ast.stmt.EmptyStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
-import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
-import org.codehaus.groovy.ast.stmt.TryCatchStatement
 import org.codehaus.groovy.control.CompilationFailedException
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -1504,230 +1498,4 @@ class ScriptAstBuilder {
     private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
 
-}
-
-
-@CompileStatic
-class ScriptNode extends ModuleNode {
-    private List<FeatureFlagNode> featureFlags = []
-    private List<IncludeNode> includes = []
-    private List<FunctionNode> functions = []
-    private List<ProcessNode> processes = []
-    private List<WorkflowNode> workflows = []
-    private WorkflowNode entry
-    private OutputNode output
-
-    ScriptNode(SourceUnit sourceUnit) {
-        super(sourceUnit)
-    }
-
-    List<FeatureFlagNode> getFeatureFlags() {
-        return featureFlags
-    }
-
-    List<IncludeNode> getIncludes() {
-        return includes
-    }
-
-    List<FunctionNode> getFunctions() {
-        return functions
-    }
-
-    List<ProcessNode> getProcesses() {
-        return processes
-    }
-
-    List<WorkflowNode> getWorkflows() {
-        return workflows
-    }
-
-    WorkflowNode getEntry() {
-        return entry
-    }
-
-    OutputNode getOutput() {
-        return output
-    }
-
-    void addFeatureFlag(FeatureFlagNode featureFlag) {
-        featureFlags << featureFlag
-    }
-
-    void addInclude(IncludeNode includeNode) {
-        includes << includeNode
-    }
-
-    void addFunction(FunctionNode functionNode) {
-        functions << functionNode
-    }
-
-    void addProcess(ProcessNode processNode) {
-        processes << processNode
-    }
-
-    void addWorkflow(WorkflowNode workflowNode) {
-        workflows << workflowNode
-    }
-
-    void setEntry(WorkflowNode entry) {
-        this.entry = entry
-    }
-
-    void setOutput(OutputNode output) {
-        this.output = output
-    }
-}
-
-
-@CompileStatic
-class FeatureFlagNode extends ExpressionStatement {
-    final String name
-    final Expression value
-    boolean resolved
-
-    FeatureFlagNode(String name, Expression value) {
-        super(EmptyExpression.INSTANCE)
-        this.name = name
-        this.value = value
-    }
-}
-
-
-@CompileStatic
-class FunctionNode extends MethodNode {
-    final String documentation
-
-    FunctionNode(String name, ClassNode returnType, Parameter[] parameters, Statement code) {
-        super(name, 0, returnType, parameters, [] as ClassNode[], code)
-    }
-
-    FunctionNode(String name, String documentation) {
-        this(name, null, Parameter.EMPTY_ARRAY, EmptyStatement.INSTANCE)
-        this.documentation = documentation
-    }
-}
-
-
-@CompileStatic
-class IncludeNode extends ExpressionStatement {
-    final String source
-    final List<IncludeVariable> modules
-
-    IncludeNode(String source, List<IncludeVariable> modules) {
-        super(EmptyExpression.INSTANCE)
-        this.source = source
-        this.modules = modules
-    }
-}
-
-
-@CompileStatic
-class IncludeVariable extends ASTNode implements Variable {
-    final String name
-    final String alias
-
-    IncludeVariable(String name, String alias=null) {
-        this.name = name
-        this.alias = alias
-    }
-
-    private MethodNode method
-
-    void setMethod(MethodNode method) {
-        this.method = method
-    }
-
-    MethodNode getMethod() { method }
-
-    @Override
-    ClassNode getType() { method.getReturnType() }
-
-    @Override
-    ClassNode getOriginType() { method.getReturnType() }
-
-    @Override
-    String getName() { alias ?: name }
-
-    @Override
-    Expression getInitialExpression() { null }
-
-    @Override
-    boolean hasInitialExpression() { false }
-
-    @Override
-    boolean isInStaticContext() { false }
-
-    @Override
-    boolean isDynamicTyped() { method.isDynamicReturnType() }
-
-    @Override
-    boolean isClosureSharedVariable() { false }
-
-    @Override
-    void setClosureSharedVariable(boolean inClosure) {}
-
-    @Override
-    int getModifiers() { method.getModifiers() }
-}
-
-
-@CompileStatic
-class ProcessNode extends MethodNode {
-    final Statement directives
-    final Statement inputs
-    final Statement outputs
-    final Expression when
-    final String type
-    final Statement exec
-    final Statement stub
-
-    ProcessNode(String name, Statement directives, Statement inputs, Statement outputs, Expression when, String type, Statement exec, Statement stub) {
-        super(name, 0, null, Parameter.EMPTY_ARRAY, [] as ClassNode[], EmptyStatement.INSTANCE)
-        this.directives = directives
-        this.inputs = inputs
-        this.outputs = outputs
-        this.when = when
-        this.type = type
-        this.exec = exec
-        this.stub = stub
-    }
-}
-
-
-@CompileStatic
-class WorkflowNode extends MethodNode {
-    final Statement takes
-    final Statement emits
-    final Statement publishers
-    final Statement main
-
-    WorkflowNode(String name, Statement takes, Statement emits, Statement publishers, Statement main) {
-        super(name, 0, null, Parameter.EMPTY_ARRAY, [] as ClassNode[], EmptyStatement.INSTANCE)
-        this.takes = takes
-        this.emits = emits
-        this.publishers = publishers
-        this.main = main
-    }
-}
-
-
-@CompileStatic
-class OutputNode extends ExpressionStatement {
-    final Statement body
-
-    OutputNode(Statement body) {
-        super(EmptyExpression.INSTANCE)
-        this.body = body
-    }
-}
-
-
-@CompileStatic
-class IncompleteNode extends ExpressionStatement {
-    final String text
-
-    IncompleteNode(String text) {
-        super(EmptyExpression.INSTANCE)
-        this.text = text
-    }
 }
