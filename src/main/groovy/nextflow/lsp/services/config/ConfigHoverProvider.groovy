@@ -98,20 +98,11 @@ class ConfigHoverProvider implements HoverProvider {
         return new Hover(new MarkupContent(MarkupKind.MARKDOWN, value))
     }
 
-    String getHoverContent(List<ASTNode> nodeTree) {
+    protected String getHoverContent(List<ASTNode> nodeTree) {
         final offsetNode = nodeTree.first()
         if( offsetNode instanceof ConfigAssignNode ) {
-            final names = []
-            for( final node : nodeTree.asReversed() ) {
-                if( node instanceof ConfigBlockNode && node.kind == null )
-                    names << node.name
-            }
+            final names = getCurrentScope(nodeTree)
             names.addAll(offsetNode.names)
-
-            if( names.first() == 'profiles' ) {
-                if( names ) names.pop()
-                if( names ) names.pop()
-            }
 
             final fqName = names.join('.')
             final option = ConfigSchema.OPTIONS[fqName]
@@ -132,18 +123,9 @@ class ConfigHoverProvider implements HoverProvider {
         }
 
         if( offsetNode instanceof ConfigBlockNode ) {
-            final names = []
-            for( final node : nodeTree.asReversed() ) {
-                if( node instanceof ConfigBlockNode && node.kind == null )
-                    names << node.name
-            }
-
-            if( names.first() == 'profiles' ) {
-                if( names ) names.pop()
-                if( names ) names.pop()
-                if( !names )
-                    return null
-            }
+            final names = getCurrentScope(nodeTree)
+            if( !names )
+                return null
 
             final fqName = names.join('.')
             final scope = ConfigSchema.SCOPES[fqName]
@@ -162,6 +144,19 @@ class ConfigHoverProvider implements HoverProvider {
         }
 
         return null
+    }
+
+    protected List<String> getCurrentScope(List<ASTNode> nodeTree) {
+        final List<String> names = []
+        for( final node : nodeTree.asReversed() ) {
+            if( node instanceof ConfigBlockNode && node.kind == null )
+                names.add(node.name)
+        }
+        if( names.first() == 'profiles' ) {
+            if( names ) names.pop()
+            if( names ) names.pop()
+        }
+        return names
     }
 
 }

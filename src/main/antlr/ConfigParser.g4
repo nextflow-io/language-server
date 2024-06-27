@@ -139,7 +139,7 @@ configBlockAltStatement
 
 // -- incomplete config statement
 configIncomplete
-    :   configPathExpression
+    :   identifier (DOT identifier)* DOT?
     ;
 
 

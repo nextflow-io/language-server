@@ -24,6 +24,7 @@ import nextflow.lsp.file.FileCache
 import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
+import nextflow.config.v2.ConfigIncompleteNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.expr.ConstantExpression
@@ -74,7 +75,8 @@ class ConfigAstCache extends ASTNodeCache {
             final moduleNode = sourceUnit.getAST()
             if( moduleNode == null )
                 return
-            visit(moduleNode.getStatementBlock())
+            for( final stmt : moduleNode.getStatementBlock().getStatements() )
+                visit(stmt)
         }
 
         @Override
@@ -85,6 +87,8 @@ class ConfigAstCache extends ASTNodeCache {
                 visitConfigBlock(node)
             else if( node instanceof ConfigIncludeNode )
                 visitConfigInclude(node)
+            else if( node instanceof ConfigIncompleteNode )
+                visitConfigIncomplete(node)
             else
                 super.visitExpressionStatement(node)
         }
@@ -102,7 +106,8 @@ class ConfigAstCache extends ASTNodeCache {
         protected void visitConfigBlock(ConfigBlockNode node) {
             pushASTNode(node)
             try {
-                visit(node.block)
+                for( final stmt : node.block.statements )
+                    visit(stmt)
             }
             finally {
                 popASTNode()
@@ -113,6 +118,15 @@ class ConfigAstCache extends ASTNodeCache {
             pushASTNode(node)
             try {
                 visit(node.source)
+            }
+            finally {
+                popASTNode()
+            }
+        }
+
+        protected void visitConfigIncomplete(ConfigIncompleteNode node) {
+            pushASTNode(node)
+            try {
             }
             finally {
                 popASTNode()

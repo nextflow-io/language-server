@@ -17,8 +17,11 @@ package nextflow.lsp.services.config
 
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
+import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
+import nextflow.config.v2.ConfigIncompleteNode
 import nextflow.config.dsl.ConfigSchema
+import nextflow.config.dsl.ConfigScope
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.services.CompletionProvider
 import nextflow.lsp.util.Logger
@@ -44,23 +47,20 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either
 @CompileStatic
 class ConfigCompletionProvider implements CompletionProvider {
 
-    private static final List<CompletionItem> SCOPES
+    private static final List<CompletionItem> TOPLEVEL_ITEMS = []
 
     static {
-        SCOPES = ConfigSchema.SCOPES.collect { name, scope ->
-            final item = new CompletionItem(name + ' {')
-            item.setKind(CompletionItemKind.Property)
-            item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, scope.description().stripIndent(true).trim()))
-            item.setInsertText(
-                """
-                ${name} {
-                  \$1
-                }
-                """.stripIndent(true).trim()
-            )
-            item.setInsertTextFormat(InsertTextFormat.Snippet)
-            item.setInsertTextMode(InsertTextMode.AdjustIndentation)
-            return item
+        ConfigSchema.SCOPES.each { name, scope ->
+            if( !name )
+                return
+            TOPLEVEL_ITEMS.add(getConfigScopeDot(name, scope))
+            TOPLEVEL_ITEMS.add(getConfigScopeBlock(name, scope))
+        }
+
+        ConfigSchema.OPTIONS.each { name, documentation ->
+            if( name.contains('.') )
+                return
+            TOPLEVEL_ITEMS.add(getConfigOption(name, documentation))
         }
     }
 
@@ -82,36 +82,75 @@ class ConfigCompletionProvider implements CompletionProvider {
         final uri = URI.create(textDocument.getUri())
         final nodeTree = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter())
         if( !nodeTree )
-            return Either.forLeft(SCOPES)
+            return Either.forLeft(TOPLEVEL_ITEMS)
 
         final scope = getCurrentScope(nodeTree)
-        final items = scope ? getConfigOptions(scope + '.') : SCOPES
+        final items = scope ? getConfigOptions(scope + '.') : TOPLEVEL_ITEMS
         return Either.forLeft(items)
     }
 
-    String getCurrentScope(List<ASTNode> nodeTree) {
+    protected String getCurrentScope(List<ASTNode> nodeTree) {
         final names = []
         for( final node : nodeTree.asReversed() ) {
-            if( node instanceof ConfigBlockNode )
-                names << node.name
+            if( node instanceof ConfigBlockNode && node.kind == null )
+                names.add(node.name)
+        }
+        if( names.first() == 'profiles' ) {
+            if( names ) names.pop()
+            if( names ) names.pop()
+        }
+        final offsetNode = nodeTree.first()
+        if( offsetNode instanceof ConfigAssignNode )
+            names.addAll(offsetNode.names[0..<-1])
+        if( offsetNode instanceof ConfigIncompleteNode ) {
+            names.addAll(offsetNode.text.tokenize('.'))
+            if( !offsetNode.text.endsWith('.') )
+                names.pop()
         }
         return names.join('.')
     }
 
     @Memoized(maxCacheSize = 10)
-    List<CompletionItem> getConfigOptions(String prefix) {
+    protected List<CompletionItem> getConfigOptions(String prefix) {
         ConfigSchema.OPTIONS
             .findAll { name, documentation -> name.startsWith(prefix) }
             .collect { name, documentation ->
                 final relativeName = name.replace(prefix, '')
-                final item = new CompletionItem(relativeName)
-                item.setKind(CompletionItemKind.Property)
-                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
-                item.setInsertText("${relativeName} = \$1")
-                item.setInsertTextFormat(InsertTextFormat.Snippet)
-                item.setInsertTextMode(InsertTextMode.AdjustIndentation)
-                return item
+                return getConfigOption(relativeName, documentation)
             }
+    }
+
+    static protected CompletionItem getConfigScopeDot(String name, ConfigScope scope) {
+        final item = new CompletionItem(name)
+        item.setKind(CompletionItemKind.Property)
+        item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, scope.description().stripIndent(true).trim()))
+        return item
+    }
+
+    static protected CompletionItem getConfigScopeBlock(String name, ConfigScope scope) {
+        final item = new CompletionItem(name + ' {')
+        item.setKind(CompletionItemKind.Property)
+        item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, scope.description().stripIndent(true).trim()))
+        item.setInsertText(
+            """
+            ${name} {
+                \$1
+            }
+            """.stripIndent(true).trim()
+        )
+        item.setInsertTextFormat(InsertTextFormat.Snippet)
+        item.setInsertTextMode(InsertTextMode.AdjustIndentation)
+        return item
+    }
+
+    static protected CompletionItem getConfigOption(String name, String documentation) {
+        final item = new CompletionItem(name)
+        item.setKind(CompletionItemKind.Property)
+        item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation.stripIndent(true).trim()))
+        item.setInsertText("${name} = \$1")
+        item.setInsertTextFormat(InsertTextFormat.Snippet)
+        item.setInsertTextMode(InsertTextMode.AdjustIndentation)
+        return item
     }
 
 }
