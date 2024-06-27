@@ -152,9 +152,9 @@ class ConfigHoverProvider implements HoverProvider {
             if( node instanceof ConfigBlockNode && node.kind == null )
                 names.add(node.name)
         }
-        if( names.first() == 'profiles' ) {
-            if( names ) names.pop()
-            if( names ) names.pop()
+        if( names.size() >= 2 && names.first() == 'profiles' ) {
+            names.pop()
+            names.pop()
         }
         return names
     }
