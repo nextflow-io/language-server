@@ -109,10 +109,6 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         currentScope = currentScope.parent
     }
 
-    private void declare(String name) {
-        declare(new VariableExpression(name))
-    }
-
     private void declare(MethodNode methodNode) {
         final classNode = currentScope.getClassScope()
         classNode.addMethod(methodNode)

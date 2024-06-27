@@ -15,18 +15,13 @@
  */
 package nextflow.lsp.services.script
 
-import java.lang.reflect.Modifier
-
 import groovy.lang.GroovyClassLoader
 import groovy.lang.Tuple2
 import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.SyntaxWarning
 import nextflow.script.dsl.ScriptDsl
 import nextflow.script.v2.FunctionNode
-import nextflow.script.v2.OutputNode
-import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
-import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.GroovyBugError
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeExpressionTransformer
@@ -35,7 +30,6 @@ import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.DynamicVariable
 import org.codehaus.groovy.ast.GenericsType
-import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ClosureExpression

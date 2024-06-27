@@ -65,14 +65,7 @@ class ScriptService extends LanguageService {
     }
 
     protected CompilerConfiguration createConfiguration() {
-        final importCustomizer = new ImportCustomizer()
-        importCustomizer.addImports( java.nio.file.Path.name )
-        // Channel
-        // Duration
-        // MemoryUnit
-
         final config = new CompilerConfiguration()
-        config.addCompilationCustomizers( importCustomizer )
         config.setPluginFactory(new ScriptParserPluginFactory())
 
         final optimizationOptions = config.getOptimizationOptions()
