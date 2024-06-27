@@ -227,7 +227,11 @@ outputDef
     ;
 
 outputBody
-    :   sep? blockStatements
+    :   sep? outputDirective (sep outputDirective)*
+    ;
+
+outputDirective
+    :   statement
     ;
 
 // -- function definition

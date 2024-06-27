@@ -294,29 +294,40 @@ class ScriptAstBuilder {
         return ast( block(null, ctx.processDirective().collect(this.&processDirective)), ctx )
     }
 
+    private Statement processDirective(ProcessDirectiveContext ctx) {
+        return checkDirective(statement(ctx.statement()), 'Invalid process directive')
+    }
+
     private Statement processInputs(ProcessInputsContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        return ast( block(null, ctx.processDirective().collect(this.&processDirective)), ctx )
+        return ast( block(null, ctx.processDirective().collect(this.&processInput)), ctx )
+    }
+
+    private Statement processInput(ProcessDirectiveContext ctx) {
+        return checkDirective(statement(ctx.statement()), 'Invalid process input')
     }
 
     private Statement processOutputs(ProcessOutputsContext ctx) {
         if( !ctx )
             return EmptyStatement.INSTANCE
-        return ast( block(null, ctx.processDirective().collect(this.&processDirective)), ctx )
+        return ast( block(null, ctx.processDirective().collect(this.&processOutput)), ctx )
     }
 
-    private Statement processDirective(ProcessDirectiveContext ctx) {
-        final stmt = statement(ctx.statement())
+    private Statement processOutput(ProcessDirectiveContext ctx) {
+        return checkDirective(statement(ctx.statement()), 'Invalid process output')
+    }
+
+    private Statement checkDirective(Statement stmt, String errorMessage) {
         if( stmt !instanceof ExpressionStatement ) {
-            collectSyntaxError(new SyntaxException('Invalid process statement', stmt))
-            return ast( new EmptyStatement(), ctx )
+            collectSyntaxError(new SyntaxException(errorMessage, stmt))
+            return ast( new EmptyStatement(), stmt )
         }
 
         final expression = ((ExpressionStatement) stmt).expression
         if( expression instanceof VariableExpression ) {
             final method = ast( constX(expression.name), expression )
-            stmt.expression = ast( callX(varX('this'), method, new ArgumentListExpression()), ctx )
+            stmt.expression = ast( callX(varX('this'), method, new ArgumentListExpression()), stmt )
             return stmt
         }
         if( isDirectiveWithNegativeValue(expression) ) {
@@ -325,18 +336,18 @@ class ScriptAstBuilder {
             final method = ast( constX(left.name), left )
             final value = (Expression) ast( new UnaryMinusExpression(binary.rightExpression), binary.rightExpression )
             final arguments = ast( args(value), value )
-            stmt.expression = ast( callX(varX('this'), method, arguments), ctx )
+            stmt.expression = ast( callX(varX('this'), method, arguments), stmt )
             return stmt
         }
         if( expression !instanceof MethodCallExpression ) {
-            collectSyntaxError(new SyntaxException('Invalid process statement', stmt))
-            return ast( new EmptyStatement(), ctx )
+            collectSyntaxError(new SyntaxException(errorMessage, stmt))
+            return ast( new EmptyStatement(), stmt )
         }
 
         final call = (MethodCallExpression) expression
         if( !call.isImplicitThis() || call.getMethod() !instanceof ConstantExpression ) {
-            collectSyntaxError(new SyntaxException('Invalid process statement', stmt))
-            return ast( new EmptyStatement(), ctx )
+            collectSyntaxError(new SyntaxException(errorMessage, stmt))
+            return ast( new EmptyStatement(), stmt )
         }
 
         return stmt
@@ -461,8 +472,18 @@ class ScriptAstBuilder {
     }
 
     private OutputNode outputDef(OutputDefContext ctx) {
-        final body = blockStatements(ctx.outputBody()?.blockStatements())
+        final body = outputBody(ctx.outputBody())
         return ast( new OutputNode(body), ctx )
+    }
+
+    private Statement outputBody(OutputBodyContext ctx) {
+        if( !ctx )
+            return EmptyStatement.INSTANCE
+        return ast( block(null, ctx.outputDirective().collect(this.&outputDirective)), ctx )
+    }
+
+    private Statement outputDirective(OutputDirectiveContext ctx) {
+        return checkDirective(statement(ctx.statement()), 'Invalid output directive')
     }
 
     private FunctionNode functionDef(FunctionDefContext ctx) {

@@ -327,7 +327,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         popState()
 
         pushState(ProcessInputDsl)
-        checkDirectives(node.inputs, 'process input')
+        checkDirectives(node.inputs, 'process input qualifier')
         visit(node.inputs)
         popState()
 
@@ -341,7 +341,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         pushState(ProcessOutputDsl)
         if( node.exec instanceof BlockStatement )
             copyVariableScope(node.exec.variableScope)
-        checkDirectives(node.outputs, 'process output')
+        checkDirectives(node.outputs, 'process output qualifier')
         visit(node.outputs)
         popState()
 
