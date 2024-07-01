@@ -30,6 +30,7 @@ import nextflow.script.dsl.FeatureFlagDsl
 import nextflow.script.dsl.Function
 import nextflow.script.dsl.ScriptDsl
 import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.IncompleteNode
 import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
@@ -38,6 +39,7 @@ import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.VariableScope
+import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression
 import org.codehaus.groovy.ast.expr.Expression
@@ -302,6 +304,12 @@ class ScriptCompletionProvider implements CompletionProvider {
             log.debug "completion constructor call -- '${namePrefix}'"
             populateTypes(namePrefix, new HashSet<>(), items)
         }
+        else if( offsetNode instanceof IncompleteNode && offsetNode.expression instanceof PropertyExpression ) {
+            // e.g. "foo.bar. "
+            //               ^
+            log.debug "completion property (incomplete)"
+            populateItemsFromObjectScope(offsetNode.expression, '', items)
+        }
         else {
             log.debug "completion ${offsetNode.class.simpleName} -- '${offsetNode.getText()}'"
             populateItemsFromScope(offsetNode, '', topNode, items)
@@ -313,19 +321,27 @@ class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateItemsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
+        final classNode = ASTUtils.getTypeOfNode(object, ast)
+        if( classNode == null || classNode.getTypeClass() == Object )
+            return
+        final isStatic = object instanceof ClassExpression
         final Set<String> existingNames = []
 
-        final fields = ASTUtils.getFieldsForObjectExpression(object, ast)
+        final fields = ASTUtils.getFieldsForType(classNode, isStatic, ast)
         populateItemsFromFields(fields, namePrefix, existingNames, items)
 
-        final methods = ASTUtils.getMethodsForObjectExpression(object, ast)
+        final methods = ASTUtils.getMethodsForType(classNode, isStatic, ast)
         populateItemsFromMethods(methods, namePrefix, existingNames, items)
     }
 
     private void populateMethodsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
+        final classNode = ASTUtils.getTypeOfNode(object, ast)
+        if( classNode == null || classNode.getTypeClass() == Object )
+            return
+        final isStatic = object instanceof ClassExpression
         final Set<String> existingNames = []
 
-        final methods = ASTUtils.getMethodsForObjectExpression(object, ast)
+        final methods = ASTUtils.getMethodsForType(classNode, isStatic, ast)
         populateItemsFromMethods(methods, namePrefix, existingNames, items)
     }
 

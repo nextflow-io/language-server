@@ -498,9 +498,21 @@ class ScriptAstBuilder {
     }
 
     private Statement incompleteStatement(IncompleteStatementContext ctx) {
-        final result = ast( new IncompleteNode(ctx.text), ctx )
+        final result = ctx.dot
+            ? incompleteProperty(ctx)
+            : ast( new IncompleteNode(ctx.text), ctx )
         collectSyntaxError(new SyntaxException("Incomplete statement", result))
         return result
+    }
+
+    private Statement incompleteProperty(IncompleteStatementContext ctx) {
+        final head = ctx.identifier().head()
+        final object = ast( varX(identifier(head)), head )
+        final result = ctx.identifier().tail().inject(object) { acc, ident ->
+            final name = ast( constX(identifier(ident)), ident )
+            ast( new PropertyExpression(acc, name), acc, name )
+        }
+        return ast( new IncompleteNode(result), ctx )
     }
 
     /// GROOVY STATEMENTS

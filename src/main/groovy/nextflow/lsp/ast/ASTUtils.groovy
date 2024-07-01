@@ -110,36 +110,6 @@ class ASTUtils {
     }
 
     /**
-     * Get the set of available fields for an object (i.e. by inspecting
-     * the type of the expression).
-     *
-     * @param node
-     * @param ast
-     */
-    static List<FieldNode> getFieldsForObjectExpression(Expression node, ASTNodeCache ast) {
-        final classNode = getTypeOfNode(node, ast)
-        if( classNode == null )
-            return Collections.emptyList()
-        final isStatic = node instanceof ClassExpression
-        return classNode.getFields().findAll { fieldNode -> isStatic ? fieldNode.isStatic() : !fieldNode.isStatic() }
-    }
-
-    /**
-     * Get the set of available methods for an object (i.e. by inspecting
-     * the type of the expression).
-     *
-     * @param node
-     * @param ast
-     */
-    static List<MethodNode> getMethodsForObjectExpression(Expression node, ASTNodeCache ast) {
-        final classNode = getTypeOfNode(node, ast)
-        if( classNode == null )
-            return Collections.emptyList()
-        final isStatic = node instanceof ClassExpression
-        return classNode.getMethods().findAll { methodNode -> isStatic ? methodNode.isStatic() : !methodNode.isStatic() }
-    }
-
-    /**
      * Get the type (i.e. class node) of an ast node.
      *
      * @param node
@@ -195,6 +165,34 @@ class ASTUtils {
     private static ClassNode getOriginalClassNode(ClassNode node, boolean strict, ASTNodeCache ast) {
         // TODO: built-in types
         return strict ? null : node
+    }
+
+    /**
+     * Get the set of available fields for a type.
+     *
+     * @param classNode
+     * @param ast
+     */
+    static List<FieldNode> getFieldsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
+        return classNode.getFields().findAll { fieldNode ->
+            if( !fieldNode.isPublic() )
+                return false
+            isStatic ? fieldNode.isStatic() : !fieldNode.isStatic()
+        }
+    }
+
+    /**
+     * Get the set of available methods for a type.
+     *
+     * @param classNode
+     * @param ast
+     */
+    static List<MethodNode> getMethodsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
+        return classNode.getMethods().findAll { methodNode ->
+            if( !methodNode.isPublic() )
+                return false
+            isStatic ? methodNode.isStatic() : !methodNode.isStatic()
+        }
     }
 
     private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {

@@ -242,7 +242,7 @@ functionDef
 
 // -- incomplete script statement
 incompleteStatement
-    :   identifier (DOT identifier)* DOT?
+    :   identifier (DOT identifier)* dot=DOT?
     ;
 
 

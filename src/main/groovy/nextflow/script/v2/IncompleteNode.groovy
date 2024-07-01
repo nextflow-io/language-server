@@ -17,6 +17,7 @@ package nextflow.script.v2
 
 import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.expr.EmptyExpression
+import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 
 /**
@@ -30,5 +31,10 @@ class IncompleteNode extends ExpressionStatement {
     IncompleteNode(String text) {
         super(EmptyExpression.INSTANCE)
         this.text = text
+    }
+
+    IncompleteNode(Expression expression) {
+        super(expression)
+        this.text = null
     }
 }
