@@ -23,6 +23,7 @@ import groovy.transform.CompileStatic
 import nextflow.lsp.file.FileCache
 import nextflow.lsp.util.Logger
 import org.antlr.v4.runtime.RecognitionException
+import org.apache.groovy.parser.antlr4.GroovySyntaxError
 import org.codehaus.groovy.GroovyBugError
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.ErrorCollector
@@ -123,6 +124,8 @@ class Compiler {
                 transform.visit(sourceUnit)
         }
         catch( RecognitionException e ) {
+        }
+        catch( GroovySyntaxError e ) {
         }
         catch( GroovyBugError e ) {
             log.error 'Unexpected exception while compiling source files'
