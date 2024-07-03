@@ -34,15 +34,17 @@ import org.eclipse.lsp4j.services.LanguageClient
 public class Logger {
 
     private static Logger instance
-    private static Boolean debugEnabled
+    private static boolean debugEnabled
 
     private LanguageClient client
     private boolean initialized
 
     static boolean isDebugEnabled() {
-        if( debugEnabled == null )
-            debugEnabled = System.getenv('NXF_DEBUG')=='true'
         return debugEnabled
+    }
+
+    static void setDebugEnabled(boolean value) {
+        debugEnabled = value
     }
 
     private Logger() {

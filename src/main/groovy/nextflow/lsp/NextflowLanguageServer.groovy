@@ -18,6 +18,7 @@ package nextflow.lsp
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 
+import com.google.gson.JsonObject
 import groovy.transform.CompileStatic
 import nextflow.lsp.util.Logger
 import nextflow.lsp.services.config.ConfigService
@@ -273,6 +274,19 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     @Override
     void didChangeConfiguration(DidChangeConfigurationParams params) {
         log.debug "workspace/didChangeConfiguration ${params.getSettings()}"
+
+		if( params.getSettings() !instanceof JsonObject )
+			return
+		final settings = (JsonObject) params.getSettings()
+        if( !settings.has('nextflow') || !settings.get('nextflow').isJsonObject() )
+            return
+        final nextflow = settings.get('nextflow').getAsJsonObject()
+        if( !nextflow.has('debug') || !nextflow.get('debug').isJsonPrimitive() )
+            return
+        final debug = nextflow.get('debug').getAsJsonPrimitive()
+        if( !debug.isBoolean() )
+            return
+        Logger.setDebugEnabled(debug.getAsBoolean())
     }
 
     @Override
