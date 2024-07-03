@@ -134,8 +134,11 @@ class ScriptAstCache extends ASTNodeCache {
 
     private List<ScriptNode> getScriptNodes() {
         final List<ScriptNode> result = []
-        for( final sourceUnit : getSourceUnits() )
-            result << (ScriptNode) sourceUnit.getAST()
+        for( final sourceUnit : getSourceUnits() ) {
+            final scriptNode = (ScriptNode) sourceUnit.getAST()
+            if( scriptNode )
+                result << scriptNode
+        }
         return result
     }
 
