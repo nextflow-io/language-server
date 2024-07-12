@@ -260,8 +260,8 @@ class ResolveVisitor extends ClassCodeExpressionTransformer implements ScriptVis
             // attempt to resolve variable as type name
             final name = ve.getName()
             final type = ClassHelper.make(name)
-            if( !type.isResolved() && !inPropertyExpression )
-                resolveOrFail(type, ve)
+            if( !type.isResolved() )
+                resolve(type)
             if( type.isResolved() )
                 return new ClassExpression(type)
         }
@@ -276,21 +276,12 @@ class ResolveVisitor extends ClassCodeExpressionTransformer implements ScriptVis
         return ve
     }
 
-    private boolean inPropertyExpression
 
     protected Expression transformPropertyExpression(PropertyExpression pe) {
-        final ipe = inPropertyExpression
         Expression objectExpression
         Expression property
-        try {
-            inPropertyExpression = true
-            objectExpression = transform(pe.getObjectExpression())
-            inPropertyExpression = false
-            property = transform(pe.getProperty())
-        }
-        finally {
-            inPropertyExpression = ipe
-        }
+        objectExpression = transform(pe.getObjectExpression())
+        property = transform(pe.getProperty())
         final result = new PropertyExpression(objectExpression, property, pe.isSafe())
         // attempt to resolve property expression as a fully-qualified class name
         final className = lookupClassName(result)
@@ -317,15 +308,18 @@ class ResolveVisitor extends ClassCodeExpressionTransformer implements ScriptVis
                 break
             }
 
-            if( expr !instanceof PropertyExpression )
+            if( expr instanceof PropertyExpression ) {
+                final property = expr.getPropertyAsString()
+                if( !property )
+                    return null
+                final classNameInfo = makeClassName(doInitialClassTest, name, property)
+                name = classNameInfo.getV1()
+                doInitialClassTest = classNameInfo.getV2()
+                expr = expr.getObjectExpression()
+            }
+            else {
                 return null
-            final property = ((PropertyExpression) expr).getPropertyAsString()
-            if( !property )
-                return null
-            final classNameInfo = makeClassName(doInitialClassTest, name, property)
-            name = classNameInfo.getV1()
-            doInitialClassTest = classNameInfo.getV2()
-            expr = ((PropertyExpression) expr).getObjectExpression()
+            }
         }
         if( name == null || name.length() == 0 )
             return null
