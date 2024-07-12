@@ -168,6 +168,7 @@ abstract class LanguageService {
         if( !provider )
             return Collections.emptyList()
 
+        updateExecutor.executeNow(DEBOUNCE_KEY)
         return provider.formatting(uri, options)
     }
 
