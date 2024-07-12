@@ -92,7 +92,7 @@ scriptStatement
     |   workflowDef                 #workflowDefAlt
     |   outputDef                   #outputDefAlt
     |   functionDef                 #functionDefAlt
-    |   incompleteStatement         #incompleteScriptStmtAlt
+    |   incompleteScriptStatement   #incompleteScriptStmtAlt
     ;
 
 // -- feature flag
@@ -241,8 +241,8 @@ functionDef
     ;
 
 // -- incomplete script statement
-incompleteStatement
-    :   identifier (DOT identifier)* dot=DOT?
+incompleteScriptStatement
+    :   identifier (DOT identifier)* DOT?
     ;
 
 
@@ -260,7 +260,6 @@ statement
     |   assignmentStatement             #assignmentStmtAlt
     |   expressionStatement             #expressionStmtAlt
     |   SEMI                            #emptyStmtAlt
-    |   incompleteStatement             #incompleteStmtAlt
     ;
 
 // -- if/else statement
@@ -436,6 +435,9 @@ expression
         |   ELVIS nls
         )
         fb=expression                                                                       #conditionalExprAlt
+
+    // incomplete expression
+    |   incompleteExpression                                                                #incompleteExprAlt
     ;
 
 primary
@@ -621,7 +623,6 @@ arguments
     :   LPAREN nls argumentList? COMMA? nls rparen
     ;
 
-
 argumentList
     :   argumentListElement
         (   COMMA nls
@@ -644,6 +645,11 @@ namedArgLabel
     |   identifier
     |   literal
     |   gstring
+    ;
+
+// -- incomplete expression
+incompleteExpression
+    :   identifier (DOT identifier)* DOT
     ;
 
 //

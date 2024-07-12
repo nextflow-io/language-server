@@ -248,11 +248,11 @@ class ScriptAstBuilder {
         }
 
         else if( ctx instanceof IncompleteScriptStmtAltContext ) {
-            incompleteStatement(ctx.incompleteStatement())
+            incompleteScriptStatement(ctx.incompleteScriptStatement())
         }
 
         else
-            throw createParsingFailedException("Invalid script statement: ${ctx.text}", ctx)
+            throw createParsingFailedException("Invalid statement: ${ctx.text}", ctx)
     }
 
     private FeatureFlagNode featureFlag(FeatureFlagContext ctx) {
@@ -497,22 +497,10 @@ class ScriptAstBuilder {
         return result
     }
 
-    private Statement incompleteStatement(IncompleteStatementContext ctx) {
-        final result = ctx.dot
-            ? incompleteProperty(ctx)
-            : ast( new IncompleteNode(ctx.text), ctx )
+    private Statement incompleteScriptStatement(IncompleteScriptStatementContext ctx) {
+        final result = ast( new IncompleteNode(ctx.text), ctx )
         collectSyntaxError(new SyntaxException("Incomplete statement", result))
         return result
-    }
-
-    private Statement incompleteProperty(IncompleteStatementContext ctx) {
-        final head = ctx.identifier().head()
-        final object = ast( varX(identifier(head)), head )
-        final result = ctx.identifier().tail().inject(object) { acc, ident ->
-            final name = ast( constX(identifier(ident)), ident )
-            ast( new PropertyExpression(acc, name), acc, name )
-        }
-        return ast( new IncompleteNode(result), ctx )
     }
 
     /// GROOVY STATEMENTS
@@ -548,10 +536,7 @@ class ScriptAstBuilder {
         if( ctx instanceof EmptyStmtAltContext )
             return EmptyStatement.INSTANCE
 
-        if( ctx instanceof IncompleteStmtAltContext )
-            return incompleteStatement(ctx.incompleteStatement())
-
-        throw createParsingFailedException("Invalid Groovy statement: ${ctx.text}", ctx)
+        throw createParsingFailedException("Invalid statement: ${ctx.text}", ctx)
     }
 
     private Statement ifElseStatement(IfElseStatementContext ctx) {
@@ -772,7 +757,10 @@ class ScriptAstBuilder {
         if( ctx instanceof UnaryNotExprAltContext )
             return ast( unaryNot(expression(ctx.expression()), ctx.op), ctx )
 
-        throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
+        if( ctx instanceof IncompleteExprAltContext )
+            return incompleteExpression(ctx.incompleteExpression())
+
+        throw createParsingFailedException("Invalid expression: ${ctx.text}", ctx)
     }
 
     private Expression binary(ExpressionContext left, ParserToken op, ExpressionContext right) {
@@ -847,7 +835,7 @@ class ScriptAstBuilder {
             return ctx.pathElement().inject(primary, (acc, el) -> pathElement(acc, el))
         }
         catch( IllegalStateException e ) {
-            throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
+            throw createParsingFailedException("Invalid expression: ${ctx.text}", ctx)
         }
     }
 
@@ -992,7 +980,7 @@ class ScriptAstBuilder {
         if( ctx instanceof BuiltInTypePrmrAltContext )
             return ast( builtInType(ctx.builtInType()), ctx )
 
-        throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
+        throw createParsingFailedException("Invalid expression: ${ctx.text}", ctx)
     }
 
     private Expression builtInType(BuiltInTypeContext ctx) {
@@ -1023,7 +1011,7 @@ class ScriptAstBuilder {
         if( ctx instanceof NullLiteralAltContext )
             return ast( constX(null), ctx )
 
-        throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
+        throw createParsingFailedException("Invalid expression: ${ctx.text}", ctx)
     }
 
     private Expression integerLiteral(IntegerLiteralAltContext ctx) {
@@ -1264,7 +1252,7 @@ class ScriptAstBuilder {
                 opts << namedArg(ctx1.namedArg())
 
             else
-                throw createParsingFailedException("Invalid Groovy method argument: ${ctx.text}", ctx)
+                throw createParsingFailedException("Invalid method argument: ${ctx.text}", ctx)
         }
 
         // TODO: validate duplicate named arguments ?
@@ -1299,7 +1287,18 @@ class ScriptAstBuilder {
         if( ctx.gstring() )
             return gstring(ctx.gstring())
 
-        throw createParsingFailedException("Invalid Groovy method named argument: ${ctx.text}", ctx)
+        throw createParsingFailedException("Invalid method named argument: ${ctx.text}", ctx)
+    }
+
+    private Expression incompleteExpression(IncompleteExpressionContext ctx) {
+        final head = ctx.identifier().head()
+        final object = ast( varX(identifier(head)), head )
+        final result = ctx.identifier().tail().inject(object) { acc, ident ->
+            final name = ast( constX(identifier(ident)), ident )
+            ast( new PropertyExpression(acc, name), acc, name )
+        }
+        collectSyntaxError(new SyntaxException("Incomplete expression", result))
+        return result
     }
 
     /// MISCELLANEOUS

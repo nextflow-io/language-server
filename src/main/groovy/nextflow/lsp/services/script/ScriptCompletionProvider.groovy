@@ -30,7 +30,6 @@ import nextflow.script.dsl.FeatureFlagDsl
 import nextflow.script.dsl.Function
 import nextflow.script.dsl.ScriptDsl
 import nextflow.script.v2.FunctionNode
-import nextflow.script.v2.IncompleteNode
 import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
@@ -304,11 +303,11 @@ class ScriptCompletionProvider implements CompletionProvider {
             log.debug "completion constructor call -- '${namePrefix}'"
             populateTypes(namePrefix, new HashSet<>(), items)
         }
-        else if( offsetNode instanceof IncompleteNode && offsetNode.expression instanceof PropertyExpression ) {
+        else if( offsetNode instanceof PropertyExpression ) {
             // e.g. "foo.bar. "
             //               ^
-            log.debug "completion property (incomplete)"
-            populateItemsFromObjectScope(offsetNode.expression, '', items)
+            log.debug "completion property -- ''"
+            populateItemsFromObjectScope(offsetNode, '', items)
         }
         else {
             log.debug "completion ${offsetNode.class.simpleName} -- '${offsetNode.getText()}'"
