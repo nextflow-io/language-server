@@ -21,6 +21,7 @@ import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
 import nextflow.lsp.ast.ASTNodeCache
+import nextflow.lsp.services.CustomFormattingOptions
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Positions
@@ -62,10 +63,8 @@ import org.codehaus.groovy.ast.stmt.IfStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.Types
-import org.eclipse.lsp4j.FormattingOptions
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
-import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.TextEdit
 
 /**
@@ -85,13 +84,12 @@ class ConfigFormattingProvider implements FormattingProvider {
     }
 
     @Override
-    List<? extends TextEdit> formatting(TextDocumentIdentifier textDocument, FormattingOptions options) {
+    List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options) {
         if( ast == null ) {
             log.error("ast cache is empty while providing formatting")
             return null
         }
 
-        final uri = URI.create(textDocument.getUri())
         final sourceUnit = ast.getSourceUnit(uri)
         final oldText = sourceUnit.getSource().getReader().getText()
         final range = new Range(new Position(0, 0), Positions.getPosition(oldText, oldText.size()))
@@ -109,13 +107,13 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     private SourceUnit sourceUnit
 
-    private FormattingOptions options
+    private CustomFormattingOptions options
 
     private StringBuilder builder = new StringBuilder()
 
     private int indentCount = 0
 
-    FormattingVisitor(SourceUnit sourceUnit, FormattingOptions options) {
+    FormattingVisitor(SourceUnit sourceUnit, CustomFormattingOptions options) {
         this.sourceUnit = sourceUnit
         this.options = options
     }
@@ -137,8 +135,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
     }
 
     protected void appendIndent() {
-        final indent = options.isInsertSpaces()
-            ? ' ' * options.getTabSize()
+        final indent = options.insertSpaces
+            ? ' ' * options.tabSize
             : '\t'
         builder.append(indent * indentCount)
     }

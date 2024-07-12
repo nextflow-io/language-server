@@ -17,6 +17,7 @@ package nextflow.lsp.services.script
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
+import nextflow.lsp.services.CustomFormattingOptions
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Positions
@@ -69,10 +70,8 @@ import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.TryCatchStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.Types
-import org.eclipse.lsp4j.FormattingOptions
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
-import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.TextEdit
 
 /**
@@ -92,13 +91,12 @@ class ScriptFormattingProvider implements FormattingProvider {
     }
 
     @Override
-    List<? extends TextEdit> formatting(TextDocumentIdentifier textDocument, FormattingOptions options) {
+    List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options) {
         if( ast == null ) {
             log.error("ast cache is empty while providing formatting")
             return Collections.emptyList()
         }
 
-        final uri = URI.create(textDocument.getUri())
         final sourceUnit = ast.getSourceUnit(uri)
         if( !sourceUnit.getAST() || ast.hasErrors(uri) )
             return Collections.emptyList()
@@ -119,7 +117,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     private SourceUnit sourceUnit
 
-    private FormattingOptions options
+    private CustomFormattingOptions options
 
     private StringBuilder builder = new StringBuilder()
 
@@ -127,7 +125,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     private int maxIncludeLength
 
-    FormattingVisitor(SourceUnit sourceUnit, FormattingOptions options) {
+    FormattingVisitor(SourceUnit sourceUnit, CustomFormattingOptions options) {
         this.sourceUnit = sourceUnit
         this.options = options
     }
@@ -142,9 +140,11 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         if( moduleNode !instanceof ScriptNode )
             return
         final scriptNode = (ScriptNode) moduleNode
+        maxIncludeLength = options.harshilAlignment
+            ? getMaxIncludeLength(scriptNode.getIncludes())
+            : 0
         for( final featureFlag : scriptNode.getFeatureFlags() )
             visitFeatureFlag(featureFlag)
-        maxIncludeLength = getMaxIncludeLength(scriptNode.getIncludes())
         if( scriptNode.getIncludes().size() > 0 )
             append('\n')
         for( final includeNode : scriptNode.getIncludes() )
@@ -182,8 +182,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     }
 
     protected void appendIndent() {
-        final indent = options.isInsertSpaces()
-            ? ' ' * options.getTabSize()
+        final indent = options.insertSpaces
+            ? ' ' * options.tabSize
             : '\t'
         builder.append(indent * indentCount)
     }
@@ -213,7 +213,9 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     @Override
     void visitInclude(IncludeNode node) {
         for( final module : node.modules ) {
-            final padding = maxIncludeLength - getIncludeLength(module)
+            final padding = options.harshilAlignment
+                ? maxIncludeLength - getIncludeLength(module)
+                : 0
             append('include { ')
             append(module.@name)
             if( module.alias ) {

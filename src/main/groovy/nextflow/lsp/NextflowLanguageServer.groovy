@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture
 import com.google.gson.JsonObject
 import groovy.transform.CompileStatic
 import nextflow.lsp.util.Logger
+import nextflow.lsp.services.CustomFormattingOptions
 import nextflow.lsp.services.config.ConfigService
 import nextflow.lsp.services.script.ScriptService
 import org.eclipse.lsp4j.CompletionItem
@@ -82,6 +83,8 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     private ScriptService scriptService = new ScriptService()
 
     private Path workspaceRoot
+
+    private boolean harshilAlignment
 
     // -- LanguageServer
 
@@ -231,12 +234,16 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
-            final options = params.getOptions()
-            log.debug "textDocument/formatting ${uri} ${options.isInsertSpaces() ? 'spaces' : 'tabs'} ${options.getTabSize()}"
+            final options = new CustomFormattingOptions(
+                tabSize: params.getOptions().getTabSize(),
+                insertSpaces: params.getOptions().isInsertSpaces(),
+                harshilAlignment: harshilAlignment
+            )
+            log.debug "textDocument/formatting ${uri} ${options.insertSpaces ? 'spaces' : 'tabs'} ${options.tabSize}"
             if( configService.matchesFile(uri) )
-                return configService.formatting(params)
+                return configService.formatting(URI.create(uri), options)
             if( scriptService.matchesFile(uri) )
-                return scriptService.formatting(params)
+                return scriptService.formatting(URI.create(uri), options)
             log.debug("File was not matched by any language service: ${uri}")
         })
     }
@@ -275,18 +282,36 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     void didChangeConfiguration(DidChangeConfigurationParams params) {
         log.debug "workspace/didChangeConfiguration ${params.getSettings()}"
 
-		if( params.getSettings() !instanceof JsonObject )
-			return
-		final settings = (JsonObject) params.getSettings()
-        if( !settings.has('nextflow') || !settings.get('nextflow').isJsonObject() )
-            return
-        final nextflow = settings.get('nextflow').getAsJsonObject()
-        if( !nextflow.has('debug') || !nextflow.get('debug').isJsonPrimitive() )
-            return
-        final debug = nextflow.get('debug').getAsJsonPrimitive()
-        if( !debug.isBoolean() )
-            return
-        Logger.setDebugEnabled(debug.getAsBoolean())
+        final debug = getJsonBoolean(params.getSettings(), 'nextflow.debug')
+        if( debug != null )
+            Logger.setDebugEnabled(debug)
+
+        final harshilAlignment = getJsonBoolean(params.getSettings(), 'nextflow.harshilAlignment')
+        if( harshilAlignment != null )
+            this.harshilAlignment = harshilAlignment
+    }
+
+    private Boolean getJsonBoolean(Object json, String path) {
+        if( json !instanceof JsonObject )
+            return null
+
+        JsonObject object = (JsonObject) json
+        final names = path.tokenize('.')
+        final scopes = names[0..<-1]
+        for( final scope : scopes ) {
+            if( !object.has(scope) || !object.get(scope).isJsonObject() )
+                return null
+            object = object.get(scope).getAsJsonObject()
+        }
+
+        final property = names.last()
+        if( !object.has(property) || !object.get(property).isJsonPrimitive() )
+            return null
+
+        final result = object.get(property).getAsJsonPrimitive()
+        if( !result.isBoolean() )
+            return null
+        return result.getAsBoolean()
     }
 
     @Override

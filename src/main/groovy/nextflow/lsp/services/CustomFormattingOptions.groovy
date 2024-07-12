@@ -15,10 +15,18 @@
  */
 package nextflow.lsp.services
 
-import org.eclipse.lsp4j.TextEdit
+import groovy.transform.CompileStatic
+import groovy.transform.Immutable
+import org.eclipse.lsp4j.FormattingOptions
 
-interface FormattingProvider {
+@CompileStatic
+@Immutable
+class CustomFormattingOptions {
 
-    List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options)
+    int tabSize
+
+    boolean insertSpaces
+
+    boolean harshilAlignment
 
 }

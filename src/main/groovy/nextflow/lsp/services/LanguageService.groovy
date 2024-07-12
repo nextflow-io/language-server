@@ -163,12 +163,12 @@ abstract class LanguageService {
         return provider.documentSymbol(params.getTextDocument())
     }
 
-    List<? extends TextEdit> formatting(DocumentFormattingParams params) {
+    List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options) {
         final provider = getFormattingProvider()
         if( !provider )
             return Collections.emptyList()
 
-        return provider.formatting(params.getTextDocument(), params.getOptions())
+        return provider.formatting(uri, options)
     }
 
     Hover hover(HoverParams params) {
