@@ -25,6 +25,10 @@ dependencies {
   testImplementation 'org.junit.jupiter:junit-jupiter:5.8.2'
 }
 
+generateGrammarSource {
+  arguments += ['-no-listener', '-no-visitor']
+}
+
 application {
   mainClass = 'nextflow.lsp.NextflowLanguageServer'
 }
