@@ -16,27 +16,36 @@
 package nextflow.config.scopes
 
 import groovy.transform.CompileStatic
+import nextflow.config.dsl.ConfigOption
 import nextflow.config.dsl.ConfigScope
 
 @CompileStatic
-class ProcessConfig implements ConfigScope {
+class WaveBuildConfig implements ConfigScope {
 
-    ProcessConfig() {}
+    WaveBuildConfig() {}
 
     @Override
     String name() {
-        'process'
+        'wave.build'
     }
 
     @Override
     String description() {
         '''
-        The `process` scope allows you to specify default directives for processes in your pipeline.
+        The `wave` scope provides advanced configuration for the use of [Wave containers](https://docs.seqera.io/wave).
 
-        [Read more](https://nextflow.io/docs/latest/config.html#scope-process)
+        [Read more](https://nextflow.io/docs/latest/config.html#scope-wave)
         '''
     }
 
-    // NOTE: process config options are inferred from ProcessDsl
+    @ConfigOption('''
+        The container repository where images built by Wave are uploaded.
+    ''')
+    String repository
+
+    @ConfigOption('''
+        The container repository used to cache image layers built by the Wave service.
+    ''')
+    String cacheRepository
 
 }

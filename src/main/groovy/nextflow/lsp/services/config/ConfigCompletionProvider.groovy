@@ -54,7 +54,8 @@ class ConfigCompletionProvider implements CompletionProvider {
             if( !name )
                 return
             TOPLEVEL_ITEMS.add(getConfigScopeDot(name, scope))
-            TOPLEVEL_ITEMS.add(getConfigScopeBlock(name, scope))
+            if( !name.contains('.') )
+                TOPLEVEL_ITEMS.add(getConfigScopeBlock(name, scope))
         }
 
         ConfigSchema.OPTIONS.each { name, documentation ->

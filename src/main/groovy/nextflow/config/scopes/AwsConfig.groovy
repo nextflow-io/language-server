@@ -16,27 +16,46 @@
 package nextflow.config.scopes
 
 import groovy.transform.CompileStatic
+import nextflow.config.dsl.ConfigOption
 import nextflow.config.dsl.ConfigScope
 
 @CompileStatic
-class ProcessConfig implements ConfigScope {
+class AwsConfig implements ConfigScope {
 
-    ProcessConfig() {}
+    AwsConfig() {}
 
     @Override
     String name() {
-        'process'
+        'aws'
     }
 
     @Override
     String description() {
         '''
-        The `process` scope allows you to specify default directives for processes in your pipeline.
+        The `aws` scope controls the interactions with AWS, including AWS Batch and S3.
 
-        [Read more](https://nextflow.io/docs/latest/config.html#scope-process)
+        [Read more](https://nextflow.io/docs/latest/config.html#scope-aws)
         '''
     }
 
-    // NOTE: process config options are inferred from ProcessDsl
+    @ConfigOption('''
+        AWS account access key.
+    ''')
+    String accessKey
+
+    @ConfigOption('''
+        AWS profile from `~/.aws/credentials`.
+    ''')
+    String profile
+
+    @ConfigOption('''
+        AWS region (e.g. `us-east-1`).
+    ''')
+    String region
+
+    @ConfigOption('''
+        AWS account secret key.
+    ''')
+    String secretKey
 
 }

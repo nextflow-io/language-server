@@ -21,56 +21,42 @@ import nextflow.config.dsl.ConfigScope
 import nextflow.util.Duration
 
 @CompileStatic
-class CondaConfig implements ConfigScope {
+class SpackConfig implements ConfigScope {
 
-    CondaConfig() {}
+    SpackConfig() {}
 
     @Override
     String name() {
-        'conda'
+        'spack'
     }
 
     @Override
     String description() {
         '''
-        The `conda` scope controls the creation of Conda environments by the Conda package manager.
+        The `spack` scope controls the creation of a Spack environment by the Spack package manager.
 
-        [Read more](https://nextflow.io/docs/latest/config.html#scope-conda)
+        [Read more](https://nextflow.io/docs/latest/config.html#scope-spack)
         '''
     }
 
     @ConfigOption('''
-        Enable Conda execution (default: `false`).
-    ''')
-    boolean enabled
-
-    @ConfigOption('''
-        The path where Conda environments are stored.
+        The path where Spack environments are stored.
     ''')
     String cacheDir
 
     @ConfigOption('''
-        Extra command line options to append to the `conda create` command.
+        Enables checksum verification for source tarballs (default: `true`).
     ''')
-    String createOptions
+    boolean checksum
 
     @ConfigOption('''
-        The amount of time to wait for the Conda environment to be created before failing (default: `20 min`).
+        The amount of time to wait for the Spack environment to be created before failing (default: `60 min`).
     ''')
     Duration createTimeout
 
     @ConfigOption('''
-        When `true`, use `mamba` instead of `conda` to create the Conda environments.
-
-        [Read more](https://github.com/mamba-org/mamba)
+        The maximum number of parallel package builds (default: the number of available CPUs).
     ''')
-    boolean useMamba
-
-    @ConfigOption('''
-        When `true`, use `micromamba` instead of `conda` to create the Conda environments.
-
-        [Read more](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html)
-    ''')
-    boolean useMicromamba
+    int parallelBuilds
 
 }

@@ -19,24 +19,22 @@ import groovy.transform.CompileStatic
 import nextflow.config.dsl.ConfigScope
 
 @CompileStatic
-class ProcessConfig implements ConfigScope {
+class AzureConfig implements ConfigScope {
 
-    ProcessConfig() {}
+    AzureConfig() {}
 
     @Override
     String name() {
-        'process'
+        'azure'
     }
 
     @Override
     String description() {
         '''
-        The `process` scope allows you to specify default directives for processes in your pipeline.
+        The `azure` scope allows you to configure the interactions with Azure, including Azure Batch and Azure Blob Storage.
 
-        [Read more](https://nextflow.io/docs/latest/config.html#scope-process)
+        [Read more](https://nextflow.io/docs/latest/config.html#scope-azure)
         '''
     }
-
-    // NOTE: process config options are inferred from ProcessDsl
 
 }

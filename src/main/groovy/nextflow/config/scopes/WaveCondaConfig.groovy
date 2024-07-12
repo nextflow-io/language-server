@@ -16,27 +16,41 @@
 package nextflow.config.scopes
 
 import groovy.transform.CompileStatic
+import nextflow.config.dsl.ConfigOption
 import nextflow.config.dsl.ConfigScope
 
 @CompileStatic
-class ProcessConfig implements ConfigScope {
+class WaveCondaConfig implements ConfigScope {
 
-    ProcessConfig() {}
+    WaveCondaConfig() {}
 
     @Override
     String name() {
-        'process'
+        'wave.build.conda'
     }
 
     @Override
     String description() {
         '''
-        The `process` scope allows you to specify default directives for processes in your pipeline.
+        The `wave` scope provides advanced configuration for the use of [Wave containers](https://docs.seqera.io/wave).
 
-        [Read more](https://nextflow.io/docs/latest/config.html#scope-process)
+        [Read more](https://nextflow.io/docs/latest/config.html#scope-wave)
         '''
     }
 
-    // NOTE: process config options are inferred from ProcessDsl
+    @ConfigOption('''
+        One or more Conda packages to be always added in the resulting container (default: `conda-forge::procps-ng`).
+    ''')
+    String basePackages
+
+    @ConfigOption('''
+        One or more commands to be added to the Dockerfile used to build a Conda based image.
+    ''')
+    String commands
+
+    @ConfigOption('''
+        The Mamba container image that is used to build Conda based container.
+    ''')
+    String mambaImage
 
 }

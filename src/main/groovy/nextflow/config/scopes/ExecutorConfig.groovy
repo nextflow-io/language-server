@@ -60,12 +60,19 @@ class ExecutorConfig implements ConfigScope {
     Duration dumpInterval = Duration.of('5 min')
 
     @ConfigOption('''
-        Determines how long to wait before returning an error status when a process is terminated but the `.exitcode` file does not exist or is empty (default: `270 sec`). Used only by grid executors.
+        *Used only by grid executors.*
+
+        Determines how long to wait for the `.exitcode` file to be created after the task has completed, before returning an error status (default: `270 sec`).
     ''')
     Duration exitReadTimeout = Duration.of('270 sec')
 
     @ConfigOption('''
-        Determines the name of jobs submitted to the underlying cluster executor e.g. `executor.jobName = { "$task.name - $task.hash" }`. Make sure the resulting job name matches the validation constraints of the underlying batch scheduler. This setting is only support by the following executors: Bridge, Condor, Flux, HyperQueue, Lsf, Moab, Nqsii, Oar, Pbs, PbsPro, Sge, Slurm and Google Batch.
+        *Used only by grid executors and Google Batch.*
+
+        Determines the name of jobs submitted to the underlying cluster executor:
+        ```groovy
+        executor.jobName = { "$task.name - $task.hash" }
+        ```
     ''')
     String jobName
 
@@ -87,19 +94,23 @@ class ExecutorConfig implements ConfigScope {
     String name
 
     @ConfigOption('''
-        *Used only by the {ref}`slurm-executor` executor.*
+        *Used only by the [SLURM](https://nextflow.io/docs/latest/executor.html#slurm) executor.*
 
-        When `true`, specifies memory allocations for SLURM jobs as `--mem-per-cpu <task.memory / task.cpus>` instead of `--mem <task.memory>`.
+        When `true`, memory allocations for SLURM jobs are specified as `--mem-per-cpu <task.memory / task.cpus>` instead of `--mem <task.memory>`.
     ''')
     boolean perCpuMemAllocation
 
     @ConfigOption('''
-        Specifies Platform LSF *per-job* memory limit mode.
+        *Used only by the [LSF](https://nextflow.io/docs/latest/executor.html#lsf) executor.*
+
+        Enables the *per-job* memory limit mode for LSF jobs.
     ''')
     boolean perJobMemLimit
 
     @ConfigOption('''
-        Specifies Platform LSF *per-task* memory reserve mode.
+        *Used only by the [LSF](https://nextflow.io/docs/latest/executor.html#lsf) executor.*
+
+        Enables the *per-task* memory reserve mode for LSF jobs.
     ''')
     boolean perTaskReserve
 
@@ -119,7 +130,9 @@ class ExecutorConfig implements ConfigScope {
     Integer queueSize
 
     @ConfigOption('''
-        Determines how often to fetch the queue status from the scheduler (default: `1 min`). Used only by grid executors.
+        *Used only by grid executors.*
+
+        Determines how often to fetch the queue status from the scheduler (default: `1 min`).
     ''')
     Duration queueStatInterval = Duration.of('1 min')
 

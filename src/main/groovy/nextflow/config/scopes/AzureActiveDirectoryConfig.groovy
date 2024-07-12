@@ -16,27 +16,41 @@
 package nextflow.config.scopes
 
 import groovy.transform.CompileStatic
+import nextflow.config.dsl.ConfigOption
 import nextflow.config.dsl.ConfigScope
 
 @CompileStatic
-class ProcessConfig implements ConfigScope {
+class AzureActiveDirectoryConfig implements ConfigScope {
 
-    ProcessConfig() {}
+    AzureActiveDirectoryConfig() {}
 
     @Override
     String name() {
-        'process'
+        'azure.activeDirectory'
     }
 
     @Override
     String description() {
         '''
-        The `process` scope allows you to specify default directives for processes in your pipeline.
+        The `azure` scope allows you to configure the interactions with Azure, including Azure Batch and Azure Blob Storage.
 
-        [Read more](https://nextflow.io/docs/latest/config.html#scope-process)
+        [Read more](https://nextflow.io/docs/latest/config.html#scope-azure)
         '''
     }
 
-    // NOTE: process config options are inferred from ProcessDsl
+    @ConfigOption('''
+        The service principal client ID.
+    ''')
+    String servicePrincipalId
+
+    @ConfigOption('''
+        The service principal client secret.
+    ''')
+    String servicePrincipalSecret
+
+    @ConfigOption('''
+        The Azure tenant ID.
+    ''')
+    String tenantId
 
 }

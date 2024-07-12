@@ -82,7 +82,7 @@ class ProcessDirectiveDsl implements DslScope {
     }
 
     @Function('''
-        The `cache` directive allows you to store the process results to a local cache. When the cache is enabled *and* the pipeline is launched with the {ref}`resume <getstarted-resume>` option, any task executions that are already cached will be re-used.
+        The `cache` directive allows you to store the process results to a local cache. When the cache is enabled *and* the pipeline is launched with the `-resume` option, any task executions that are already cached will be re-used.
 
         [Read more](https://nextflow.io/docs/latest/process.html#cache)
     ''')

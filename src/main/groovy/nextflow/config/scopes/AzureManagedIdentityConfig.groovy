@@ -20,42 +20,41 @@ import nextflow.config.dsl.ConfigOption
 import nextflow.config.dsl.ConfigScope
 
 @CompileStatic
-class UnscopedConfig implements ConfigScope {
+class AzureManagedIdentityConfig implements ConfigScope {
 
-    UnscopedConfig() {}
+    AzureManagedIdentityConfig() {}
 
     @Override
     String name() {
-        ''
+        'azure.managedIdentity'
     }
 
     @Override
     String description() {
         '''
-        Miscellaneous settings that do not have a dedicated scope.
+        The `azure` scope allows you to configure the interactions with Azure, including Azure Batch and Azure Blob Storage.
 
-        [Read more](https://nextflow.io/docs/latest/config.html#miscellaneous)
+        [Read more](https://nextflow.io/docs/latest/config.html#scope-azure)
         '''
     }
 
     @ConfigOption('''
-        If `true`, on a successful completion of a run all files in *work* directory are automatically deleted.
+        The client ID for an Azure managed identity.
+
+        [Read more](https://nextflow.io/docs/latest/azure.html#managed-identities)
     ''')
-    boolean cleanup
+    String clientId
 
     @ConfigOption('''
-        If `true`, dump task hash keys in the log file, for debugging purposes. Equivalent to the `-dump-hashes` option of the `run` command.
+        When `true`, use the system-assigned managed identity to authenticate Azure resources.
+
+        [Read more](https://nextflow.io/docs/latest/azure.html#managed-identities)
     ''')
-    boolean dumpHashes
+    boolean system
 
     @ConfigOption('''
-        If `true`, enable the use of previously cached task executions. Equivalent to the `-resume` option of the `run` command.
+        The Azure tenant ID.
     ''')
-    boolean resume
-
-    @ConfigOption('''
-        The pipeline work directory. Equivalent to the `-work-dir` option of the `run` command.
-    ''')
-    String workDir
+    String tenantId
 
 }

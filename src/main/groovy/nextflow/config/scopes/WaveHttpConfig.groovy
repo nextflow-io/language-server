@@ -16,27 +16,32 @@
 package nextflow.config.scopes
 
 import groovy.transform.CompileStatic
+import nextflow.config.dsl.ConfigOption
 import nextflow.config.dsl.ConfigScope
+import nextflow.util.Duration
 
 @CompileStatic
-class ProcessConfig implements ConfigScope {
+class WaveHttpConfig implements ConfigScope {
 
-    ProcessConfig() {}
+    WaveHttpConfig() {}
 
     @Override
     String name() {
-        'process'
+        'wave.httpClient'
     }
 
     @Override
     String description() {
         '''
-        The `process` scope allows you to specify default directives for processes in your pipeline.
+        The `wave` scope provides advanced configuration for the use of [Wave containers](https://docs.seqera.io/wave).
 
-        [Read more](https://nextflow.io/docs/latest/config.html#scope-process)
+        [Read more](https://nextflow.io/docs/latest/config.html#scope-wave)
         '''
     }
 
-    // NOTE: process config options are inferred from ProcessDsl
+    @ConfigOption('''
+        The connection timeout for the Wave HTTP client (default: `30s`).
+    ''')
+    Duration connectTime
 
 }

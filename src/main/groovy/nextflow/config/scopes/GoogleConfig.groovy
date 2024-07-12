@@ -21,56 +21,49 @@ import nextflow.config.dsl.ConfigScope
 import nextflow.util.Duration
 
 @CompileStatic
-class CondaConfig implements ConfigScope {
+class GoogleConfig implements ConfigScope {
 
-    CondaConfig() {}
+    GoogleConfig() {}
 
     @Override
     String name() {
-        'conda'
+        'google'
     }
 
     @Override
     String description() {
         '''
-        The `conda` scope controls the creation of Conda environments by the Conda package manager.
+        The `google` scope allows you to configure the interactions with Google Cloud, including Google Cloud Batch and Google Cloud Storage.
 
-        [Read more](https://nextflow.io/docs/latest/config.html#scope-conda)
+        [Read more](https://nextflow.io/docs/latest/config.html#scope-google)
         '''
     }
 
     @ConfigOption('''
-        Enable Conda execution (default: `false`).
+        When `true`, the given Google Cloud project ID is used as the billing project for storage access (default: `false`). Required when accessing data from *requester pays enabled* buckets.
+
+        [Read more](https://cloud.google.com/storage/docs/requester-pays)
     ''')
-    boolean enabled
+    boolean enableRequesterPaysBuckets
 
     @ConfigOption('''
-        The path where Conda environments are stored.
+        The HTTP connection timeout for Cloud Storage API requests (default: `'60s'`).
     ''')
-    String cacheDir
+    Duration httpConnectTimeout
 
     @ConfigOption('''
-        Extra command line options to append to the `conda create` command.
+        The HTTP read timeout for Cloud Storage API requests (default: `'60s'`).
     ''')
-    String createOptions
+    Duration httpReadTimeout
 
     @ConfigOption('''
-        The amount of time to wait for the Conda environment to be created before failing (default: `20 min`).
+        The Google Cloud location where jobs are executed (default: `us-central1`).
     ''')
-    Duration createTimeout
+    String location
 
     @ConfigOption('''
-        When `true`, use `mamba` instead of `conda` to create the Conda environments.
-
-        [Read more](https://github.com/mamba-org/mamba)
+        The Google Cloud project ID to use for pipeline execution.
     ''')
-    boolean useMamba
-
-    @ConfigOption('''
-        When `true`, use `micromamba` instead of `conda` to create the Conda environments.
-
-        [Read more](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html)
-    ''')
-    boolean useMicromamba
+    String project
 
 }
