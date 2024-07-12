@@ -1073,7 +1073,7 @@ class ScriptAstBuilder {
                 strings << ast( constX(part.text), part )
 
             if( part instanceof GstringDqPathAltContext )
-                values << ast( gstringPath(part.text), part )
+                values << ast( gstringPath(part), part )
 
             if( part instanceof GstringDqExprAltContext )
                 values << expression(part.expression())
@@ -1084,7 +1084,7 @@ class ScriptAstBuilder {
                 strings << ast( constX(part.text), part )
 
             if( part instanceof GstringTdqPathAltContext )
-                values << ast( gstringPath(part.text), part )
+                values << ast( gstringPath(part), part )
 
             if( part instanceof GstringTdqExprAltContext )
                 values << expression(part.expression())
@@ -1093,10 +1093,31 @@ class ScriptAstBuilder {
         new GStringExpression(verbatimText, strings, values)
     }
 
-    private Expression gstringPath(String text) {
-        final names = text.tokenize('.')
-        final primary = varX(names.head().substring(1))
-        return names.tail().inject(primary, (acc, name) -> propX(acc, constX(name)) )
+    private Expression gstringPath(ParserRuleContext ctx) {
+        final names = ctx.text.tokenize('.')
+        int currentLine = ctx.getStart().getLine()
+        int currentChar = ctx.getStart().getCharPositionInLine() + 1
+        final varName = names.head().substring(1)
+        Expression result = varX(varName)
+        currentChar += 1
+        result.setLineNumber(currentLine)
+        result.setColumnNumber(currentChar)
+        currentChar += varName.size()
+        result.setLastLineNumber(currentLine)
+        result.setLastColumnNumber(currentChar)
+
+        for( final propName : names.tail() ) {
+            final property = constX(propName)
+            currentChar += 1
+            property.setLineNumber(currentLine)
+            property.setColumnNumber(currentChar)
+            currentChar += propName.size()
+            property.setLastLineNumber(currentLine)
+            property.setLastColumnNumber(currentChar)
+            result = ast( propX(result, property), result, property )
+        }
+
+        return result
     }
 
     private Expression creator(CreatorContext ctx) {
