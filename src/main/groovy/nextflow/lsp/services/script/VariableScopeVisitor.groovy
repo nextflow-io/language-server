@@ -319,7 +319,9 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         pushState(ProcessDsl)
         currentTopLevelNode = node
         node.variableScope = currentScope
-        new DeclareInputsVisitor().visit(node.inputs)
+
+        if( node.inputs instanceof BlockStatement )
+            declareProcessInputs((BlockStatement) node.inputs)
 
         pushState(ProcessDirectiveDsl)
         checkDirectives(node.directives, 'process directive')
@@ -349,19 +351,36 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         popState()
     }
 
-    private class DeclareInputsVisitor extends ClassCodeVisitorSupport {
-
-        @Override
-        protected SourceUnit getSourceUnit() {
-            return sourceUnit
+    private void declareProcessInputs(BlockStatement inputs) {
+        for( final input : inputs.statements ) {
+            if( input !instanceof ExpressionStatement )
+                continue
+            final stmt = (ExpressionStatement) input
+            if( stmt.expression !instanceof MethodCallExpression )
+                continue
+            final call = (MethodCallExpression) stmt.expression
+            if( call.getMethodAsString() == 'tuple' ) {
+                final args = (ArgumentListExpression) call.arguments
+                for( final arg : args ) {
+                    if( arg !instanceof MethodCallExpression )
+                        continue
+                    declareProcessInput((MethodCallExpression) arg)
+                }
+            }
+            else {
+                declareProcessInput(call)
+            }
         }
+    }
 
-        @Override
-        void visitVariableExpression(VariableExpression node) {
-            if( node.name == 'this' )
-                return
-            declare(node)
-        }
+    private void declareProcessInput(MethodCallExpression call) {
+        if( call.getMethodAsString() !in ['val', 'path'] )
+            return
+        final args = (ArgumentListExpression) call.arguments
+        if( args.size() < 1 || args.first() !instanceof VariableExpression )
+            return
+        final var = (VariableExpression) args.first()
+        declare(var)
     }
 
     private void checkDirectives(Statement node, String typeLabel) {
@@ -399,7 +418,9 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         pushState(node.name ? WorkflowDsl : EntryWorkflowDsl)
         currentTopLevelNode = node
         node.variableScope = currentScope
-        new DeclareInputsVisitor().visit(node.takes)
+
+        if( node.takes instanceof BlockStatement )
+            declareWorkflowInputs((BlockStatement) node.takes)
 
         visit(node.main)
         if( node.main instanceof BlockStatement )
@@ -410,6 +431,20 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
         currentTopLevelNode = null
         popState()
+    }
+
+    private void declareWorkflowInputs(BlockStatement takes) {
+        for( final take : takes.statements ) {
+            if( take !instanceof ExpressionStatement )
+                continue
+            final stmt = (ExpressionStatement) take
+            if( stmt.expression !instanceof VariableExpression )
+                continue
+            final var = (VariableExpression) stmt.expression
+            if( var.name == 'this' )
+                continue
+            declare(var)
+        }
     }
 
     @Override
