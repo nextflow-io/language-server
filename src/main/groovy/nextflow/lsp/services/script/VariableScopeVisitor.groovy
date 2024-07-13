@@ -351,14 +351,12 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         popState()
     }
 
-    private void declareProcessInputs(BlockStatement inputs) {
-        for( final input : inputs.statements ) {
-            if( input !instanceof ExpressionStatement )
+    private void declareProcessInputs(BlockStatement block) {
+        for( final stmt : block.statements ) {
+            if( stmt !instanceof ExpressionStatement )
                 continue
-            final stmt = (ExpressionStatement) input
-            if( stmt.expression !instanceof MethodCallExpression )
-                continue
-            final call = (MethodCallExpression) stmt.expression
+            final stmtX = (ExpressionStatement) stmt
+            final call = (MethodCallExpression) stmtX.expression
             if( call.getMethodAsString() == 'tuple' ) {
                 final args = (ArgumentListExpression) call.arguments
                 for( final arg : args ) {
@@ -383,14 +381,22 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         declare(var)
     }
 
-    private void checkDirectives(Statement node, String typeLabel) {
+    private void checkDirectives(Statement node, String typeLabel, boolean checkSyntaxErrors=false) {
         if( node !instanceof BlockStatement )
             return
         final block = (BlockStatement) node
         for( final stmt : block.statements ) {
-            if( stmt instanceof EmptyStatement )
+            if( stmt !instanceof ExpressionStatement ) {
+                if( checkSyntaxErrors )
+                    addError("Invalid ${typeLabel}", stmt)
                 continue
+            }
             final stmtX = (ExpressionStatement) stmt
+            if( stmtX.expression !instanceof MethodCallExpression ) {
+                if( checkSyntaxErrors )
+                    addError("Invalid ${typeLabel}", stmt)
+                continue
+            }
             final call = (MethodCallExpression) stmtX.expression
             final name = call.getMethodAsString()
             if( !findClassMember(currentScope.getClassScope(), name) )
@@ -433,14 +439,14 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         popState()
     }
 
-    private void declareWorkflowInputs(BlockStatement takes) {
-        for( final take : takes.statements ) {
-            if( take !instanceof ExpressionStatement )
+    private void declareWorkflowInputs(BlockStatement block) {
+        for( final stmt : block.statements ) {
+            if( stmt !instanceof ExpressionStatement )
                 continue
-            final stmt = (ExpressionStatement) take
-            if( stmt.expression !instanceof VariableExpression )
+            final stmtX = (ExpressionStatement) stmt
+            if( stmtX.expression !instanceof VariableExpression )
                 continue
-            final var = (VariableExpression) stmt.expression
+            final var = (VariableExpression) stmtX.expression
             if( var.name == 'this' )
                 continue
             declare(var)
@@ -452,10 +458,73 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         pushState(OutputDsl)
         currentTopLevelNode = node
 
-        visit(node.body)
+        if( node.body instanceof BlockStatement )
+            visitOutputBody((BlockStatement) node.body)
 
         currentTopLevelNode = null
         popState()
+    }
+
+    private void visitOutputBody(BlockStatement block) {
+        block.variableScope = currentScope
+
+        for( final stmt : block.statements ) {
+            if( stmt !instanceof ExpressionStatement )
+                continue
+            final stmtX = (ExpressionStatement) stmt
+            final call = (MethodCallExpression) stmtX.expression
+
+            // treat as regular directive
+            final name = call.getMethodAsString()
+            if( findClassMember(currentScope.getClassScope(), name) ) {
+                visit(call)
+                continue
+            }
+
+            // treat as target definition
+            final args = (ArgumentListExpression) call.arguments
+            if( args.size() == 1 && args.first() instanceof ClosureExpression ) {
+                final closure = (ClosureExpression) args.first()
+                final target = (BlockStatement) closure.code
+                pushState(OutputDsl.TargetDsl)
+                checkDirectives(target, 'output target directive', true)
+                visitTargetBody(target)
+                popState()
+                continue
+            }
+
+            addError('Invalid output directive', stmt)
+        }
+    }
+
+    private void visitTargetBody(BlockStatement block) {
+        block.variableScope = currentScope
+
+        for( final stmt : block.statements ) {
+            if( stmt !instanceof ExpressionStatement )
+                continue
+            final stmtX = (ExpressionStatement) stmt
+            if( stmtX.expression !instanceof MethodCallExpression )
+                continue
+            final call = (MethodCallExpression) stmtX.expression
+
+            // treat as index definition
+            final name = call.getMethodAsString()
+            final args = (ArgumentListExpression) call.arguments
+            if( name == 'index' && args.size() == 1 && args.first() instanceof ClosureExpression ) {
+                final closure = (ClosureExpression) args.first()
+                final index = (BlockStatement) closure.code
+                pushState(OutputDsl.IndexDsl)
+                index.variableScope = null
+                checkDirectives(index, 'output index directive', true)
+                visit(index)
+                popState()
+                continue
+            }
+
+            // treat as regular directive
+            visit(call)
+        }
     }
 
     @Override
