@@ -29,6 +29,7 @@ import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
 import nextflow.script.v2.WorkflowNode
+import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
@@ -820,7 +821,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         while( i < strings.size() || j < values.size() ) {
             final string = i < strings.size() ? strings[i] : null
             final value = j < values.size() ? values[j] : null
-            if( !value || (string.getLineNumber() < value.getLineNumber()) || (string.getLineNumber() == value.getLineNumber() && string.getColumnNumber() < value.getColumnNumber()) ) {
+            if( isNodeBefore(string, value) ) {
                 append(replaceEscapes(string.text, quoteChar))
                 i++
             }
@@ -832,6 +833,16 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             }
         }
         append(quoteChar)
+    }
+
+    protected boolean isNodeBefore(ASTNode a, ASTNode b) {
+        if( !a )
+            return false
+        if( !b )
+            return true
+        if( a.getLineNumber() < b.getLineNumber() )
+            return true
+        return a.getLineNumber() == b.getLineNumber() && a.getColumnNumber() < b.getColumnNumber()
     }
 
     @Override
