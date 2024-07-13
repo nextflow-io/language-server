@@ -31,7 +31,9 @@ import nextflow.script.v2.ScriptNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassHelper
+import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.Parameter
+import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.BitwiseNegationExpression
 import org.codehaus.groovy.ast.expr.CastExpression
@@ -150,11 +152,14 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         for( final includeNode : scriptNode.getIncludes() )
             visitInclude(includeNode)
         for( final workflowNode : scriptNode.getWorkflows() )
-            visitWorkflow(workflowNode)
+            if( workflowNode.name )
+                visitWorkflow(workflowNode)
         for( final functionNode : scriptNode.getFunctions() )
             visitFunction(functionNode)
         for( final processNode : scriptNode.getProcesses() )
             visitProcess(processNode)
+        if( scriptNode.getEntry() )
+            visitWorkflow(scriptNode.getEntry())
         if( scriptNode.getOutput() )
             visitOutput(scriptNode.getOutput())
     }
@@ -295,10 +300,14 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         for( final statement : code.statements ) {
             final stmtX = (ExpressionStatement)statement
             final methodCall = (MethodCallExpression)stmtX.expression
-            appendIndent()
-            visitMethodCallExpression(methodCall, true)
-            append('\n')
+            visitDirective(methodCall)
         }
+    }
+
+    protected void visitDirective(MethodCallExpression methodCall) {
+        appendIndent()
+        visitMethodCallExpression(methodCall, true)
+        append('\n')
     }
 
     @Override
@@ -345,11 +354,71 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         append('\n')
         append('output {\n')
         incIndent()
-        if( node.body instanceof BlockStatement ) {
-            visit(node.body)
-        }
+        if( node.body instanceof BlockStatement )
+            visitOutputBody((BlockStatement) node.body)
         decIndent()
         append('}\n')
+    }
+
+    protected void visitOutputBody(BlockStatement block) {
+        for( final stmt : block.statements ) {
+            if( stmt !instanceof ExpressionStatement )
+                continue
+            final stmtX = (ExpressionStatement) stmt
+            final call = (MethodCallExpression) stmtX.expression
+
+            // treat as target definition
+            final args = (ArgumentListExpression) call.arguments
+            if( args.size() == 1 && args.first() instanceof ClosureExpression ) {
+                final closure = (ClosureExpression) args.first()
+                final target = (BlockStatement) closure.code
+                append('\n')
+                appendIndent()
+                visit(call.getMethod())
+                append(' {\n')
+                incIndent()
+                visitTargetBody(target)
+                decIndent()
+                appendIndent()
+                append('}\n')
+                continue
+            }
+
+            // treat as regular directive
+            visitDirective(call)
+        }
+    }
+
+    protected void visitTargetBody(BlockStatement block) {
+        for( final stmt : block.statements ) {
+            if( stmt !instanceof ExpressionStatement )
+                continue
+            final stmtX = (ExpressionStatement) stmt
+            if( stmtX.expression !instanceof MethodCallExpression )
+                continue
+            final call = (MethodCallExpression) stmtX.expression
+
+            // treat as index definition
+            final name = call.getMethodAsString()
+            final args = (ArgumentListExpression) call.arguments
+            if( name == 'index' && args.size() == 1 && args.first() instanceof ClosureExpression ) {
+                final closure = (ClosureExpression) args.first()
+                final index = (BlockStatement) closure.code
+                append('\n')
+                appendIndent()
+                append(name)
+                append(' {\n')
+                incIndent()
+                visitDirectives(index)
+                decIndent()
+                appendIndent()
+                append('}\n')
+                continue
+            }
+
+            // treat as regular directive
+            visitDirective(call)
+        }
     }
 
     // statements
@@ -469,7 +538,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             visit(parenArgs)
             append(')')
         }
-        else {
+        else if( parenArgs.size() > 0 ) {
             append(' ')
             visit(parenArgs)
         }
@@ -482,7 +551,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     @Override
     void visitConstructorCallExpression(ConstructorCallExpression node) {
         append('new ')
-        append(node.type.name)
+        visitTypeName(node.type)
         append('(')
         visit(node.arguments)
         append(')')
@@ -577,7 +646,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     protected void visitParameter(Parameter parameter) {
         final type = parameter.type
         if( type != ClassHelper.OBJECT_TYPE ) {
-            append(type.getNameWithoutPackage())
+            visitTypeName(type)
             append(' ')
         }
         append(parameter.name)
@@ -685,7 +754,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     void visitCastExpression(CastExpression node) {
         visit(node.expression)
         append(' as ')
-        append(node.type.name)
+        visitTypeName(node.type)
     }
 
     @Override
@@ -696,9 +765,15 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     protected void visitConstantExpression(ConstantExpression node, boolean quote) {
         if( node.value instanceof String ) {
             final value = (String) node.value
-            if( quote ) append('\'')
-            append(replaceEscapes(value, '\''))
-            if( quote ) append('\'')
+            if( quote ) {
+                final quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> SQ_STR)
+                append(quoteChar)
+                append(replaceEscapes(value, quoteChar))
+                append(quoteChar)
+            }
+            else {
+                append(value)
+            }
         }
         else {
             append(node.text)
@@ -706,15 +781,20 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     }
 
     private String replaceEscapes(String value, String quoteChar) {
-        value
-            .replace(quoteChar, '\\' + quoteChar)
-            .replace('\n', '\\n')
-            .replace('\t', '\\t')
+        value = value.replace(quoteChar, '\\' + quoteChar)
+        if( quoteChar == SQ_STR || quoteChar == DQ_STR )
+            value = value.replace('\n', '\\n')
+        return value
     }
 
     @Override
     void visitClassExpression(ClassExpression node) {
-        append(node.text)
+        visitTypeName(node.type)
+    }
+
+    protected visitTypeName(ClassNode type) {
+        final isFullyQualified = type.getNodeMetaData(IS_FULLY_QUALIFIED)
+        append(isFullyQualified ? type.getName() : type.getNameWithoutPackage())
     }
 
     @Override
@@ -731,9 +811,27 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitGStringExpression(GStringExpression node) {
-        append('"')
-        append(replaceEscapes(node.text, '\"'))
-        append('"')
+        final quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> DQ_STR)
+        final strings = node.strings
+        final values = node.values
+        append(quoteChar)
+        int i = 0
+        int j = 0
+        while( i < strings.size() || j < values.size() ) {
+            final string = i < strings.size() ? strings[i] : null
+            final value = j < values.size() ? values[j] : null
+            if( !value || (string.getLineNumber() < value.getLineNumber()) || (string.getLineNumber() == value.getLineNumber() && string.getColumnNumber() < value.getColumnNumber()) ) {
+                append(replaceEscapes(string.text, quoteChar))
+                i++
+            }
+            else {
+                append('${')
+                visit(value)
+                append('}')
+                j++
+            }
+        }
+        append(quoteChar)
     }
 
     @Override
@@ -755,7 +853,15 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             append(')')
     }
 
+    private static final String SLASH_STR = '/'
+    private static final String TDQ_STR = '"""'
+    private static final String TSQ_STR = "'''"
+    private static final String SQ_STR = "'"
+    private static final String DQ_STR = '"'
+
     private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
+    private static final String IS_FULLY_QUALIFIED = "_IS_FULLY_QUALIFIED"
+    private static final String QUOTE_CHAR = "_QUOTE_CHAR"
 
 }

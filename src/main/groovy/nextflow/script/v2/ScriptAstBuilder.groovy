@@ -1003,7 +1003,7 @@ class ScriptAstBuilder {
             return ast( floatingPointLiteral(ctx), ctx )
 
         if( ctx instanceof StringLiteralAltContext )
-            return ast( constX(stringLiteral(ctx.stringLiteral())), ctx )
+            return ast( string(ctx.stringLiteral()), ctx )
 
         if( ctx instanceof BooleanLiteralAltContext )
             return ast( constX(ctx.text == 'true'), ctx )
@@ -1038,6 +1038,17 @@ class ScriptAstBuilder {
         constX(num, true)
     }
 
+    private Expression string(StringLiteralContext ctx) {
+        final text = ctx.text
+        final result = constX(stringLiteral(text))
+        if( text.startsWith(SQ_STR)    ) result.putNodeMetaData(QUOTE_CHAR, SQ_STR)
+        if( text.startsWith(DQ_STR)    ) result.putNodeMetaData(QUOTE_CHAR, DQ_STR)
+        if( text.startsWith(TSQ_STR)   ) result.putNodeMetaData(QUOTE_CHAR, TSQ_STR)
+        if( text.startsWith(TDQ_STR)   ) result.putNodeMetaData(QUOTE_CHAR, TDQ_STR)
+        if( text.startsWith(SLASH_STR) ) result.putNodeMetaData(QUOTE_CHAR, SLASH_STR)
+        return result
+    }
+
     private String stringLiteral(StringLiteralContext ctx) {
         stringLiteral(ctx.text)
     }
@@ -1064,7 +1075,8 @@ class ScriptAstBuilder {
     }
 
     private Expression gstring(GstringContext ctx) {
-        final verbatimText = stringLiteral(ctx.text)
+        final text = ctx.text
+        final verbatimText = stringLiteral(text)
         final List<ConstantExpression> strings = []
         final List<Expression> values = []
 
@@ -1090,7 +1102,10 @@ class ScriptAstBuilder {
                 values << expression(part.expression())
         }
 
-        new GStringExpression(verbatimText, strings, values)
+        final result = new GStringExpression(verbatimText, strings, values)
+        if( text.startsWith(DQ_STR)  ) result.putNodeMetaData(QUOTE_CHAR, DQ_STR)
+        if( text.startsWith(TDQ_STR) ) result.putNodeMetaData(QUOTE_CHAR, TDQ_STR)
+        return result
     }
 
     private Expression gstringPath(ParserRuleContext ctx) {
@@ -1395,7 +1410,10 @@ class ScriptAstBuilder {
     }
 
     private ClassNode qualifiedClassName(QualifiedClassNameContext ctx, boolean allowProxy=true) {
-        final classNode = ClassHelper.make(ctx.text)
+        final text = ctx.text
+        final classNode = ClassHelper.make(text)
+        if( text.contains('.') )
+            classNode.putNodeMetaData(IS_FULLY_QUALIFIED, true)
 
         if( classNode.isUsingGenerics() && allowProxy ) {
             final proxy = ClassHelper.makeWithoutCaching(classNode.name)
@@ -1550,5 +1568,7 @@ class ScriptAstBuilder {
 
     private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
+    private static final String IS_FULLY_QUALIFIED = "_IS_FULLY_QUALIFIED"
+    private static final String QUOTE_CHAR = "_QUOTE_CHAR"
 
 }

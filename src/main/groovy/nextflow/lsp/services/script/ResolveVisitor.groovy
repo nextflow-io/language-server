@@ -287,6 +287,7 @@ class ResolveVisitor extends ClassCodeExpressionTransformer implements ScriptVis
         final className = lookupClassName(result)
         if( className != null ) {
             final type = ClassHelper.make(className)
+            type.putNodeMetaData("_IS_FULLY_QUALIFIED", true)
             if( resolve(type) )
                 return new ClassExpression(type)
         }

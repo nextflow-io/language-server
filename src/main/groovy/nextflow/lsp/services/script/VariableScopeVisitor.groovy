@@ -624,7 +624,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
                 if( name in ['for', 'while'] )
                     addError("`${name}` loops are no longer supported", node)
                 else
-                    addError("`${name}` is not defined", node)
+                    addError("`${name}` is not defined", method)
             }
         }
         super.visitMethodCallExpression(node)
