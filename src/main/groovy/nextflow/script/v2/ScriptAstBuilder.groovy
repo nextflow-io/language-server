@@ -1329,10 +1329,11 @@ class ScriptAstBuilder {
     private Expression incompleteExpression(IncompleteExpressionContext ctx) {
         final head = ctx.identifier().head()
         final object = ast( varX(identifier(head)), head )
-        final result = ctx.identifier().tail().inject(object) { acc, ident ->
+        final propX = ctx.identifier().tail().inject(object) { acc, ident ->
             final name = ast( constX(identifier(ident)), ident )
             ast( new PropertyExpression(acc, name), acc, name )
         }
+        final result = ast( new PropertyExpression(propX, ''), ctx )
         collectSyntaxError(new SyntaxException("Incomplete expression", result))
         return result
     }
