@@ -15,14 +15,18 @@
  */
 package nextflow.lsp.services
 
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.compiler.SyntaxWarning
 import nextflow.lsp.file.FileCache
+import nextflow.lsp.file.PathUtils
 import nextflow.lsp.util.DebouncingExecutor
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
@@ -84,34 +88,42 @@ abstract class LanguageService {
     protected ReferenceProvider getReferenceProvider() { null }
     protected SymbolProvider getSymbolProvider() { null }
 
-    void initialize(String root) {
+    void initialize(String rootUri, List<String> excludes) {
         synchronized (this) {
-            final uris = root != null
-                ? getWorkspaceFiles(root)
+            final uris = rootUri != null
+                ? getWorkspaceFiles(rootUri, excludes)
                 : fileCache.getOpenFiles()
 
-            final errors = getAstCache().update(uris, fileCache)
+            final astCache = getAstCache()
+            astCache.clear()
+            final errors = astCache.update(uris, fileCache)
             publishDiagnostics(errors)
         }
     }
 
-    protected Set<URI> getWorkspaceFiles(String root) {
+    protected Set<URI> getWorkspaceFiles(String rootUri, List<String> excludes) {
         try {
-            final workspaceRoot = Path.of(URI.create(root))
+            final root = Path.of(URI.create(rootUri))
             final Set<URI> result = []
-            for( final path : Files.walk(workspaceRoot) ) {
-                if( path.isDirectory() )
-                    continue
-                if( !matchesFile(path.toString()) )
-                    continue
-
-                result << path.toUri()
-            }
+            Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
+                @Override
+                FileVisitResult preVisitDirectory(Path path, BasicFileAttributes attrs) {
+                    return PathUtils.isPathExcluded(path, excludes)
+                        ? FileVisitResult.SKIP_SUBTREE
+                        : FileVisitResult.CONTINUE
+                }
+                @Override
+                FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
+                    if( matchesFile(path.toString()) && !PathUtils.isPathExcluded(path, excludes) )
+                        result << path.toUri()
+                    return FileVisitResult.CONTINUE
+                }
+            })
 
             return result
         }
         catch( IOException e ) {
-            log.error "Failed to query workspace files: ${root} -- cause: ${e}"
+            log.error "Failed to query workspace files: ${rootUri} -- cause: ${e}"
             return Collections.emptySet()
         }
     }

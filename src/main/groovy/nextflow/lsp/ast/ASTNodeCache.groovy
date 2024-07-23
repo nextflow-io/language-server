@@ -97,6 +97,16 @@ class ASTNodeCache {
     }
 
     /**
+     * Clear the cache.
+     */
+    void clear() {
+        sourcesByUri.clear()
+        errorsByUri.clear()
+        nodesByURI.clear()
+        lookup.clear()
+    }
+
+    /**
      * Update the cache for a set of source files.
      *
      * @param uris

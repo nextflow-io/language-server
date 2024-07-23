@@ -15,10 +15,13 @@
  */
 package nextflow.lsp
 
+import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import groovy.transform.CompileStatic
+import nextflow.lsp.file.PathUtils
 import nextflow.lsp.util.Logger
 import nextflow.lsp.services.CustomFormattingOptions
 import nextflow.lsp.services.LanguageService
@@ -90,6 +93,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     private Map<String, LanguageService> configServices = [:]
     private Map<String, LanguageService> scriptServices = [:]
 
+    private List<String> excludePatterns
     private boolean harshilAlignment
 
     // -- LanguageServer
@@ -105,7 +109,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             addWorkspaceFolder(name, uri)
         }
 
-        if( workspaceRoots.isEmpty() )
+        if( params.getWorkspaceFolders().isEmpty() )
             addWorkspaceFolder(DEFAULT_WORKSPACE_FOLDER_NAME, null)
 
         final serverCapabilities = new ServerCapabilities()
@@ -170,13 +174,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         final uri = params.getTextDocument().getUri()
         log.debug "textDocument/didOpen ${relativePath(uri)}"
 
-        final configService = getLanguageService(uri, configServices)
-        if( configService )
-            configService.didOpen(params)
-
-        final scriptService = getLanguageService(uri, scriptServices)
-        if( scriptService )
-            scriptService.didOpen(params)
+        final service = getLanguageService(uri)
+        if( service )
+            service.didOpen(params)
     }
 
     @Override
@@ -184,13 +184,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         final uri = params.getTextDocument().getUri()
         log.debug "textDocument/didChange ${relativePath(uri)}"
 
-        final configService = getLanguageService(uri, configServices)
-        if( configService )
-            configService.didChange(params)
-
-        final scriptService = getLanguageService(uri, scriptServices)
-        if( scriptService )
-            scriptService.didChange(params)
+        final service = getLanguageService(uri)
+        if( service )
+            service.didChange(params)
     }
 
     @Override
@@ -198,13 +194,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         final uri = params.getTextDocument().getUri()
         log.debug "textDocument/didClose ${relativePath(uri)}"
 
-        final configService = getLanguageService(uri, configServices)
-        if( configService )
-            configService.didClose(params)
-
-        final scriptService = getLanguageService(uri, scriptServices)
-        if( scriptService )
-            scriptService.didClose(params)
+        final service = getLanguageService(uri)
+        if( service )
+            service.didClose(params)
     }
 
     @Override
@@ -218,13 +210,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
-            final configService = getLanguageService(uri, configServices)
-            if( configService )
-                return configService.completion(params)
-            final scriptService = getLanguageService(uri, scriptServices)
-            if( scriptService )
-                return scriptService.completion(params)
-            log.debug("File was not matched by any language service: ${uri}")
+            final service = getLanguageService(uri)
+            if( service )
+                return service.completion(params)
         })
     }
 
@@ -235,13 +223,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             final uri = params.getTextDocument().getUri()
             final position = params.getPosition()
             log.debug "textDocument/definition ${uri} [ ${position.getLine()}, ${position.getCharacter()} ]"
-            final configService = getLanguageService(uri, configServices)
-            if( configService )
-                return configService.definition(params)
-            final scriptService = getLanguageService(uri, scriptServices)
-            if( scriptService )
-                return scriptService.definition(params)
-            log.debug("File was not matched by any language service: ${uri}")
+            final service = getLanguageService(uri)
+            if( service )
+                return service.definition(params)
         })
     }
 
@@ -251,13 +235,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
             log.debug "textDocument/symbol ${uri}"
-            final configService = getLanguageService(uri, configServices)
-            if( configService )
-                return configService.documentSymbol(params)
-            final scriptService = getLanguageService(uri, scriptServices)
-            if( scriptService )
-                return scriptService.documentSymbol(params)
-            log.debug("File was not matched by any language service: ${uri}")
+            final service = getLanguageService(uri)
+            if( service )
+                return service.documentSymbol(params)
         })
     }
 
@@ -272,13 +252,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
                 harshilAlignment: harshilAlignment
             )
             log.debug "textDocument/formatting ${uri} ${options.insertSpaces ? 'spaces' : 'tabs'} ${options.tabSize}"
-            final configService = getLanguageService(uri, configServices)
-            if( configService )
-                return configService.formatting(URI.create(uri), options)
-            final scriptService = getLanguageService(uri, scriptServices)
-            if( scriptService )
-                return scriptService.formatting(URI.create(uri), options)
-            log.debug("File was not matched by any language service: ${uri}")
+            final service = getLanguageService(uri)
+            if( service )
+                return service.formatting(URI.create(uri), options)
         })
     }
 
@@ -287,13 +263,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
-            final configService = getLanguageService(uri, configServices)
-            if( configService )
-                return configService.hover(params)
-            final scriptService = getLanguageService(uri, scriptServices)
-            if( scriptService )
-                return scriptService.hover(params)
-            log.debug("File was not matched by any language service: ${uri}")
+            final service = getLanguageService(uri)
+            if( service )
+                return service.hover(params)
         })
     }
 
@@ -304,13 +276,9 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             final uri = params.getTextDocument().getUri()
             final position = params.getPosition()
             log.debug "textDocument/references ${uri} [ ${position.getLine()}, ${position.getCharacter()} ]"
-            final configService = getLanguageService(uri, configServices)
-            if( configService )
-                return configService.references(params)
-            final scriptService = getLanguageService(uri, scriptServices)
-            if( scriptService )
-                return scriptService.references(params)
-            log.debug("File was not matched by any language service: ${uri}")
+            final service = getLanguageService(uri)
+            if( service )
+                return service.references(params)
         })
     }
 
@@ -324,32 +292,20 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         if( debug != null )
             Logger.setDebugEnabled(debug)
 
+        final excludePatterns = getJsonStringArray(params.getSettings(), 'nextflow.files.exclude')
+        if( this.excludePatterns != excludePatterns ) {
+            this.excludePatterns = excludePatterns
+            for( final name : workspaceRoots.keySet() ) {
+                log.debug "workspace/didChangeConfiguration initialize ${name}"
+                final uri = workspaceRoots[name]
+                configServices[name].initialize(uri, excludePatterns)
+                scriptServices[name].initialize(uri, excludePatterns)
+            }
+        }
+
         final harshilAlignment = getJsonBoolean(params.getSettings(), 'nextflow.formatting.harshilAlignment')
         if( harshilAlignment != null )
             this.harshilAlignment = harshilAlignment
-    }
-
-    private Boolean getJsonBoolean(Object json, String path) {
-        if( json !instanceof JsonObject )
-            return null
-
-        JsonObject object = (JsonObject) json
-        final names = path.tokenize('.')
-        final scopes = names[0..<-1]
-        for( final scope : scopes ) {
-            if( !object.has(scope) || !object.get(scope).isJsonObject() )
-                return null
-            object = object.get(scope).getAsJsonObject()
-        }
-
-        final property = names.last()
-        if( !object.has(property) || !object.get(property).isJsonPrimitive() )
-            return null
-
-        final result = object.get(property).getAsJsonPrimitive()
-        if( !result.isBoolean() )
-            return null
-        return result.getAsBoolean()
     }
 
     @Override
@@ -372,6 +328,8 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             final uri = workspaceFolder.getUri()
             log.debug "workspace/didChangeWorkspaceFolders add ${name} ${uri}"
             addWorkspaceFolder(name, uri)
+            configServices[name].initialize(uri, excludePatterns)
+            scriptServices[name].initialize(uri, excludePatterns)
         }
     }
 
@@ -405,17 +363,14 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     // -- INTERNAL
 
     private void addWorkspaceFolder(String name, String uri) {
-        if( uri )
-            workspaceRoots.put(name, uri)
+        workspaceRoots.put(name, uri)
 
         final configService = new ConfigService()
         configService.connect(client)
-        configService.initialize(uri)
         configServices.put(name, configService)
 
         final scriptService = new ScriptService()
         scriptService.connect(client)
-        scriptService.initialize(uri)
         scriptServices.put(name, scriptService)
     }
 
@@ -427,14 +382,71 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         return uri.replace(root, '')
     }
 
-    private LanguageService getLanguageService(String uri, Map<String, LanguageService> services) {
-        final entry = workspaceRoots.find { name, root -> uri.startsWith(root) }
-        if( !entry )
-            return services[DEFAULT_WORKSPACE_FOLDER_NAME]
-        final service = services[entry.key]
-        if( !service.matchesFile(uri) )
+    private LanguageService getLanguageService(String uri) {
+        final service = getLanguageService0(uri, scriptServices) ?: getLanguageService0(uri, configServices)
+        if( !service ) {
+            log.debug "No language service found for file: ${uri}"
+            return null
+        }
+        final path = Path.of(URI.create(uri))
+        if( PathUtils.isPathExcluded(path, excludePatterns) )
             return null
         return service
+    }
+
+    private LanguageService getLanguageService0(String uri, Map<String, LanguageService> services) {
+        final entry = workspaceRoots.find { name, root -> uri.startsWith(root) }
+        final service = entry
+            ? services[entry.key]
+            : services[DEFAULT_WORKSPACE_FOLDER_NAME]
+        if( !service || !service.matchesFile(uri) )
+            return null
+        return service
+    }
+
+    private List<String> getJsonStringArray(Object json, String path) {
+        final value = getJsonElement(json, path)
+        if( !value || !value.isJsonArray() )
+            return null
+        final List<String> result = []
+        for( final el : value.getAsJsonArray() ) {
+            try {
+                result.add(el.getAsJsonPrimitive().getAsString())
+            }
+            catch( AssertionError e ) {
+                continue
+            }
+        }
+        return result
+    }
+
+    private Boolean getJsonBoolean(Object json, String path) {
+        final value = getJsonElement(json, path)
+        if( !value || !value.isJsonPrimitive() )
+            return null
+        final result = value.getAsJsonPrimitive()
+        if( !result.isBoolean() )
+            return null
+        return result.getAsBoolean()
+    }
+
+    private JsonElement getJsonElement(Object json, String path) {
+        if( json !instanceof JsonObject )
+            return null
+
+        JsonObject object = (JsonObject) json
+        final names = path.tokenize('.')
+        final scopes = names[0..<-1]
+        for( final scope : scopes ) {
+            if( !object.has(scope) || !object.get(scope).isJsonObject() )
+                return null
+            object = object.get(scope).getAsJsonObject()
+        }
+
+        final property = names.last()
+        if( !object.has(property) )
+            return null
+        return object.get(property)
     }
 
 }
