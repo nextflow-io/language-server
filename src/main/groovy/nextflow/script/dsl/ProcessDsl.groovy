@@ -298,6 +298,14 @@ class ProcessDirectiveDsl implements DslScope {
     }
 
     @Function('''
+        The `secret` directive allows you to securely provide secrets to a process.
+
+        [Read more](https://nextflow.io/docs/latest/secrets.html#process-directive)
+    ''')
+    void secret(String value) {
+    }
+
+    @Function('''
         The `shell` directive allows you to define a custom shell command for process scripts. By default, script blocks are executed with `/bin/bash -ue`.
 
         [Read more](https://nextflow.io/docs/latest/process.html#shell)

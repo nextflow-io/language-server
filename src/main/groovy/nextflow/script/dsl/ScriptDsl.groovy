@@ -50,6 +50,11 @@ class ScriptDsl implements DslScope {
     NextflowMeta nextflow
 
     @Constant('''
+        Map of user-defined pipeline secrets.
+    ''')
+    Map secrets
+
+    @Constant('''
         Map of workflow runtime information.
     ''')
     WorkflowMetadata workflow
