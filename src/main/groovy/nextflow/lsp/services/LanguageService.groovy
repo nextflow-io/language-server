@@ -84,10 +84,10 @@ abstract class LanguageService {
     protected ReferenceProvider getReferenceProvider() { null }
     protected SymbolProvider getSymbolProvider() { null }
 
-    void initialize(Path workspaceRoot) {
+    void initialize(String root) {
         synchronized (this) {
-            final uris = workspaceRoot != null
-                ? getWorkspaceFiles(workspaceRoot)
+            final uris = root != null
+                ? getWorkspaceFiles(root)
                 : fileCache.getOpenFiles()
 
             final errors = getAstCache().update(uris, fileCache)
@@ -95,8 +95,9 @@ abstract class LanguageService {
         }
     }
 
-    protected Set<URI> getWorkspaceFiles(Path workspaceRoot) {
+    protected Set<URI> getWorkspaceFiles(String root) {
         try {
+            final workspaceRoot = Path.of(URI.create(root))
             final Set<URI> result = []
             for( final path : Files.walk(workspaceRoot) ) {
                 if( path.isDirectory() )
@@ -110,7 +111,7 @@ abstract class LanguageService {
             return result
         }
         catch( IOException e ) {
-            log.error "Failed to query workspace files: ${workspaceRoot} -- cause: ${e}"
+            log.error "Failed to query workspace files: ${root} -- cause: ${e}"
             return Collections.emptySet()
         }
     }
@@ -123,17 +124,17 @@ abstract class LanguageService {
 
     void didOpen(DidOpenTextDocumentParams params) {
         fileCache.didOpen(params)
-        updateExecutor.submit(DEBOUNCE_KEY)
+        updateLater()
     }
 
     void didChange(DidChangeTextDocumentParams params) {
         fileCache.didChange(params)
-        updateExecutor.submit(DEBOUNCE_KEY)
+        updateLater()
     }
 
     void didClose(DidCloseTextDocumentParams params) {
         fileCache.didClose(params)
-        updateExecutor.submit(DEBOUNCE_KEY)
+        updateLater()
     }
 
     // --- REQUESTS
@@ -143,7 +144,7 @@ abstract class LanguageService {
         if( !provider )
             return Either.forLeft(Collections.emptyList())
 
-        updateExecutor.executeNow(DEBOUNCE_KEY)
+        updateNow()
         return provider.completion(params.getTextDocument(), params.getPosition())
     }
 
@@ -168,7 +169,7 @@ abstract class LanguageService {
         if( !provider )
             return Collections.emptyList()
 
-        updateExecutor.executeNow(DEBOUNCE_KEY)
+        updateNow()
         return provider.formatting(uri, options)
     }
 
@@ -196,6 +197,14 @@ abstract class LanguageService {
     }
 
     // --- INTERNAL
+
+    protected void updateLater() {
+        updateExecutor.submit(DEBOUNCE_KEY)
+    }
+
+    protected void updateNow() {
+        updateExecutor.executeNow(DEBOUNCE_KEY)
+    }
 
     /**
      * Re-compile any changed files.

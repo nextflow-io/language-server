@@ -15,13 +15,13 @@
  */
 package nextflow.lsp
 
-import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 
 import com.google.gson.JsonObject
 import groovy.transform.CompileStatic
 import nextflow.lsp.util.Logger
 import nextflow.lsp.services.CustomFormattingOptions
+import nextflow.lsp.services.LanguageService
 import nextflow.lsp.services.config.ConfigService
 import nextflow.lsp.services.script.ScriptService
 import org.eclipse.lsp4j.CompletionItem
@@ -34,6 +34,7 @@ import org.eclipse.lsp4j.DeleteFilesParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams
+import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DidSaveTextDocumentParams
@@ -53,6 +54,8 @@ import org.eclipse.lsp4j.SetTraceParams
 import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.TextDocumentSyncKind
 import org.eclipse.lsp4j.TextEdit
+import org.eclipse.lsp4j.WorkspaceFoldersOptions
+import org.eclipse.lsp4j.WorkspaceServerCapabilities
 import org.eclipse.lsp4j.WorkspaceSymbolParams
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures
 import org.eclipse.lsp4j.jsonrpc.Launcher
@@ -77,12 +80,15 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         launcher.startListening()
     }
 
+    private static final String DEFAULT_WORKSPACE_FOLDER_NAME = ''
+
     private static Logger log = Logger.instance
 
-    private ConfigService configService = new ConfigService()
-    private ScriptService scriptService = new ScriptService()
+    private LanguageClient client = null
 
-    private Path workspaceRoot
+    private Map<String, String> workspaceRoots = [:]
+    private Map<String, LanguageService> configServices = [:]
+    private Map<String, LanguageService> scriptServices = [:]
 
     private boolean harshilAlignment
 
@@ -90,15 +96,27 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
 
     @Override
     CompletableFuture<InitializeResult> initialize(InitializeParams params) {
-        final root = params.getRootUri()
-        if( root != null ) {
-            this.workspaceRoot = Path.of(URI.create(root))
-            configService.initialize(workspaceRoot)
-            scriptService.initialize(workspaceRoot)
+        log.info "initialize"
+
+        for( final workspaceFolder : params.getWorkspaceFolders() ) {
+            final name = workspaceFolder.getName()
+            final uri = workspaceFolder.getUri()
+            log.info "workspace folder ${name} ${uri}"
+            addWorkspaceFolder(name, uri)
         }
+
+        if( workspaceRoots.isEmpty() )
+            addWorkspaceFolder(DEFAULT_WORKSPACE_FOLDER_NAME, null)
 
         final serverCapabilities = new ServerCapabilities()
         serverCapabilities.setTextDocumentSync(TextDocumentSyncKind.Incremental)
+
+        final workspaceFoldersOptions = new WorkspaceFoldersOptions()
+        workspaceFoldersOptions.setSupported(true)
+        workspaceFoldersOptions.setChangeNotifications(true)
+        final workspaceCapabilities = new WorkspaceServerCapabilities(workspaceFoldersOptions)
+        serverCapabilities.setWorkspace(workspaceCapabilities)
+
         final completionOptions = new CompletionOptions(false, List.of('.'))
         serverCapabilities.setCompletionProvider(completionOptions)
         serverCapabilities.setDefinitionProvider(true)
@@ -141,9 +159,8 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
 
     @Override
     void connect(LanguageClient client) {
+        this.client = client
         log.initialize(client)
-        configService.connect(client)
-        scriptService.connect(client)
     }
 
     // -- TextDocumentService
@@ -153,9 +170,12 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         final uri = params.getTextDocument().getUri()
         log.debug "textDocument/didOpen ${relativePath(uri)}"
 
-        if( configService.matchesFile(uri) )
+        final configService = getLanguageService(uri, configServices)
+        if( configService )
             configService.didOpen(params)
-        if( scriptService.matchesFile(uri) )
+
+        final scriptService = getLanguageService(uri, scriptServices)
+        if( scriptService )
             scriptService.didOpen(params)
     }
 
@@ -164,9 +184,12 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         final uri = params.getTextDocument().getUri()
         log.debug "textDocument/didChange ${relativePath(uri)}"
 
-        if( configService.matchesFile(uri) )
+        final configService = getLanguageService(uri, configServices)
+        if( configService )
             configService.didChange(params)
-        if( scriptService.matchesFile(uri) )
+
+        final scriptService = getLanguageService(uri, scriptServices)
+        if( scriptService )
             scriptService.didChange(params)
     }
 
@@ -175,9 +198,12 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         final uri = params.getTextDocument().getUri()
         log.debug "textDocument/didClose ${relativePath(uri)}"
 
-        if( configService.matchesFile(uri) )
+        final configService = getLanguageService(uri, configServices)
+        if( configService )
             configService.didClose(params)
-        if( scriptService.matchesFile(uri) )
+
+        final scriptService = getLanguageService(uri, scriptServices)
+        if( scriptService )
             scriptService.didClose(params)
     }
 
@@ -192,9 +218,11 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
-            if( configService.matchesFile(uri) )
+            final configService = getLanguageService(uri, configServices)
+            if( configService )
                 return configService.completion(params)
-            if( scriptService.matchesFile(uri) )
+            final scriptService = getLanguageService(uri, scriptServices)
+            if( scriptService )
                 return scriptService.completion(params)
             log.debug("File was not matched by any language service: ${uri}")
         })
@@ -207,9 +235,11 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             final uri = params.getTextDocument().getUri()
             final position = params.getPosition()
             log.debug "textDocument/definition ${uri} [ ${position.getLine()}, ${position.getCharacter()} ]"
-            if( configService.matchesFile(uri) )
+            final configService = getLanguageService(uri, configServices)
+            if( configService )
                 return configService.definition(params)
-            if( scriptService.matchesFile(uri) )
+            final scriptService = getLanguageService(uri, scriptServices)
+            if( scriptService )
                 return scriptService.definition(params)
             log.debug("File was not matched by any language service: ${uri}")
         })
@@ -221,9 +251,11 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
             log.debug "textDocument/symbol ${uri}"
-            if( configService.matchesFile(uri) )
+            final configService = getLanguageService(uri, configServices)
+            if( configService )
                 return configService.documentSymbol(params)
-            if( scriptService.matchesFile(uri) )
+            final scriptService = getLanguageService(uri, scriptServices)
+            if( scriptService )
                 return scriptService.documentSymbol(params)
             log.debug("File was not matched by any language service: ${uri}")
         })
@@ -240,9 +272,11 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
                 harshilAlignment: harshilAlignment
             )
             log.debug "textDocument/formatting ${uri} ${options.insertSpaces ? 'spaces' : 'tabs'} ${options.tabSize}"
-            if( configService.matchesFile(uri) )
+            final configService = getLanguageService(uri, configServices)
+            if( configService )
                 return configService.formatting(URI.create(uri), options)
-            if( scriptService.matchesFile(uri) )
+            final scriptService = getLanguageService(uri, scriptServices)
+            if( scriptService )
                 return scriptService.formatting(URI.create(uri), options)
             log.debug("File was not matched by any language service: ${uri}")
         })
@@ -253,9 +287,11 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
-            if( configService.matchesFile(uri) )
+            final configService = getLanguageService(uri, configServices)
+            if( configService )
                 return configService.hover(params)
-            if( scriptService.matchesFile(uri) )
+            final scriptService = getLanguageService(uri, scriptServices)
+            if( scriptService )
                 return scriptService.hover(params)
             log.debug("File was not matched by any language service: ${uri}")
         })
@@ -268,9 +304,11 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             final uri = params.getTextDocument().getUri()
             final position = params.getPosition()
             log.debug "textDocument/references ${uri} [ ${position.getLine()}, ${position.getCharacter()} ]"
-            if( configService.matchesFile(uri) )
+            final configService = getLanguageService(uri, configServices)
+            if( configService )
                 return configService.references(params)
-            if( scriptService.matchesFile(uri) )
+            final scriptService = getLanguageService(uri, scriptServices)
+            if( scriptService )
                 return scriptService.references(params)
             log.debug("File was not matched by any language service: ${uri}")
         })
@@ -320,6 +358,24 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
     }
 
     @Override
+    void didChangeWorkspaceFolders(DidChangeWorkspaceFoldersParams params) {
+        final event = params.getEvent()
+        for( final workspaceFolder : event.getRemoved() ) {
+            final name = workspaceFolder.getName()
+            log.debug "workspace/didChangeWorkspaceFolders remove ${name}"
+            workspaceRoots.remove(name)
+            configServices.remove(name)
+            scriptServices.remove(name)
+        }
+        for( final workspaceFolder : event.getAdded() ) {
+            final name = workspaceFolder.getName()
+            final uri = workspaceFolder.getUri()
+            log.debug "workspace/didChangeWorkspaceFolders add ${name} ${uri}"
+            addWorkspaceFolder(name, uri)
+        }
+    }
+
+    @Override
     void didCreateFiles(CreateFilesParams params) {
         log.debug "workspace/didCreateFiles ${params}"
     }
@@ -339,14 +395,46 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
             log.debug "workspace/symbol ${params}"
-            return scriptService.symbol(params)
+            final result = []
+            for( final scriptService : scriptServices.values() )
+                result.addAll(scriptService.symbol(params))
+            return result as List<? extends SymbolInformation>
         })
     }
 
     // -- INTERNAL
 
+    private void addWorkspaceFolder(String name, String uri) {
+        if( uri )
+            workspaceRoots.put(name, uri)
+
+        final configService = new ConfigService()
+        configService.connect(client)
+        configService.initialize(uri)
+        configServices.put(name, configService)
+
+        final scriptService = new ScriptService()
+        scriptService.connect(client)
+        scriptService.initialize(uri)
+        scriptServices.put(name, scriptService)
+    }
+
     private String relativePath(String uri) {
-        uri.replace("file://${workspaceRoot ?: ''}", '')
+        final entry = workspaceRoots.find { name, root -> uri.startsWith(root) }
+        if( !entry )
+            return uri
+        final root = entry.value
+        return uri.replace(root, '')
+    }
+
+    private LanguageService getLanguageService(String uri, Map<String, LanguageService> services) {
+        final entry = workspaceRoots.find { name, root -> uri.startsWith(root) }
+        if( !entry )
+            return services[DEFAULT_WORKSPACE_FOLDER_NAME]
+        final service = services[entry.key]
+        if( !service.matchesFile(uri) )
+            return null
+        return service
     }
 
 }
