@@ -324,7 +324,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         if( debug != null )
             Logger.setDebugEnabled(debug)
 
-        final harshilAlignment = getJsonBoolean(params.getSettings(), 'nextflow.harshilAlignment')
+        final harshilAlignment = getJsonBoolean(params.getSettings(), 'nextflow.formatting.harshilAlignment')
         if( harshilAlignment != null )
             this.harshilAlignment = harshilAlignment
     }
