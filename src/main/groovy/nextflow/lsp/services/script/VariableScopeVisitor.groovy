@@ -60,6 +60,7 @@ import org.codehaus.groovy.ast.expr.EmptyExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.MapEntryExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
+import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.ast.expr.TupleExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.BlockStatement
@@ -573,8 +574,10 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
     }
 
     /**
-     * Treat a variable assignment as a declaration if it has not
-     * been declared yet.
+     * In processes and workflows, variables can be declared without `def`
+     * and are treated as variables scoped to the process / workflow.
+     *
+     * @param left
      */
     void visitAssignment(Expression left) {
         if( left instanceof TupleExpression ) {
@@ -584,18 +587,32 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
             }
         }
 
-        if( left instanceof VariableExpression ) {
-            VariableScope scope = currentScope
-            while( scope != null ) {
-                if( left.name in scope.getDeclaredVariables() )
-                    return
-                scope = scope.parent
-            }
-            if( currentTopLevelNode instanceof ProcessNode || currentTopLevelNode instanceof WorkflowNode )
-                declare(left)
-            else
-                addError("`${left.name}` was assigned but not declared", left)
+        final varX = getAssignmentTargetVariable(left)
+        if( varX == null )
+            return
+        VariableScope scope = currentScope
+        while( scope != null ) {
+            if( varX.name in scope.getDeclaredVariables() )
+                return
+            scope = scope.parent
         }
+        if( currentTopLevelNode instanceof ProcessNode || currentTopLevelNode instanceof WorkflowNode )
+            declare(varX)
+        else
+            addError("`${varX.name}` was assigned but not declared", varX)
+    }
+
+    private VariableExpression getAssignmentTargetVariable(Expression left) {
+        // e.g. p = 123
+        if( left instanceof VariableExpression )
+            return left
+        // e.g. obj.p = 123
+        if( left instanceof PropertyExpression )
+            return getAssignmentTargetVariable(left.objectExpression)
+        // e.g. list[1] = 123 OR map['a'] = 123
+        if( left instanceof BinaryExpression && left.operation.type == Types.LEFT_SQUARE_BRACKET )
+            return getAssignmentTargetVariable(left.leftExpression)
+        return null
     }
 
     @Override
