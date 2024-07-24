@@ -205,6 +205,7 @@ workflowMain
 
 workflowEmits
     :   workflowEmit (sep workflowEmit)*
+    |   expression
     ;
 
 workflowEmit

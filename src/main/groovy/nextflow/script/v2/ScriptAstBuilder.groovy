@@ -443,7 +443,9 @@ class ScriptAstBuilder {
         if( !ctx )
             return EmptyStatement.INSTANCE
 
-        final statements = ctx.workflowEmit().collect(this.&workflowEmit)
+        final statements = ctx.workflowEmit()
+            ? ctx.workflowEmit().collect(this.&workflowEmit)
+            : List<Statement>.of(ast( stmt(expression(ctx.expression())), ctx ))
         return ast( block(null, statements), ctx )
     }
 

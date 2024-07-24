@@ -312,6 +312,12 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
                 stmtX.expression = callThisX('_emit_', args(constX(left.name)))
                 mainCode.addStatement(stmtX)
             }
+            else {
+                final target = varX('$out')
+                mainCode.addStatement(assignS(target, emit))
+                stmtX.expression = callThisX('_emit_', args(constX(target.name)))
+                mainCode.addStatement(stmtX)
+            }
         }
     }
 
