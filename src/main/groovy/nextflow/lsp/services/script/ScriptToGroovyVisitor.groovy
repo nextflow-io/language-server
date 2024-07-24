@@ -76,19 +76,7 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
     void visit() {
         if( moduleNode == null )
             return
-        for( final featureFlag : moduleNode.getFeatureFlags() )
-            visitFeatureFlag(featureFlag)
-        for( final includeNode : moduleNode.getIncludes() )
-            visitInclude(includeNode)
-        for( final functionNode : moduleNode.getFunctions() )
-            visitFunction(functionNode)
-        for( final processNode : moduleNode.getProcesses() )
-            visitProcess(processNode)
-        for( final workflowNode : moduleNode.getWorkflows() )
-            visitWorkflow(workflowNode)
-        if( moduleNode.getOutput() )
-            visitOutput(moduleNode.getOutput())
-
+        ScriptVisitor.super.visit(moduleNode)
         if( moduleNode.isEmpty() )
             moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
     }

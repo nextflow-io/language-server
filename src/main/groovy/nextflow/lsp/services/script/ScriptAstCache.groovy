@@ -157,19 +157,7 @@ class ScriptAstCache extends ASTNodeCache {
             final moduleNode = sourceUnit.getAST()
             if( moduleNode !instanceof ScriptNode )
                 return
-            final scriptNode = (ScriptNode) moduleNode
-            for( final featureFlag : scriptNode.getFeatureFlags() )
-                visitFeatureFlag(featureFlag)
-            for( final includeNode : scriptNode.getIncludes() )
-                visitInclude(includeNode)
-            for( final functionNode : scriptNode.getFunctions() )
-                visitFunction(functionNode)
-            for( final processNode : scriptNode.getProcesses() )
-                visitProcess(processNode)
-            for( final workflowNode : scriptNode.getWorkflows() )
-                visitWorkflow(workflowNode)
-            if( scriptNode.getOutput() )
-                visitOutput(scriptNode.getOutput())
+            ScriptVisitor.super.visit((ScriptNode) moduleNode)
         }
 
         @Override
@@ -221,12 +209,7 @@ class ScriptAstCache extends ASTNodeCache {
         void visitProcess(ProcessNode node) {
             pushASTNode(node)
             try {
-                visit(node.directives)
-                visit(node.inputs)
-                visit(node.outputs)
-                visit(node.when)
-                visit(node.exec)
-                visit(node.stub)
+                ScriptVisitor.super.visitProcess(node)
             }
             finally {
                 popASTNode()
@@ -237,10 +220,7 @@ class ScriptAstCache extends ASTNodeCache {
         void visitWorkflow(WorkflowNode node) {
             pushASTNode(node)
             try {
-                visit(node.takes)
-                visit(node.emits)
-                visit(node.publishers)
-                visit(node.main)
+                ScriptVisitor.super.visitWorkflow(node)
             }
             finally {
                 popASTNode()
@@ -251,7 +231,7 @@ class ScriptAstCache extends ASTNodeCache {
         void visitOutput(OutputNode node) {
             pushASTNode(node)
             try {
-                visit(node.body)
+                ScriptVisitor.super.visitOutput(node)
             }
             finally {
                 popASTNode()

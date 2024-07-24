@@ -34,6 +34,8 @@ interface ScriptVisitor {
     default void visit(ScriptNode script) {
         for( final featureFlag : script.getFeatureFlags() )
             visitFeatureFlag(featureFlag)
+        for( final includeNode : script.getIncludes() )
+            visitInclude(includeNode)
         for( final functionNode : script.getFunctions() )
             visitFunction(functionNode)
         for( final processNode : script.getProcesses() )
@@ -63,9 +65,9 @@ interface ScriptVisitor {
 
     default void visitWorkflow(WorkflowNode node) {
         visit(node.takes)
+        visit(node.main)
         visit(node.emits)
         visit(node.publishers)
-        visit(node.main)
     }
 
     default void visitOutput(OutputNode node) {
