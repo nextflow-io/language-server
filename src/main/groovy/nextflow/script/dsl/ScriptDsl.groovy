@@ -34,6 +34,17 @@ class ScriptDsl implements DslScope {
         nextflow.util.MemoryUnit,
     ].collect { clazz -> new ClassNode(clazz) }
 
+    @Deprecated
+    @Constant('''
+        Alias of `workflow.projectDir`.
+    ''')
+    Path baseDir
+
+    @Constant('''
+        Alias of `workflow.launchDir`.
+    ''')
+    Path launchDir
+
     @Constant('''
         Logger which can be used to log messages to the console.
     ''')
@@ -50,9 +61,19 @@ class ScriptDsl implements DslScope {
     NextflowMeta nextflow
 
     @Constant('''
+        Alias of `workflow.projectDir`.
+    ''')
+    Path projectDir
+
+    @Constant('''
         Map of user-defined pipeline secrets.
     ''')
     Map secrets
+
+    @Constant('''
+        Alias of `workflow.workDir`.
+    ''')
+    Path workDir
 
     @Constant('''
         Map of workflow runtime information.

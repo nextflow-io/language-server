@@ -136,8 +136,9 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
      * Find the declaration of a given variable.
      *
      * @param name
+     * @param node
      */
-    private Variable findVariableDeclaration(String name) {
+    private Variable findVariableDeclaration(String name, ASTNode node) {
         Variable variable = null
         VariableScope scope = currentScope
         while( scope != null ) {
@@ -150,7 +151,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
             variable = scope.getReferencedClassVariable(name)
             if( variable )
                 break
-            variable = findClassMember(scope.getClassScope(), name)
+            variable = findClassMember(scope.getClassScope(), name, node)
             if( variable )
                 break
             scope = scope.parent
@@ -172,7 +173,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         return variable
     }
 
-    private Variable findClassMember(ClassNode cn, String name) {
+    private Variable findClassMember(ClassNode cn, String name, ASTNode node) {
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             for( final fn : cn.getFields() ) {
                 if( fn.getName() != name )
@@ -180,6 +181,8 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
                 final annot = findAnnotation(fn, Constant)
                 if( !annot )
                     continue
+                if( findAnnotation(fn, Deprecated) )
+                    addWarning("`${name}` is deprecated and will be removed in a future version", node)
                 final description = annot.getMember('value').getText().stripIndent(true).trim()
                 final content = wrapDescriptionAsGroovydoc(description)
                 fn.putNodeMetaData(GroovydocHolder.DOC_COMMENT, new Groovydoc(content, fn))
@@ -188,17 +191,19 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
             for( final mn : cn.getMethods() ) {
                 if( mn.getName() != name )
                     continue
-                final annot = findAnnotation(mn, Function)
-                if( annot ) {
-                    final documentation = annot.getMember('value').getText().stripIndent(true).trim()
-                    final mnWithDocs = new FunctionNode(name, documentation)
-                    final methodTypeLabel = getMethodTypeLabel(mn, cn)
-                    if( methodTypeLabel )
-                        mnWithDocs.putNodeMetaData('type.label', methodTypeLabel)
-                    return wrapMethodAsVariable(mnWithDocs, cn)
-                }
                 if( mn instanceof FunctionNode || mn instanceof ProcessNode || mn instanceof WorkflowNode )
                     return wrapMethodAsVariable(mn, cn)
+                final annot = findAnnotation(mn, Function)
+                if( !annot )
+                    continue
+                if( findAnnotation(mn, Deprecated) )
+                    addWarning("`${name}` is deprecated and will be removed in a future version", node)
+                final documentation = annot.getMember('value').getText().stripIndent(true).trim()
+                final mnWithDocs = new FunctionNode(name, documentation)
+                final methodTypeLabel = getMethodTypeLabel(mn, cn)
+                if( methodTypeLabel )
+                    mnWithDocs.putNodeMetaData('type.label', methodTypeLabel)
+                return wrapMethodAsVariable(mnWithDocs, cn)
             }
             cn = cn.getSuperClass()
         }
@@ -403,7 +408,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
             }
             final call = (MethodCallExpression) stmtX.expression
             final name = call.getMethodAsString()
-            if( !findClassMember(currentScope.getClassScope(), name) )
+            if( !findClassMember(currentScope.getClassScope(), name, call.getMethod()) )
                 addError("Invalid ${typeLabel} `${name}`", stmt)
         }
     }
@@ -480,7 +485,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
             // treat as regular directive
             final name = call.getMethodAsString()
-            if( findClassMember(currentScope.getClassScope(), name) ) {
+            if( findClassMember(currentScope.getClassScope(), name, call.getMethod()) ) {
                 visit(call)
                 continue
             }
@@ -639,7 +644,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         if( node.isImplicitThis() && node.method instanceof ConstantExpression ) {
             final method = node.method
             final name = method.text
-            final variable = findVariableDeclaration(name)
+            final variable = findVariableDeclaration(name, node)
             if( !variable ) {
                 if( name in ['for', 'while'] )
                     addError("`${name}` loops are no longer supported", node)
@@ -677,7 +682,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         final name = node.name
         if( name == 'this' )
             return
-        Variable variable = findVariableDeclaration(name)
+        Variable variable = findVariableDeclaration(name, node)
         if( !variable ) {
             if( name == 'it' ) {
                 addWarning('Implicit variable `it` in closure will not be supported in a future version', node)
