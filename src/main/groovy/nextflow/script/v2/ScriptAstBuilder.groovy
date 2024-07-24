@@ -1380,8 +1380,8 @@ class ScriptAstBuilder {
     private ClassNode createdName(CreatedNameContext ctx) {
         if( ctx.qualifiedClassName() ) {
             final classNode = qualifiedClassName(ctx.qualifiedClassName())
-            if( ctx.typeArgumentsOrDiamond() )
-                classNode.setGenericsTypes( typeArguments(ctx.typeArgumentsOrDiamond()) )
+            if( ctx.typeArguments() )
+                classNode.setGenericsTypes( typeArguments(ctx.typeArguments()) )
             return classNode
         }
 
@@ -1426,12 +1426,6 @@ class ScriptAstBuilder {
             return primitiveType(ctx.primitiveType())
 
         throw createParsingFailedException("Unrecognized type: ${ctx.text}", ctx)
-    }
-
-    private GenericsType[] typeArguments(TypeArgumentsOrDiamondContext ctx) {
-        ctx.typeArguments()
-            ? typeArguments(ctx.typeArguments())
-            : GenericsType.EMPTY_ARRAY
     }
 
     private GenericsType[] typeArguments(TypeArgumentsContext ctx) {

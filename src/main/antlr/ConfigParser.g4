@@ -398,12 +398,7 @@ creator
 
 createdName
     :   primitiveType
-    |   qualifiedClassName typeArgumentsOrDiamond?
-    ;
-
-typeArgumentsOrDiamond
-    :   LT GT
-    |   typeArguments
+    |   qualifiedClassName typeArguments?
     ;
 
 // -- parenthetical expression
