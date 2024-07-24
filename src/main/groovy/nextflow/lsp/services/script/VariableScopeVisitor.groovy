@@ -362,10 +362,9 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
     private void declareProcessInputs(BlockStatement block) {
         for( final stmt : block.statements ) {
-            if( stmt !instanceof ExpressionStatement )
+            final call = asMethodCallX(stmt)
+            if( !call )
                 continue
-            final stmtX = (ExpressionStatement) stmt
-            final call = (MethodCallExpression) stmtX.expression
             if( call.getMethodAsString() == 'tuple' ) {
                 final args = (ArgumentListExpression) call.arguments
                 for( final arg : args ) {
@@ -397,18 +396,12 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
             return
         final block = (BlockStatement) node
         for( final stmt : block.statements ) {
-            if( stmt !instanceof ExpressionStatement ) {
+            final call = asMethodCallX(stmt)
+            if( !call ) {
                 if( checkSyntaxErrors )
                     addError("Invalid ${typeLabel}", stmt)
                 continue
             }
-            final stmtX = (ExpressionStatement) stmt
-            if( stmtX.expression !instanceof MethodCallExpression ) {
-                if( checkSyntaxErrors )
-                    addError("Invalid ${typeLabel}", stmt)
-                continue
-            }
-            final call = (MethodCallExpression) stmtX.expression
             final name = call.getMethodAsString()
             if( !findClassMember(currentScope.getClassScope(), name, call.getMethod()) )
                 addError("Invalid ${typeLabel} `${name}`", stmt)
@@ -452,15 +445,10 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
     private void declareWorkflowInputs(BlockStatement block) {
         for( final stmt : block.statements ) {
-            if( stmt !instanceof ExpressionStatement )
+            final varX = asVarX(stmt)
+            if( !varX || varX.name == 'this' )
                 continue
-            final stmtX = (ExpressionStatement) stmt
-            if( stmtX.expression !instanceof VariableExpression )
-                continue
-            final var = (VariableExpression) stmtX.expression
-            if( var.name == 'this' )
-                continue
-            declare(var)
+            declare(varX)
         }
     }
 
@@ -480,10 +468,9 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         block.variableScope = currentScope
 
         for( final stmt : block.statements ) {
-            if( stmt !instanceof ExpressionStatement )
+            final call = asMethodCallX(stmt)
+            if( !call )
                 continue
-            final stmtX = (ExpressionStatement) stmt
-            final call = (MethodCallExpression) stmtX.expression
 
             // treat as regular directive
             final name = call.getMethodAsString()
@@ -493,13 +480,11 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
             }
 
             // treat as target definition
-            final args = (ArgumentListExpression) call.arguments
-            if( args.size() == 1 && args.first() instanceof ClosureExpression ) {
-                final closure = (ClosureExpression) args.first()
-                final target = (BlockStatement) closure.code
+            final code = asDslBlock(call, 1)
+            if( code != null ) {
                 pushState(OutputDsl.TargetDsl)
-                checkDirectives(target, 'output target directive', true)
-                visitTargetBody(target)
+                checkDirectives(code, 'output target directive', true)
+                visitTargetBody(code)
                 popState()
                 continue
             }
@@ -512,25 +497,22 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         block.variableScope = currentScope
 
         for( final stmt : block.statements ) {
-            if( stmt !instanceof ExpressionStatement )
+            final call = asMethodCallX(stmt)
+            if( !call )
                 continue
-            final stmtX = (ExpressionStatement) stmt
-            if( stmtX.expression !instanceof MethodCallExpression )
-                continue
-            final call = (MethodCallExpression) stmtX.expression
 
             // treat as index definition
             final name = call.getMethodAsString()
-            final args = (ArgumentListExpression) call.arguments
-            if( name == 'index' && args.size() == 1 && args.first() instanceof ClosureExpression ) {
-                final closure = (ClosureExpression) args.first()
-                final index = (BlockStatement) closure.code
-                pushState(OutputDsl.IndexDsl)
-                index.variableScope = null
-                checkDirectives(index, 'output index directive', true)
-                visit(index)
-                popState()
-                continue
+            if( name == 'index' ) {
+                final code = asDslBlock(call, 1)
+                if( code != null ) {
+                    pushState(OutputDsl.IndexDsl)
+                    code.variableScope = null
+                    checkDirectives(code, 'output index directive', true)
+                    visit(code)
+                    popState()
+                    continue
+                }
             }
 
             // treat as regular directive
@@ -648,7 +630,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
             final name = method.text
             final variable = findVariableDeclaration(name, node)
             if( !variable ) {
-                if( name in ['for', 'while'] )
+                if( name == 'for' || name == 'while' )
                     addError("`${name}` loops are no longer supported", node)
                 else
                     addError("`${name}` is not defined", method)
@@ -661,22 +643,16 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
      * Treat `set` operator as an assignment.
      */
     void visitAssignmentOperator(MethodCallExpression node) {
-        if( node.getMethodAsString() !in ['set', 'tap'] )
+        final name = node.getMethodAsString()
+        if( !(name == 'set' || name == 'tap') )
             return
-        final args = (ArgumentListExpression)node.arguments
-        if( args.size() != 1 || args.first() !instanceof ClosureExpression )
+        final code = asDslBlock(node, 1)
+        if( !code || code.statements.size() != 1 )
             return
-        final closure = (ClosureExpression)args.first()
-        final code = (BlockStatement)closure.code
-        if( code.statements.size() != 1 )
+        final varX = asVarX(code.statements.first())
+        if( !varX )
             return
-        final stmt = code.statements.first()
-        if( stmt !instanceof ExpressionStatement )
-            return
-        final expr = ((ExpressionStatement)stmt).expression
-        if( expr !instanceof VariableExpression )
-            return
-        currentScope.putDeclaredVariable((VariableExpression) expr)
+        currentScope.putDeclaredVariable(varX)
     }
 
     @Override
@@ -701,6 +677,34 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         }
         if( variable )
             node.setAccessedVariable(variable)
+    }
+
+    private BlockStatement asDslBlock(MethodCallExpression call, int nArgs) {
+        final args = (ArgumentListExpression) call.arguments
+        if( args.size() != nArgs )
+            return null
+        if( args.last() !instanceof ClosureExpression )
+            return null
+        final closure = (ClosureExpression) args.last()
+        return (BlockStatement) closure.code
+    }
+
+    private MethodCallExpression asMethodCallX(Statement stmt) {
+        if( stmt !instanceof ExpressionStatement )
+            return null
+        final stmtX = (ExpressionStatement) stmt
+        if( stmtX.expression !instanceof MethodCallExpression )
+            return null
+        return (MethodCallExpression) stmtX.expression
+    }
+
+    private VariableExpression asVarX(Statement stmt) {
+        if( stmt !instanceof ExpressionStatement )
+            return null
+        final stmtX = (ExpressionStatement) stmt
+        if( stmtX.expression !instanceof VariableExpression )
+            return null
+        return (VariableExpression) stmtX.expression
     }
 
     @Override

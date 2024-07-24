@@ -88,6 +88,8 @@ class ConfigSchemaVisitor extends ClassCodeVisitorSupport {
         }
 
         final fqName = names.join('.')
+        if( fqName.startsWith('process.ext.') )
+            return
         final option = ConfigSchema.OPTIONS[fqName]
         if( !option )
             addWarning("Unrecognized config option '${fqName}'", node)
