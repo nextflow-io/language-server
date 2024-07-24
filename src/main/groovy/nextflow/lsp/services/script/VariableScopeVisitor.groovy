@@ -380,13 +380,15 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         }
     }
 
+    static private final List<String> DECLARING_INPUT_TYPES = ['val', 'path', 'each']
+
     private void declareProcessInput(MethodCallExpression call) {
-        if( call.getMethodAsString() !in ['val', 'path'] )
+        if( call.getMethodAsString() !in DECLARING_INPUT_TYPES )
             return
         final args = (ArgumentListExpression) call.arguments
-        if( args.size() < 1 || args.first() !instanceof VariableExpression )
+        if( args.size() < 1 || args.last() !instanceof VariableExpression )
             return
-        final var = (VariableExpression) args.first()
+        final var = (VariableExpression) args.last()
         declare(var)
     }
 

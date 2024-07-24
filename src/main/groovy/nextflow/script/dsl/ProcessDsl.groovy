@@ -400,6 +400,12 @@ class ProcessInputDsl implements DslScope {
     void tuple(Object... args) {
     }
 
+    @Function('''
+        Declare an `each` input.
+    ''')
+    void each(arg) {
+    }
+
 }
 
 @CompileStatic
