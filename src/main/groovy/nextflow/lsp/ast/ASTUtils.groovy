@@ -75,7 +75,7 @@ class ASTUtils {
             return getOriginalClassNode(node.type, strict, ast)
 
         if( node instanceof FeatureFlagNode )
-            return node.resolved ? node : null
+            return node.accessedVariable ? node : null
 
         if( node instanceof IncludeVariable )
             return node.getMethod()

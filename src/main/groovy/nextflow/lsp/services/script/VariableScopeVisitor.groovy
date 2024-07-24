@@ -280,11 +280,14 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
     @Override
     void visitFeatureFlag(FeatureFlagNode node) {
-        final clazz = FeatureFlagDsl.class
-        for( final field : clazz.getDeclaredFields() ) {
-            final annot = field.getAnnotation(FeatureFlag)
-            if( annot && annot.name() == node.name ) {
-                node.resolved = true
+        final cn = new ClassNode(FeatureFlagDsl)
+        for( final fn : cn.getFields() ) {
+            final annot = findAnnotation(fn, FeatureFlag)
+            if( !annot )
+                continue
+            final name = annot.getMember('name').getText()
+            if( name == node.name ) {
+                node.accessedVariable = fn
                 return
             }
         }

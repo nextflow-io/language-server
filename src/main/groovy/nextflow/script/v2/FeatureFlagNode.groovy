@@ -16,6 +16,7 @@
 package nextflow.script.v2
 
 import groovy.transform.CompileStatic
+import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.ast.expr.EmptyExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
@@ -28,7 +29,7 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement
 class FeatureFlagNode extends ExpressionStatement {
     final String name
     final Expression value
-    boolean resolved
+    Variable accessedVariable
 
     FeatureFlagNode(String name, Expression value) {
         super(EmptyExpression.INSTANCE)
