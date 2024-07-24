@@ -86,7 +86,7 @@ compilationUnit
 // top-level statements
 //
 scriptStatement
-    :   featureFlag                 #featureFlagStmtAlt
+    :   topAssignmentStatement      #topAssignmentStmtAlt
     |   includeStatement            #includeStmtAlt
     |   processDef                  #processDefAlt
     |   workflowDef                 #workflowDefAlt
@@ -95,12 +95,12 @@ scriptStatement
     |   incompleteScriptStatement   #incompleteScriptStmtAlt
     ;
 
-// -- feature flag
-featureFlag
-    :   featureFlagPath nls ASSIGN nls literal
+// -- top-level assignment (feature flag, param)
+topAssignmentStatement
+    :   assignmentPath nls ASSIGN nls expression
     ;
 
-featureFlagPath
+assignmentPath
     :   identifier (DOT identifier)*
     ;
 

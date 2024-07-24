@@ -178,13 +178,27 @@ class ScriptAstBuilder {
     /// SCRIPT STATEMENTS
 
     private ModuleNode compilationUnit(CompilationUnitContext ctx) {
+        final List<Statement> extraStatements = []
         for( final stmt : ctx.scriptStatement() )
-            scriptStatement(stmt)
+            scriptStatement(stmt, extraStatements)
 
         if( ctx.workflowMain() ) {
-            final workflowNode = workflowDef(ctx.workflowMain())
+            final main = blockStatements(ctx.workflowMain().blockStatements())
+            final workflowNode = workflowDef(main)
             moduleNode.addWorkflow(workflowNode)
             moduleNode.setEntry(workflowNode)
+        }
+
+        if( extraStatements ) {
+            if( !moduleNode.getEntry() ) {
+                final main = block(new VariableScope(), List<Statement>.of())
+                moduleNode.setEntry(workflowDef(main))
+            }
+            final entry = moduleNode.getEntry()
+            final main = (BlockStatement) entry.main
+            final statements = main.statements
+            for( final extra : extraStatements.asReversed() )
+                statements.add(0, extra)
         }
 
         final scriptClassNode = moduleNode.getScriptClassDummy()
@@ -211,9 +225,13 @@ class ScriptAstBuilder {
         return '_nf_script_' + hash.toString()
     }
 
-    private void scriptStatement(ScriptStatementContext ctx) {
-        if( ctx instanceof FeatureFlagStmtAltContext ) {
-            moduleNode.addFeatureFlag(featureFlag(ctx.featureFlag()))
+    private void scriptStatement(ScriptStatementContext ctx, List<Statement> extraStatements) {
+        if( ctx instanceof TopAssignmentStmtAltContext ) {
+            final node = topAssignmentStatement(ctx.topAssignmentStatement())
+            if( node instanceof FeatureFlagNode )
+                moduleNode.addFeatureFlag(node)
+            else if( node instanceof ExpressionStatement )
+                extraStatements.add(node)
         }
 
         else if( ctx instanceof FunctionDefAltContext ) {
@@ -253,11 +271,34 @@ class ScriptAstBuilder {
             throw createParsingFailedException("Invalid statement: ${ctx.text}", ctx)
     }
 
-    private FeatureFlagNode featureFlag(FeatureFlagContext ctx) {
-        final names = ctx.featureFlagPath().identifier().collect( this.&identifier )
-        final value = literal(ctx.literal())
+    private ASTNode topAssignmentStatement(TopAssignmentStatementContext ctx) {
+        final names = ctx.assignmentPath().identifier().collect( this.&identifier )
+        final value = expression(ctx.expression())
 
-        ast( new FeatureFlagNode(names.join('.'), value), ctx )
+        if( names.first() == 'nextflow' ) {
+            final result = ast( new FeatureFlagNode(names.join('.'), value), ctx )
+            if( value !instanceof ConstantExpression )
+                collectSyntaxError(new SyntaxException('Feature flag value should be a literal value (number, string, true/false)', result))
+            return result
+        }
+        else if( names.first() == 'params' ) {
+            final left = propertyExpression(ctx.assignmentPath().identifier())
+            return stmt(ast( assignX(left, value), ctx ))
+        }
+        else {
+            final result = ast( new EmptyStatement(), ctx )
+            collectSyntaxError(new SyntaxException('Invalid top-level statement (hint: move into entry workflow)', result))
+            return result
+        }
+    }
+
+    private Expression propertyExpression(List<IdentifierContext> idents) {
+        final head = idents.head()
+        final var = ast( varX(identifier(head)), head )
+        return idents.tail().inject(var) { acc, ident ->
+            final name = ast( constX(identifier(ident)), ident )
+            ast( propX(acc, name), acc, name )
+        }
     }
 
     private IncludeNode includeStatement(IncludeStatementContext ctx) {
@@ -398,11 +439,10 @@ class ScriptAstBuilder {
         return result
     }
 
-    private WorkflowNode workflowDef(WorkflowMainContext ctx) {
+    private WorkflowNode workflowDef(BlockStatement main) {
         final takes = EmptyStatement.INSTANCE
         final emits = EmptyStatement.INSTANCE
         final publishers = EmptyStatement.INSTANCE
-        final main = blockStatements(ctx.blockStatements())
         for( final statement : main.statements ) {
             if( statement !instanceof ExpressionStatement )
                 continue
@@ -1313,13 +1353,8 @@ class ScriptAstBuilder {
     }
 
     private Expression incompleteExpression(IncompleteExpressionContext ctx) {
-        final head = ctx.identifier().head()
-        final object = ast( varX(identifier(head)), head )
-        final propX = ctx.identifier().tail().inject(object) { acc, ident ->
-            final name = ast( constX(identifier(ident)), ident )
-            ast( new PropertyExpression(acc, name), acc, name )
-        }
-        final result = ast( new PropertyExpression(propX, ''), ctx )
+        final prop = propertyExpression(ctx.identifier())
+        final result = ast( propX(prop, ''), ctx )
         collectSyntaxError(new SyntaxException("Incomplete expression", result))
         return result
     }

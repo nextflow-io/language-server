@@ -99,10 +99,10 @@ configInclude
 
 // -- config assignment
 configAssignment
-    :   configPathExpression nls ASSIGN nls expression
+    :   configAssignmentPath nls ASSIGN nls expression
     ;
 
-configPathExpression
+configAssignmentPath
     :   identifier (DOT identifier)*
     ;
 

@@ -225,7 +225,7 @@ class ConfigAstBuilder {
     }
 
     private Statement configAssignment(ConfigAssignmentContext ctx) {
-        final names = ctx.configPathExpression().identifier().collect( this.&identifier )
+        final names = ctx.configAssignmentPath().identifier().collect( this.&identifier )
         final value = expression(ctx.expression())
         ast( new ConfigAssignNode(names, value), ctx )
     }
