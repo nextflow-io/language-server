@@ -380,7 +380,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         }
     }
 
-    static private final List<String> DECLARING_INPUT_TYPES = ['val', 'path', 'each']
+    static private final List<String> DECLARING_INPUT_TYPES = ['val', 'file', 'path', 'each']
 
     private void declareProcessInput(MethodCallExpression call) {
         if( call.getMethodAsString() !in DECLARING_INPUT_TYPES )
@@ -504,7 +504,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
                 continue
             }
 
-            addError('Invalid output directive', stmt)
+            addError("Invalid output directive `${name}`", stmt)
         }
     }
 
@@ -561,7 +561,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         node.variableScope = currentScope
         if( node.parameters != null ) {
             for( final parameter : node.parameters ) {
-                declare(parameter, node)
+                declare(parameter, parameter)
                 if( parameter.hasInitialExpression() )
                     visit(parameter.initialExpression)
             }

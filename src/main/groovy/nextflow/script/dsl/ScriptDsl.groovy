@@ -19,6 +19,7 @@ import java.nio.file.Path
 
 import groovy.transform.CompileStatic
 import nextflow.NextflowMeta
+import nextflow.extension.GroupKey
 import nextflow.script.WorkflowMetadata
 import nextflow.util.ArrayTuple
 import org.codehaus.groovy.ast.ClassNode
@@ -97,6 +98,12 @@ class ScriptDsl implements DslScope {
         Convenience method for `file()` that always returns a list.
     ''')
     List<Path> files(Map opts=null, String filePattern) {
+    }
+
+    @Function('''
+        Create a grouping key to use with the [groupTuple](https://nextflow.io/docs/latest/operator.html#grouptuple) operator.
+    ''')
+    GroupKey groupKey(Object key, int size) {
     }
 
     @Function('''

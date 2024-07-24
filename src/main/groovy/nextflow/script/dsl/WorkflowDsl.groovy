@@ -18,9 +18,37 @@ package nextflow.script.dsl
 import groovy.transform.CompileStatic
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
+import nextflow.script.ChannelOut
 
 @CompileStatic
 class WorkflowDsl implements DslScope {
+
+    @Operator
+    @Function('''
+        The `branch` operator forwards each value from a source channel to one of multiple output channels, based on a selection criteria.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#branch)
+    ''')
+    ChannelOut branch(DataflowReadChannel source, Closure action) {
+    }
+
+    @Operator
+    @Function('''
+        The `buffer` operator collects values from a source channel into subsets and emits each subset separately.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#buffer)
+    ''')
+    DataflowWriteChannel buffer(DataflowReadChannel source, Closure openingCondition=null, Closure closingCondition) {
+    }
+
+    @Operator
+    @Function('''
+        The `collate` operator collects values from a source channel into groups of *N* values.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#collate)
+    ''')
+    DataflowWriteChannel collate(DataflowReadChannel source, int size, int step, boolean remainder = true) {
+    }
 
     @Operator
     @Function('''
@@ -29,6 +57,24 @@ class WorkflowDsl implements DslScope {
         [Read more](https://nextflow.io/docs/latest/operator.html#collect)
     ''')
     DataflowWriteChannel collect(DataflowReadChannel source, Closure action=null) {
+    }
+
+    @Operator
+    @Function('''
+        The `collectFile` operator collects the values from a source channel and saves them to one or more files, emitting the collected file(s).
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#collectfile)
+    ''')
+    DataflowWriteChannel collectFile(DataflowReadChannel source, Map opts=[:], Closure closure=null) {
+    }
+
+    @Operator
+    @Function('''
+        The `combine` operator produces the combinations (i.e. cross product, “Cartesian” product) of two source channels, or a channel and a list (as the right operand), emitting each combination separately.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#combine)
+    ''')
+    DataflowWriteChannel combine(DataflowReadChannel left, Map opts=[:], Object right) {
     }
 
     @Operator
@@ -55,7 +101,7 @@ class WorkflowDsl implements DslScope {
 
         [Read more](https://nextflow.io/docs/latest/operator.html#cross)
     ''')
-    DataflowWriteChannel cross(DataflowReadChannel source, DataflowReadChannel other, Closure mapper=null) {
+    DataflowWriteChannel cross(DataflowReadChannel left, DataflowReadChannel right, Closure mapper=null) {
     }
 
     @Operator
@@ -65,6 +111,15 @@ class WorkflowDsl implements DslScope {
         [Read more](https://nextflow.io/docs/latest/operator.html#distinct)
     ''')
     DataflowWriteChannel distinct(DataflowReadChannel source) {
+    }
+
+    @Operator
+    @Function('''
+        When the pipeline is executed with the `-dump-channels` command-line option, the `dump` operator prints each value in a source channel, otherwise it does nothing.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#dump)
+    ''')
+    DataflowWriteChannel dump(DataflowReadChannel source, Map opts=[:]) {
     }
 
     @Operator
@@ -150,6 +205,16 @@ class WorkflowDsl implements DslScope {
     DataflowWriteChannel map(DataflowReadChannel source, Closure closure) {
     }
 
+    @Deprecated
+    @Operator
+    @Function('''
+        The `merge` operator joins the values from two or more channels into a new channel.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#merge)
+    ''')
+    DataflowWriteChannel merge(DataflowReadChannel source, DataflowReadChannel... others) {
+    }
+
     @Operator
     @Function('''
         The `mix` operator emits the values from two or more source channels into a single output channel.
@@ -157,6 +222,15 @@ class WorkflowDsl implements DslScope {
         [Read more](https://nextflow.io/docs/latest/operator.html#mix)
     ''')
     DataflowWriteChannel mix(DataflowReadChannel source, DataflowReadChannel... others) {
+    }
+
+    @Operator
+    @Function('''
+        The `multiMap` operator applies a set of mapping functions to a source channel, producing a separate output channel for each mapping function.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#multimap)
+    ''')
+    ChannelOut multiMap(DataflowReadChannel source, Closure action) {
     }
 
     @Operator
@@ -170,11 +244,74 @@ class WorkflowDsl implements DslScope {
 
     @Operator
     @Function('''
+        The `set` operator assigns a source channel to a variable, whose name is specified in a closure.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#set)
+    ''')
+    void set(DataflowReadChannel source, Closure holder) {
+    }
+
+    @Operator
+    @Function('''
+        The `splitCsv` operator parses and splits [CSV-formatted](http://en.wikipedia.org/wiki/Comma-separated_values) text from a source channel into records, or groups of records with a given size.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#splitcsv)
+    ''')
+    DataflowWriteChannel splitCsv(DataflowReadChannel source, Map opts=[:]) {
+    }
+
+    @Operator
+    @Function('''
+        The `splitFastq` operator splits [FASTQ formatted](http://en.wikipedia.org/wiki/FASTQ_format) text from a source channel into individual sequences.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#splitfastq)
+    ''')
+    DataflowWriteChannel splitFastq(DataflowReadChannel source, Map opts=[:]) {
+    }
+
+    @Operator
+    @Function('''
+        The `splitText` operator splits multi-line text content from a source channel into chunks of *N* lines.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#splittext)
+    ''')
+    DataflowWriteChannel splitText(DataflowReadChannel source, Map opts=[:], Closure action=null) {
+    }
+
+    @Operator
+    @Function('''
+        The `subscribe` operator invokes a custom function for each value in a source channel.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#subscribe)
+    ''')
+    DataflowReadChannel subscribe(DataflowReadChannel source, Closure closure) {
+    }
+
+    @Operator
+    @Function('''
         The `take` operator takes the first *N* values from a source channel.
 
         [Read more](https://nextflow.io/docs/latest/operator.html#take)
     ''')
     DataflowWriteChannel take(DataflowReadChannel source, int n) {
+    }
+
+    @Operator
+    @Function('''
+        The `toList` operator collects all the values from a source channel into a list and emits the list as a single value.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#to;ist)
+    ''')
+    DataflowWriteChannel toList(DataflowReadChannel source) {
+    }
+
+    @Operator
+    @Function('''
+        The `toSortedList` operator collects all the values from a source channel into a sorted list and emits the list as a single value.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#tosortedlist)
+    ''')
+    DataflowWriteChannel toSortedList(DataflowReadChannel source) {
     }
 
     @Operator

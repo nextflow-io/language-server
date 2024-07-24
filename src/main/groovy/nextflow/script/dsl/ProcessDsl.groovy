@@ -372,6 +372,13 @@ class ProcessInputDsl implements DslScope {
     void val(arg) {
     }
 
+    @Deprecated
+    @Function('''
+        Declare a file input.
+    ''')
+    void file(arg) {
+    }
+
     @Function('''
         Declare a file input. The received value should be a file or collection of files.
 
@@ -415,6 +422,13 @@ class ProcessOutputDsl implements DslScope {
         Declare a value output. The argument can be any value, and it can reference any output variables defined in the process body (i.e. variables declared without the `def` keyword).
     ''')
     void val(arg) {
+    }
+
+    @Deprecated
+    @Function('''
+        Declare a file output.
+    ''')
+    void file(arg) {
     }
 
     @Function('''
