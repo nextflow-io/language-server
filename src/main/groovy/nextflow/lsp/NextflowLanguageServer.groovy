@@ -222,7 +222,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
             final position = params.getPosition()
-            log.debug "textDocument/definition ${uri} [ ${position.getLine()}, ${position.getCharacter()} ]"
+            log.debug "textDocument/definition ${relativePath(uri)} [ ${position.getLine()}, ${position.getCharacter()} ]"
             final service = getLanguageService(uri)
             if( service )
                 return service.definition(params)
@@ -234,7 +234,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
-            log.debug "textDocument/symbol ${uri}"
+            log.debug "textDocument/symbol ${relativePath(uri)}"
             final service = getLanguageService(uri)
             if( service )
                 return service.documentSymbol(params)
@@ -251,7 +251,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
                 insertSpaces: params.getOptions().isInsertSpaces(),
                 harshilAlignment: harshilAlignment
             )
-            log.debug "textDocument/formatting ${uri} ${options.insertSpaces ? 'spaces' : 'tabs'} ${options.tabSize}"
+            log.debug "textDocument/formatting ${relativePath(uri)} ${options.insertSpaces ? 'spaces' : 'tabs'} ${options.tabSize}"
             final service = getLanguageService(uri)
             if( service )
                 return service.formatting(URI.create(uri), options)
@@ -275,7 +275,7 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
             cancelChecker.checkCanceled()
             final uri = params.getTextDocument().getUri()
             final position = params.getPosition()
-            log.debug "textDocument/references ${uri} [ ${position.getLine()}, ${position.getCharacter()} ]"
+            log.debug "textDocument/references ${relativePath(uri)} [ ${position.getLine()}, ${position.getCharacter()} ]"
             final service = getLanguageService(uri)
             if( service )
                 return service.references(params)
@@ -378,8 +378,10 @@ class NextflowLanguageServer implements LanguageServer, LanguageClientAware, Tex
         final entry = workspaceRoots.find { name, root -> uri.startsWith(root) }
         if( !entry )
             return uri
+        final name = entry.key
         final root = entry.value
-        return uri.replace(root, '')
+        final prefix = (name == DEFAULT_WORKSPACE_FOLDER_NAME) ? '' : name + ':'
+        return uri.replace(root, prefix)
     }
 
     private LanguageService getLanguageService(String uri) {
