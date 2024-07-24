@@ -73,7 +73,7 @@ class ConfigSchemaVisitor extends ClassCodeVisitorSupport {
             if( names ) names.pop()
         }
         if( names.first() == 'env' ) {
-            final envName = names.head().join('.')
+            final envName = names.tail().join('.')
             if( envName.contains('.') )
                 addWarning("Invalid environment variable name '${envName}'", node)
             return

@@ -54,6 +54,7 @@ class ConfigSchema {
         new nextflow.config.scopes.CondaConfig(),
         new nextflow.config.scopes.DagConfig(),
         new nextflow.config.scopes.DockerConfig(),
+        new nextflow.config.scopes.EnvConfig(),
         new nextflow.config.scopes.ExecutorConfig(),
         new nextflow.config.scopes.FusionConfig(),
         new nextflow.config.scopes.GoogleConfig(),
