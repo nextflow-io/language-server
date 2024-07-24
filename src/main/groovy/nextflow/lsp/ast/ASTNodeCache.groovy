@@ -46,8 +46,6 @@ import org.codehaus.groovy.ast.expr.MapEntryExpression
 import org.codehaus.groovy.ast.expr.MapExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
 import org.codehaus.groovy.ast.expr.NotExpression
-import org.codehaus.groovy.ast.expr.PostfixExpression
-import org.codehaus.groovy.ast.expr.PrefixExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.ast.expr.RangeExpression
 import org.codehaus.groovy.ast.expr.SpreadExpression
@@ -584,28 +582,6 @@ class ASTNodeCache {
             try {
                 // see CodeVisitorSupport::visitShortTernaryExpression()
                 super.visitTernaryExpression(node)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        @Override
-        void visitPostfixExpression(PostfixExpression node) {
-            pushASTNode(node)
-            try {
-                super.visitPostfixExpression(node)
-            }
-            finally {
-                popASTNode()
-            }
-        }
-
-        @Override
-        void visitPrefixExpression(PrefixExpression node) {
-            pushASTNode(node)
-            try {
-                super.visitPrefixExpression(node)
             }
             finally {
                 popASTNode()

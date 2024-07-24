@@ -72,8 +72,8 @@ import static nextflow.antlr.SemanticPredicates.*;
     }
 
     private static final int[] REGEX_CHECK_ARRAY = {
-        DEC,
-        INC,
+        // DEC,
+        // INC,
         // THIS,
         RBRACE,
         RBRACK,
@@ -718,8 +718,8 @@ GE              : '>=';
 NOTEQUAL        : '!=';
 AND             : '&&';
 OR              : '||';
-INC             : '++';
-DEC             : '--';
+// INC             : '++';
+// DEC             : '--';
 ADD             : '+';
 SUB             : '-';
 MUL             : '*';

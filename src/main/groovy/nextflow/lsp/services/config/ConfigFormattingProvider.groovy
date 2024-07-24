@@ -44,8 +44,6 @@ import org.codehaus.groovy.ast.expr.MapEntryExpression
 import org.codehaus.groovy.ast.expr.MapExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
 import org.codehaus.groovy.ast.expr.NotExpression
-import org.codehaus.groovy.ast.expr.PostfixExpression
-import org.codehaus.groovy.ast.expr.PrefixExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.ast.expr.RangeExpression
 import org.codehaus.groovy.ast.expr.SpreadExpression
@@ -318,18 +316,6 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
         visit(node.trueExpression)
         append(' ?: ')
         visit(node.falseExpression)
-    }
-
-    @Override
-    void visitPostfixExpression(PostfixExpression node) {
-        visit(node.expression)
-        append(node.operation.text)
-    }
-
-    @Override
-    void visitPrefixExpression(PrefixExpression node) {
-        append(node.operation.text)
-        visit(node.expression)
     }
 
     @Override

@@ -59,8 +59,6 @@ import org.codehaus.groovy.ast.expr.MapExpression
 import org.codehaus.groovy.ast.expr.MapEntryExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
 import org.codehaus.groovy.ast.expr.NotExpression
-import org.codehaus.groovy.ast.expr.PostfixExpression
-import org.codehaus.groovy.ast.expr.PrefixExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.ast.expr.RangeExpression
 import org.codehaus.groovy.ast.expr.SpreadExpression
@@ -475,14 +473,8 @@ class ConfigAstBuilder {
         if( ctx instanceof PathExprAltContext )
             return ast( pathExpression(ctx), ctx )
 
-        if( ctx instanceof PostfixExprAltContext )
-            return ast( postfix(primary(ctx.primary()), ctx.op), ctx )
-
         if( ctx instanceof PowerExprAltContext )
             return ast( binary(ctx.left, ctx.op, ctx.right), ctx )
-
-        if( ctx instanceof PrefixExprAltContext )
-            return ast( prefix(expression(ctx.expression()), ctx.op), ctx )
 
         if( ctx instanceof RegexExprAltContext )
             return ast( binary(ctx.left, ctx.op, ctx.right), ctx )
@@ -519,14 +511,6 @@ class ConfigAstBuilder {
 
     private Expression binary(ExpressionContext left, ParserToken op, Expression right) {
         binX(expression(left), token(op), right)
-    }
-
-    private Expression postfix(Expression expression, ParserToken op) {
-        new PostfixExpression(expression, token(op))
-    }
-
-    private Expression prefix(Expression expression, ParserToken op) {
-        new PrefixExpression(token(op), expression)
     }
 
     private Expression shift(ShiftExprAltContext ctx) {

@@ -243,20 +243,14 @@ expressionStatement
 // expressions
 //
 expression
-    // postfix (++/--)
-    :   primary op=(INC | DEC)                                                              #postfixExprAlt
-
     // identifiers, literals, list/map element, method invocation
-    |   primary pathElement*                                                                #pathExprAlt
+    :   primary pathElement*                                                                #pathExprAlt
 
     // bitwise not (~) / logical not (!) (level 1)
     |   op=(BITNOT | NOT) nls expression                                                    #unaryNotExprAlt
 
     // math power operator (**) (level 2)
     |   left=expression op=POWER nls right=expression                                       #powerExprAlt
-
-    // prefix (++/--) (level 3)
-    |   op=(INC | DEC) expression                                                           #prefixExprAlt
 
     // unary (+/-) (level 3)
     |   op=(ADD | SUB) expression                                                           #unaryAddExprAlt
