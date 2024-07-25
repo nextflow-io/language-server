@@ -192,6 +192,10 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         builder.append(indent * indentCount)
     }
 
+    protected void appendNewLine() {
+        append('\n')
+    }
+
     protected void incIndent() {
         indentCount++
     }
@@ -211,7 +215,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         append(node.name)
         append(' = ')
         visit(node.value)
-        append('\n')
+        appendNewLine()
     }
 
     @Override
@@ -235,7 +239,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitFunction(FunctionNode node) {
-        append('\n')
+        appendNewLine()
         append('def ')
         append(node.name)
         append('(')
@@ -253,26 +257,26 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitProcess(ProcessNode node) {
-        append('\n')
+        appendNewLine()
         append('process ')
         append(node.name)
         append(' {\n')
         incIndent()
         if( node.directives instanceof BlockStatement ) {
             visitDirectives((BlockStatement) node.directives)
-            append('\n')
+            appendNewLine()
         }
         if( node.inputs instanceof BlockStatement ) {
             appendIndent()
             append('input:\n')
             visitDirectives((BlockStatement) node.inputs)
-            append('\n')
+            appendNewLine()
         }
         if( node.outputs instanceof BlockStatement ) {
             appendIndent()
             append('output:\n')
             visitDirectives((BlockStatement) node.outputs)
-            append('\n')
+            appendNewLine()
         }
         if( node.when !instanceof EmptyExpression ) {
             appendIndent()
@@ -286,7 +290,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         append(':\n')
         visit(node.exec)
         if( node.stub !instanceof EmptyStatement ) {
-            append('\n')
+            appendNewLine()
             appendIndent()
             append('stub:\n')
             visit(node.stub)
@@ -306,12 +310,12 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     protected void visitDirective(MethodCallExpression methodCall) {
         appendIndent()
         visitMethodCallExpression(methodCall, true)
-        append('\n')
+        appendNewLine()
     }
 
     @Override
     void visitWorkflow(WorkflowNode node) {
-        append('\n')
+        appendNewLine()
         append('workflow')
         if( node.name ) {
             append(' ')
@@ -323,7 +327,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             appendIndent()
             append('take:\n')
             visit(node.takes)
-            append('\n')
+            appendNewLine()
         }
         if( node.main instanceof BlockStatement ) {
             if( node.takes instanceof BlockStatement || node.emits instanceof BlockStatement || node.publishers instanceof BlockStatement ) {
@@ -333,13 +337,13 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             visit(node.main)
         }
         if( node.emits instanceof BlockStatement ) {
-            append('\n')
+            appendNewLine()
             appendIndent()
             append('emit:\n')
             visit(node.emits)
         }
         if( node.publishers instanceof BlockStatement ) {
-            append('\n')
+            appendNewLine()
             appendIndent()
             append('publish:\n')
             visit(node.publishers)
@@ -350,7 +354,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitOutput(OutputNode node) {
-        append('\n')
+        appendNewLine()
         append('output {\n')
         incIndent()
         if( node.body instanceof BlockStatement )
@@ -371,7 +375,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             if( args.size() == 1 && args.first() instanceof ClosureExpression ) {
                 final closure = (ClosureExpression) args.first()
                 final target = (BlockStatement) closure.code
-                append('\n')
+                appendNewLine()
                 appendIndent()
                 visit(call.getMethod())
                 append(' {\n')
@@ -403,7 +407,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             if( name == 'index' && args.size() == 1 && args.first() instanceof ClosureExpression ) {
                 final closure = (ClosureExpression) args.first()
                 final index = (BlockStatement) closure.code
-                append('\n')
+                appendNewLine()
                 appendIndent()
                 append(name)
                 append(' {\n')
@@ -421,6 +425,26 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     }
 
     // statements
+
+    @Override
+    void visitBlockStatement(BlockStatement block) {
+        for( int i = 0; i < block.statements.size(); i++ ) {
+            final stmt = block.statements[i]
+            if( i == 0 ) {
+                stmt.visit(this)
+                continue
+            }
+
+            if( stmt instanceof IfStatement )
+                append('\n')
+            if( stmt instanceof ExpressionStatement ) {
+                final expr = stmt.expression
+                if( expr instanceof MethodCallExpression )
+                    append('\n')
+            }
+            stmt.visit(this)
+        }
+    }
 
     @Override
     void visitIfElse(IfStatement node) {
@@ -464,7 +488,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             }
         }
         visit(node.expression)
-        append('\n')
+        appendNewLine()
     }
 
     @Override
@@ -472,7 +496,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         appendIndent()
         append('return ')
         visit(node.expression)
-        append('\n')
+        appendNewLine()
     }
 
     @Override
@@ -484,7 +508,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             append(', ')
             visit(node.messageExpression)
         }
-        append('\n')
+        appendNewLine()
     }
 
     @Override
@@ -528,18 +552,19 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         }
         visit(node.method, false)
         final arguments = (TupleExpression) node.arguments
+        if( directive ) {
+            append(' ')
+            visit(arguments)
+            return
+        }
         final lastClosureArg = arguments.size() > 0 && arguments.last() instanceof ClosureExpression
         final parenArgs = lastClosureArg
             ? new TupleExpression(arguments.expressions[0..<-1])
             : arguments
-        if( !directive || (parenArgs.size() > 0 && lastClosureArg) ) {
+        if( parenArgs.size() > 0 || !lastClosureArg ) {
             append('(')
             visit(parenArgs)
             append(')')
-        }
-        else if( parenArgs.size() > 0 ) {
-            append(' ')
-            visit(parenArgs)
         }
         if( lastClosureArg ) {
             append(' ')
@@ -621,7 +646,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             append(' }')
         }
         else {
-            append('\n')
+            appendNewLine()
             incIndent()
             visit(code)
             decIndent()
