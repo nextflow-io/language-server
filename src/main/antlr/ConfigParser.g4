@@ -462,7 +462,6 @@ arguments
     :   LPAREN nls argumentList? COMMA? nls rparen
     ;
 
-
 argumentList
     :   argumentListElement
         (   COMMA nls

@@ -25,6 +25,7 @@ import nextflow.lsp.services.CustomFormattingOptions
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Positions
+import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.Parameter
@@ -85,10 +86,13 @@ class ConfigFormattingProvider implements FormattingProvider {
     List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options) {
         if( ast == null ) {
             log.error("ast cache is empty while providing formatting")
-            return null
+            return Collections.emptyList()
         }
 
         final sourceUnit = ast.getSourceUnit(uri)
+        if( !sourceUnit.getAST() || ast.hasErrors(uri) )
+            return Collections.emptyList()
+
         final oldText = sourceUnit.getSource().getReader().getText()
         final range = new Range(new Position(0, 0), Positions.getPosition(oldText, oldText.size()))
         final visitor = new FormattingVisitor(sourceUnit, options)
@@ -139,6 +143,10 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
         builder.append(indent * indentCount)
     }
 
+    protected void appendNewLine() {
+        append('\n')
+    }
+
     protected void incIndent() {
         indentCount++
     }
@@ -155,6 +163,11 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     @Override
     void visitIfElse(IfStatement node) {
+        visitIfElse(node, true)
+    }
+
+    protected void visitIfElse(IfStatement node, boolean preIndent) {
+        if( preIndent )
         appendIndent()
         append('if (')
         visit(node.booleanExpression)
@@ -167,7 +180,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
         if( node.elseBlock instanceof IfStatement ) {
             appendIndent()
             append('else ')
-            visit(node.elseBlock)
+            visitIfElse((IfStatement) node.elseBlock, false)
         }
         else if( node.elseBlock !instanceof EmptyStatement ) {
             appendIndent()
@@ -194,7 +207,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
         else {
             appendIndent()
             visit(node.expression)
-            append('\n')
+            appendNewLine()
         }
     }
 
@@ -203,11 +216,11 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
         append(node.names.join('.'))
         append(node instanceof ConfigAppendNode ? ' ' : ' = ')
         visit(node.value)
-        append('\n')
+        appendNewLine()
     }
 
     protected void visitConfigBlock(ConfigBlockNode node) {
-        append('\n')
+        appendNewLine()
         appendIndent()
         if( node.kind != null ) {
             append(node.kind)
@@ -215,7 +228,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
         }
         append(node.name)
         append(' {')
-        append('\n')
+        appendNewLine()
 
         incIndent()
         visit(node.block)
@@ -229,7 +242,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
         appendIndent()
         append('includeConfig ')
         visit(node.source)
-        append('\n')
+        appendNewLine()
     }
 
     @Override
@@ -237,7 +250,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
         appendIndent()
         append('return ')
         visit(node.expression)
-        append('\n')
+        appendNewLine()
     }
 
     @Override
@@ -249,7 +262,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
             append(', ')
             visit(node.messageExpression)
         }
-        append('\n')
+        appendNewLine()
     }
 
     // expressions
@@ -261,15 +274,19 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
             append('.')
         }
         visit(node.method, false)
-        final arguments = node.arguments as TupleExpression
-        if( arguments.size() == 1 && arguments.first() instanceof ClosureExpression ) {
-            append(' ')
-            visit(arguments)
-        }
-        else {
+        final arguments = (TupleExpression) node.arguments
+        final lastClosureArg = arguments.size() > 0 && arguments.last() instanceof ClosureExpression
+        final parenArgs = lastClosureArg
+            ? new TupleExpression(arguments.expressions[0..<-1])
+            : arguments
+        if( parenArgs.size() > 0 || !lastClosureArg ) {
             append('(')
-            visit(arguments)
+            visit(parenArgs)
             append(')')
+        }
+        if( lastClosureArg ) {
+            append(' ')
+            visit(arguments.last())
         }
     }
 
@@ -336,18 +353,18 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
             }
             append(' ->')
         }
-        final code = node.code as BlockStatement
+        final code = (BlockStatement) node.code
         if( code.statements.size() == 0 ) {
             append(' }')
         }
         else if( code.statements.size() == 1 && code.statements.first() instanceof ExpressionStatement ) {
-            final stmt = code.statements.first() as ExpressionStatement
+            final stmt = (ExpressionStatement) code.statements.first()
             append(' ')
             visit(stmt.expression)
             append(' }')
         }
         else {
-            append('\n')
+            appendNewLine()
             incIndent()
             visit(code)
             decIndent()
@@ -371,10 +388,23 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     @Override
     void visitTupleExpression(TupleExpression node) {
-        for( int i = 0; i < node.expressions.size(); i++ ) {
-            visit(node.expressions[i])
-            if( i + 1 < node.expressions.size() )
+        final hasNamedArgs = node.getNodeMetaData(HAS_NAMED_ARGS)
+        final positionalArgs = hasNamedArgs ? node.expressions.tail() : node.expressions
+        for( int i = 0; i < positionalArgs.size(); i++ ) {
+            visit(positionalArgs[i])
+            if( i + 1 < positionalArgs.size() )
                 append(', ')
+        }
+        if( hasNamedArgs ) {
+            if( positionalArgs )
+                append(', ')
+            final mapX = (MapExpression)node.expressions.first()
+            final namedArgs = mapX.mapEntryExpressions
+            for( int i = 0; i < namedArgs.size(); i++ ) {
+                visit(namedArgs[i])
+                if( i + 1 < namedArgs.size() )
+                    append(', ')
+            }
         }
     }
 
@@ -465,9 +495,15 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
     protected void visitConstantExpression(ConstantExpression node, boolean quote) {
         if( node.value instanceof String ) {
             final value = (String) node.value
-            if( quote ) append('\'')
-            append(replaceEscapes(value, '\''))
-            if( quote ) append('\'')
+            if( quote ) {
+                final quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> SQ_STR)
+                append(quoteChar)
+                append(replaceEscapes(value, quoteChar))
+                append(quoteChar)
+            }
+            else {
+                append(value)
+            }
         }
         else {
             append(node.text)
@@ -475,10 +511,10 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
     }
 
     private String replaceEscapes(String value, String quoteChar) {
-        value
-            .replace(quoteChar, '\\' + quoteChar)
-            .replace('\n', '\\n')
-            .replace('\t', '\\t')
+        value = value.replace(quoteChar, '\\' + quoteChar)
+        if( quoteChar == SQ_STR || quoteChar == DQ_STR )
+            value = value.replace('\n', '\\n')
+        return value
     }
 
     @Override
@@ -500,9 +536,37 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     @Override
     void visitGStringExpression(GStringExpression node) {
-        append('"')
-        append(replaceEscapes(node.text, '\"'))
-        append('"')
+        final quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> DQ_STR)
+        final strings = node.strings
+        final values = node.values
+        append(quoteChar)
+        int i = 0
+        int j = 0
+        while( i < strings.size() || j < values.size() ) {
+            final string = i < strings.size() ? strings[i] : null
+            final value = j < values.size() ? values[j] : null
+            if( isNodeBefore(string, value) ) {
+                append(replaceEscapes(string.text, quoteChar))
+                i++
+            }
+            else {
+                append('${')
+                visit(value)
+                append('}')
+                j++
+            }
+        }
+        append(quoteChar)
+    }
+
+    protected boolean isNodeBefore(ASTNode a, ASTNode b) {
+        if( !a )
+            return false
+        if( !b )
+            return true
+        if( a.getLineNumber() < b.getLineNumber() )
+            return true
+        return a.getLineNumber() == b.getLineNumber() && a.getColumnNumber() < b.getColumnNumber()
     }
 
     @Override
@@ -511,18 +575,27 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
     }
 
     protected void visit(Expression node, boolean quote) {
-        final Number number = node.getNodeMetaData(INSIDE_PARENTHESES_LEVEL)
-        final k = number != null ? number.intValue() : 0
-        append('(' * k)
+        final number = (Number) node.getNodeMetaData(INSIDE_PARENTHESES_LEVEL)
+        if( number?.intValue() )
+            append('(')
         if( node instanceof ConstantExpression ) {
             visitConstantExpression(node, quote)
         }
         else {
             super.visit(node)
         }
-        append(')' * k)
+        if( number?.intValue() )
+            append(')')
     }
 
+    private static final String SLASH_STR = '/'
+    private static final String TDQ_STR = '"""'
+    private static final String TSQ_STR = "'''"
+    private static final String SQ_STR = "'"
+    private static final String DQ_STR = '"'
+
+    private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
+    private static final String QUOTE_CHAR = "_QUOTE_CHAR"
 
 }

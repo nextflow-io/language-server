@@ -216,7 +216,7 @@ class ConfigAstBuilder {
         if( ctx instanceof ConfigIncompleteStmtAltContext )
             return ast( configIncomplete(ctx.configIncomplete()), ctx )
 
-        throw createParsingFailedException("Invalid config statement: ${ctx.text}", ctx)
+        throw createParsingFailedException("Invalid statement: ${ctx.text}", ctx)
     }
 
     private Statement configInclude(ConfigIncludeContext ctx) {
@@ -321,7 +321,7 @@ class ConfigAstBuilder {
         if( ctx instanceof EmptyStmtAltContext )
             return EmptyStatement.INSTANCE
 
-        throw createParsingFailedException("Invalid Groovy statement: ${ctx.text}", ctx)
+        throw createParsingFailedException("Invalid statement: ${ctx.text}", ctx)
     }
 
     private Statement ifElseStatement(IfElseStatementContext ctx) {
@@ -502,7 +502,7 @@ class ConfigAstBuilder {
         if( ctx instanceof UnaryNotExprAltContext )
             return ast( unaryNot(expression(ctx.expression()), ctx.op), ctx )
 
-        throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
+        throw createParsingFailedException("Invalid expression: ${ctx.text}", ctx)
     }
 
     private Expression binary(ExpressionContext left, ParserToken op, ExpressionContext right) {
@@ -569,7 +569,7 @@ class ConfigAstBuilder {
             return ctx.pathElement().inject(primary, (acc, el) -> pathElement(acc, el))
         }
         catch( IllegalStateException e ) {
-            throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
+            throw createParsingFailedException("Invalid expression: ${ctx.text}", ctx)
         }
     }
 
@@ -709,7 +709,7 @@ class ConfigAstBuilder {
         if( ctx instanceof BuiltInTypePrmrAltContext )
             return ast( builtInType(ctx.builtInType()), ctx )
 
-        throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
+        throw createParsingFailedException("Invalid expression: ${ctx.text}", ctx)
     }
 
     private Expression builtInType(BuiltInTypeContext ctx) {
@@ -732,7 +732,7 @@ class ConfigAstBuilder {
             return ast( floatingPointLiteral(ctx), ctx )
 
         if( ctx instanceof StringLiteralAltContext )
-            return ast( constX(stringLiteral(ctx.stringLiteral())), ctx )
+            return ast( string(ctx.stringLiteral()), ctx )
 
         if( ctx instanceof BooleanLiteralAltContext )
             return ast( constX(ctx.text == 'true'), ctx )
@@ -740,7 +740,7 @@ class ConfigAstBuilder {
         if( ctx instanceof NullLiteralAltContext )
             return ast( constX(null), ctx )
 
-        throw createParsingFailedException("Invalid Groovy expression: ${ctx.text}", ctx)
+        throw createParsingFailedException("Invalid expression: ${ctx.text}", ctx)
     }
 
     private Expression integerLiteral(IntegerLiteralAltContext ctx) {
@@ -765,6 +765,17 @@ class ConfigAstBuilder {
         }
 
         constX(num, true)
+    }
+
+    private Expression string(StringLiteralContext ctx) {
+        final text = ctx.text
+        final result = constX(stringLiteral(text))
+        if( text.startsWith(SQ_STR)    ) result.putNodeMetaData(QUOTE_CHAR, SQ_STR)
+        if( text.startsWith(DQ_STR)    ) result.putNodeMetaData(QUOTE_CHAR, DQ_STR)
+        if( text.startsWith(TSQ_STR)   ) result.putNodeMetaData(QUOTE_CHAR, TSQ_STR)
+        if( text.startsWith(TDQ_STR)   ) result.putNodeMetaData(QUOTE_CHAR, TDQ_STR)
+        if( text.startsWith(SLASH_STR) ) result.putNodeMetaData(QUOTE_CHAR, SLASH_STR)
+        return result
     }
 
     private String stringLiteral(StringLiteralContext ctx) {
@@ -793,7 +804,8 @@ class ConfigAstBuilder {
     }
 
     private Expression gstring(GstringContext ctx) {
-        final verbatimText = stringLiteral(ctx.text)
+        final text = ctx.text
+        final verbatimText = stringLiteral(text)
         final List<ConstantExpression> strings = []
         final List<Expression> values = []
 
@@ -819,7 +831,10 @@ class ConfigAstBuilder {
                 values << expression(part.expression())
         }
 
-        new GStringExpression(verbatimText, strings, values)
+        final result = new GStringExpression(verbatimText, strings, values)
+        if( text.startsWith(DQ_STR)  ) result.putNodeMetaData(QUOTE_CHAR, DQ_STR)
+        if( text.startsWith(TDQ_STR) ) result.putNodeMetaData(QUOTE_CHAR, TDQ_STR)
+        return result
     }
 
     private Expression gstringPath(ParserRuleContext ctx) {
@@ -982,7 +997,7 @@ class ConfigAstBuilder {
                 opts << namedArg(ctx1.namedArg())
 
             else
-                throw createParsingFailedException("Invalid Groovy method argument: ${ctx.text}", ctx)
+                throw createParsingFailedException("Invalid method argument: ${ctx.text}", ctx)
         }
 
         // TODO: validate duplicate named arguments ?
@@ -1017,7 +1032,7 @@ class ConfigAstBuilder {
         if( ctx.gstring() )
             return gstring(ctx.gstring())
 
-        throw createParsingFailedException("Invalid Groovy method named argument: ${ctx.text}", ctx)
+        throw createParsingFailedException("Invalid method named argument: ${ctx.text}", ctx)
     }
 
     /// MISCELLANEOUS
@@ -1242,5 +1257,6 @@ class ConfigAstBuilder {
 
     private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
+    private static final String QUOTE_CHAR = "_QUOTE_CHAR"
 
 }
