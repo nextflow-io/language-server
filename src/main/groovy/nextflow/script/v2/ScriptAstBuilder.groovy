@@ -832,11 +832,6 @@ class ScriptAstBuilder {
             return ast( pathClosureElement(expression, closure), expression, ctx )
         }
 
-        if( ctx instanceof ClosureWithLabelsPathExprAltContext ) {
-            final closure = closureWithLabels(ctx.closureWithLabels())
-            return ast( pathClosureElement(expression, closure), expression, ctx )
-        }
-
         if( ctx instanceof ArgumentsPathExprAltContext )
             return ast( pathArgumentsElement(expression, ctx.arguments()), expression, ctx )
 
@@ -1135,26 +1130,6 @@ class ScriptAstBuilder {
         final params = parameters(ctx.formalParameterList())
         final code = blockStatements(ctx.blockStatements())
         ast( closureX(params, code), ctx )
-    }
-
-    private Expression closureWithLabels(ClosureWithLabelsContext ctx) {
-        final params = parameters(ctx.formalParameterList())
-        final code = blockStatementsWithLabels(ctx.blockStatementsWithLabels())
-        ast( closureX(params, code), ctx )
-    }
-
-    private BlockStatement blockStatementsWithLabels(BlockStatementsWithLabelsContext ctx) {
-        final statements = ctx.statementOrLabeled().collect( this.&statementOrLabeled )
-        ast( block(new VariableScope(), statements), ctx )
-    }
-
-    private Statement statementOrLabeled(StatementOrLabeledContext ctx) {
-        final result = statement(ctx.statement())
-        if( ctx.identifier() ) {
-            final label = identifier(ctx.identifier())
-            result.addStatementLabel(label)
-        }
-        return result
     }
 
     private Expression list(ListContext ctx) {
