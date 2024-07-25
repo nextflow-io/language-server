@@ -407,6 +407,7 @@ class ProcessInputDsl implements DslScope {
     void tuple(Object... args) {
     }
 
+    @Deprecated
     @Function('''
         Declare an `each` input.
     ''')
