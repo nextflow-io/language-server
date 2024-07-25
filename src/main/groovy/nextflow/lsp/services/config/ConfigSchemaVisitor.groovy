@@ -20,10 +20,11 @@ import nextflow.config.dsl.ConfigSchema
 import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
+import nextflow.config.v2.ConfigNode
+import nextflow.config.v2.ConfigVisitor
 import nextflow.lsp.compiler.SyntaxWarning
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 
@@ -32,7 +33,7 @@ import org.codehaus.groovy.control.messages.SyntaxErrorMessage
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ConfigSchemaVisitor extends ClassCodeVisitorSupport {
+class ConfigSchemaVisitor extends ClassCodeVisitorSupport implements ConfigVisitor {
 
     private SourceUnit sourceUnit
 
@@ -49,24 +50,13 @@ class ConfigSchemaVisitor extends ClassCodeVisitorSupport {
 
     void visit() {
         final moduleNode = sourceUnit.getAST()
-        if( moduleNode == null )
+        if( moduleNode !instanceof ConfigNode )
             return
-        visit(moduleNode.getStatementBlock())
+        ConfigVisitor.super.visit((ConfigNode) moduleNode)
     }
 
     @Override
-    void visitExpressionStatement(ExpressionStatement node) {
-        if( node instanceof ConfigAssignNode )
-            visitConfigAssign(node)
-        else if( node instanceof ConfigBlockNode )
-            visitConfigBlock(node)
-        else if( node instanceof ConfigIncludeNode )
-            visitConfigInclude(node)
-        else
-            super.visitExpressionStatement(node)
-    }
-
-    protected void visitConfigAssign(ConfigAssignNode node) {
+    void visitConfigAssign(ConfigAssignNode node) {
         final names = scopes + node.names
         if( names.first() == 'profiles' ) {
             if( names ) names.pop()
@@ -95,16 +85,19 @@ class ConfigSchemaVisitor extends ClassCodeVisitorSupport {
             addWarning("Unrecognized config option '${fqName}'", node)
     }
 
-    protected void visitConfigBlock(ConfigBlockNode node) {
+    @Override
+    void visitConfigBlock(ConfigBlockNode node) {
         final newScope = node.kind == null
         if( newScope )
             scopes.add(node.name)
-        visit(node.block)
+        ConfigVisitor.super.visitConfigBlock(node)
         if( newScope )
             scopes.removeLast()
     }
 
-    protected void visitConfigInclude(ConfigIncludeNode node) {
+    @Override
+    void visitConfigInclude(ConfigIncludeNode node) {
+        // TODO: validate embedded config settings in this context?
     }
 
     void addWarning(String message, ASTNode node) {

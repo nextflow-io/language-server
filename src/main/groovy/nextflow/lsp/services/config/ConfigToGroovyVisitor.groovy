@@ -20,10 +20,13 @@ import nextflow.config.v2.ConfigAppendNode
 import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
+import nextflow.config.v2.ConfigNode
+import nextflow.config.v2.ConfigVisitor
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
+import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.expr.Expression
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
+import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.SourceUnit
 
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*
@@ -33,12 +36,15 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ConfigToGroovyVisitor extends ClassCodeVisitorSupport {
+class ConfigToGroovyVisitor extends ClassCodeVisitorSupport implements ConfigVisitor {
 
     private SourceUnit sourceUnit
 
+    private ConfigNode moduleNode
+
     ConfigToGroovyVisitor(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit
+        this.moduleNode = (ConfigNode) sourceUnit.getAST()
     }
 
     @Override
@@ -47,38 +53,49 @@ class ConfigToGroovyVisitor extends ClassCodeVisitorSupport {
     }
 
     void visit() {
-        final moduleNode = sourceUnit.getAST()
         if( moduleNode == null )
             return
-        super.visitBlockStatement(moduleNode.getStatementBlock())
-
+        ConfigVisitor.super.visit(moduleNode)
         if( moduleNode.isEmpty() )
             moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
     }
 
     @Override
-    void visitExpressionStatement(ExpressionStatement node) {
-        if( node instanceof ConfigAssignNode )
-            visitConfigAssign(node)
-        else if( node instanceof ConfigBlockNode )
-            visitConfigBlock(node)
-        else if( node instanceof ConfigIncludeNode )
-            visitConfigInclude(node)
-        else
-            super.visitExpressionStatement(node)
+    void visitConfigAssign(ConfigAssignNode node) {
+        moduleNode.addStatement(transformConfigAssign(node))
     }
 
-    protected void visitConfigAssign(ConfigAssignNode node) {
+    protected Statement transformConfigAssign(ConfigAssignNode node) {
         final methodName = node instanceof ConfigAppendNode ? 'append' : 'assign'
         final names = listX( node.names.collect(name -> constX(name)) as List<Expression> )
-        node.expression = callThisX(methodName, args(names, node.value))
+        return stmt(callThisX(methodName, args(names, node.value)))
     }
 
-    protected void visitConfigBlock(ConfigBlockNode node) {
-        node.expression = callThisX(node.kind ?: 'block', args(constX(node.name), closureX(node.block)))
+    @Override
+    void visitConfigBlock(ConfigBlockNode node) {
+        moduleNode.addStatement(transformConfigBlock(node))
     }
 
-    protected void visitConfigInclude(ConfigIncludeNode node) {
-        node.expression = callThisX('includeConfig', args(node.source))
+    protected Statement transformConfigBlock(ConfigBlockNode node) {
+        final List<Statement> statements = []
+        for( final stmt : node.statements ) {
+            if( stmt instanceof ConfigAssignNode )
+                statements.add(transformConfigAssign(stmt))
+            else if( stmt instanceof ConfigBlockNode )
+                statements.add(transformConfigBlock(stmt))
+            else if( stmt instanceof ConfigIncludeNode )
+                statements.add(transformConfigInclude(stmt))
+        }
+        final code = block(new VariableScope(), statements)
+        return stmt(callThisX(node.kind ?: 'block', args(constX(node.name), closureX(code))))
+    }
+
+    @Override
+    void visitConfigInclude(ConfigIncludeNode node) {
+        moduleNode.addStatement(transformConfigInclude(node))
+    }
+
+    protected Statement transformConfigInclude(ConfigIncludeNode node) {
+        return stmt(callThisX('includeConfig', args(node.source)))
     }
 }

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services.script
+package nextflow.script.v2
 
 import groovy.transform.CompileStatic
 import nextflow.script.v2.FeatureFlagNode
@@ -23,10 +23,8 @@ import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
 import nextflow.script.v2.WorkflowNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.Statement
-import org.codehaus.groovy.control.SourceUnit
 
 @CompileStatic
 interface ScriptVisitor {

@@ -16,22 +16,11 @@
 package nextflow.config.v2
 
 import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.expr.Expression
+import org.codehaus.groovy.ast.stmt.Statement
 
-/**
- *
- * @author Ben Sherman <bentshermann@gmail.com>
- */
 @CompileStatic
-class ConfigIncludeNode extends ConfigStatement {
-    final Expression source
+class ConfigStatement extends Statement {
 
-    ConfigIncludeNode(Expression source) {
-        this.source = source
-    }
-
-    @Override
     void visit(ConfigVisitor visitor) {
-        visitor.visitConfigInclude(this)
     }
 }

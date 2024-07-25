@@ -22,6 +22,7 @@ import nextflow.lsp.compiler.SyntaxWarning
 import nextflow.script.dsl.ScriptDsl
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.ScriptNode
+import nextflow.script.v2.ScriptVisitor
 import org.codehaus.groovy.GroovyBugError
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeExpressionTransformer

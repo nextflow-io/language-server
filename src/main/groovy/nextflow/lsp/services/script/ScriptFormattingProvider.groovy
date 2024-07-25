@@ -28,6 +28,7 @@ import nextflow.script.v2.IncludeVariable
 import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
+import nextflow.script.v2.ScriptVisitor
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport

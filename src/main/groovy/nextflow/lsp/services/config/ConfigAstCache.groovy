@@ -25,10 +25,11 @@ import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
 import nextflow.config.v2.ConfigIncompleteNode
+import nextflow.config.v2.ConfigNode
+import nextflow.config.v2.ConfigVisitor
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.expr.ConstantExpression
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
 
@@ -64,7 +65,7 @@ class ConfigAstCache extends ASTNodeCache {
         return new Visitor(sourceUnit)
     }
 
-    private class Visitor extends ASTNodeCache.Visitor {
+    private class Visitor extends ASTNodeCache.Visitor implements ConfigVisitor {
 
         Visitor(SourceUnit sourceUnit) {
             super(sourceUnit)
@@ -73,60 +74,49 @@ class ConfigAstCache extends ASTNodeCache {
         @Override
         void visit() {
             final moduleNode = sourceUnit.getAST()
-            if( moduleNode == null )
+            if( moduleNode !instanceof ConfigNode )
                 return
-            for( final stmt : moduleNode.getStatementBlock().getStatements() )
-                visit(stmt)
+            ConfigVisitor.super.visit((ConfigNode) moduleNode)
         }
 
         @Override
-        void visitExpressionStatement(ExpressionStatement node) {
-            if( node instanceof ConfigAssignNode )
-                visitConfigAssign(node)
-            else if( node instanceof ConfigBlockNode )
-                visitConfigBlock(node)
-            else if( node instanceof ConfigIncludeNode )
-                visitConfigInclude(node)
-            else if( node instanceof ConfigIncompleteNode )
-                visitConfigIncomplete(node)
-            else
-                super.visitExpressionStatement(node)
-        }
-
-        protected void visitConfigAssign(ConfigAssignNode node) {
+        void visitConfigAssign(ConfigAssignNode node) {
             pushASTNode(node)
             try {
-                visit(node.value)
+                ConfigVisitor.super.visitConfigAssign(node)
             }
             finally {
                 popASTNode()
             }
         }
 
-        protected void visitConfigBlock(ConfigBlockNode node) {
+        @Override
+        void visitConfigBlock(ConfigBlockNode node) {
             pushASTNode(node)
             try {
-                for( final stmt : node.block.statements )
-                    visit(stmt)
+                ConfigVisitor.super.visitConfigBlock(node)
             }
             finally {
                 popASTNode()
             }
         }
 
-        protected void visitConfigInclude(ConfigIncludeNode node) {
+        @Override
+        void visitConfigInclude(ConfigIncludeNode node) {
             pushASTNode(node)
             try {
-                visit(node.source)
+                ConfigVisitor.super.visitConfigInclude(node)
             }
             finally {
                 popASTNode()
             }
         }
 
-        protected void visitConfigIncomplete(ConfigIncompleteNode node) {
+        @Override
+        void visitConfigIncomplete(ConfigIncompleteNode node) {
             pushASTNode(node)
             try {
+                ConfigVisitor.super.visitConfigIncomplete(node)
             }
             finally {
                 popASTNode()
@@ -134,7 +124,7 @@ class ConfigAstCache extends ASTNodeCache {
         }
     }
 
-    private class ResolveIncludeVisitor extends ClassCodeVisitorSupport {
+    private class ResolveIncludeVisitor extends ClassCodeVisitorSupport implements ConfigVisitor {
 
         private SourceUnit sourceUnit
 
@@ -160,30 +150,13 @@ class ConfigAstCache extends ASTNodeCache {
 
         void visit() {
             final moduleNode = sourceUnit.getAST()
-            if( moduleNode == null )
+            if( moduleNode !instanceof ConfigNode )
                 return
-            visit(moduleNode.getStatementBlock())
+            ConfigVisitor.super.visit((ConfigNode) moduleNode)
         }
 
         @Override
-        void visitExpressionStatement(ExpressionStatement node) {
-            if( node instanceof ConfigAssignNode )
-                visitConfigAssign(node)
-            else if( node instanceof ConfigBlockNode )
-                visitConfigBlock(node)
-            else if( node instanceof ConfigIncludeNode )
-                visitConfigInclude(node)
-            else
-                super.visitExpressionStatement(node)
-        }
-
-        protected void visitConfigAssign(ConfigAssignNode node) {
-        }
-
-        protected void visitConfigBlock(ConfigBlockNode node) {
-        }
-
-        protected void visitConfigInclude(ConfigIncludeNode node) {
+        void visitConfigInclude(ConfigIncludeNode node) {
             if( node.source !instanceof ConstantExpression )
                 return
             final source = node.source.getText()

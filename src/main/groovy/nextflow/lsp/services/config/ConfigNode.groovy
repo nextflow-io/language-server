@@ -16,22 +16,26 @@
 package nextflow.config.v2
 
 import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.expr.Expression
+import org.codehaus.groovy.ast.ModuleNode
+import org.codehaus.groovy.control.SourceUnit
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ConfigIncludeNode extends ConfigStatement {
-    final Expression source
+class ConfigNode extends ModuleNode {
+    private List<ConfigStatement> configStatements = []
 
-    ConfigIncludeNode(Expression source) {
-        this.source = source
+    ConfigNode(SourceUnit sourceUnit) {
+        super(sourceUnit)
     }
 
-    @Override
-    void visit(ConfigVisitor visitor) {
-        visitor.visitConfigInclude(this)
+    List<ConfigStatement> getConfigStatements() {
+        return configStatements
+    }
+
+    void addConfigStatement(ConfigStatement statement) {
+        configStatements.add(statement)
     }
 }

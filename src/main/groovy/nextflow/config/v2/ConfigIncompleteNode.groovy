@@ -16,19 +16,21 @@
 package nextflow.config.v2
 
 import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.expr.EmptyExpression
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ConfigIncompleteNode extends ExpressionStatement {
+class ConfigIncompleteNode extends ConfigStatement {
     final String text
 
     ConfigIncompleteNode(String text) {
-        super(EmptyExpression.INSTANCE)
         this.text = text
+    }
+
+    @Override
+    void visit(ConfigVisitor visitor) {
+        visitor.visitConfigIncomplete(this)
     }
 }

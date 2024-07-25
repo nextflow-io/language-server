@@ -20,6 +20,8 @@ import nextflow.config.v2.ConfigAppendNode
 import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
+import nextflow.config.v2.ConfigNode
+import nextflow.config.v2.ConfigVisitor
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.services.CustomFormattingOptions
 import nextflow.lsp.services.FormattingProvider
@@ -105,7 +107,7 @@ class ConfigFormattingProvider implements FormattingProvider {
 }
 
 @CompileStatic
-class FormattingVisitor extends ClassCodeVisitorSupport {
+class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor {
 
     private SourceUnit sourceUnit
 
@@ -127,9 +129,9 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     void visit() {
         final moduleNode = sourceUnit.getAST()
-        if( !moduleNode )
+        if( moduleNode !instanceof ConfigNode )
             return
-        moduleNode.statementBlock.visit(this)
+        ConfigVisitor.super.visit((ConfigNode) moduleNode)
     }
 
     protected void append(String value) {
@@ -157,6 +159,45 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     String toString() {
         return builder.toString()
+    }
+
+    // config statements
+
+    @Override
+    void visitConfigAssign(ConfigAssignNode node) {
+        appendIndent()
+        append(node.names.join('.'))
+        append(node instanceof ConfigAppendNode ? ' ' : ' = ')
+        visit(node.value)
+        appendNewLine()
+    }
+
+    @Override
+    void visitConfigBlock(ConfigBlockNode node) {
+        appendNewLine()
+        appendIndent()
+        if( node.kind != null ) {
+            append(node.kind)
+            append(':')
+        }
+        append(node.name)
+        append(' {')
+        appendNewLine()
+
+        incIndent()
+        ConfigVisitor.super.visitConfigBlock(node)
+        decIndent()
+
+        appendIndent()
+        append('}\n')
+    }
+
+    @Override
+    void visitConfigInclude(ConfigIncludeNode node) {
+        appendIndent()
+        append('includeConfig ')
+        visit(node.source)
+        appendNewLine()
     }
 
     // statements
@@ -195,53 +236,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport {
 
     @Override
     void visitExpressionStatement(ExpressionStatement node) {
-        if( node instanceof ConfigAssignNode ) {
-            visitConfigAssign(node)
-        }
-        else if( node instanceof ConfigBlockNode ) {
-            visitConfigBlock(node)
-        }
-        else if( node instanceof ConfigIncludeNode ) {
-            visitConfigInclude(node)
-        }
-        else {
-            appendIndent()
-            visit(node.expression)
-            appendNewLine()
-        }
-    }
-
-    protected void visitConfigAssign(ConfigAssignNode node) {
         appendIndent()
-        append(node.names.join('.'))
-        append(node instanceof ConfigAppendNode ? ' ' : ' = ')
-        visit(node.value)
-        appendNewLine()
-    }
-
-    protected void visitConfigBlock(ConfigBlockNode node) {
-        appendNewLine()
-        appendIndent()
-        if( node.kind != null ) {
-            append(node.kind)
-            append(':')
-        }
-        append(node.name)
-        append(' {')
-        appendNewLine()
-
-        incIndent()
-        visit(node.block)
-        decIndent()
-
-        appendIndent()
-        append('}\n')
-    }
-
-    protected void visitConfigInclude(ConfigIncludeNode node) {
-        appendIndent()
-        append('includeConfig ')
-        visit(node.source)
+        visit(node.expression)
         appendNewLine()
     }
 

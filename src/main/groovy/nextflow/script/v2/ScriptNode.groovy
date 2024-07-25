@@ -66,23 +66,23 @@ class ScriptNode extends ModuleNode {
     }
 
     void addFeatureFlag(FeatureFlagNode featureFlag) {
-        featureFlags << featureFlag
+        featureFlags.add(featureFlag)
     }
 
     void addInclude(IncludeNode includeNode) {
-        includes << includeNode
+        includes.add(includeNode)
     }
 
     void addFunction(FunctionNode functionNode) {
-        functions << functionNode
+        functions.add(functionNode)
     }
 
     void addProcess(ProcessNode processNode) {
-        processes << processNode
+        processes.add(processNode)
     }
 
     void addWorkflow(WorkflowNode workflowNode) {
-        workflows << workflowNode
+        workflows.add(workflowNode)
     }
 
     void setEntry(WorkflowNode entry) {

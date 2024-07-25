@@ -16,23 +16,25 @@
 package nextflow.config.v2
 
 import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.expr.EmptyExpression
 import org.codehaus.groovy.ast.expr.Expression
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ConfigAssignNode extends ExpressionStatement {
+class ConfigAssignNode extends ConfigStatement {
     final List<String> names
     final Expression value
 
     ConfigAssignNode(List<String> names, Expression value) {
-        super(EmptyExpression.INSTANCE)
         this.names = names
         this.value = value
+    }
+
+    @Override
+    void visit(ConfigVisitor visitor) {
+        visitor.visitConfigAssign(this)
     }
 }
 

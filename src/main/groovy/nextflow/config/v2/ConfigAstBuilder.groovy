@@ -94,7 +94,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 class ConfigAstBuilder {
 
     private SourceUnit sourceUnit
-    private ModuleNode moduleNode
+    private ConfigNode moduleNode
     private ConfigLexer lexer
     private ConfigParser parser
 
@@ -102,7 +102,7 @@ class ConfigAstBuilder {
 
     ConfigAstBuilder(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit
-        this.moduleNode = new ModuleNode(sourceUnit)
+        this.moduleNode = new ConfigNode(sourceUnit)
 
         final charStream = createCharStream(sourceUnit)
         this.lexer = new ConfigLexer(charStream)
@@ -174,12 +174,12 @@ class ConfigAstBuilder {
 
     private ModuleNode compilationUnit(CompilationUnitContext ctx) {
         for( final stmt : ctx.configStatement() )
-            moduleNode.addStatement(configStatement(stmt))
+            moduleNode.addConfigStatement(configStatement(stmt))
 
         final scriptClassNode = moduleNode.getScriptClassDummy()
         scriptClassNode.setName(getMainClassName())
 
-        final statements = moduleNode.getStatementBlock().getStatements()
+        final statements = moduleNode.getConfigStatements()
         if( scriptClassNode && !statements.isEmpty() ) {
             final first = statements.first()
             final last = statements.last()
@@ -200,7 +200,7 @@ class ConfigAstBuilder {
         return '_nf_config_' + hash.toString()
     }
 
-    private Statement configStatement(ConfigStatementContext ctx) {
+    private ConfigStatement configStatement(ConfigStatementContext ctx) {
         if( ctx instanceof ConfigIncludeStmtAltContext )
             return ast( configInclude(ctx.configInclude()), ctx )
 
@@ -219,27 +219,26 @@ class ConfigAstBuilder {
         throw createParsingFailedException("Invalid statement: ${ctx.text}", ctx)
     }
 
-    private Statement configInclude(ConfigIncludeContext ctx) {
+    private ConfigStatement configInclude(ConfigIncludeContext ctx) {
         final source = expression(ctx.expression())
         new ConfigIncludeNode(source)
     }
 
-    private Statement configAssignment(ConfigAssignmentContext ctx) {
+    private ConfigStatement configAssignment(ConfigAssignmentContext ctx) {
         final names = ctx.configAssignmentPath().identifier().collect( this.&identifier )
         final value = expression(ctx.expression())
         ast( new ConfigAssignNode(names, value), ctx )
     }
 
-    private Statement configBlock(ConfigBlockContext ctx) {
+    private ConfigStatement configBlock(ConfigBlockContext ctx) {
         final name = ctx.identifier()
             ? identifier(ctx.identifier())
             : stringLiteral(ctx.stringLiteral())
         final statements = ctx.configBlockStatement().collect( this.&configBlockStatement )
-        final block = block(new VariableScope(), statements)
-        new ConfigBlockNode(name, block)
+        new ConfigBlockNode(name, statements)
     }
 
-    private Statement configBlockStatement(ConfigBlockStatementContext ctx) {
+    private ConfigStatement configBlockStatement(ConfigBlockStatementContext ctx) {
         if( ctx instanceof ConfigIncludeBlockStmtAltContext )
             return ast( configInclude(ctx.configInclude()), ctx )
 
@@ -258,12 +257,11 @@ class ConfigAstBuilder {
         throw createParsingFailedException("Invalid statement in config block: ${ctx.text}", ctx)
     }
 
-    private Statement configSelector(ConfigSelectorContext ctx) {
+    private ConfigStatement configSelector(ConfigSelectorContext ctx) {
         final kind = ctx.kind.text
         final target = configSelectorTarget(ctx.target)
         final statements = ctx.configAssignment().collect( this.&configAssignment )
-        final block = block(new VariableScope(), statements)
-        new ConfigBlockNode(kind, target, block)
+        new ConfigBlockNode(kind, target, statements)
     }
 
     private String configSelectorTarget(ConfigSelectorTargetContext ctx) {
@@ -272,23 +270,22 @@ class ConfigAstBuilder {
             : stringLiteral(ctx.stringLiteral())
     }
 
-    private Statement configBlockAlt(ConfigBlockAltContext ctx) {
+    private ConfigStatement configBlockAlt(ConfigBlockAltContext ctx) {
         final name = identifier(ctx.identifier())
         final statements = ctx.configBlockAltStatement().collect( this.&configBlockAltStatement )
-        final block = block(new VariableScope(), statements)
-        final result = ast( new ConfigBlockNode(name, block), ctx )
+        final result = ast( new ConfigBlockNode(name, statements), ctx )
         if( name != 'plugins' )
             collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (i.e. omitting the equals sign)", result))
         return result
     }
 
-    private Statement configBlockAltStatement(ConfigBlockAltStatementContext ctx) {
+    private ConfigStatement configBlockAltStatement(ConfigBlockAltStatementContext ctx) {
         final name = identifier(ctx.identifier())
         final value = literal(ctx.literal())
         ast( new ConfigAppendNode(List.of(name), value), ctx )
     }
 
-    private Statement configIncomplete(ConfigIncompleteContext ctx) {
+    private ConfigStatement configIncomplete(ConfigIncompleteContext ctx) {
         final result = ast( new ConfigIncompleteNode(ctx.text), ctx )
         collectSyntaxError(new SyntaxException("Incomplete statement", result))
         return result

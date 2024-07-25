@@ -16,24 +16,25 @@
 package nextflow.config.v2
 
 import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.expr.EmptyExpression
-import org.codehaus.groovy.ast.stmt.BlockStatement
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ConfigBlockNode extends ExpressionStatement {
+class ConfigBlockNode extends ConfigStatement {
     final String kind
     final String name
-    final BlockStatement block
+    final List<ConfigStatement> statements
 
-    ConfigBlockNode(String kind = null, String name, BlockStatement block) {
-        super(EmptyExpression.INSTANCE)
+    ConfigBlockNode(String kind = null, String name, List<ConfigStatement> statements) {
         this.kind = kind
         this.name = name
-        this.block = block
+        this.statements = statements
+    }
+
+    @Override
+    void visit(ConfigVisitor visitor) {
+        visitor.visitConfigBlock(this)
     }
 }
