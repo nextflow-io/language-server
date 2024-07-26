@@ -13,25 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.v2
+package nextflow.config.v2;
 
-import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.expr.Expression
+import org.codehaus.groovy.ast.expr.Expression;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class ConfigIncludeNode extends ConfigStatement {
-    final Expression source
+public class ConfigIncludeNode extends ConfigStatement {
+    public final Expression source;
 
-    ConfigIncludeNode(Expression source) {
-        this.source = source
+    public ConfigIncludeNode(Expression source) {
+        this.source = source;
     }
 
     @Override
-    void visit(ConfigVisitor visitor) {
-        visitor.visitConfigInclude(this)
+    public void visit(ConfigVisitor visitor) {
+        visitor.visitConfigInclude(this);
     }
 }

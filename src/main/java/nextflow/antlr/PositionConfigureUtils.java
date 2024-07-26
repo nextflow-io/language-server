@@ -40,7 +40,7 @@ public class PositionConfigureUtils {
      * @param ctx     Context from which information is obtained.
      * @return Modified astNode.
      */
-    public static <T extends ASTNode> T configureAST(T astNode, ParserRuleContext ctx) {
+    public static <T extends ASTNode> T ast(T astNode, ParserRuleContext ctx) {
         Token start = ctx.getStart();
         Token stop = ctx.getStop();
 
@@ -68,11 +68,11 @@ public class PositionConfigureUtils {
         }
     }
 
-    public static <T extends ASTNode> T configureAST(T astNode, TerminalNode terminalNode) {
-        return configureAST(astNode, terminalNode.getSymbol());
+    public static <T extends ASTNode> T ast(T astNode, TerminalNode terminalNode) {
+        return ast(astNode, terminalNode.getSymbol());
     }
 
-    public static <T extends ASTNode> T configureAST(T astNode, Token token) {
+    public static <T extends ASTNode> T ast(T astNode, Token token) {
         astNode.setLineNumber(token.getLine());
         astNode.setColumnNumber(token.getCharPositionInLine() + 1);
         astNode.setLastLineNumber(token.getLine());
@@ -81,7 +81,7 @@ public class PositionConfigureUtils {
         return astNode;
     }
 
-    public static <T extends ASTNode> T configureAST(T astNode, ASTNode source) {
+    public static <T extends ASTNode> T ast(T astNode, ASTNode source) {
         astNode.setLineNumber(source.getLineNumber());
         astNode.setColumnNumber(source.getColumnNumber());
         astNode.setLastLineNumber(source.getLastLineNumber());
@@ -90,7 +90,7 @@ public class PositionConfigureUtils {
         return astNode;
     }
 
-    public static <T extends ASTNode> T configureAST(T astNode, ParserRuleContext ctx, ASTNode initialStop) {
+    public static <T extends ASTNode> T ast(T astNode, ParserRuleContext ctx, ASTNode initialStop) {
         Token start = ctx.getStart();
         astNode.setLineNumber(start.getLine());
         astNode.setColumnNumber(start.getCharPositionInLine() + 1);
@@ -106,7 +106,7 @@ public class PositionConfigureUtils {
         return astNode;
     }
 
-    public static <T extends ASTNode> T configureAST(T astNode, ASTNode start, ParserRuleContext ctx) {
+    public static <T extends ASTNode> T ast(T astNode, ASTNode start, ParserRuleContext ctx) {
         astNode.setLineNumber(start.getLineNumber());
         astNode.setColumnNumber(start.getColumnNumber());
 
@@ -121,7 +121,7 @@ public class PositionConfigureUtils {
         astNode.setLastColumnNumber(endPosition.getV2());
     }
 
-    public static <T extends ASTNode> T configureAST(T astNode, ASTNode start, ASTNode stop) {
+    public static <T extends ASTNode> T ast(T astNode, ASTNode start, ASTNode stop) {
         astNode.setLineNumber(start.getLineNumber());
         astNode.setColumnNumber(start.getColumnNumber());
 

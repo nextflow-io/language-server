@@ -13,15 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.v2
+package nextflow.config.v2;
 
-import org.codehaus.groovy.control.ParserPlugin
-import org.codehaus.groovy.control.ParserPluginFactory
+import java.util.List;
 
-class ConfigParserPluginFactory extends ParserPluginFactory {
+import org.codehaus.groovy.ast.expr.Expression;
 
-    @Override
-    ParserPlugin createParserPlugin() {
-        return new ConfigParserPlugin()
+/**
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public class ConfigAppendNode extends ConfigAssignNode {
+    public ConfigAppendNode(List<String> names, Expression value) {
+        super(names, value);
     }
 }

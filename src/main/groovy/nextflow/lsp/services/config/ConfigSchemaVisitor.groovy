@@ -52,7 +52,7 @@ class ConfigSchemaVisitor extends ClassCodeVisitorSupport implements ConfigVisit
         final moduleNode = sourceUnit.getAST()
         if( moduleNode !instanceof ConfigNode )
             return
-        ConfigVisitor.super.visit((ConfigNode) moduleNode)
+        super.visit((ConfigNode) moduleNode)
     }
 
     @Override
@@ -90,7 +90,7 @@ class ConfigSchemaVisitor extends ClassCodeVisitorSupport implements ConfigVisit
         final newScope = node.kind == null
         if( newScope )
             scopes.add(node.name)
-        ConfigVisitor.super.visitConfigBlock(node)
+        super.visitConfigBlock(node)
         if( newScope )
             scopes.removeLast()
     }

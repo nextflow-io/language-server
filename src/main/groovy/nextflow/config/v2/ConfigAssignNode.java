@@ -13,24 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.v2
+package nextflow.config.v2;
 
-import groovy.transform.CompileStatic
+import java.util.List;
+
+import org.codehaus.groovy.ast.expr.Expression;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class ConfigIncompleteNode extends ConfigStatement {
-    final String text
+public class ConfigAssignNode extends ConfigStatement {
+    public final List<String> names;
+    public final Expression value;
 
-    ConfigIncompleteNode(String text) {
-        this.text = text
+    public ConfigAssignNode(List<String> names, Expression value) {
+        this.names = names;
+        this.value = value;
     }
 
     @Override
-    void visit(ConfigVisitor visitor) {
-        visitor.visitConfigIncomplete(this)
+    public void visit(ConfigVisitor visitor) {
+        visitor.visitConfigAssign(this);
     }
 }

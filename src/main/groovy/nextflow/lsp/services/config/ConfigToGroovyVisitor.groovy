@@ -55,7 +55,7 @@ class ConfigToGroovyVisitor extends ClassCodeVisitorSupport implements ConfigVis
     void visit() {
         if( moduleNode == null )
             return
-        ConfigVisitor.super.visit(moduleNode)
+        super.visit(moduleNode)
         if( moduleNode.isEmpty() )
             moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
     }

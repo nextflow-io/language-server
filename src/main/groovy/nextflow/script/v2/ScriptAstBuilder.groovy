@@ -83,7 +83,7 @@ import org.codehaus.groovy.syntax.Token
 import org.codehaus.groovy.syntax.Types
 
 import static nextflow.antlr.ScriptParser.*
-import static nextflow.antlr.PositionConfigureUtils.configureAST as ast
+import static nextflow.antlr.PositionConfigureUtils.ast
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 
 /**
@@ -166,7 +166,7 @@ class ScriptAstBuilder {
             return createParsingFailedException(t)
     }
 
-    ModuleNode buildAST(SourceUnit sourceUnit) {
+    ModuleNode buildAST() {
         try {
             return compilationUnit(buildCST())
         }

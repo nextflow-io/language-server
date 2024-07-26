@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.v2
+package nextflow.config.v2;
 
-import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.stmt.Statement
+import org.codehaus.groovy.control.ParserPlugin;
+import org.codehaus.groovy.control.ParserPluginFactory;
 
-@CompileStatic
-class ConfigStatement extends Statement {
+public class ConfigParserPluginFactory extends ParserPluginFactory {
 
-    void visit(ConfigVisitor visitor) {
+    @Override
+    public ParserPlugin createParserPlugin() {
+        return new ConfigParserPlugin();
     }
 }

@@ -76,14 +76,14 @@ class ConfigAstCache extends ASTNodeCache {
             final moduleNode = sourceUnit.getAST()
             if( moduleNode !instanceof ConfigNode )
                 return
-            ConfigVisitor.super.visit((ConfigNode) moduleNode)
+            super.visit((ConfigNode) moduleNode)
         }
 
         @Override
         void visitConfigAssign(ConfigAssignNode node) {
             pushASTNode(node)
             try {
-                ConfigVisitor.super.visitConfigAssign(node)
+                super.visitConfigAssign(node)
             }
             finally {
                 popASTNode()
@@ -94,7 +94,7 @@ class ConfigAstCache extends ASTNodeCache {
         void visitConfigBlock(ConfigBlockNode node) {
             pushASTNode(node)
             try {
-                ConfigVisitor.super.visitConfigBlock(node)
+                super.visitConfigBlock(node)
             }
             finally {
                 popASTNode()
@@ -105,7 +105,7 @@ class ConfigAstCache extends ASTNodeCache {
         void visitConfigInclude(ConfigIncludeNode node) {
             pushASTNode(node)
             try {
-                ConfigVisitor.super.visitConfigInclude(node)
+                super.visitConfigInclude(node)
             }
             finally {
                 popASTNode()
@@ -116,7 +116,7 @@ class ConfigAstCache extends ASTNodeCache {
         void visitConfigIncomplete(ConfigIncompleteNode node) {
             pushASTNode(node)
             try {
-                ConfigVisitor.super.visitConfigIncomplete(node)
+                super.visitConfigIncomplete(node)
             }
             finally {
                 popASTNode()
@@ -152,7 +152,7 @@ class ConfigAstCache extends ASTNodeCache {
             final moduleNode = sourceUnit.getAST()
             if( moduleNode !instanceof ConfigNode )
                 return
-            ConfigVisitor.super.visit((ConfigNode) moduleNode)
+            super.visit((ConfigNode) moduleNode)
         }
 
         @Override

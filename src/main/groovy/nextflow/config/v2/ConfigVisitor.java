@@ -13,47 +13,45 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.v2
+package nextflow.config.v2;
 
-import groovy.transform.CompileStatic
-import nextflow.config.v2.ConfigAssignNode
-import nextflow.config.v2.ConfigBlockNode
-import nextflow.config.v2.ConfigIncludeNode
-import nextflow.config.v2.ConfigIncompleteNode
-import nextflow.config.v2.ConfigNode
-import nextflow.config.v2.ConfigStatement
-import org.codehaus.groovy.ast.ModuleNode
-import org.codehaus.groovy.ast.expr.Expression
-import org.codehaus.groovy.ast.stmt.Statement
+import nextflow.config.v2.ConfigAssignNode;
+import nextflow.config.v2.ConfigBlockNode;
+import nextflow.config.v2.ConfigIncludeNode;
+import nextflow.config.v2.ConfigIncompleteNode;
+import nextflow.config.v2.ConfigNode;
+import nextflow.config.v2.ConfigStatement;
+import org.codehaus.groovy.ast.ModuleNode;
+import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.stmt.Statement;
 
-@CompileStatic
-interface ConfigVisitor {
+public interface ConfigVisitor {
 
     default void visit(ConfigNode moduleNode) {
-        for( final stmt : moduleNode.getConfigStatements() )
-            visit(stmt)
+        for( var stmt : moduleNode.getConfigStatements() )
+            visit(stmt);
     }
 
     default void visit(ConfigStatement node) {
-        node.visit(this)
+        node.visit(this);
     }
 
     default void visitConfigAssign(ConfigAssignNode node) {
-        visit(node.value)
+        visit(node.value);
     }
 
     default void visitConfigBlock(ConfigBlockNode node) {
-        for( final stmt : node.statements )
-            visit(stmt)
+        for( var stmt : node.statements )
+            visit(stmt);
     }
 
     default void visitConfigInclude(ConfigIncludeNode node) {
-        visit(node.source)
+        visit(node.source);
     }
 
     default void visitConfigIncomplete(ConfigIncompleteNode node) {
     }
 
-    void visit(Expression node)
+    void visit(Expression node);
 
 }

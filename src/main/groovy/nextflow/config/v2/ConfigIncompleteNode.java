@@ -13,28 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.v2
-
-import groovy.transform.CompileStatic
+package nextflow.config.v2;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class ConfigBlockNode extends ConfigStatement {
-    final String kind
-    final String name
-    final List<ConfigStatement> statements
+public class ConfigIncompleteNode extends ConfigStatement {
+    public final String text;
 
-    ConfigBlockNode(String kind = null, String name, List<ConfigStatement> statements) {
-        this.kind = kind
-        this.name = name
-        this.statements = statements
+    public ConfigIncompleteNode(String text) {
+        this.text = text;
     }
 
     @Override
-    void visit(ConfigVisitor visitor) {
-        visitor.visitConfigBlock(this)
+    public void visit(ConfigVisitor visitor) {
+        visitor.visitConfigIncomplete(this);
     }
 }

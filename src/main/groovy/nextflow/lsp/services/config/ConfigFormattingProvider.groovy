@@ -131,7 +131,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
         final moduleNode = sourceUnit.getAST()
         if( moduleNode !instanceof ConfigNode )
             return
-        ConfigVisitor.super.visit((ConfigNode) moduleNode)
+        super.visit((ConfigNode) moduleNode)
     }
 
     protected void append(String value) {
@@ -185,7 +185,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
         appendNewLine()
 
         incIndent()
-        ConfigVisitor.super.visitConfigBlock(node)
+        super.visitConfigBlock(node)
         decIndent()
 
         appendIndent()

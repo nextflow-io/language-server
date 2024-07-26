@@ -13,35 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.v2
+package nextflow.config.v2;
 
-import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.expr.Expression
+import java.util.List;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class ConfigAssignNode extends ConfigStatement {
-    final List<String> names
-    final Expression value
+public class ConfigBlockNode extends ConfigStatement {
+    public final String kind;
+    public final String name;
+    public final List<ConfigStatement> statements;
 
-    ConfigAssignNode(List<String> names, Expression value) {
-        this.names = names
-        this.value = value
+    public ConfigBlockNode(String kind, String name, List<ConfigStatement> statements) {
+        this.kind = kind;
+        this.name = name;
+        this.statements = statements;
+    }
+
+    public ConfigBlockNode(String name, List<ConfigStatement> statements) {
+        this(null, name, statements);
     }
 
     @Override
-    void visit(ConfigVisitor visitor) {
-        visitor.visitConfigAssign(this)
-    }
-}
-
-
-@CompileStatic
-class ConfigAppendNode extends ConfigAssignNode {
-    ConfigAppendNode(List<String> names, Expression value) {
-        super(names, value)
+    public void visit(ConfigVisitor visitor) {
+        visitor.visitConfigBlock(this);
     }
 }

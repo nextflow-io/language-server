@@ -13,38 +13,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.v2
+package nextflow.config.v2;
 
-import nextflow.exception.ConfigParseException
-import org.codehaus.groovy.ast.ModuleNode
-import org.codehaus.groovy.control.ParserPlugin
-import org.codehaus.groovy.control.SourceUnit
-import org.codehaus.groovy.control.io.StringReaderSource
-import org.codehaus.groovy.runtime.IOGroovyMethods
-import org.codehaus.groovy.syntax.Reduction
+import org.codehaus.groovy.GroovyBugError;
+import org.codehaus.groovy.ast.ModuleNode;
+import org.codehaus.groovy.control.ParserPlugin;
+import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.io.StringReaderSource;
+import org.codehaus.groovy.runtime.IOGroovyMethods;
+import org.codehaus.groovy.syntax.Reduction;
+
+import java.io.IOException;
+import java.io.Reader;
 
 /**
  * Parser plugin for the Nextflow config parser.
  */
-class ConfigParserPlugin implements ParserPlugin {
+public class ConfigParserPlugin implements ParserPlugin {
 
     @Override
-    Reduction parseCST(SourceUnit sourceUnit, Reader reader) {
+    public Reduction parseCST(SourceUnit sourceUnit, Reader reader) {
         if (!sourceUnit.getSource().canReopenSource()) {
             try {
                 sourceUnit.setSource(new StringReaderSource(
                         IOGroovyMethods.getText(reader),
                         sourceUnit.getConfiguration()
-                ))
+                ));
             } catch (IOException e) {
-                throw new ConfigParseException("Failed to create StringReaderSource", e)
+                throw new GroovyBugError("Failed to create StringReaderSource", e);
             }
         }
-        return null
+        return null;
     }
 
     @Override
-    ModuleNode buildAST(SourceUnit sourceUnit, ClassLoader classLoader, Reduction cst) {
-        return new ConfigAstBuilder(sourceUnit).buildAST()
+    public ModuleNode buildAST(SourceUnit sourceUnit, ClassLoader classLoader, Reduction cst) {
+        return new ConfigAstBuilder(sourceUnit).buildAST();
     }
 }
