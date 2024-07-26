@@ -16,7 +16,7 @@ repositories {
 
 dependencies {
   antlr 'org.antlr:antlr4:4.9.2'
-  implementation 'io.nextflow:nextflow:24.03.0-edge'
+  implementation 'io.nextflow:nextflow:24.04.0'
   implementation 'org.apache.groovy:groovy:4.0.21'
   implementation 'org.apache.groovy:groovy-nio:4.0.21'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
