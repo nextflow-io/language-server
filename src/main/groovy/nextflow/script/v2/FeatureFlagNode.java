@@ -13,27 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.v2
+package nextflow.script.v2;
 
-import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.Variable
-import org.codehaus.groovy.ast.expr.EmptyExpression
-import org.codehaus.groovy.ast.expr.Expression
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
+import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.ast.expr.EmptyExpression;
+import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class FeatureFlagNode extends ExpressionStatement {
-    final String name
-    final Expression value
-    Variable accessedVariable
+public class FeatureFlagNode extends ExpressionStatement {
+    public final String name;
+    public final Expression value;
+    public Variable accessedVariable;
 
-    FeatureFlagNode(String name, Expression value) {
-        super(EmptyExpression.INSTANCE)
-        this.name = name
-        this.value = value
+    public FeatureFlagNode(String name, Expression value) {
+        super(EmptyExpression.INSTANCE);
+        this.name = name;
+        this.value = value;
     }
 }

@@ -158,7 +158,7 @@ class ScriptAstCache extends ASTNodeCache {
             final moduleNode = sourceUnit.getAST()
             if( moduleNode !instanceof ScriptNode )
                 return
-            ScriptVisitor.super.visit((ScriptNode) moduleNode)
+            super.visit((ScriptNode) moduleNode)
         }
 
         @Override
@@ -210,7 +210,7 @@ class ScriptAstCache extends ASTNodeCache {
         void visitProcess(ProcessNode node) {
             pushASTNode(node)
             try {
-                ScriptVisitor.super.visitProcess(node)
+                super.visitProcess(node)
             }
             finally {
                 popASTNode()
@@ -221,7 +221,7 @@ class ScriptAstCache extends ASTNodeCache {
         void visitWorkflow(WorkflowNode node) {
             pushASTNode(node)
             try {
-                ScriptVisitor.super.visitWorkflow(node)
+                super.visitWorkflow(node)
             }
             finally {
                 popASTNode()
@@ -232,7 +232,7 @@ class ScriptAstCache extends ASTNodeCache {
         void visitOutput(OutputNode node) {
             pushASTNode(node)
             try {
-                ScriptVisitor.super.visitOutput(node)
+                super.visitOutput(node)
             }
             finally {
                 popASTNode()

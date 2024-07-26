@@ -13,23 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.v2
+package nextflow.script.v2;
 
-import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.expr.EmptyExpression
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
-import org.codehaus.groovy.ast.stmt.Statement
+import java.util.List;
+
+import org.codehaus.groovy.ast.expr.EmptyExpression;
+import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class OutputNode extends ExpressionStatement {
-    final Statement body
+public class IncludeNode extends ExpressionStatement {
+    public final String source;
+    public final List<IncludeVariable> modules;
 
-    OutputNode(Statement body) {
-        super(EmptyExpression.INSTANCE)
-        this.body = body
+    public IncludeNode(String source, List<IncludeVariable> modules) {
+        super(EmptyExpression.INSTANCE);
+        this.source = source;
+        this.modules = modules;
     }
 }

@@ -13,15 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.v2
+package nextflow.script.v2;
 
-import org.codehaus.groovy.control.ParserPlugin
-import org.codehaus.groovy.control.ParserPluginFactory
+import org.codehaus.groovy.ast.expr.EmptyExpression;
+import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 
-class ScriptParserPluginFactory extends ParserPluginFactory {
+/**
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public class IncompleteNode extends ExpressionStatement {
+    public final String text;
 
-    @Override
-    ParserPlugin createParserPlugin() {
-        return new ScriptParserPlugin()
+    public IncompleteNode(String text) {
+        super(EmptyExpression.INSTANCE);
+        this.text = text;
+    }
+
+    public IncompleteNode(Expression expression) {
+        super(expression);
+        this.text = null;
     }
 }

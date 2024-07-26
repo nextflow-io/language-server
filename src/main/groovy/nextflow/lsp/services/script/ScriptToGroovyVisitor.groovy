@@ -77,7 +77,7 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
     void visit() {
         if( moduleNode == null )
             return
-        ScriptVisitor.super.visit(moduleNode)
+        super.visit(moduleNode)
         if( moduleNode.isEmpty() )
             moduleNode.addStatement(ReturnStatement.RETURN_NULL_OR_VOID)
     }

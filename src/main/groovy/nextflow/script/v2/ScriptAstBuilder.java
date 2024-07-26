@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.v2;
+package nextflow.script.v2;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -26,8 +26,8 @@ import java.util.stream.Collectors;
 
 import com.google.common.hash.Hashing;
 import groovy.lang.Tuple2;
-import nextflow.antlr.ConfigLexer;
-import nextflow.antlr.ConfigParser;
+import nextflow.antlr.ScriptLexer;
+import nextflow.antlr.ScriptParser;
 import nextflow.antlr.DescriptiveErrorStrategy;
 import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStream;
@@ -76,44 +76,50 @@ import org.codehaus.groovy.ast.expr.UnaryMinusExpression;
 import org.codehaus.groovy.ast.expr.UnaryPlusExpression;
 import org.codehaus.groovy.ast.stmt.AssertStatement;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
+import org.codehaus.groovy.ast.stmt.CatchStatement;
 import org.codehaus.groovy.ast.stmt.EmptyStatement;
+import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
+import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 import org.codehaus.groovy.syntax.Numbers;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Types;
 
-import static nextflow.antlr.ConfigParser.*;
+import static nextflow.antlr.ScriptParser.*;
 import static nextflow.antlr.PositionConfigureUtils.ast;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
 /**
- * Transform a Nextflow config parse tree into a Groovy AST.
+ * Transform a Nextflow script parse tree into a Groovy AST.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class ConfigAstBuilder {
+public class ScriptAstBuilder {
 
     private SourceUnit sourceUnit;
-    private ConfigNode moduleNode;
-    private ConfigLexer lexer;
-    private ConfigParser parser;
+    private ScriptNode moduleNode;
+    private ScriptLexer lexer;
+    private ScriptParser parser;
+    private final GroovydocManager groovydocManager;
 
     private Tuple2<ParserRuleContext,Exception> numberFormatError;
 
-    public ConfigAstBuilder(SourceUnit sourceUnit) {
+    public ScriptAstBuilder(SourceUnit sourceUnit, boolean groovydocEnabled) {
         this.sourceUnit = sourceUnit;
-        this.moduleNode = new ConfigNode(sourceUnit);
+        this.moduleNode = new ScriptNode(sourceUnit);
 
         var charStream = createCharStream(sourceUnit);
-        this.lexer = new ConfigLexer(charStream);
-        this.parser = new ConfigParser(new CommonTokenStream(lexer));
+        this.lexer = new ScriptLexer(charStream);
+        this.parser = new ScriptParser(new CommonTokenStream(lexer));
         parser.setErrorHandler(new DescriptiveErrorStrategy(charStream));
+
+        this.groovydocManager = new GroovydocManager(groovydocEnabled);
     }
 
     private CharStream createCharStream(SourceUnit sourceUnit) {
@@ -175,16 +181,36 @@ public class ConfigAstBuilder {
         }
     }
 
-    /// CONFIG STATEMENTS
+    /// SCRIPT STATEMENTS
 
     private ModuleNode compilationUnit(CompilationUnitContext ctx) {
-        for( var stmt : ctx.configStatement() )
-            moduleNode.addConfigStatement(configStatement(stmt));
+        var extraStatements = new ArrayList<Statement>();
+        for( var stmt : ctx.scriptStatement() )
+            scriptStatement(stmt, extraStatements);
+
+        if( ctx.workflowMain() != null ) {
+            var main = blockStatements(ctx.workflowMain().blockStatements());
+            var workflowNode = workflowDef(main);
+            moduleNode.addWorkflow(workflowNode);
+            moduleNode.setEntry(workflowNode);
+        }
+
+        if( !extraStatements.isEmpty() ) {
+            if( moduleNode.getEntry() == null ) {
+                var main = block(new VariableScope(), Collections.emptyList());
+                moduleNode.setEntry(workflowDef(main));
+            }
+            var entry = moduleNode.getEntry();
+            var main = (BlockStatement) entry.main;
+            var statements = main.getStatements();
+            for( var extra : DefaultGroovyMethods.asReversed(extraStatements) )
+                statements.add(0, extra);
+        }
 
         var scriptClassNode = moduleNode.getScriptClassDummy();
         scriptClassNode.setName(getMainClassName());
 
-        var statements = moduleNode.getConfigStatements();
+        var statements = moduleNode.getStatementBlock().getStatements();
         if( scriptClassNode != null && !statements.isEmpty() ) {
             var first = statements.get(0);
             var last = statements.get(statements.size() - 1);
@@ -204,108 +230,367 @@ public class ConfigAstBuilder {
             var reader = sourceUnit.getSource().getReader();
             var text = IOGroovyMethods.getText(reader);
             var hash = Hashing.sipHash24().newHasher().putUnencodedChars(text).hash();
-            return "_nf_config_" + hash.toString();
+            return "_nf_script_" + hash.toString();
         }
         catch( IOException e ) {
             throw new GroovyBugError("Failed to create main class name", e);
         }
     }
 
-    private ConfigStatement configStatement(ConfigStatementContext ctx) {
-        if( ctx instanceof ConfigIncludeStmtAltContext ciac )
-            return ast( configInclude(ciac.configInclude()), ciac );
+    private void scriptStatement(ScriptStatementContext ctx, List<Statement> extraStatements) {
+        if( ctx instanceof TopAssignmentStmtAltContext taac ) {
+            var node = topAssignmentStatement(taac.topAssignmentStatement());
+            if( node instanceof FeatureFlagNode ffn )
+                moduleNode.addFeatureFlag(ffn);
+            else if( node instanceof ExpressionStatement es )
+                extraStatements.add(es);
+        }
 
-        if( ctx instanceof ConfigAssignmentStmtAltContext caac )
-            return ast( configAssignment(caac.configAssignment()), caac );
+        else if( ctx instanceof FunctionDefAltContext fdac ) {
+            moduleNode.addFunction(functionDef(fdac.functionDef()));
+        }
 
-        if( ctx instanceof ConfigBlockStmtAltContext cbac )
-            return ast( configBlock(cbac.configBlock()), cbac );
+        else if( ctx instanceof IncludeStmtAltContext iac ) {
+            moduleNode.addInclude(includeStatement(iac.includeStatement()));
+        }
 
-        if( ctx instanceof ConfigBlockAltStmtAltContext cbac )
-            return ast( configBlockAlt(cbac.configBlockAlt()), cbac );
+        else if( ctx instanceof OutputDefAltContext odac ) {
+            var outputNode = outputDef(odac.outputDef());
+            if( moduleNode.getOutput() != null )
+                collectSyntaxError(new SyntaxException("Output block defined more than once", outputNode));
+            moduleNode.setOutput(outputNode);
+        }
 
-        if( ctx instanceof ConfigIncompleteStmtAltContext ciac )
-            return ast( configIncomplete(ciac.configIncomplete()), ciac );
+        else if( ctx instanceof ProcessDefAltContext pdac ) {
+            moduleNode.addProcess(processDef(pdac.processDef()));
+        }
 
-        throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
+        else if( ctx instanceof WorkflowDefAltContext wdac ) {
+            var workflowNode = workflowDef(wdac.workflowDef());
+            if( workflowNode.getName() == null ) {
+                if( moduleNode.getEntry() != null )
+                    collectSyntaxError(new SyntaxException("Entry workflow defined more than once", workflowNode));
+                moduleNode.setEntry(workflowNode);
+            }
+            moduleNode.addWorkflow(workflowNode);
+        }
+
+        else if( ctx instanceof IncompleteScriptStmtAltContext iac ) {
+            incompleteScriptStatement(iac.incompleteScriptStatement());
+        }
+
+        else
+            throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
     }
 
-    private ConfigStatement configInclude(ConfigIncludeContext ctx) {
-        var source = expression(ctx.expression());
-        return new ConfigIncludeNode(source);
-    }
-
-    private ConfigStatement configAssignment(ConfigAssignmentContext ctx) {
-        var names = ctx.configAssignmentPath().identifier().stream()
+    private ASTNode topAssignmentStatement(TopAssignmentStatementContext ctx) {
+        var names = ctx.assignmentPath().identifier().stream()
             .map(this::identifier)
             .collect(Collectors.toList());
         var value = expression(ctx.expression());
-        return ast( new ConfigAssignNode(names, value), ctx );
+        var firstName = names.get(0);
+        if( "nextflow".equals(firstName) ) {
+            var fullName = DefaultGroovyMethods.join(names, ".");
+            var result = ast( new FeatureFlagNode(fullName, value), ctx );
+            if( !(value instanceof ConstantExpression) )
+                collectSyntaxError(new SyntaxException("Feature flag value should be a literal value (number, string, true/false)", result));
+            return result;
+        }
+        else if( "params".equals(firstName) ) {
+            var left = propertyExpression(ctx.assignmentPath().identifier());
+            return stmt(ast( assignX(left, value), ctx ));
+        }
+        else {
+            var result = ast( new EmptyStatement(), ctx );
+            collectSyntaxError(new SyntaxException("Invalid top-level statement (hint: move into entry workflow)", result));
+            return result;
+        }
     }
 
-    private ConfigStatement configBlock(ConfigBlockContext ctx) {
-        var name = ctx.identifier() != null
-            ? identifier(ctx.identifier())
-            : stringLiteral(ctx.stringLiteral());
-        var statements = ctx.configBlockStatement().stream()
-            .map(this::configBlockStatement)
-            .collect(Collectors.toList());
-        return new ConfigBlockNode(name, statements);
-    }
-
-    private ConfigStatement configBlockStatement(ConfigBlockStatementContext ctx) {
-        if( ctx instanceof ConfigIncludeBlockStmtAltContext ciac )
-            return ast( configInclude(ciac.configInclude()), ciac );
-
-        if( ctx instanceof ConfigAssignmentBlockStmtAltContext caac )
-            return ast( configAssignment(caac.configAssignment()), caac );
-
-        if( ctx instanceof ConfigBlockBlockStmtAltContext cbac )
-            return ast( configBlock(cbac.configBlock()), cbac );
-
-        if( ctx instanceof ConfigSelectorBlockStmtAltContext csac )
-            return ast( configSelector(csac.configSelector()), csac );
-
-        if( ctx instanceof ConfigIncompleteBlockStmtAltContext ciac )
-            return ast( configIncomplete(ciac.configIncomplete()), ciac );
-
-        throw createParsingFailedException("Invalid statement in config block: " + ctx.getText(), ctx);
-    }
-
-    private ConfigStatement configSelector(ConfigSelectorContext ctx) {
-        var kind = ctx.kind.getText();
-        var target = configSelectorTarget(ctx.target);
-        var statements = ctx.configAssignment().stream()
-            .map(this::configAssignment)
-            .collect(Collectors.toList());
-        return new ConfigBlockNode(kind, target, statements);
-    }
-
-    private String configSelectorTarget(ConfigSelectorTargetContext ctx) {
-        return ctx.identifier() != null
-            ? identifier(ctx.identifier())
-            : stringLiteral(ctx.stringLiteral());
-    }
-
-    private ConfigStatement configBlockAlt(ConfigBlockAltContext ctx) {
-        var name = identifier(ctx.identifier());
-        var statements = ctx.configBlockAltStatement().stream()
-            .map(this::configBlockAltStatement)
-            .collect(Collectors.toList());
-        var result = ast( new ConfigBlockNode(name, statements), ctx );
-        if( "plugins".equals(name) )
-            collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (i.e. omitting the equals sign)", result));
+    private Expression propertyExpression(List<IdentifierContext> idents) {
+        var head = idents.get(0);
+        Expression result = ast( varX(identifier(head)), head );
+        for( int i = 1; i < idents.size(); i++ ) {
+            var ident = idents.get(i);
+            var name = ast( constX(identifier(ident)), ident );
+            result = ast( propX(result, name), result, name );
+        }
         return result;
     }
 
-    private ConfigStatement configBlockAltStatement(ConfigBlockAltStatementContext ctx) {
-        var name = identifier(ctx.identifier());
-        var value = literal(ctx.literal());
-        return ast( new ConfigAppendNode(List.of(name), value), ctx );
+    private IncludeNode includeStatement(IncludeStatementContext ctx) {
+        var source = stringLiteral(ctx.stringLiteral());
+        var modules = ctx.includeNames().includeName().stream()
+            .map(it -> {
+                var name = it.name.getText();
+                var alias = it.alias != null ? it.alias.getText() : null;
+                return ast( new IncludeVariable(name, alias), it );
+            })
+            .collect(Collectors.toList());
+
+        return ast( new IncludeNode(source, modules), ctx );
     }
 
-    private ConfigStatement configIncomplete(ConfigIncompleteContext ctx) {
-        var result = ast( new ConfigIncompleteNode(ctx.getText()), ctx );
+    private ProcessNode processDef(ProcessDefContext ctx) {
+        var name = ctx.name.getText();
+        var directives = processDirectives(ctx.body.processDirectives());
+        var inputs = processInputs(ctx.body.processInputs());
+        var outputs = processOutputs(ctx.body.processOutputs());
+        var when = processWhen(ctx.body.processWhen());
+        var type = processType(ctx.body.processExec());
+        var exec = ctx.body.blockStatements() != null
+            ? blockStatements(ctx.body.blockStatements())
+            : blockStatements(ctx.body.processExec().blockStatements());
+        var stub = processStub(ctx.body.processStub());
+
+        var result = ast( new ProcessNode(name, directives, inputs, outputs, when, type, exec, stub), ctx );
+        groovydocManager.handle(result, ctx);
+        return result;
+    }
+
+    private Statement processDirectives(ProcessDirectivesContext ctx) {
+        if( ctx == null )
+            return EmptyStatement.INSTANCE;
+        var statements = ctx.processDirective().stream()
+            .map(this::processDirective)
+            .collect(Collectors.toList());
+        return ast( block(null, statements), ctx );
+    }
+
+    private Statement processDirective(ProcessDirectiveContext ctx) {
+        return checkDirective(statement(ctx.statement()), "Invalid process directive");
+    }
+
+    private Statement processInputs(ProcessInputsContext ctx) {
+        if( ctx == null )
+            return EmptyStatement.INSTANCE;
+        var statements = ctx.processDirective().stream()
+            .map(this::processInput)
+            .collect(Collectors.toList());
+        return ast( block(null, statements), ctx );
+    }
+
+    private Statement processInput(ProcessDirectiveContext ctx) {
+        return checkDirective(statement(ctx.statement()), "Invalid process input");
+    }
+
+    private Statement processOutputs(ProcessOutputsContext ctx) {
+        if( ctx == null )
+            return EmptyStatement.INSTANCE;
+        var statements = ctx.processDirective().stream()
+            .map(this::processOutput)
+            .collect(Collectors.toList());
+        return ast( block(null, statements), ctx );
+    }
+
+    private Statement processOutput(ProcessDirectiveContext ctx) {
+        return checkDirective(statement(ctx.statement()), "Invalid process output");
+    }
+
+    private Statement checkDirective(Statement stmt, String errorMessage) {
+        if( !(stmt instanceof ExpressionStatement) ) {
+            collectSyntaxError(new SyntaxException(errorMessage, stmt));
+            return ast( new EmptyStatement(), stmt );
+        }
+
+        var stmtX = (ExpressionStatement) stmt;
+        var expression = stmtX.getExpression();
+        if( expression instanceof VariableExpression ve ) {
+            var method = ast( constX(ve.getName()), ve );
+            var call = ast( callX(varX("this"), method, new ArgumentListExpression()), stmtX );
+            stmtX.setExpression(call);
+            return stmtX;
+        }
+        if( isDirectiveWithNegativeValue(expression) ) {
+            var binary = (BinaryExpression) expression;
+            var left = (VariableExpression) binary.getLeftExpression();
+            var method = ast( constX(left.getName()), left );
+            var value = (Expression) ast( new UnaryMinusExpression(binary.getRightExpression()), binary.getRightExpression() );
+            var arguments = ast( args(value), value );
+            var call = ast( callX(varX("this"), method, arguments), stmtX );
+            stmtX.setExpression(call);
+            return stmtX;
+        }
+        if( !(expression instanceof MethodCallExpression) ) {
+            collectSyntaxError(new SyntaxException(errorMessage, stmtX));
+            return ast( new EmptyStatement(), stmtX );
+        }
+
+        var call = (MethodCallExpression) expression;
+        if( !call.isImplicitThis() || !(call.getMethod() instanceof ConstantExpression) ) {
+            collectSyntaxError(new SyntaxException(errorMessage, stmtX));
+            return ast( new EmptyStatement(), stmtX );
+        }
+
+        return stmtX;
+    }
+
+    private boolean isDirectiveWithNegativeValue(Expression expression) {
+        if( !(expression instanceof BinaryExpression) )
+            return false;
+        var binary = (BinaryExpression) expression;
+        if( !(binary.getLeftExpression() instanceof VariableExpression) )
+            return false;
+        if( binary.getOperation().getType() != Types.MINUS )
+            return false;
+        return true;
+    }
+
+    private Expression processWhen(ProcessWhenContext ctx) {
+        if( ctx == null )
+            return EmptyExpression.INSTANCE;
+        return ast( expression(ctx.expression()), ctx );
+    }
+
+    private String processType(ProcessExecContext ctx) {
+        if( ctx == null )
+            return "script";
+
+        if( ctx.EXEC() != null )
+            return "exec";
+        else if( ctx.SHELL() != null )
+            return "shell";
+        else
+            return "script";
+    }
+
+    private Statement processStub(ProcessStubContext ctx) {
+        if( ctx == null )
+            return EmptyStatement.INSTANCE;
+        return ast( blockStatements(ctx.blockStatements()), ctx );
+    }
+
+    private WorkflowNode workflowDef(WorkflowDefContext ctx) {
+        var name = ctx.name != null ? ctx.name.getText() : null;
+        var takes = workflowTakes(
+            ctx.body != null ? ctx.body.workflowTakes() : null
+        );
+        var emits = workflowEmits(
+            ctx.body != null ? ctx.body.workflowEmits() : null
+        );
+        var publishers = workflowPublishers(
+            ctx.body != null ? ctx.body.workflowPublishers() : null
+        );
+        var main = blockStatements(
+            ctx.body != null && ctx.body.workflowMain() != null
+                ? ctx.body.workflowMain().blockStatements()
+                : null
+        );
+
+        var result = ast( new WorkflowNode(name, takes, emits, publishers, main), ctx );
+        groovydocManager.handle(result, ctx);
+        return result;
+    }
+
+    private WorkflowNode workflowDef(BlockStatement main) {
+        var takes = EmptyStatement.INSTANCE;
+        var emits = EmptyStatement.INSTANCE;
+        var publishers = EmptyStatement.INSTANCE;
+        for( var statement : main.getStatements() ) {
+            if( !(statement instanceof ExpressionStatement) )
+                continue;
+            var stmtX = (ExpressionStatement) statement;
+            if( !(stmtX.getExpression() instanceof MethodCallExpression) )
+                continue;
+            var call = (MethodCallExpression) stmtX.getExpression();
+            var name = call.getMethodAsString();
+            if( "process".equals(name) ) {
+                collectSyntaxError(new SyntaxException("Process definition is not allowed with implicit workflow", statement));
+                stmtX.setExpression(EmptyExpression.INSTANCE);
+            }
+            else if( "workflow".equals(name) ) {
+                collectSyntaxError(new SyntaxException("Workflow definition is not allowed with implicit workflow", statement));
+                stmtX.setExpression(EmptyExpression.INSTANCE);
+            }
+            else if( "output".equals(name) ) {
+                collectSyntaxError(new SyntaxException("Output definition is not allowed with implicit workflow", statement));
+                stmtX.setExpression(EmptyExpression.INSTANCE);
+            }
+        }
+        return new WorkflowNode(null, takes, emits, publishers, main);
+    }
+
+    private Statement workflowTakes(WorkflowTakesContext ctx) {
+        if( ctx == null )
+            return EmptyStatement.INSTANCE;
+
+        var statements = ctx.identifier().stream()
+            .map(this::workflowTake)
+            .collect(Collectors.toList());
+        return ast( block(null, statements), ctx );
+    }
+
+    private Statement workflowTake(IdentifierContext ctx) {
+        return stmt(ast( varX(ctx.getText()), ctx ));
+    }
+
+    private Statement workflowEmits(WorkflowEmitsContext ctx) {
+        if( ctx == null )
+            return EmptyStatement.INSTANCE;
+
+        var statements = ctx.workflowEmit() != null
+            ? ctx.workflowEmit().stream().map(this::workflowEmit).collect(Collectors.toList())
+            : List.of(ast( stmt(expression(ctx.expression())), ctx ));
+        return ast( block(null, statements), ctx );
+    }
+
+    private Statement workflowEmit(WorkflowEmitContext ctx) {
+        var varX = variableName(ctx.identifier());
+        return ctx.expression() != null
+            ? stmt(ast( assignX(varX, expression(ctx.expression())), ctx ))
+            : stmt(varX);
+    }
+
+    private Statement workflowPublishers(WorkflowPublishersContext ctx) {
+        if( ctx == null )
+            return EmptyStatement.INSTANCE;
+
+        var statements = ctx.workflowPublish().stream()
+            .map(this::workflowPublish)
+            .collect(Collectors.toList());
+        return ast( block(null, statements), ctx );
+    }
+
+    private Statement workflowPublish(WorkflowPublishContext ctx) {
+        var source = expression(ctx.source);
+        var op = token(ctx.op, 2);
+        var target = expression(ctx.target);
+        return stmt(ast( binX(source, op, target), ctx ));
+    }
+
+    private OutputNode outputDef(OutputDefContext ctx) {
+        var body = outputBody(ctx.outputBody());
+        return ast( new OutputNode(body), ctx );
+    }
+
+    private Statement outputBody(OutputBodyContext ctx) {
+        if( ctx == null )
+            return EmptyStatement.INSTANCE;
+        var statements = ctx.outputDirective().stream()
+            .map(this::outputDirective)
+            .collect(Collectors.toList());
+        return ast( block(null, statements), ctx );
+    }
+
+    private Statement outputDirective(OutputDirectiveContext ctx) {
+        return checkDirective(statement(ctx.statement()), "Invalid output directive");
+    }
+
+    private FunctionNode functionDef(FunctionDefContext ctx) {
+        var name = identifier(ctx.identifier());
+        var returnType = type(ctx.type());
+        var params = parameters(ctx.formalParameterList());
+        if( params == null )
+            params = Parameter.EMPTY_ARRAY;
+        var code = blockStatements(ctx.blockStatements());
+
+        var result = ast( new FunctionNode(name, returnType, params, code), ctx );
+        groovydocManager.handle(result, ctx);
+        return result;
+    }
+
+    private Statement incompleteScriptStatement(IncompleteScriptStatementContext ctx) {
+        var result = ast( new IncompleteNode(ctx.getText()), ctx );
         collectSyntaxError(new SyntaxException("Incomplete statement", result));
         return result;
     }
@@ -316,8 +601,14 @@ public class ConfigAstBuilder {
         if( ctx instanceof IfElseStmtAltContext ieac )
             return ast( ifElseStatement(ieac.ifElseStatement()), ieac );
 
+        if( ctx instanceof TryCatchStmtAltContext tcac )
+            return ast( tryCatchStatement(tcac.tryCatchStatement()), tcac );
+
         if( ctx instanceof ReturnStmtAltContext rac )
             return ast( returnStatement(rac.expression()), rac );
+
+        if( ctx instanceof ThrowStmtAltContext tac )
+            return ast( throwStatement(tac.expression()), tac );
 
         if( ctx instanceof AssertStmtAltContext aac )
             return ast( assertStatement(aac.assertStatement()), aac );
@@ -365,11 +656,51 @@ public class ConfigAstBuilder {
         return ast( block(new VariableScope(), statements), ctx );
     }
 
+    private Statement tryCatchStatement(TryCatchStatementContext ctx) {
+        var tryStatement = statementOrBlock(ctx.statementOrBlock());
+        var catchClauses = ctx.catchClause().stream()
+            .map(this::catchClause)
+            .collect(Collectors.toList());
+        var result = tryCatchS(tryStatement);
+        for( var clause : catchClauses )
+            for( var stmt : clause )
+                result.addCatch(stmt);
+        return result;
+    }
+
+    private List<CatchStatement> catchClause(CatchClauseContext ctx) {
+        var types = catchTypes(ctx.catchTypes());
+        return types.stream()
+            .map(type -> {
+                var name = identifier(ctx.identifier());
+                var variable = ast( param(type, name), ctx.identifier() );
+                var code = statementOrBlock(ctx.statementOrBlock());
+                return ast( new CatchStatement(variable, code), ctx );
+            })
+            .collect(Collectors.toList());
+    }
+
+    private List<ClassNode> catchTypes(CatchTypesContext ctx) {
+        if( ctx == null )
+            return Collections.singletonList( ClassHelper.dynamicType() );
+
+        return ctx.qualifiedClassName().stream()
+            .map(this::qualifiedClassName)
+            .collect(Collectors.toList());
+    }
+
     private Statement returnStatement(ExpressionContext ctx) {
         var result = ctx != null
             ? expression(ctx)
             : ConstantExpression.EMPTY_EXPRESSION;
         return returnS(result);
+    }
+
+    private Statement throwStatement(ExpressionContext ctx) {
+        var result = ctx != null
+            ? expression(ctx)
+            : ConstantExpression.EMPTY_EXPRESSION;
+        return throwS(result);
     }
 
     private Statement assertStatement(AssertStatementContext ctx) {
@@ -524,6 +855,9 @@ public class ConfigAstBuilder {
         if( ctx instanceof UnaryNotExprAltContext unac )
             return ast( unaryNot(expression(unac.expression()), unac.op), unac );
 
+        if( ctx instanceof IncompleteExprAltContext iac )
+            return incompleteExpression(iac.incompleteExpression());
+
         throw createParsingFailedException("Invalid expression: " + ctx.getText(), ctx);
     }
 
@@ -564,20 +898,20 @@ public class ConfigAstBuilder {
     }
 
     private Expression unaryAdd(Expression expression, Token op) {
-        if( op.getType() == ConfigParser.ADD )
+        if( op.getType() == ScriptParser.ADD )
             return new UnaryPlusExpression(expression);
 
-        if( op.getType() == ConfigParser.SUB )
+        if( op.getType() == ScriptParser.SUB )
             return new UnaryMinusExpression(expression);
 
         throw new IllegalStateException();
     }
 
     private Expression unaryNot(Expression expression, Token op) {
-        if( op.getType() == ConfigParser.NOT )
+        if( op.getType() == ScriptParser.NOT )
             return new NotExpression(expression);
 
-        if( op.getType() == ConfigParser.BITNOT )
+        if( op.getType() == ScriptParser.BITNOT )
             return new BitwiseNegationExpression(expression);
 
         throw new IllegalStateException();
@@ -604,6 +938,11 @@ public class ConfigAstBuilder {
         if( ctx instanceof ClosurePathExprAltContext cac ) {
             var closure = closure(cac.closure());
             return ast( pathClosureElement(expression, closure), expression, cac );
+        }
+
+        if( ctx instanceof ClosureWithLabelsPathExprAltContext clac ) {
+            var closure = closureWithLabels(clac.closureWithLabels());
+            return ast( pathClosureElement(expression, closure), expression, clac );
         }
 
         if( ctx instanceof ArgumentsPathExprAltContext aac )
@@ -905,6 +1244,28 @@ public class ConfigAstBuilder {
         return ast( closureX(params, code), ctx );
     }
 
+    private Expression closureWithLabels(ClosureWithLabelsContext ctx) {
+        var params = parameters(ctx.formalParameterList());
+        var code = blockStatementsWithLabels(ctx.blockStatementsWithLabels());
+        return ast( closureX(params, code), ctx );
+    }
+
+    private BlockStatement blockStatementsWithLabels(BlockStatementsWithLabelsContext ctx) {
+        var statements = ctx.statementOrLabeled().stream()
+            .map(this::statementOrLabeled)
+            .collect(Collectors.toList());
+        return ast( block(new VariableScope(), statements), ctx );
+    }
+
+    private Statement statementOrLabeled(StatementOrLabeledContext ctx) {
+        var result = statement(ctx.statement());
+        if( ctx.identifier() != null ) {
+            var label = identifier(ctx.identifier());
+            result.addStatementLabel(label);
+        }
+        return result;
+    }
+
     private Expression list(ListContext ctx) {
         if( ctx.COMMA() != null && ctx.expressionList() == null )
             throw createParsingFailedException("Empty list literal should not contain any comma(,)", ctx.COMMA());
@@ -1068,6 +1429,13 @@ public class ConfigAstBuilder {
             return gstring(ctx.gstring());
 
         throw createParsingFailedException("Invalid method named argument: " + ctx.getText(), ctx);
+    }
+
+    private Expression incompleteExpression(IncompleteExpressionContext ctx) {
+        var prop = propertyExpression(ctx.identifier());
+        var result = ast( propX(prop, ""), ctx );
+        collectSyntaxError(new SyntaxException("Incomplete expression", result));
+        return result;
     }
 
     /// MISCELLANEOUS

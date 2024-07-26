@@ -13,41 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.v2
+package nextflow.script.v2;
 
-import nextflow.exception.ScriptCompilationException
-import org.codehaus.groovy.ast.ModuleNode
-import org.codehaus.groovy.control.ParserPlugin
-import org.codehaus.groovy.control.SourceUnit
-import org.codehaus.groovy.control.io.StringReaderSource
-import org.codehaus.groovy.runtime.IOGroovyMethods
-import org.codehaus.groovy.syntax.Reduction
+import org.codehaus.groovy.GroovyBugError;
+import org.codehaus.groovy.ast.ModuleNode;
+import org.codehaus.groovy.control.ParserPlugin;
+import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.io.StringReaderSource;
+import org.codehaus.groovy.runtime.IOGroovyMethods;
+import org.codehaus.groovy.syntax.Reduction;
+
+import java.io.IOException;
+import java.io.Reader;
 
 /**
  * Parser plugin for the Nextflow parser.
  */
-class ScriptParserPlugin implements ParserPlugin {
+public class ScriptParserPlugin implements ParserPlugin {
 
     @Override
-    Reduction parseCST(SourceUnit sourceUnit, Reader reader) {
+    public Reduction parseCST(SourceUnit sourceUnit, Reader reader) {
         if (!sourceUnit.getSource().canReopenSource()) {
             try {
                 sourceUnit.setSource(new StringReaderSource(
                         IOGroovyMethods.getText(reader),
                         sourceUnit.getConfiguration()
-                ))
+                ));
             } catch (IOException e) {
-                throw new ScriptCompilationException("Failed to create StringReaderSource", e)
+                throw new GroovyBugError("Failed to create StringReaderSource", e);
             }
         }
-        return null
+        return null;
     }
 
     @Override
-    ModuleNode buildAST(SourceUnit sourceUnit, ClassLoader classLoader, Reduction cst) {
+    public ModuleNode buildAST(SourceUnit sourceUnit, ClassLoader classLoader, Reduction cst) {
         return new ScriptAstBuilder(
             sourceUnit,
             sourceUnit.getConfiguration().isGroovydocEnabled()
-        ).buildAST()
+        ).buildAST();
     }
 }
