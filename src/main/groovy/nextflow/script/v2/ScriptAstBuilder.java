@@ -1258,12 +1258,15 @@ public class ScriptAstBuilder {
     }
 
     private Statement statementOrLabeled(StatementOrLabeledContext ctx) {
-        var result = statement(ctx.statement());
         if( ctx.identifier() != null ) {
             var label = identifier(ctx.identifier());
+            var result = statementOrLabeled(ctx.statementOrLabeled());
             result.addStatementLabel(label);
+            return result;
         }
-        return result;
+        else {
+            return statement(ctx.statement());
+        }
     }
 
     private Expression list(ListContext ctx) {

@@ -566,7 +566,7 @@ blockStatementsWithLabels
     ;
 
 statementOrLabeled
-    :   identifier COLON nls statement
+    :   identifier COLON nls statementOrLabeled
     |   statement
     ;
 
