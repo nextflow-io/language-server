@@ -15,6 +15,8 @@
  */
 package nextflow.lsp.ast
 
+import java.util.stream.Collectors
+
 import groovy.lang.groovydoc.Groovydoc
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
@@ -105,7 +107,9 @@ class ASTNodeStringUtils {
     }
 
     static String toString(Parameter[] params, ASTNodeCache ast) {
-        return params.collect { param -> toString(param, ast) }.join(', ')
+        return params.stream()
+            .map(param -> toString(param, ast))
+            .collect(Collectors.joining(', '))
     }
 
     static String toString(ProcessNode node, ASTNodeCache ast) {

@@ -15,6 +15,8 @@
  */
 package nextflow.lsp.ast
 
+import java.util.stream.Collectors
+
 import groovy.transform.CompileStatic
 import nextflow.script.v2.FeatureFlagNode
 import nextflow.script.v2.IncludeVariable
@@ -100,13 +102,15 @@ class ASTUtils {
         final defNode = getDefinition(node, true, ast)
         if( defNode == null )
             return Collections.emptyList()
-        return ast.getNodes().findAll { otherNode ->
-            if( otherNode.getLineNumber() == -1 || otherNode.getColumnNumber() == -1 )
-                return false
-            if( !includeDeclaration && defNode == otherNode )
-                return false
-            return defNode == getDefinition(otherNode, false, ast)
-        }
+        return ast.getNodes().stream()
+            .filter(otherNode -> {
+                if( otherNode.getLineNumber() == -1 || otherNode.getColumnNumber() == -1 )
+                    return false
+                if( !includeDeclaration && defNode == otherNode )
+                    return false
+                return defNode == getDefinition(otherNode, false, ast)
+            })
+            .collect(Collectors.toList())
     }
 
     /**
@@ -174,11 +178,13 @@ class ASTUtils {
      * @param ast
      */
     static List<FieldNode> getFieldsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
-        return classNode.getFields().findAll { fieldNode ->
-            if( !fieldNode.isPublic() )
-                return false
-            isStatic ? fieldNode.isStatic() : !fieldNode.isStatic()
-        }
+        return classNode.getFields().stream()
+            .filter(fieldNode -> {
+                if( !fieldNode.isPublic() )
+                    return false
+                isStatic ? fieldNode.isStatic() : !fieldNode.isStatic()
+            })
+            .collect(Collectors.toList())
     }
 
     /**
@@ -188,11 +194,13 @@ class ASTUtils {
      * @param ast
      */
     static List<MethodNode> getMethodsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
-        return classNode.getMethods().findAll { methodNode ->
-            if( !methodNode.isPublic() )
-                return false
-            isStatic ? methodNode.isStatic() : !methodNode.isStatic()
-        }
+        return classNode.getMethods().stream()
+            .filter(methodNode -> {
+                if( !methodNode.isPublic() )
+                    return false
+                isStatic ? methodNode.isStatic() : !methodNode.isStatic()
+            })
+            .collect(Collectors.toList())
     }
 
     private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
@@ -246,8 +254,11 @@ class ASTUtils {
 
         if( node instanceof ConstructorCallExpression ) {
             final constructorType = node.getType()
-            if( constructorType != null )
-                return constructorType.getDeclaredConstructors().collect { ctor -> (MethodNode) ctor }
+            if( constructorType != null ) {
+                return constructorType.getDeclaredConstructors().stream()
+                    .map(ctor -> (MethodNode) ctor)
+                    .collect(Collectors.toList())
+            }
         }
 
         return Collections.emptyList()

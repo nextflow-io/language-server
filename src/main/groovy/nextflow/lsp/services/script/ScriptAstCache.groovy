@@ -290,10 +290,14 @@ class ScriptAstCache extends ASTNodeCache {
             final definitions = astCache.getDefinitions(includeUri)
             for( final module : node.modules ) {
                 final includedName = module.@name
-                final includedNode = definitions.find { defNode -> defNode.name == includedName }
-                if( !includedNode )
+                final includedNode = definitions.stream()
+                    .filter(defNode -> defNode.name == includedName)
+                    .findFirst()
+                if( !includedNode.isPresent() ) {
                     addError("Invalid include name: '${includedName}'", node)
-                module.setMethod(includedNode)
+                    continue
+                }
+                module.setMethod(includedNode.get())
             }
         }
 
