@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -578,9 +579,7 @@ public class ScriptAstBuilder {
 
     private FunctionNode functionDef(FunctionDefContext ctx) {
         var name = identifier(ctx.identifier());
-        var params = parameters(ctx.formalParameterList());
-        if( params == null )
-            params = Parameter.EMPTY_ARRAY;
+        var params = Optional.ofNullable(parameters(ctx.formalParameterList())).orElse(Parameter.EMPTY_ARRAY);
         var code = blockStatements(ctx.blockStatements());
 
         var result = ast( new FunctionNode(name, null, params, code), ctx );

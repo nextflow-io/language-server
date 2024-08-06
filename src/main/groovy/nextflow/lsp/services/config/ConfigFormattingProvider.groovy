@@ -139,8 +139,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
     }
 
     protected void appendIndent() {
-        final indent = options.insertSpaces
-            ? ' ' * options.tabSize
+        final indent = options.insertSpaces()
+            ? ' ' * options.tabSize()
             : '\t'
         builder.append(indent * indentCount)
     }

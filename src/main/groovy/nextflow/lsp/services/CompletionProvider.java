@@ -13,15 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services
+package nextflow.lsp.services;
 
-import org.eclipse.lsp4j.CompletionItem
-import org.eclipse.lsp4j.CompletionList
-import org.eclipse.lsp4j.Position
-import org.eclipse.lsp4j.TextDocumentIdentifier
-import org.eclipse.lsp4j.jsonrpc.messages.Either
+import java.util.List;
 
-interface CompletionProvider {
+import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.CompletionList;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
+
+public interface CompletionProvider {
 
     /**
      * Get a list of completions for a given completion context. An
@@ -31,6 +33,6 @@ interface CompletionProvider {
      * @param textDocument
      * @param position
      */
-    Either<List<CompletionItem>, CompletionList> completion(TextDocumentIdentifier textDocument, Position position)
+    Either<List<CompletionItem>, CompletionList> completion(TextDocumentIdentifier textDocument, Position position);
 
 }

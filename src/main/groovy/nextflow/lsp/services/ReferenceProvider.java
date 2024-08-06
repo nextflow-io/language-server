@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services
+package nextflow.lsp.services;
 
-import org.eclipse.lsp4j.Location
-import org.eclipse.lsp4j.Position
-import org.eclipse.lsp4j.TextDocumentIdentifier
+import java.util.List;
 
-interface ReferenceProvider {
+import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 
-    List<? extends Location> references(TextDocumentIdentifier textDocument, Position position, boolean includeDeclaration)
+public interface ReferenceProvider {
+
+    List<? extends Location> references(TextDocumentIdentifier textDocument, Position position, boolean includeDeclaration);
 
 }

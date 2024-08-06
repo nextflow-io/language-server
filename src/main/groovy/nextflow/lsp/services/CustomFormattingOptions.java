@@ -13,17 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services
+package nextflow.lsp.services;
 
-import org.eclipse.lsp4j.DocumentSymbol
-import org.eclipse.lsp4j.SymbolInformation
-import org.eclipse.lsp4j.TextDocumentIdentifier
-import org.eclipse.lsp4j.jsonrpc.messages.Either
-
-interface SymbolProvider {
-
-    List<Either<SymbolInformation, DocumentSymbol>> documentSymbol(TextDocumentIdentifier textDocument)
-
-    List<? extends SymbolInformation> symbol(String query)
-
-}
+public record CustomFormattingOptions(
+    int tabSize,
+    boolean insertSpaces,
+    boolean harshilAlignment
+) {}

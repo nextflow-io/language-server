@@ -142,7 +142,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         if( moduleNode !instanceof ScriptNode )
             return
         final scriptNode = (ScriptNode) moduleNode
-        maxIncludeLength = options.harshilAlignment
+        maxIncludeLength = options.harshilAlignment()
             ? getMaxIncludeLength(scriptNode.getIncludes())
             : 0
         for( final featureFlag : scriptNode.getFeatureFlags() )
@@ -187,8 +187,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     }
 
     protected void appendIndent() {
-        final indent = options.insertSpaces
-            ? ' ' * options.tabSize
+        final indent = options.insertSpaces()
+            ? ' ' * options.tabSize()
             : '\t'
         builder.append(indent * indentCount)
     }
@@ -222,7 +222,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     @Override
     void visitInclude(IncludeNode node) {
         for( final module : node.modules ) {
-            final padding = options.harshilAlignment
+            final padding = options.harshilAlignment()
                 ? maxIncludeLength - getIncludeLength(module)
                 : 0
             append('include { ')

@@ -13,14 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services
+package nextflow.lsp.services;
 
-import org.eclipse.lsp4j.Hover
-import org.eclipse.lsp4j.Position
-import org.eclipse.lsp4j.TextDocumentIdentifier
+import java.util.List;
 
-interface HoverProvider {
+import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.LocationLink;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
-    Hover hover(TextDocumentIdentifier textDocument, Position position)
+public interface DefinitionProvider {
+
+    Either<List<? extends Location>, List<? extends LocationLink>> definition(TextDocumentIdentifier textDocument, Position position);
 
 }

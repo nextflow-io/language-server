@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services
+package nextflow.lsp.services;
 
-import groovy.transform.CompileStatic
-import groovy.transform.Immutable
-import org.eclipse.lsp4j.FormattingOptions
+import java.util.List;
 
-@CompileStatic
-@Immutable
-class CustomFormattingOptions {
+import org.eclipse.lsp4j.DocumentSymbol;
+import org.eclipse.lsp4j.SymbolInformation;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
-    int tabSize
+public interface SymbolProvider {
 
-    boolean insertSpaces
+    List<Either<SymbolInformation, DocumentSymbol>> documentSymbol(TextDocumentIdentifier textDocument);
 
-    boolean harshilAlignment
+    List<? extends SymbolInformation> symbol(String query);
 
 }

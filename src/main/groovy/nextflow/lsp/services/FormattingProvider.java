@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services
+package nextflow.lsp.services;
 
-import org.eclipse.lsp4j.TextEdit
+import java.net.URI;
+import java.util.List;
 
-interface FormattingProvider {
+import org.eclipse.lsp4j.TextEdit;
 
-    List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options)
+public interface FormattingProvider {
+
+    List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options);
 
 }
