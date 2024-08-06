@@ -13,10 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.compiler
+package nextflow.lsp.file;
 
-import org.codehaus.groovy.control.SourceUnit
+import java.nio.file.Path;
+import java.util.List;
 
-interface CompilerTransform {
-    void visit(SourceUnit sourceUnit)
+public class PathUtils {
+
+    public static boolean isPathExcluded(Path path, List<String> excludePatterns) {
+        if( excludePatterns == null )
+            return false;
+        for( var excludePattern : excludePatterns ) {
+            var iterator = path.iterator();
+            while( iterator.hasNext() ) {
+                var name = iterator.next();
+                if( excludePattern.equals(name.toString()) )
+                    return true;
+            }
+        }
+        return false;
+    }
+
 }

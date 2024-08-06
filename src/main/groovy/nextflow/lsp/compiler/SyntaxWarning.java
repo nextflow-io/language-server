@@ -13,23 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.file
+package nextflow.lsp.compiler;
 
-import java.nio.file.Path
+import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.syntax.SyntaxException;
 
-import groovy.transform.CompileStatic
+/**
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public class SyntaxWarning extends SyntaxException {
 
-@CompileStatic
-class PathUtils {
-
-    static boolean isPathExcluded(Path path, List<String> excludePatterns) {
-        for( final excludePattern : excludePatterns ) {
-            for( final name : path.iterator() ) {
-                if( name.toString() == excludePattern )
-                    return true
-            }
-        }
-        return false
+    public SyntaxWarning(String message, ASTNode node) {
+        super(message, node);
     }
-
 }

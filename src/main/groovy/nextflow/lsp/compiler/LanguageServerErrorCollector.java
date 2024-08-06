@@ -13,24 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.compiler
+package nextflow.lsp.compiler;
 
-import groovy.transform.CompileStatic
-import org.codehaus.groovy.control.CompilerConfiguration
-import org.codehaus.groovy.control.ErrorCollector
+import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.ErrorCollector;
 
 /**
  * Error collector that does not throw exceptions.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class LanguageServerErrorCollector extends ErrorCollector {
+public class LanguageServerErrorCollector extends ErrorCollector {
 
-    private static final long serialVersionUID = 1L
+    private static final long serialVersionUID = 1L;
 
-    LanguageServerErrorCollector(CompilerConfiguration configuration) {
-        super(configuration)
+    public LanguageServerErrorCollector(CompilerConfiguration configuration) {
+        super(configuration);
     }
 
     @Override

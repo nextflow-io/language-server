@@ -13,21 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.compiler
+package nextflow.lsp.compiler;
 
-import java.nio.file.Files
-import java.nio.file.Path
+import java.io.File;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.AbstractMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-import groovy.lang.GroovyClassLoader
-import groovy.transform.CompileStatic
-import nextflow.lsp.file.FileCache
-import nextflow.lsp.util.Logger
-import org.antlr.v4.runtime.RecognitionException
-import org.codehaus.groovy.GroovyBugError
-import org.codehaus.groovy.control.CompilationFailedException
-import org.codehaus.groovy.control.CompilerConfiguration
-import org.codehaus.groovy.control.ErrorCollector
-import org.codehaus.groovy.control.SourceUnit
+import groovy.lang.GroovyClassLoader;
+import nextflow.lsp.file.FileCache;
+import nextflow.lsp.util.Logger;
+import org.antlr.v4.runtime.RecognitionException;
+import org.codehaus.groovy.GroovyBugError;
+import org.codehaus.groovy.control.CompilationFailedException;
+import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.ErrorCollector;
+import org.codehaus.groovy.control.SourceUnit;
 
 /**
  * Compile source files and defer any errors to the
@@ -35,21 +42,20 @@ import org.codehaus.groovy.control.SourceUnit
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class Compiler {
+public class Compiler {
 
-    private static Logger log = Logger.instance
+    private static Logger log = Logger.getInstance();
 
-    private CompilerConfiguration config
+    private CompilerConfiguration config;
 
-    private GroovyClassLoader classLoader
+    private GroovyClassLoader classLoader;
 
-    private List<CompilerTransform> transforms
+    private List<CompilerTransform> transforms;
 
-    Compiler(CompilerConfiguration config, GroovyClassLoader classLoader, List<CompilerTransform> transforms) {
-        this.config = config
-        this.classLoader = classLoader
-        this.transforms = transforms
+    public Compiler(CompilerConfiguration config, GroovyClassLoader classLoader, List<CompilerTransform> transforms) {
+        this.config = config;
+        this.classLoader = classLoader;
+        this.transforms = transforms;
     }
 
     /**
@@ -58,21 +64,19 @@ class Compiler {
      * @param uris
      * @param fileCache
      */
-    Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache) {
-        final stream = uris.parallelStream().map((uri) -> {
-            final sourceUnit = getSourceUnit(uri, fileCache)
-            if( sourceUnit )
-                compile(sourceUnit)
-            return new Tuple2<>(uri, sourceUnit)
-        })
-
-        final Map<URI, SourceUnit> result = [:]
-        for( final tuple : stream ) {
-            final uri = tuple.v1
-            final sourceUnit = tuple.v2
-            result[uri] = sourceUnit
-        }
-        return result
+    public Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache) {
+        return uris.parallelStream()
+            .map((uri) -> {
+                var sourceUnit = getSourceUnit(uri, fileCache);
+                if( sourceUnit != null )
+                    compile(sourceUnit);
+                return new AbstractMap.SimpleEntry<>(uri, sourceUnit);
+            })
+            .sequential()
+            .collect(Collectors.toMap(
+                Map.Entry::getKey,
+                Map.Entry::getValue
+            ));
     }
 
     /**
@@ -87,27 +91,27 @@ class Compiler {
      */
     protected SourceUnit getSourceUnit(URI uri, FileCache fileCache) {
         if( fileCache.isOpen(uri) ) {
-            final contents = fileCache.getContents(uri)
+            var contents = fileCache.getContents(uri);
             return new SourceUnit(
                     uri.toString(),
                     new StringReaderSourceWithURI(contents, uri, config),
                     config,
                     classLoader,
-                    newErrorCollector())
+                    newErrorCollector());
         }
         else if( Files.exists(Path.of(uri)) ) {
             return new SourceUnit(
                     new File(uri),
                     config,
                     classLoader,
-                    newErrorCollector())
+                    newErrorCollector());
         }
         else
-            return null
+            return null;
     }
 
     protected ErrorCollector newErrorCollector() {
-        new LanguageServerErrorCollector(config)
+        return new LanguageServerErrorCollector(config);
     }
 
     /**
@@ -118,17 +122,17 @@ class Compiler {
      */
     protected void compile(SourceUnit sourceUnit) {
         try {
-            sourceUnit.parse()
-            sourceUnit.buildAST()
-            for( final transform : transforms )
-                transform.visit(sourceUnit)
+            sourceUnit.parse();
+            sourceUnit.buildAST();
+            for( var transform : transforms )
+                transform.visit(sourceUnit);
         }
         catch( RecognitionException e ) {
         }
         catch( CompilationFailedException e ) {
         }
         catch( GroovyBugError | Exception e ) {
-            log.error "Unexpected exception while compiling source files: ${e}"
+            log.error("Unexpected exception while compiling source files: " + e.toString());
         }
     }
 

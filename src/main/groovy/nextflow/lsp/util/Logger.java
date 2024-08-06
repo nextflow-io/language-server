@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.util
+package nextflow.lsp.util;
 
-import groovy.transform.CompileStatic
-import org.eclipse.lsp4j.MessageParams
-import org.eclipse.lsp4j.MessageType
-import org.eclipse.lsp4j.services.LanguageClient
+import org.eclipse.lsp4j.MessageParams;
+import org.eclipse.lsp4j.MessageType;
+import org.eclipse.lsp4j.services.LanguageClient;
 
 /**
  * Log messages to the client using the language server protocol.
@@ -30,21 +29,20 @@ import org.eclipse.lsp4j.services.LanguageClient
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
 public class Logger {
 
-    private static Logger instance
-    private static boolean debugEnabled
+    private static Logger instance;
+    private static boolean debugEnabled;
 
-    private LanguageClient client
-    private boolean initialized
+    private LanguageClient client;
+    private boolean initialized;
 
-    static boolean isDebugEnabled() {
-        return debugEnabled
+    public static boolean isDebugEnabled() {
+        return debugEnabled;
     }
 
-    static void setDebugEnabled(boolean value) {
-        debugEnabled = value
+    public static void setDebugEnabled(boolean value) {
+        debugEnabled = value;
     }
 
     private Logger() {
@@ -52,32 +50,32 @@ public class Logger {
 
     public void initialize(LanguageClient client) {
         if( !initialized )
-            this.client = client
-        initialized = true
+            this.client = client;
+        initialized = true;
     }
 
     public static Logger getInstance() {
         if( instance == null )
-            instance = new Logger()
-        return instance
+            instance = new Logger();
+        return instance;
     }
 
     public void debug(String message) {
         if( !initialized || !isDebugEnabled() )
-            return
-        client.logMessage(new MessageParams(MessageType.Log, message))
+            return;
+        client.logMessage(new MessageParams(MessageType.Log, message));
     }
 
     public void error(String message) {
         if( !initialized )
-            return
-        client.logMessage(new MessageParams(MessageType.Error, message))
+            return;
+        client.logMessage(new MessageParams(MessageType.Error, message));
     }
 
     public void info(String message) {
         if( !initialized )
-            return
-        client.logMessage(new MessageParams(MessageType.Info, message))
+            return;
+        client.logMessage(new MessageParams(MessageType.Info, message));
     }
 
 }

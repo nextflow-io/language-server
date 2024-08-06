@@ -13,22 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.util
+package nextflow.lsp.util;
 
-import groovy.transform.CompileStatic
-import org.eclipse.lsp4j.Position
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.Comparator;
 
-@CompileStatic
-class Positions {
+import org.eclipse.lsp4j.Position;
 
-    static final Comparator<Position> COMPARATOR = (Position a, Position b) -> {
-        a.getLine() != b.getLine()
+public class Positions {
+
+    public static final Comparator<Position> COMPARATOR = (Position a, Position b) -> {
+        return a.getLine() != b.getLine()
             ? a.getLine() - b.getLine()
-            : a.getCharacter() - b.getCharacter()
-    }
+            : a.getCharacter() - b.getCharacter();
+    };
 
-    static boolean isValid(Position p) {
-        return p.getLine() >= 0 || p.getCharacter() >= 0
+    public static boolean isValid(Position p) {
+        return p.getLine() >= 0 || p.getCharacter() >= 0;
     }
 
     /**
@@ -38,37 +41,37 @@ class Positions {
      * @param string
      * @param position
      */
-    static int getOffset(String string, Position position) {
-        int line = position.getLine()
-        int character = position.getCharacter()
-        int currentIndex = 0
+    public static int getOffset(String string, Position position) {
+        int line = position.getLine();
+        int character = position.getCharacter();
+        int currentIndex = 0;
         if( line > 0 ) {
-            final reader = new BufferedReader(new StringReader(string))
+            var reader = new BufferedReader(new StringReader(string));
             try {
-                int readLines = 0
+                int readLines = 0;
                 while( true ) {
-                    final currentChar = (char) reader.read()
+                    var currentChar = (char) reader.read();
                     if( currentChar == -1 )
-                        return -1
-                    currentIndex++
+                        return -1;
+                    currentIndex++;
                     if( currentChar == '\n' ) {
-                        readLines++
+                        readLines++;
                         if( readLines == line )
-                            break
+                            break;
                     }
                 }
             }
             catch( IOException e ) {
-                return -1
+                return -1;
             }
 
             try {
-                reader.close()
+                reader.close();
             }
             catch( IOException e ) {
             }
         }
-        return currentIndex + character
+        return currentIndex + character;
     }
 
     /**
@@ -78,37 +81,37 @@ class Positions {
      * @param string
      * @param offset
      */
-    static Position getPosition(String string, int offset) {
-        int line = 0
-        int character = 0
+    public static Position getPosition(String string, int offset) {
+        int line = 0;
+        int character = 0;
         if( offset > 0 ) {
-            final reader = new BufferedReader(new StringReader(string))
+            var reader = new BufferedReader(new StringReader(string));
             try {
                 while( true ) {
-                    final currentChar = (char) reader.read()
+                    var currentChar = (char) reader.read();
                     if( currentChar == -1 )
-                        return new Position(-1, -1)
-                    offset--
-                    character++
+                        return new Position(-1, -1);
+                    offset--;
+                    character++;
                     if( currentChar == '\n' ) {
-                        line++
-                        character = 0
+                        line++;
+                        character = 0;
                     }
                     if( offset == 0 )
-                        break
+                        break;
                 }
             }
             catch( IOException e ) {
-                return new Position(-1, -1)
+                return new Position(-1, -1);
             }
 
             try {
-                reader.close()
+                reader.close();
             }
             catch( IOException e ) {
             }
         }
-        return new Position(line, character)
+        return new Position(line, character);
     }
 
 }

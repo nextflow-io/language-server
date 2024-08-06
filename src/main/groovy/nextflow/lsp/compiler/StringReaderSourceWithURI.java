@@ -13,18 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.compiler
+package nextflow.lsp.compiler;
 
-import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.syntax.SyntaxException
+import java.net.URI;
 
-/**
- *
- * @author Ben Sherman <bentshermann@gmail.com>
- */
-class SyntaxWarning extends SyntaxException {
+import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.io.StringReaderSource;
 
-    SyntaxWarning(String message, ASTNode node) {
-        super(message, node)
+public class StringReaderSourceWithURI extends StringReaderSource {
+
+    private URI uri;
+
+    public StringReaderSourceWithURI(String string, URI uri, CompilerConfiguration configuration) {
+        super(string, configuration);
+        this.uri = uri;
     }
+
+    public URI getURI() {
+        return uri;
+    }
+
 }

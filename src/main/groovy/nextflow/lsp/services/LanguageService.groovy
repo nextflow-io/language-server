@@ -76,7 +76,7 @@ abstract class LanguageService {
     private DebouncingExecutor updateExecutor
 
     LanguageService() {
-        this.updateExecutor = new DebouncingExecutor(DEBOUNCE_MILLIS, { key -> update() })
+        this.updateExecutor = new DebouncingExecutor(DEBOUNCE_MILLIS, (key) -> update())
     }
 
     abstract boolean matchesFile(String uri)
