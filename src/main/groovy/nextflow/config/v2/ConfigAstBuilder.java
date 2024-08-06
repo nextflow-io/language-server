@@ -293,7 +293,7 @@ public class ConfigAstBuilder {
             .map(this::configBlockAltStatement)
             .collect(Collectors.toList());
         var result = ast( new ConfigBlockNode(name, statements), ctx );
-        if( "plugins".equals(name) )
+        if( !"plugins".equals(name) )
             collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (i.e. omitting the equals sign)", result));
         return result;
     }
