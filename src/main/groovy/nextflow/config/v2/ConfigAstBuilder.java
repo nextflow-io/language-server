@@ -380,29 +380,24 @@ public class ConfigAstBuilder {
     }
 
     private Statement variableDeclaration(VariableDeclarationContext ctx) {
-        if( ctx.typeNamePairs() != null ) {
+        if( ctx.variableNames() != null ) {
             // multiple assignment
-            var variables = ctx.typeNamePairs().typeNamePair().stream()
-                .map(pair -> {
-                    var name = identifier(pair.identifier());
-                    var type = type(pair.type());
-                    return (Expression) ast( varX(name, type), pair.identifier() );
+            var variables = ctx.variableNames().identifier().stream()
+                .map(ident -> {
+                    var name = identifier(ident);
+                    return (Expression) ast( varX(name), ident );
                 })
                 .collect(Collectors.toList());
-            var target = variables.size() > 1
-                ? new ArgumentListExpression(variables)
-                : variables.get(0);
+            var target = new ArgumentListExpression(variables);
             var initializer = expression(ctx.initializer);
             return stmt(ast( declX(target, initializer), ctx ));
         }
         else {
             // single assignment
-            var type = type(ctx.type());
-            var decl = ctx.variableDeclarator();
-            var name = identifier(decl.identifier());
-            var target = ast( varX(name, type), decl.identifier() );
-            var initializer = decl.initializer != null
-                ? expression(decl.initializer)
+            var name = identifier(ctx.identifier());
+            var target = ast( varX(name), ctx.identifier() );
+            var initializer = ctx.initializer != null
+                ? expression(ctx.initializer)
                 : EmptyExpression.INSTANCE;
             return stmt(ast( declX(target, initializer), ctx ));
         }
@@ -410,7 +405,7 @@ public class ConfigAstBuilder {
 
     private Statement assignment(MultipleAssignmentStatementContext ctx) {
         var left = variableNames(ctx.variableNames());
-        var right = expression(ctx.right);
+        var right = expression(ctx.expression());
         return stmt(ast( assignX(left, right), ctx ));
     }
 

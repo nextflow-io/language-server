@@ -237,7 +237,7 @@ outputDirective
 
 // -- function definition
 functionDef
-    :   (DEF | type | DEF type) nls identifier LPAREN formalParameterList? rparen nls LBRACE
+    :   DEF identifier LPAREN formalParameterList? rparen nls LBRACE
         nls blockStatements? RBRACE
     ;
 
@@ -298,29 +298,13 @@ assertStatement
 
 // -- variable declaration
 variableDeclaration
-    :   DEF type? variableDeclarator
-    |   DEF typeNamePairs nls ASSIGN nls initializer=expression
-    |   type variableDeclarator
-    ;
-
-variableDeclarator
-    :   identifier (nls ASSIGN nls initializer=expression)?
-    ;
-
-typeNamePairs
-    :   LPAREN typeNamePair (COMMA typeNamePair)* rparen
-    ;
-
-typeNamePair
-    :   type? identifier
+    :   DEF identifier (nls ASSIGN nls initializer=expression)?
+    |   DEF variableNames nls ASSIGN nls initializer=expression
     ;
 
 // -- assignment statement
-// "(a) = [1]" is a special case of multipleAssignmentStatement, it will be handled by assignmentStatement
 multipleAssignmentStatement
-    :   left=variableNames nls
-        op=ASSIGN nls
-        right=expression
+    :   variableNames nls ASSIGN nls expression
     ;
 
 variableNames
@@ -554,7 +538,7 @@ formalParameterList
     ;
 
 formalParameter
-    :   DEF? type? ELLIPSIS? identifier (nls ASSIGN nls expression)?
+    :   type? ELLIPSIS? identifier (nls ASSIGN nls expression)?
     ;
 
 closureWithLabels
