@@ -287,6 +287,10 @@ class ScriptAstCache extends ASTNodeCache {
                 addError("Invalid include source: '${includeUri}'", node)
                 return
             }
+            if( !includeUnit.getAST() ) {
+                addError("Module could not be parsed: '${includeUri}'", node)
+                return
+            }
             final definitions = astCache.getDefinitions(includeUri)
             for( final module : node.modules ) {
                 final includedName = module.@name
@@ -294,7 +298,7 @@ class ScriptAstCache extends ASTNodeCache {
                     .filter(defNode -> defNode.name == includedName)
                     .findFirst()
                 if( !includedNode.isPresent() ) {
-                    addError("Invalid include name: '${includedName}'", node)
+                    addError("Included name '${includedName}' is not defined in module '${includeUri}'", node)
                     continue
                 }
                 module.setMethod(includedNode.get())
