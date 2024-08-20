@@ -58,6 +58,7 @@ class ScriptAstCache extends ASTNodeCache {
             final uri = sourceUnit.getSource().getURI()
             if( !errorsByUri.containsKey(uri) )
                 errorsByUri.put(uri, [])
+            errorsByUri[uri].removeIf((error) -> error instanceof IncludeException)
             errorsByUri[uri].addAll(visitor.getErrors())
         }
 
@@ -279,9 +280,10 @@ class ScriptAstCache extends ASTNodeCache {
             if( source.startsWith('plugin/') )
                 return
             final includeUri = getIncludeUri(uri, source)
-            // resolve include node only if it is stale
-            if( uri !in changedUris && includeUri !in changedUris )
+            if( !isIncludeStale(node, includeUri) )
                 return
+            for( final module : node.modules )
+                module.setMethod(null)
             final includeUnit = astCache.getSourceUnit(includeUri)
             if( !includeUnit ) {
                 addError("Invalid include source: '${includeUri}'", node)
@@ -305,7 +307,7 @@ class ScriptAstCache extends ASTNodeCache {
             }
         }
 
-        protected URI getIncludeUri(URI uri, String source) {
+        protected static URI getIncludeUri(URI uri, String source) {
             Path includePath = Path.of(uri).getParent().resolve(source)
             if( includePath.isDirectory() )
                 includePath = includePath.resolve('main.nf')
@@ -314,13 +316,23 @@ class ScriptAstCache extends ASTNodeCache {
             return includePath.normalize().toUri()
         }
 
+        protected boolean isIncludeStale(IncludeNode node, URI includeUri) {
+            if( uri in changedUris || includeUri in changedUris )
+                return true
+            for( final module : node.modules ) {
+                if( !module.getMethod() )
+                    return true
+            }
+            return false
+        }
+
         List<SyntaxException> getErrors() {
             return errors
         }
 
         @Override
         void addError(String message, ASTNode node) {
-            errors.add(new SyntaxException(message, node))
+            errors.add(new IncludeException(message, node))
         }
     }
 
