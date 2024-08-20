@@ -102,6 +102,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     private List<String> excludePatterns;
     private boolean harshilAlignment;
+    private boolean suppressWarnings;
 
     // -- LanguageServer
 
@@ -301,6 +302,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     public void didChangeConfiguration(DidChangeConfigurationParams params) {
         log.debug("workspace/didChangeConfiguration " + params.getSettings());
 
+        var shouldInitialize = false;
+
         var debug = getJsonBoolean(params.getSettings(), "nextflow.debug");
         if( debug != null )
             Logger.setDebugEnabled(debug);
@@ -308,17 +311,27 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var excludePatterns = getJsonStringArray(params.getSettings(), "nextflow.files.exclude");
         if( !DefaultGroovyMethods.equals(this.excludePatterns, excludePatterns) ) {
             this.excludePatterns = excludePatterns;
-            for( var name : workspaceRoots.keySet() ) {
-                log.debug("workspace/didChangeConfiguration initialize " + name);
-                var uri = workspaceRoots.get(name);
-                configServices.get(name).initialize(uri, excludePatterns);
-                scriptServices.get(name).initialize(uri, excludePatterns);
-            }
+            shouldInitialize = true;
         }
 
         var harshilAlignment = getJsonBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
         if( harshilAlignment != null )
             this.harshilAlignment = harshilAlignment;
+
+        var suppressWarnings = getJsonBoolean(params.getSettings(), "nextflow.suppressWarnings");
+        if( suppressWarnings != null && this.suppressWarnings != suppressWarnings ) {
+            this.suppressWarnings = suppressWarnings;
+            shouldInitialize = true;
+        }
+
+        if( shouldInitialize ) {
+            for( var name : workspaceRoots.keySet() ) {
+                log.debug("workspace/didChangeConfiguration initialize " + name);
+                var uri = workspaceRoots.get(name);
+                configServices.get(name).initialize(uri, this.excludePatterns, this.suppressWarnings);
+                scriptServices.get(name).initialize(uri, this.excludePatterns, this.suppressWarnings);
+            }
+        }
     }
 
     @Override
@@ -341,8 +354,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var uri = workspaceFolder.getUri();
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
             addWorkspaceFolder(name, uri);
-            configServices.get(name).initialize(uri, excludePatterns);
-            scriptServices.get(name).initialize(uri, excludePatterns);
+            configServices.get(name).initialize(uri, excludePatterns, suppressWarnings);
+            scriptServices.get(name).initialize(uri, excludePatterns, suppressWarnings);
         }
     }
 

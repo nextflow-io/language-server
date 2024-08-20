@@ -81,6 +81,7 @@ public abstract class LanguageService {
     private LanguageClient client;
     private FileCache fileCache = new FileCache();
     private DebouncingExecutor updateExecutor;
+    private boolean suppressWarnings;
 
     public LanguageService() {
         this.updateExecutor = new DebouncingExecutor(DEBOUNCE_MILLIS, (key) -> update());
@@ -95,7 +96,8 @@ public abstract class LanguageService {
     protected ReferenceProvider getReferenceProvider() { return null; }
     protected SymbolProvider getSymbolProvider() { return null; }
 
-    public void initialize(String rootUri, List<String> excludes) {
+    public void initialize(String rootUri, List<String> excludes, boolean suppressWarnings) {
+        this.suppressWarnings = suppressWarnings;
         synchronized (this) {
             var uris = rootUri != null
                 ? getWorkspaceFiles(rootUri, excludes)
@@ -257,6 +259,9 @@ public abstract class LanguageService {
                 var severity = error instanceof SyntaxWarning
                     ? DiagnosticSeverity.Warning
                     : DiagnosticSeverity.Error;
+
+                if( suppressWarnings && severity == DiagnosticSeverity.Warning )
+                    continue;
 
                 var diagnostic = new Diagnostic();
                 diagnostic.setRange(range);
