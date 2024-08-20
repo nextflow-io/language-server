@@ -50,12 +50,12 @@ public class IncludeVariable extends ASTNode implements Variable {
 
     @Override
     public ClassNode getType() {
-        return method.getReturnType();
+        return method != null ? method.getReturnType() : null;
     }
 
     @Override
     public ClassNode getOriginType() {
-        return method.getReturnType();
+        return method != null ? method.getReturnType() : null;
     }
 
     @Override
@@ -80,7 +80,7 @@ public class IncludeVariable extends ASTNode implements Variable {
 
     @Override
     public boolean isDynamicTyped() {
-        return method.isDynamicReturnType();
+        return method != null && method.isDynamicReturnType();
     }
 
     @Override

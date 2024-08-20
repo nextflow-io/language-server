@@ -277,8 +277,7 @@ public class ASTUtils {
         var minCount = Math.min(paramsCount, argsCount);
 
         int score = 0;
-        if( minCount == 0 && paramsCount == argsCount )
-            score++;
+        score -= Math.abs(paramsCount - argsCount);
 
         for( int i = 0; i < minCount; i++ ) {
             var paramType = (i < paramsCount) ? parameters[i].getType() : null;
@@ -289,11 +288,6 @@ public class ASTUtils {
                     score += 1000;
                 else if( argType.isDerivedFrom(paramType) )
                     score += 100;
-                else
-                    score++;
-            }
-            else if( paramType != null ) {
-                score++;
             }
         }
         return score;

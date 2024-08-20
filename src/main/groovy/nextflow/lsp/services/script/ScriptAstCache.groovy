@@ -19,6 +19,7 @@ import java.nio.file.Path
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
+import nextflow.lsp.ast.ASTUtils
 import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.file.FileCache
 import nextflow.script.v2.FeatureFlagNode
@@ -33,6 +34,9 @@ import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.expr.ArgumentListExpression
+import org.codehaus.groovy.ast.expr.MethodCallExpression
+import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
 
@@ -52,14 +56,19 @@ class ScriptAstCache extends ASTNodeCache {
         final errorsByUri = super.update(uris, fileCache)
 
         for( final sourceUnit : getSourceUnits() ) {
-            final visitor = new ResolveIncludeVisitor(sourceUnit, this, uris)
-            visitor.visit()
-
             final uri = sourceUnit.getSource().getURI()
             if( !errorsByUri.containsKey(uri) )
                 errorsByUri.put(uri, [])
+
+            final includeVisitor = new ResolveIncludeVisitor(sourceUnit, this, uris)
+            includeVisitor.visit()
             errorsByUri[uri].removeIf((error) -> error instanceof IncludeException)
-            errorsByUri[uri].addAll(visitor.getErrors())
+            errorsByUri[uri].addAll(includeVisitor.getErrors())
+
+            final callArgsVisitor = new CallArgumentsVisitor(sourceUnit, this)
+            callArgsVisitor.visit()
+            errorsByUri[uri].removeIf((error) -> error instanceof CallArgumentsException)
+            errorsByUri[uri].addAll(callArgsVisitor.getErrors())
         }
 
         return errorsByUri
@@ -333,6 +342,80 @@ class ScriptAstCache extends ASTNodeCache {
         @Override
         void addError(String message, ASTNode node) {
             errors.add(new IncludeException(message, node))
+        }
+    }
+
+    private class CallArgumentsVisitor extends ClassCodeVisitorSupport implements ScriptVisitor {
+
+        private SourceUnit sourceUnit
+
+        private ScriptAstCache astCache
+
+        private List<SyntaxException> errors = []
+
+        CallArgumentsVisitor(SourceUnit sourceUnit, ScriptAstCache astCache) {
+            this.sourceUnit = sourceUnit
+            this.astCache = astCache
+        }
+
+        @Override
+        protected SourceUnit getSourceUnit() {
+            return sourceUnit
+        }
+
+        void visit() {
+            final moduleNode = sourceUnit.getAST()
+            if( moduleNode !instanceof ScriptNode )
+                return
+            final scriptNode = (ScriptNode) moduleNode
+            for( final node : scriptNode.getWorkflows() )
+                visitWorkflow(node)
+        }
+
+        @Override
+        void visitWorkflow(WorkflowNode node) {
+            visit(node.main)
+        }
+
+        @Override
+        void visitMethodCallExpression(MethodCallExpression node) {
+            final defNode = ASTUtils.getMethodFromCallExpression(node, astCache)
+            if( !defNode )
+                return
+            if( defNode !instanceof ProcessNode && defNode !instanceof WorkflowNode )
+                return
+
+            final argsCount = ((ArgumentListExpression) node.arguments).size()
+            final paramsCount = getNumberofParameters(defNode)
+            if( argsCount != paramsCount )
+                addError("Incorrect number of call arguments, expected ${paramsCount} but received ${argsCount}", node)
+
+            super.visitMethodCallExpression(node)
+        }
+
+        protected static int getNumberofParameters(MethodNode node) {
+            if( node instanceof ProcessNode ) {
+                if( node.inputs !instanceof BlockStatement )
+                    return 0
+                final code = (BlockStatement) node.inputs
+                return code.statements.size()
+            }
+            if( node instanceof WorkflowNode ) {
+                if( node.takes !instanceof BlockStatement )
+                    return 0
+                final code = (BlockStatement) node.takes
+                return code.statements.size()
+            }
+            return node.parameters.length
+        }
+
+        List<SyntaxException> getErrors() {
+            return errors
+        }
+
+        @Override
+        void addError(String message, ASTNode node) {
+            errors.add(new CallArgumentsException(message, node))
         }
     }
 
