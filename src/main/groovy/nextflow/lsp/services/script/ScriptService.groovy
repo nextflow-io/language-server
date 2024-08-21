@@ -20,6 +20,7 @@ import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
 import nextflow.lsp.compiler.CompilerTransform
+import nextflow.lsp.services.CallHierarchyProvider
 import nextflow.lsp.services.CompletionProvider
 import nextflow.lsp.services.DefinitionProvider
 import nextflow.lsp.services.FormattingProvider
@@ -72,6 +73,11 @@ class ScriptService extends LanguageService {
         optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true)
 
         return config
+    }
+
+    @Override
+    protected CallHierarchyProvider getCallHierarchyProvider() {
+        new ScriptCallHierarchyProvider(astCache)
     }
 
     @Override

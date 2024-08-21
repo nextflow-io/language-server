@@ -52,7 +52,7 @@ class ScriptReferenceProvider implements ReferenceProvider {
         if( !offsetNode )
             return Collections.emptyList()
 
-        final references = ASTUtils.getReferences(offsetNode, ast, includeDeclaration)
+        final references = ASTUtils.getReferences(offsetNode, ast, includeDeclaration, true)
         final List<Location> result = []
         for( final refNode : references ) {
             final refUri = ast.getURI(refNode)

@@ -34,6 +34,12 @@ import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.config.ConfigService;
 import nextflow.lsp.services.script.ScriptService;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
+import org.eclipse.lsp4j.CallHierarchyIncomingCall;
+import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams;
+import org.eclipse.lsp4j.CallHierarchyItem;
+import org.eclipse.lsp4j.CallHierarchyOutgoingCall;
+import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams;
+import org.eclipse.lsp4j.CallHierarchyPrepareParams;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionOptions;
@@ -129,6 +135,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var workspaceCapabilities = new WorkspaceServerCapabilities(workspaceFoldersOptions);
         serverCapabilities.setWorkspace(workspaceCapabilities);
 
+        serverCapabilities.setCallHierarchyProvider(true);
         var completionOptions = new CompletionOptions(false, List.of("."));
         serverCapabilities.setCompletionProvider(completionOptions);
         serverCapabilities.setDefinitionProvider(true);
@@ -279,6 +286,47 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             if( service == null )
                 return null;
             return service.hover(params);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<CallHierarchyItem>> prepareCallHierarchy(CallHierarchyPrepareParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var uri = params.getTextDocument().getUri();
+            log.debug("textDocument/prepareCallHierarchy " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return null;
+            return service.prepareCallHierarchy(params);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<CallHierarchyIncomingCall>> callHierarchyIncomingCalls(CallHierarchyIncomingCallsParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var item = params.getItem();
+            var uri = item.getUri();
+            log.debug("textDocument/callHierarchyIncomingCalls " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return null;
+            return service.callHierarchyIncomingCalls(item);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<CallHierarchyOutgoingCall>> callHierarchyOutgoingCalls(CallHierarchyOutgoingCallsParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var item = params.getItem();
+            var uri = item.getUri();
+            log.debug("textDocument/callHierarchyOutgoingCalls " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return null;
+            return service.callHierarchyOutgoingCalls(item);
         });
     }
 

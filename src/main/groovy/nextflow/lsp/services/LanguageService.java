@@ -40,6 +40,10 @@ import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.syntax.SyntaxException;
+import org.eclipse.lsp4j.CallHierarchyIncomingCall;
+import org.eclipse.lsp4j.CallHierarchyItem;
+import org.eclipse.lsp4j.CallHierarchyOutgoingCall;
+import org.eclipse.lsp4j.CallHierarchyPrepareParams;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionParams;
@@ -89,6 +93,7 @@ public abstract class LanguageService {
 
     public abstract boolean matchesFile(String uri);
     protected abstract ASTNodeCache getAstCache();
+    protected CallHierarchyProvider getCallHierarchyProvider() { return null; }
     protected CompletionProvider getCompletionProvider() { return null; }
     protected DefinitionProvider getDefinitionProvider() { return null; }
     protected FormattingProvider getFormattingProvider() { return null; }
@@ -200,6 +205,30 @@ public abstract class LanguageService {
             return null;
 
         return provider.hover(params.getTextDocument(), params.getPosition());
+    }
+
+    public List<CallHierarchyItem> prepareCallHierarchy(CallHierarchyPrepareParams params) {
+        var provider = getCallHierarchyProvider();
+        if( provider == null )
+            return Collections.emptyList();
+
+        return provider.prepare(params.getTextDocument(), params.getPosition());
+    }
+
+    public List<CallHierarchyIncomingCall> callHierarchyIncomingCalls(CallHierarchyItem item) {
+        var provider = getCallHierarchyProvider();
+        if( provider == null )
+            return Collections.emptyList();
+
+        return provider.incomingCalls(item);
+    }
+
+    public List<CallHierarchyOutgoingCall> callHierarchyOutgoingCalls(CallHierarchyItem item) {
+        var provider = getCallHierarchyProvider();
+        if( provider == null )
+            return Collections.emptyList();
+
+        return provider.outgoingCalls(item);
     }
 
     public List<? extends Location> references(ReferenceParams params) {

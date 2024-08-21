@@ -97,8 +97,9 @@ public class ASTUtils {
      * @param node
      * @param ast
      * @param includeDeclaration
+     * @param includeIncludes
      */
-    public static List<ASTNode> getReferences(ASTNode node, ASTNodeCache ast, boolean includeDeclaration) {
+    public static List<ASTNode> getReferences(ASTNode node, ASTNodeCache ast, boolean includeDeclaration, boolean includeIncludes) {
         var defNode = getDefinition(node, true, ast);
         if( defNode == null )
             return Collections.emptyList();
@@ -106,7 +107,9 @@ public class ASTUtils {
             .filter(otherNode -> {
                 if( otherNode.getLineNumber() == -1 || otherNode.getColumnNumber() == -1 )
                     return false;
-                if( !includeDeclaration && defNode == otherNode )
+                if( defNode == otherNode )
+                    return includeDeclaration;
+                if( !includeIncludes && otherNode instanceof IncludeVariable )
                     return false;
                 return defNode == getDefinition(otherNode, false, ast);
             })
