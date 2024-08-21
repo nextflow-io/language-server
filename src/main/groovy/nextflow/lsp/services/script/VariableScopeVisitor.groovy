@@ -568,7 +568,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
     /**
      * In processes and workflows, variables can be declared without `def`
-     * and are treated as variables scoped to the process / workflow.
+     * and are treated as variables scoped to the process or workflow.
      *
      * @param left
      */
@@ -589,10 +589,15 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
                 return
             scope = scope.parent
         }
-        if( currentTopLevelNode instanceof ProcessNode || currentTopLevelNode instanceof WorkflowNode )
+        if( currentTopLevelNode instanceof ProcessNode || currentTopLevelNode instanceof WorkflowNode ) {
+            scope = currentScope
+            currentScope = currentTopLevelNode.variableScope
             declare(varX)
-        else
+            currentScope = scope
+        }
+        else {
             addError("`${varX.name}` was assigned but not declared", varX)
+        }
     }
 
     private VariableExpression getAssignmentTargetVariable(Expression left) {
