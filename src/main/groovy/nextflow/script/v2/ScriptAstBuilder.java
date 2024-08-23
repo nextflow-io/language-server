@@ -334,6 +334,13 @@ public class ScriptAstBuilder {
 
     private ProcessNode processDef(ProcessDefContext ctx) {
         var name = ctx.name.getText();
+        if( ctx.body == null ) {
+            var empty = EmptyStatement.INSTANCE;
+            var result = ast( new ProcessNode(name, empty, empty, empty, EmptyExpression.INSTANCE, null, empty, empty), ctx );
+            collectSyntaxError(new SyntaxException("Missing process script body", result));
+            return result;
+        }
+
         var directives = processDirectives(ctx.body.processDirectives());
         var inputs = processInputs(ctx.body.processInputs());
         var outputs = processOutputs(ctx.body.processOutputs());

@@ -121,7 +121,7 @@ includeName
 // -- process definition
 processDef
     :   PROCESS name=identifier nls LBRACE
-        body=processBody
+        body=processBody?
         sep? RBRACE
     ;
 
