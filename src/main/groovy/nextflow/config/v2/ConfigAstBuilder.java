@@ -221,8 +221,8 @@ public class ConfigAstBuilder {
         if( ctx instanceof ConfigBlockStmtAltContext cbac )
             return ast( configBlock(cbac.configBlock()), cbac );
 
-        if( ctx instanceof ConfigBlockAltStmtAltContext cbac )
-            return ast( configBlockAlt(cbac.configBlockAlt()), cbac );
+        if( ctx instanceof ConfigAppendBlockStmtAltContext cbac )
+            return ast( configAppendBlock(cbac.configAppendBlock()), cbac );
 
         if( ctx instanceof ConfigIncompleteStmtAltContext ciac )
             return ast( configIncomplete(ciac.configIncomplete()), ciac );
@@ -263,6 +263,9 @@ public class ConfigAstBuilder {
         if( ctx instanceof ConfigBlockBlockStmtAltContext cbac )
             return ast( configBlock(cbac.configBlock()), cbac );
 
+        if( ctx instanceof ConfigAppendBlockBlockStmtAltContext cbac )
+            return ast( configAppendBlock(cbac.configAppendBlock()), cbac );
+
         if( ctx instanceof ConfigSelectorBlockStmtAltContext csac )
             return ast( configSelector(csac.configSelector()), csac );
 
@@ -287,18 +290,18 @@ public class ConfigAstBuilder {
             : stringLiteral(ctx.stringLiteral());
     }
 
-    private ConfigStatement configBlockAlt(ConfigBlockAltContext ctx) {
+    private ConfigStatement configAppendBlock(ConfigAppendBlockContext ctx) {
         var name = identifier(ctx.identifier());
-        var statements = ctx.configBlockAltStatement().stream()
-            .map(this::configBlockAltStatement)
+        var statements = ctx.configAppendBlockStatement().stream()
+            .map(this::configAppendBlockStatement)
             .collect(Collectors.toList());
         var result = ast( new ConfigBlockNode(name, statements), ctx );
         if( !"plugins".equals(name) )
-            collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (i.e. omitting the equals sign)", result));
+            collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (i.e. no equals sign)", result));
         return result;
     }
 
-    private ConfigStatement configBlockAltStatement(ConfigBlockAltStatementContext ctx) {
+    private ConfigStatement configAppendBlockStatement(ConfigAppendBlockStatementContext ctx) {
         var name = identifier(ctx.identifier());
         var value = literal(ctx.literal());
         return ast( new ConfigAppendNode(List.of(name), value), ctx );

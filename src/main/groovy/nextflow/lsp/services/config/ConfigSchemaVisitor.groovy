@@ -72,10 +72,6 @@ class ConfigSchemaVisitor extends ClassCodeVisitorSupport implements ConfigVisit
             // TODO: validate params against schema
             return
         }
-        if( names.first() == 'plugins' ) {
-            // TODO: load plugin config scopes
-            return
-        }
 
         final fqName = names.join('.')
         if( fqName.startsWith('process.ext.') )
