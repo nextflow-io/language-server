@@ -38,4 +38,8 @@ public class WorkflowNode extends MethodNode {
         this.publishers = publishers;
         this.main = main;
     }
+
+    public boolean isEntry() {
+        return getName() == null;
+    }
 }

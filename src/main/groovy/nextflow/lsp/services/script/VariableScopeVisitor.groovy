@@ -15,6 +15,10 @@
  */
 package nextflow.lsp.services.script
 
+import java.lang.reflect.Modifier
+import java.nio.file.Path
+
+import groovy.json.JsonSlurper
 import groovy.lang.groovydoc.Groovydoc
 import groovy.lang.groovydoc.GroovydocHolder
 import groovy.transform.CompileStatic
@@ -26,6 +30,7 @@ import nextflow.script.dsl.FeatureFlagDsl
 import nextflow.script.dsl.Function
 import nextflow.script.dsl.Operator
 import nextflow.script.dsl.OutputDsl
+import nextflow.script.dsl.ParamsMap
 import nextflow.script.dsl.ProcessDsl
 import nextflow.script.dsl.ProcessDirectiveDsl
 import nextflow.script.dsl.ProcessInputDsl
@@ -89,6 +94,8 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
     private ASTNode currentTopLevelNode
 
     private VariableScope currentScope
+
+    private ClassNode paramsType
 
     VariableScopeVisitor(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit
@@ -267,7 +274,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         for( final processNode : scriptNode.getProcesses() )
             declare(processNode)
         for( final workflowNode : scriptNode.getWorkflows() ) {
-            if( workflowNode != scriptNode.getEntry() )
+            if( !workflowNode.isEntry() )
                 declare(workflowNode)
         }
 
@@ -388,8 +395,8 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         final args = (ArgumentListExpression) call.arguments
         if( args.size() < 1 || args.last() !instanceof VariableExpression )
             return
-        final var = (VariableExpression) args.last()
-        declare(var)
+        final varX = (VariableExpression) args.last()
+        declare(varX)
     }
 
     private void checkDirectives(Statement node, String typeLabel, boolean checkSyntaxErrors=false) {
@@ -426,6 +433,9 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
     @Override
     void visitWorkflow(WorkflowNode node) {
+        if( node.isEntry() )
+            declareParameters()
+
         pushState(node.name ? WorkflowDsl : EntryWorkflowDsl)
         currentTopLevelNode = node
         node.variableScope = currentScope
@@ -442,6 +452,55 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
         currentTopLevelNode = null
         popState()
+
+        if( node.isEntry() )
+            this.paramsType = null
+    }
+
+    private void declareParameters() {
+        // load parameter schema
+        final uri = sourceUnit.getSource().getURI()
+        final schemaPath = Path.of(uri).getParent().resolve('nextflow_schema.json')
+        if( !schemaPath.exists() )
+            return
+        final schemaJson = new JsonSlurper().parseText(schemaPath.text) as Map
+        final defs = (schemaJson.defs ?: schemaJson.definitions) as Map<String,Map>
+
+        // create synthetic params type
+        final cn = new ClassNode(ParamsMap)
+        defs.values().stream()
+            .flatMap((defn) -> {
+                final props = defn.properties as Map<String, Map<String,String>>
+                return props.entrySet().stream()
+            })
+            .forEach((entry) -> {
+                final name = entry.key
+                final attrs = entry.value
+                final type = getTypeClassFromString(attrs.type)
+                final description = attrs.description
+                final fn = new FieldNode(name, Modifier.PUBLIC, type, cn, null)
+                fn.setHasNoRealSourcePosition(true)
+                fn.setDeclaringClass(cn)
+                fn.setSynthetic(true)
+                final an = new AnnotationNode(new ClassNode(Constant))
+                an.addMember('value', new ConstantExpression(description))
+                fn.addAnnotation(an)
+                cn.addField(fn)
+            })
+
+        this.paramsType = cn
+    }
+
+    private ClassNode getTypeClassFromString(String type) {
+        if( type == 'boolean' )
+            return ClassHelper.boolean_TYPE
+        if( type == 'integer' )
+            return ClassHelper.long_TYPE
+        if( type == 'number' )
+            return ClassHelper.double_TYPE
+        if( type == 'string' )
+            return ClassHelper.STRING_TYPE
+        return ClassHelper.dynamicType()
     }
 
     private void declareWorkflowInputs(BlockStatement block) {
@@ -560,7 +619,8 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
     void visitBinaryExpression(BinaryExpression node) {
         if( node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
             visit(node.rightExpression)
-            visitAssignment(node.leftExpression)
+            declareAssignedVariable(node.leftExpression)
+            visit(node.leftExpression)
         }
         else
             super.visitBinaryExpression(node)
@@ -572,31 +632,28 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
      *
      * @param left
      */
-    void visitAssignment(Expression left) {
+    void declareAssignedVariable(Expression left) {
         if( left instanceof TupleExpression ) {
             for( final el : left.expressions ) {
                 if( el instanceof VariableExpression )
-                    visitAssignment(el)
+                    declareAssignedVariable(el)
             }
         }
 
         final varX = getAssignmentTargetVariable(left)
         if( varX == null )
             return
-        VariableScope scope = currentScope
-        while( scope != null ) {
-            if( varX.name in scope.getDeclaredVariables() )
-                return
-            scope = scope.parent
-        }
+        final name = varX.name
+        if( findVariableDeclaration(name, varX) )
+            return
         if( currentTopLevelNode instanceof ProcessNode || currentTopLevelNode instanceof WorkflowNode ) {
-            scope = currentScope
+            final scope = currentScope
             currentScope = currentTopLevelNode.variableScope
             declare(varX)
             currentScope = scope
         }
         else {
-            addError("`${varX.name}` was assigned but not declared", varX)
+            addError("`${name}` was assigned but not declared", varX)
         }
     }
 
@@ -659,6 +716,29 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         if( !varX )
             return
         currentScope.putDeclaredVariable(varX)
+    }
+
+    @Override
+    void visitPropertyExpression(PropertyExpression node) {
+        super.visitPropertyExpression(node)
+
+        // validate parameter against schema if applicable
+        // NOTE: should be incorporated into type-checking visitor
+        if( !paramsType )
+            return
+        if( node.objectExpression !instanceof VariableExpression )
+            return
+        final varX = (VariableExpression) node.objectExpression
+        if( varX.name != 'params' )
+            return
+        final property = node.getPropertyAsString()
+        if( !findClassMember(paramsType, property, node) ) {
+            addError("Unrecognized parameter `${property}`", node)
+            return
+        }
+        final variable = varX.getAccessedVariable()
+        if( variable instanceof FieldNode )
+            variable.setType(paramsType)
     }
 
     @Override

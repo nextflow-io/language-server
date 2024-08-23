@@ -16,6 +16,7 @@
 package nextflow.lsp.ast;
 
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -99,10 +100,10 @@ public class ASTUtils {
      * @param includeDeclaration
      * @param includeIncludes
      */
-    public static List<ASTNode> getReferences(ASTNode node, ASTNodeCache ast, boolean includeDeclaration, boolean includeIncludes) {
+    public static Iterator<ASTNode> getReferences(ASTNode node, ASTNodeCache ast, boolean includeDeclaration, boolean includeIncludes) {
         var defNode = getDefinition(node, true, ast);
         if( defNode == null )
-            return Collections.emptyList();
+            return Collections.emptyIterator();
         return ast.getNodes().stream()
             .filter(otherNode -> {
                 if( otherNode.getLineNumber() == -1 || otherNode.getColumnNumber() == -1 )
@@ -113,7 +114,7 @@ public class ASTUtils {
                     return false;
                 return defNode == getDefinition(otherNode, false, ast);
             })
-            .collect(Collectors.toList());
+            .iterator();
     }
 
     /**
@@ -180,14 +181,14 @@ public class ASTUtils {
      * @param classNode
      * @param ast
      */
-    public static List<FieldNode> getFieldsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
+    public static Iterator<FieldNode> getFieldsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
         return classNode.getFields().stream()
             .filter(fieldNode -> {
                 if( !fieldNode.isPublic() )
                     return false;
                 return isStatic ? fieldNode.isStatic() : !fieldNode.isStatic();
             })
-            .collect(Collectors.toList());
+            .iterator();
     }
 
     /**
@@ -196,21 +197,21 @@ public class ASTUtils {
      * @param classNode
      * @param ast
      */
-    public static List<MethodNode> getMethodsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
+    public static Iterator<MethodNode> getMethodsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
         return classNode.getMethods().stream()
             .filter(methodNode -> {
                 if( !methodNode.isPublic() )
                     return false;
                 return isStatic ? methodNode.isStatic() : !methodNode.isStatic();
             })
-            .collect(Collectors.toList());
+            .iterator();
     }
 
     private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
         var classNode = getTypeOfNode(node.getObjectExpression(), ast);
         if( classNode == null )
             return null;
-        return classNode.getField(node.getProperty().getText());
+        return classNode.getField(node.getPropertyAsString());
     }
 
     /**
@@ -255,7 +256,7 @@ public class ASTUtils {
             else {
                 var leftType = getTypeOfNode(mce.getObjectExpression(), ast);
                 if( leftType != null )
-                    return leftType.getMethods(mce.getMethod().getText());
+                    return leftType.getMethods(mce.getMethodAsString());
             }
         }
 

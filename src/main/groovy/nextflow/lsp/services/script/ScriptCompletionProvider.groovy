@@ -34,6 +34,7 @@ import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.MethodNode
@@ -307,7 +308,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             // e.g. "foo.bar. "
             //               ^
             log.debug "completion property -- ''"
-            populateItemsFromObjectScope(offsetNode, '', items)
+            populateItemsFromObjectScope(offsetNode.getObjectExpression(), '', items)
         }
         else {
             log.debug "completion ${offsetNode.class.simpleName} -- '${offsetNode.getText()}'"
@@ -321,7 +322,7 @@ class ScriptCompletionProvider implements CompletionProvider {
 
     private void populateItemsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
         final classNode = ASTUtils.getTypeOfNode(object, ast)
-        if( classNode == null || classNode.getTypeClass() == Object )
+        if( classNode == null || ClassHelper.isObjectType(classNode) )
             return
         final isStatic = object instanceof ClassExpression
         final Set<String> existingNames = []
@@ -335,7 +336,7 @@ class ScriptCompletionProvider implements CompletionProvider {
 
     private void populateMethodsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
         final classNode = ASTUtils.getTypeOfNode(object, ast)
-        if( classNode == null || classNode.getTypeClass() == Object )
+        if( classNode == null || ClassHelper.isObjectType(classNode) )
             return
         final isStatic = object instanceof ClassExpression
         final Set<String> existingNames = []
@@ -348,7 +349,7 @@ class ScriptCompletionProvider implements CompletionProvider {
     static private final ClassNode DSL_CONSTANT_TYPE = new ClassNode(Constant)
     static private final ClassNode DSL_FUNCTION_TYPE = new ClassNode(Function)
 
-    private void populateItemsFromFields(List<FieldNode> fields, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
+    private void populateItemsFromFields(Iterator<FieldNode> fields, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
         for( final field : fields ) {
             final name = field.getName()
             if( !name.startsWith(namePrefix) || existingNames.contains(name) )
@@ -375,7 +376,7 @@ class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
-    private void populateItemsFromMethods(List<MethodNode> methods, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
+    private void populateItemsFromMethods(Iterator<MethodNode> methods, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
         for( final method : methods ) {
             final name = method.getName()
             if( !name.startsWith(namePrefix) || existingNames.contains(name) )
@@ -440,8 +441,8 @@ class ScriptCompletionProvider implements CompletionProvider {
 
         if( scope.isClassScope() ) {
             final cn = scope.getClassScope()
-            populateItemsFromFields(cn.getFields(), namePrefix, existingNames, items)
-            populateItemsFromMethods(cn.getMethods(), namePrefix, existingNames, items)
+            populateItemsFromFields(cn.getFields().iterator(), namePrefix, existingNames, items)
+            populateItemsFromMethods(cn.getMethods().iterator(), namePrefix, existingNames, items)
         }
     }
 
