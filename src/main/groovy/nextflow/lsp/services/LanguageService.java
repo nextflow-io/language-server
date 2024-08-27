@@ -87,6 +87,7 @@ public abstract class LanguageService {
     private LanguageClient client;
     private FileCache fileCache = new FileCache();
     private DebouncingExecutor updateExecutor;
+    private volatile boolean initialized;
     private boolean suppressWarnings;
 
     public LanguageService() {
@@ -107,6 +108,8 @@ public abstract class LanguageService {
     public void initialize(String rootUri, List<String> excludes, boolean suppressWarnings) {
         this.suppressWarnings = suppressWarnings;
         synchronized (this) {
+            this.initialized = false;
+
             var uris = rootUri != null
                 ? getWorkspaceFiles(rootUri, excludes)
                 : fileCache.getOpenFiles();
@@ -115,6 +118,8 @@ public abstract class LanguageService {
             astCache.clear();
             var errors = astCache.update(uris, fileCache);
             publishDiagnostics(errors);
+
+            this.initialized = true;
         }
     }
 
@@ -273,9 +278,12 @@ public abstract class LanguageService {
      */
     protected void update() {
         synchronized (this) {
+            if( !initialized )
+                return;
+
             var uris = fileCache.removeChangedFiles();
 
-            log.debug("update " + DefaultGroovyMethods.join(uris, ", "));
+            log.debug("update " + DefaultGroovyMethods.join(uris, " , "));
             var errors = getAstCache().update(uris, fileCache);
             publishDiagnostics(errors);
         }
