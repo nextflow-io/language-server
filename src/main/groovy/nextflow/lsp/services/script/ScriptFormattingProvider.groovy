@@ -357,7 +357,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             appendNewLine()
             appendIndent()
             append('emit:\n')
-            visit(node.emits)
+            visitWorkflowEmits((BlockStatement) node.emits)
         }
         if( node.publishers instanceof BlockStatement ) {
             appendNewLine()
@@ -367,6 +367,56 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         }
         decIndent()
         append('}\n')
+    }
+
+    protected void visitWorkflowEmits(BlockStatement block) {
+        final alignmentWidth = options.harshilAlignment()
+            ? getWorkflowEmitWidth(block)
+            : 0
+
+        for( final stmt : block.statements ) {
+            final stmtX = (ExpressionStatement)stmt
+            if( stmtX.expression instanceof BinaryExpression ) {
+                final binX = (BinaryExpression)stmtX.expression
+                final varX = (VariableExpression)binX.getLeftExpression()
+                appendIndent()
+                visit(varX)
+                if( alignmentWidth > 0 ) {
+                    final padding = alignmentWidth - varX.name.length()
+                    append(' ' * padding)
+                }
+                append(' = ')
+                visit(binX.getRightExpression())
+                appendNewLine()
+            }
+            else {
+                visit(stmt)
+            }
+        }
+    }
+
+    protected int getWorkflowEmitWidth(BlockStatement block) {
+        if( block.statements.size() == 1 )
+            return 0
+
+        int maxWidth = 0
+        for( final stmt : block.statements ) {
+            final stmtX = (ExpressionStatement)stmt
+            int width = 0
+            if( stmtX.expression instanceof VariableExpression ) {
+                final varX = (VariableExpression)stmtX.expression
+                width = varX.name.length()
+            }
+            else if( stmtX.expression instanceof BinaryExpression ) {
+                final binX = (BinaryExpression)stmtX.expression
+                final varX = (VariableExpression)binX.getLeftExpression()
+                width = varX.name.length()
+            }
+
+            if( maxWidth < width )
+                maxWidth = width
+        }
+        return maxWidth
     }
 
     @Override
