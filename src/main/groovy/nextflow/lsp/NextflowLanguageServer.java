@@ -119,12 +119,9 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
-        log.info("initialize");
-
         for( var workspaceFolder : params.getWorkspaceFolders() ) {
             var name = workspaceFolder.getName();
             var uri = workspaceFolder.getUri();
-            log.info("workspace folder " + name + " " + uri);
             addWorkspaceFolder(name, uri);
         }
 
