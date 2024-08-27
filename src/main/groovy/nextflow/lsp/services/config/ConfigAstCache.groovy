@@ -161,8 +161,7 @@ class ConfigAstCache extends ASTNodeCache {
                 return
             final source = node.source.getText()
             final includeUri = getIncludeUri(uri, source)
-            // resolve include node only if it is stale
-            if( uri !in changedUris && includeUri !in changedUris )
+            if( !isIncludeLocal(includeUri) || !isIncludeStale(includeUri) )
                 return
             final includeUnit = astCache.getSourceUnit(includeUri)
             if( !includeUnit ) {
@@ -173,6 +172,14 @@ class ConfigAstCache extends ASTNodeCache {
 
         protected URI getIncludeUri(URI uri, String source) {
             return Path.of(uri).getParent().resolve(source).normalize().toUri()
+        }
+
+        protected boolean isIncludeLocal(URI includeUri) {
+            return includeUri.getScheme() == 'file'
+        }
+
+        protected boolean isIncludeStale(URI includeUri) {
+            return uri in changedUris || includeUri in changedUris
         }
 
         List<SyntaxException> getErrors() {
