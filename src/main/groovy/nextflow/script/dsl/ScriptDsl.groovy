@@ -82,6 +82,12 @@ class ScriptDsl implements DslScope {
     WorkflowMetadata workflow
 
     @Function('''
+        Create a branch criteria to use with the `branch` operator.
+    ''')
+    void branchCriteria(Closure closure) {
+    }
+
+    @Function('''
         Throw a script runtime error with an optional error message.
     ''')
     void error(String message=null) {
@@ -104,6 +110,12 @@ class ScriptDsl implements DslScope {
         Create a grouping key to use with the [groupTuple](https://nextflow.io/docs/latest/operator.html#grouptuple) operator.
     ''')
     GroupKey groupKey(Object key, int size) {
+    }
+
+    @Function('''
+        Create a multi-map criteria to use with the `multiMap` operator.
+    ''')
+    void multiMapCriteria(Closure closure) {
     }
 
     @Function('''

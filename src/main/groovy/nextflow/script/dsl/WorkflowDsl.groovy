@@ -18,10 +18,16 @@ package nextflow.script.dsl
 import groovy.transform.CompileStatic
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
+import nextflow.Channel
 import nextflow.script.ChannelOut
 
 @CompileStatic
 class WorkflowDsl implements DslScope {
+
+    @Constant('''
+        Alias for `Channel`.
+    ''')
+    Channel channel
 
     @Operator
     @Function('''
@@ -258,6 +264,15 @@ class WorkflowDsl implements DslScope {
         [Read more](https://nextflow.io/docs/latest/operator.html#splitcsv)
     ''')
     DataflowWriteChannel splitCsv(DataflowReadChannel source, Map opts=[:]) {
+    }
+
+    @Operator
+    @Function('''
+        The `splitFasta` operator splits [FASTA formatted](http://en.wikipedia.org/wiki/FASTA_format) text from a source channel into individual sequences.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#splitfasta)
+    ''')
+    DataflowWriteChannel splitFasta(DataflowReadChannel source, Map opts=[:]) {
     }
 
     @Operator
