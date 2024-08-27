@@ -320,7 +320,7 @@ public class ScriptAstBuilder {
     }
 
     private IncludeNode includeStatement(IncludeStatementContext ctx) {
-        var source = stringLiteral(ctx.stringLiteral());
+        var source = ast( constX(stringLiteral(ctx.stringLiteral())), ctx.stringLiteral() );
         var modules = ctx.includeNames().includeName().stream()
             .map(it -> {
                 var name = it.name.getText();
