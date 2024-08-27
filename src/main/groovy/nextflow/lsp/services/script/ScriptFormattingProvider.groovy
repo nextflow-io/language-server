@@ -148,18 +148,18 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             visitFeatureFlag(featureFlag)
         for( final includeNode : scriptNode.getIncludes() )
             visitInclude(includeNode)
-        for( final workflowNode : scriptNode.getWorkflows() ) {
-            if( !workflowNode.isEntry() )
-                visitWorkflow(workflowNode)
-        }
-        for( final functionNode : scriptNode.getFunctions() )
-            visitFunction(functionNode)
-        for( final processNode : scriptNode.getProcesses() )
-            visitProcess(processNode)
         if( scriptNode.getEntry() )
             visitWorkflow(scriptNode.getEntry())
         if( scriptNode.getOutput() )
             visitOutput(scriptNode.getOutput())
+        for( final workflowNode : scriptNode.getWorkflows() ) {
+            if( !workflowNode.isEntry() )
+                visitWorkflow(workflowNode)
+        }
+        for( final processNode : scriptNode.getProcesses() )
+            visitProcess(processNode)
+        for( final functionNode : scriptNode.getFunctions() )
+            visitFunction(functionNode)
     }
 
     protected int getMaxIncludeWidth(List<IncludeNode> includes) {
