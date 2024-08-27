@@ -401,7 +401,7 @@ formalParameterList
     ;
 
 formalParameter
-    :   type? ELLIPSIS? identifier (nls ASSIGN nls expression)?
+    :   type? identifier (nls ASSIGN nls expression)?
     ;
 
 // -- list expression

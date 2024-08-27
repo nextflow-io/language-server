@@ -1448,12 +1448,6 @@ public class ScriptAstBuilder {
         if( ctx == null )
             return null;
 
-        for( int i = 0, n = ctx.formalParameter().size(); i < n - 1; i += 1 ) {
-            var el = ctx.formalParameter(i);
-            if( el.ELLIPSIS() != null )
-                throw createParsingFailedException("The var-arg parameter must be the last parameter", el);
-        }
-
         var params = ctx.formalParameter().stream()
             .map(this::parameter)
             .collect(Collectors.toList());
@@ -1471,14 +1465,7 @@ public class ScriptAstBuilder {
     }
 
     private Parameter parameter(FormalParameterContext ctx) {
-        ClassNode type = type(ctx.type());
-        if( ctx.ELLIPSIS() != null ) {
-            type = type.makeArray();
-            type = ctx.type() != null
-                ? ast( type, ctx.type(), ast(constX("..."), ctx.ELLIPSIS()) )
-                : ast( type, ctx.ELLIPSIS() );
-        }
-
+        var type = type(ctx.type());
         var name = identifier(ctx.identifier());
         var defaultValue = ctx.expression() != null
             ? expression(ctx.expression())

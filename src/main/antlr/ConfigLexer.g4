@@ -778,7 +778,7 @@ JavaLetterOrDigitInGString
 
 // Additional symbols not defined in the lexical specification
 // AT : '@';
-ELLIPSIS : '...';
+// ELLIPSIS : '...';
 
 // Whitespace, line escape and comments
 WS  : ([ \t]+ | LineEscape+) -> skip
