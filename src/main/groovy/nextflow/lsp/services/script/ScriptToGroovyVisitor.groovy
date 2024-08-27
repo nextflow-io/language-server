@@ -98,7 +98,7 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
                 : createX(IncludeDef.Module, name)
         } as List<Expression>
         final include = callThisX('include', args(createX(IncludeDef, args(moduleArgs))))
-        final from = callX(include, 'from', args(constX(node.source)))
+        final from = callX(include, 'from', args(node.source))
         node.expression = callX(from, 'load0', args(varX('params')))
         moduleNode.addStatement(node)
     }

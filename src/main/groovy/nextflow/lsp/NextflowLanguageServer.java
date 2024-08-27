@@ -54,8 +54,11 @@ import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams;
 import org.eclipse.lsp4j.DidCloseTextDocumentParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.DidSaveTextDocumentParams;
-import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.DocumentFormattingParams;
+import org.eclipse.lsp4j.DocumentLink;
+import org.eclipse.lsp4j.DocumentLinkOptions;
+import org.eclipse.lsp4j.DocumentLinkParams;
+import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.HoverParams;
@@ -142,6 +145,9 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         serverCapabilities.setCompletionProvider(completionOptions);
         serverCapabilities.setDefinitionProvider(true);
         serverCapabilities.setDocumentFormattingProvider(true);
+        var documentLinkOptions = new DocumentLinkOptions();
+        documentLinkOptions.setResolveProvider(false);
+        serverCapabilities.setDocumentLinkProvider(documentLinkOptions);
         serverCapabilities.setDocumentSymbolProvider(true);
         serverCapabilities.setHoverProvider(true);
         serverCapabilities.setReferencesProvider(true);
@@ -245,6 +251,19 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             if( service == null )
                 return Either.forLeft(Collections.emptyList());
             return service.definition(params);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<DocumentLink>> documentLink(DocumentLinkParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var uri = params.getTextDocument().getUri();
+            log.debug("textDocument/documentLink " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return Collections.emptyList();
+            return service.documentLink(params);
         });
     }
 

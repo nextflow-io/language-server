@@ -54,6 +54,8 @@ import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 import org.eclipse.lsp4j.DidCloseTextDocumentParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.DocumentFormattingParams;
+import org.eclipse.lsp4j.DocumentLink;
+import org.eclipse.lsp4j.DocumentLinkParams;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.Hover;
@@ -98,6 +100,7 @@ public abstract class LanguageService {
     protected DefinitionProvider getDefinitionProvider() { return null; }
     protected FormattingProvider getFormattingProvider() { return null; }
     protected HoverProvider getHoverProvider() { return null; }
+    protected LinkProvider getLinkProvider() { return null; }
     protected ReferenceProvider getReferenceProvider() { return null; }
     protected SymbolProvider getSymbolProvider() { return null; }
 
@@ -180,6 +183,14 @@ public abstract class LanguageService {
             return Either.forLeft(Collections.emptyList());
 
         return provider.definition(params.getTextDocument(), params.getPosition());
+    }
+
+    public List<DocumentLink> documentLink(DocumentLinkParams params) {
+        var provider = getLinkProvider();
+        if( provider == null )
+            return Collections.emptyList();
+
+        return provider.documentLink(params.getTextDocument());
     }
 
     public List<Either<SymbolInformation, DocumentSymbol>> documentSymbol(DocumentSymbolParams params) {

@@ -26,6 +26,7 @@ import nextflow.lsp.services.DefinitionProvider
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.services.HoverProvider
 import nextflow.lsp.services.LanguageService
+import nextflow.lsp.services.LinkProvider
 import nextflow.lsp.services.ReferenceProvider
 import nextflow.lsp.services.SymbolProvider
 import nextflow.script.v2.ScriptParserPluginFactory
@@ -98,6 +99,11 @@ class ScriptService extends LanguageService {
     @Override
     protected HoverProvider getHoverProvider() {
         new ScriptHoverProvider(astCache)
+    }
+
+    @Override
+    protected LinkProvider getLinkProvider() {
+        new ScriptLinkProvider(astCache)
     }
 
     @Override

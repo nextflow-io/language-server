@@ -25,6 +25,7 @@ import nextflow.lsp.services.CompletionProvider
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.services.HoverProvider
 import nextflow.lsp.services.LanguageService
+import nextflow.lsp.services.LinkProvider
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.SourceUnit
 
@@ -79,6 +80,11 @@ class ConfigService extends LanguageService {
     @Override
     protected HoverProvider getHoverProvider() {
         new ConfigHoverProvider(astCache)
+    }
+
+    @Override
+    protected LinkProvider getLinkProvider() {
+        new ConfigLinkProvider(astCache)
     }
 
 }

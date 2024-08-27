@@ -170,11 +170,11 @@ class ConfigAstCache extends ASTNodeCache {
             }
         }
 
-        protected URI getIncludeUri(URI uri, String source) {
+        protected static URI getIncludeUri(URI uri, String source) {
             return Path.of(uri).getParent().resolve(source).normalize().toUri()
         }
 
-        protected boolean isIncludeLocal(URI includeUri) {
+        protected static boolean isIncludeLocal(URI includeUri) {
             return includeUri.getScheme() == 'file'
         }
 

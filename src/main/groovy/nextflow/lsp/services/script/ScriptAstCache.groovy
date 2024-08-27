@@ -177,6 +177,7 @@ class ScriptAstCache extends ASTNodeCache {
         void visitInclude(IncludeNode node) {
             pushASTNode(node)
             try {
+                visit(node.source)
                 for( final module : node.modules )
                     visitIncludeVariable(module)
             }
@@ -276,7 +277,7 @@ class ScriptAstCache extends ASTNodeCache {
 
         @Override
         void visitInclude(IncludeNode node) {
-            final source = node.source
+            final source = node.source.getText()
             if( source.startsWith('plugin/') )
                 return
             final includeUri = getIncludeUri(uri, source)

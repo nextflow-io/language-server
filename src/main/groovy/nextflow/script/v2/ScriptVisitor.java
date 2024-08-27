@@ -48,7 +48,9 @@ public interface ScriptVisitor {
         visit(node.getCode());
     }
 
-    default void visitInclude(IncludeNode node) {}
+    default void visitInclude(IncludeNode node) {
+        visit(node.source);
+    }
 
     default void visitProcess(ProcessNode node) {
         visit(node.directives);

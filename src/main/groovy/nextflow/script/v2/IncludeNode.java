@@ -17,6 +17,7 @@ package nextflow.script.v2;
 
 import java.util.List;
 
+import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.EmptyExpression;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 
@@ -25,10 +26,10 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class IncludeNode extends ExpressionStatement {
-    public final String source;
+    public final ConstantExpression source;
     public final List<IncludeVariable> modules;
 
-    public IncludeNode(String source, List<IncludeVariable> modules) {
+    public IncludeNode(ConstantExpression source, List<IncludeVariable> modules) {
         super(EmptyExpression.INSTANCE);
         this.source = source;
         this.modules = modules;

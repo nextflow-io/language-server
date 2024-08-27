@@ -232,9 +232,9 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
                 append(module.alias)
             }
             append(' ' * padding)
-            append(' } from \'')
-            append(node.source)
-            append('\'\n')
+            append(' } from ')
+            visit(node.source)
+            append('\n')
         }
     }
 
