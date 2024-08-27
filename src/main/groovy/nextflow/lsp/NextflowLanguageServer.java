@@ -64,12 +64,17 @@ import org.eclipse.lsp4j.RenameFilesParams;
 import org.eclipse.lsp4j.InitializeResult;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
+import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.ReferenceParams;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.SetTraceParams;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.TextEdit;
+import org.eclipse.lsp4j.WorkDoneProgressBegin;
+import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
+import org.eclipse.lsp4j.WorkDoneProgressEnd;
+import org.eclipse.lsp4j.WorkDoneProgressReport;
 import org.eclipse.lsp4j.WorkspaceFoldersOptions;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceSymbol;
@@ -373,13 +378,47 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         }
 
         if( shouldInitialize ) {
+            var progressToken = "initialize";
+            progressCreate(progressToken);
+            progressBegin(progressToken, "Initializing workspace...");
+
+            var count = 0;
+            var total = workspaceRoots.keySet().size();
             for( var name : workspaceRoots.keySet() ) {
-                log.debug("workspace/didChangeConfiguration initialize " + name);
+                var progressMessage = String.format("Initializing workspace: %s (%d / %d)", name, count + 1, total);
+                progressUpdate(progressToken, progressMessage, count * 100 / total);
+                count++;
+
                 var uri = workspaceRoots.get(name);
                 configServices.get(name).initialize(uri, this.excludePatterns, this.suppressWarnings);
                 scriptServices.get(name).initialize(uri, this.excludePatterns, this.suppressWarnings);
             }
+
+            progressEnd(progressToken);
         }
+    }
+
+    private void progressCreate(String token) {
+        client.createProgress(new WorkDoneProgressCreateParams(Either.forLeft(token)));
+    }
+
+    private void progressBegin(String token, String message) {
+        var progress = new WorkDoneProgressBegin();
+        progress.setMessage(message);
+        progress.setPercentage(0);
+        client.notifyProgress(new ProgressParams(Either.forLeft(token), Either.forLeft(progress)));
+    }
+
+    private void progressUpdate(String token, String message, int percentage) {
+        var progress = new WorkDoneProgressReport();
+        progress.setMessage(message);
+        progress.setPercentage(percentage);
+        client.notifyProgress(new ProgressParams(Either.forLeft(token), Either.forLeft(progress)));
+    }
+
+    private void progressEnd(String token) {
+        var progress = new WorkDoneProgressEnd();
+        client.notifyProgress(new ProgressParams(Either.forLeft(token), Either.forLeft(progress)));
     }
 
     @Override
