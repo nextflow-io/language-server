@@ -119,8 +119,6 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
 
     private int indentCount = 0
 
-    private List<Integer> alignmentWidths = []
-
     FormattingVisitor(SourceUnit sourceUnit, CustomFormattingOptions options) {
         this.sourceUnit = sourceUnit
         this.options = options
@@ -161,18 +159,6 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
         indentCount--
     }
 
-    protected void pushAlignmentWidth(Integer width) {
-        alignmentWidths.push(width)
-    }
-
-    protected void popAlignmentWidth() {
-        alignmentWidths.pop()
-    }
-
-    protected Integer getAlignmentWidth() {
-        return alignmentWidths.size() > 0 ? alignmentWidths.first() : 0
-    }
-
     protected void appendComments(ASTNode node) {
         final comments = (List<String>) node.getNodeMetaData(PREPEND_COMMENTS)
         if( !comments )
@@ -201,9 +187,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
         appendIndent()
         final name = node.names.join('.')
         append(name)
-        final alignmentWidth = getAlignmentWidth()
-        if( alignmentWidth > 0 ) {
-            final padding = alignmentWidth - name.length()
+        if( currentAlignmentWidth > 0 ) {
+            final padding = currentAlignmentWidth - name.length()
             append(' ' * padding)
         }
         append(node instanceof ConfigAppendNode ? ' ' : ' = ')
@@ -212,6 +197,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
     }
 
     private static final Pattern IDENTIFIER = ~/[a-zA-Z_]+[a-zA-Z0-9_]*/
+
+    private int currentAlignmentWidth = 0
 
     @Override
     void visitConfigBlock(ConfigBlockNode node) {
@@ -233,6 +220,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
         append(' {')
         appendNewLine()
 
+        int caw
         if( options.harshilAlignment() ) {
             int maxWidth = 0
             for( final stmt : node.statements ) {
@@ -242,7 +230,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
                 if( maxWidth < width )
                     maxWidth = width
             }
-            pushAlignmentWidth(maxWidth)
+            caw = currentAlignmentWidth
+            currentAlignmentWidth = maxWidth
         }
 
         incIndent()
@@ -250,7 +239,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
         decIndent()
 
         if( options.harshilAlignment() )
-            popAlignmentWidth()
+            currentAlignmentWidth = caw
 
         appendIndent()
         append('}')

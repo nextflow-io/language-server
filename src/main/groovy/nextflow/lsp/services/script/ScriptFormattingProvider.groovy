@@ -17,6 +17,7 @@ package nextflow.lsp.services.script
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
+import nextflow.lsp.ast.ASTUtils
 import nextflow.lsp.services.CustomFormattingOptions
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.util.Logger
@@ -105,7 +106,7 @@ class ScriptFormattingProvider implements FormattingProvider {
 
         final oldText = sourceUnit.getSource().getReader().getText()
         final range = new Range(new Position(0, 0), Positions.getPosition(oldText, oldText.size()))
-        final visitor = new FormattingVisitor(sourceUnit, options)
+        final visitor = new FormattingVisitor(sourceUnit, options, ast)
         visitor.visit()
         final newText = visitor.toString()
 
@@ -121,15 +122,18 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     private CustomFormattingOptions options
 
+    private ASTNodeCache ast
+
     private StringBuilder builder = new StringBuilder()
 
     private int indentCount = 0
 
     private int maxIncludeWidth = 0
 
-    FormattingVisitor(SourceUnit sourceUnit, CustomFormattingOptions options) {
+    FormattingVisitor(SourceUnit sourceUnit, CustomFormattingOptions options, ASTNodeCache ast) {
         this.sourceUnit = sourceUnit
         this.options = options
+        this.ast = ast
     }
 
     @Override
@@ -526,8 +530,12 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         }
     }
 
+    private Expression currentStmtExpr
+
     @Override
     void visitExpressionStatement(ExpressionStatement node) {
+        final cse = currentStmtExpr
+        currentStmtExpr = node.expression
         appendComments(node)
         appendIndent()
         if( node.statementLabels ) {
@@ -538,6 +546,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         }
         visit(node.expression)
         appendNewLine()
+        currentStmtExpr = cse
     }
 
     @Override
@@ -598,11 +607,23 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         visitMethodCallExpression(node, false)
     }
 
+    private boolean inMultilineMethodChain
+
     protected void visitMethodCallExpression(MethodCallExpression node, boolean directive) {
+        final beginMultilineChain = currentStmtExpr == node && getPropertyMethodDepth(node) >= 2
+        if( beginMultilineChain )
+            inMultilineMethodChain = true
         if( !node.isImplicitThis() ) {
             visit(node.objectExpression)
+            if( inMultilineMethodChain ) {
+                appendNewLine()
+                incIndent()
+                appendIndent()
+            }
             append('.')
         }
+        final immc = inMultilineMethodChain
+        inMultilineMethodChain = false
         visit(node.method, false)
         final arguments = (TupleExpression) node.arguments
         if( directive ) {
@@ -615,14 +636,37 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             ? new TupleExpression(arguments.expressions[0..<-1])
             : arguments
         if( parenArgs.size() > 0 || !lastClosureArg ) {
+            final newline = isMultilineMethodCall(node)
             append('(')
-            visit(parenArgs)
+            if( newline )
+                appendNewLine()
+            visitArguments(parenArgs, newline)
+            if( newline )
+                appendIndent()
             append(')')
         }
         if( lastClosureArg ) {
             append(' ')
             visit(arguments.last())
         }
+        inMultilineMethodChain = immc
+        if( !node.isImplicitThis() && inMultilineMethodChain )
+            decIndent()
+        if( beginMultilineChain )
+            inMultilineMethodChain = false
+    }
+
+    protected int getPropertyMethodDepth(Expression node) {
+        return node instanceof MethodCallExpression && !node.isImplicitThis()
+            ? 1 + getPropertyMethodDepth(node.getObjectExpression())
+            : 0
+    }
+
+    protected boolean isMultilineMethodCall(MethodCallExpression node) {
+        if( currentStmtExpr != node )
+            return false
+        final defNode = ASTUtils.getMethodFromCallExpression(node, ast)
+        return defNode instanceof ProcessNode || defNode instanceof WorkflowNode
     }
 
     @Override
@@ -643,6 +687,11 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             append(']')
         }
         else {
+            Expression cse = null
+            if( currentStmtExpr == node && node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
+                cse = currentStmtExpr
+                currentStmtExpr = node.getRightExpression()
+            }
             if( node instanceof DeclarationExpression ) {
                 append('def ')
             }
@@ -651,6 +700,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             append(node.operation.text)
             append(' ')
             visit(node.rightExpression)
+            if( cse )
+                currentStmtExpr = cse
         }
     }
 
@@ -723,24 +774,39 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitTupleExpression(TupleExpression node) {
+        visitArguments(node, false)
+    }
+
+    protected void visitArguments(TupleExpression node, boolean newline) {
         final hasNamedArgs = node.getNodeMetaData(NAMED_ARGS)
         final positionalArgs = hasNamedArgs ? node.expressions.tail() : node.expressions
+        final comma = newline ? ',' : ', '
+        if( newline )
+            incIndent()
         for( int i = 0; i < positionalArgs.size(); i++ ) {
+            if( newline )
+                appendIndent()
             visit(positionalArgs[i])
-            if( i + 1 < positionalArgs.size() )
-                append(', ')
+            if( i + 1 < positionalArgs.size() || hasNamedArgs )
+                append(comma)
+            if( newline )
+                appendNewLine()
         }
         if( hasNamedArgs ) {
-            if( positionalArgs )
-                append(', ')
             final mapX = (MapExpression)node.expressions.first()
             final namedArgs = mapX.mapEntryExpressions
             for( int i = 0; i < namedArgs.size(); i++ ) {
+                if( newline )
+                    appendIndent()
                 visit(namedArgs[i])
                 if( i + 1 < namedArgs.size() )
-                    append(', ')
+                    append(comma)
+                if( newline )
+                    appendNewLine()
             }
         }
+        if( newline )
+            decIndent()
     }
 
     @Override
