@@ -212,22 +212,28 @@ public class ConfigAstBuilder {
     }
 
     private ConfigStatement configStatement(ConfigStatementContext ctx) {
+        ConfigStatement result;
+
         if( ctx instanceof ConfigIncludeStmtAltContext ciac )
-            return ast( configInclude(ciac.configInclude()), ciac );
+            result = ast( configInclude(ciac.configInclude()), ciac );
 
-        if( ctx instanceof ConfigAssignmentStmtAltContext caac )
-            return ast( configAssignment(caac.configAssignment()), caac );
+        else if( ctx instanceof ConfigAssignmentStmtAltContext caac )
+            result = ast( configAssignment(caac.configAssignment()), caac );
 
-        if( ctx instanceof ConfigBlockStmtAltContext cbac )
-            return ast( configBlock(cbac.configBlock()), cbac );
+        else if( ctx instanceof ConfigBlockStmtAltContext cbac )
+            result = ast( configBlock(cbac.configBlock()), cbac );
 
-        if( ctx instanceof ConfigAppendBlockStmtAltContext cbac )
-            return ast( configAppendBlock(cbac.configAppendBlock()), cbac );
+        else if( ctx instanceof ConfigAppendBlockStmtAltContext cbac )
+            result = ast( configAppendBlock(cbac.configAppendBlock()), cbac );
 
-        if( ctx instanceof ConfigIncompleteStmtAltContext ciac )
-            return ast( configIncomplete(ciac.configIncomplete()), ciac );
+        else if( ctx instanceof ConfigIncompleteStmtAltContext ciac )
+            result = ast( configIncomplete(ciac.configIncomplete()), ciac );
 
-        throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
+        else
+            throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
+
+        prependComments(result, ctx);
+        return result;
     }
 
     private ConfigStatement configInclude(ConfigIncludeContext ctx) {
@@ -254,25 +260,31 @@ public class ConfigAstBuilder {
     }
 
     private ConfigStatement configBlockStatement(ConfigBlockStatementContext ctx) {
+        ConfigStatement result;
+
         if( ctx instanceof ConfigIncludeBlockStmtAltContext ciac )
-            return ast( configInclude(ciac.configInclude()), ciac );
+            result = ast( configInclude(ciac.configInclude()), ciac );
 
-        if( ctx instanceof ConfigAssignmentBlockStmtAltContext caac )
-            return ast( configAssignment(caac.configAssignment()), caac );
+        else if( ctx instanceof ConfigAssignmentBlockStmtAltContext caac )
+            result = ast( configAssignment(caac.configAssignment()), caac );
 
-        if( ctx instanceof ConfigBlockBlockStmtAltContext cbac )
-            return ast( configBlock(cbac.configBlock()), cbac );
+        else if( ctx instanceof ConfigBlockBlockStmtAltContext cbac )
+            result = ast( configBlock(cbac.configBlock()), cbac );
 
-        if( ctx instanceof ConfigAppendBlockBlockStmtAltContext cbac )
-            return ast( configAppendBlock(cbac.configAppendBlock()), cbac );
+        else if( ctx instanceof ConfigAppendBlockBlockStmtAltContext cbac )
+            result = ast( configAppendBlock(cbac.configAppendBlock()), cbac );
 
-        if( ctx instanceof ConfigSelectorBlockStmtAltContext csac )
-            return ast( configSelector(csac.configSelector()), csac );
+        else if( ctx instanceof ConfigSelectorBlockStmtAltContext csac )
+            result = ast( configSelector(csac.configSelector()), csac );
 
-        if( ctx instanceof ConfigIncompleteBlockStmtAltContext ciac )
-            return ast( configIncomplete(ciac.configIncomplete()), ciac );
+        else if( ctx instanceof ConfigIncompleteBlockStmtAltContext ciac )
+            result = ast( configIncomplete(ciac.configIncomplete()), ciac );
 
-        throw createParsingFailedException("Invalid statement in config block: " + ctx.getText(), ctx);
+        else
+            throw createParsingFailedException("Invalid statement in config block: " + ctx.getText(), ctx);
+
+        prependComments(result, ctx);
+        return result;
     }
 
     private ConfigStatement configSelector(ConfigSelectorContext ctx) {
@@ -316,31 +328,37 @@ public class ConfigAstBuilder {
     /// GROOVY STATEMENTS
 
     private Statement statement(StatementContext ctx) {
+        Statement result;
+
         if( ctx instanceof IfElseStmtAltContext ieac )
-            return ast( ifElseStatement(ieac.ifElseStatement()), ieac );
+            result = ast( ifElseStatement(ieac.ifElseStatement()), ieac );
 
-        if( ctx instanceof ReturnStmtAltContext rac )
-            return ast( returnStatement(rac.expression()), rac );
+        else if( ctx instanceof ReturnStmtAltContext rac )
+            result = ast( returnStatement(rac.expression()), rac );
 
-        if( ctx instanceof AssertStmtAltContext aac )
-            return ast( assertStatement(aac.assertStatement()), aac );
+        else if( ctx instanceof AssertStmtAltContext aac )
+            result = ast( assertStatement(aac.assertStatement()), aac );
 
-        if( ctx instanceof VariableDeclarationStmtAltContext vdac )
-            return ast( variableDeclaration(vdac.variableDeclaration()), vdac );
+        else if( ctx instanceof VariableDeclarationStmtAltContext vdac )
+            result = ast( variableDeclaration(vdac.variableDeclaration()), vdac );
 
-        if( ctx instanceof MultipleAssignmentStmtAltContext maac )
-            return ast( assignment(maac.multipleAssignmentStatement()), maac );
+        else if( ctx instanceof MultipleAssignmentStmtAltContext maac )
+            result = ast( assignment(maac.multipleAssignmentStatement()), maac );
 
-        if( ctx instanceof AssignmentStmtAltContext aac )
-            return ast( assignment(aac.assignmentStatement()), aac );
+        else if( ctx instanceof AssignmentStmtAltContext aac )
+            result = ast( assignment(aac.assignmentStatement()), aac );
 
-        if( ctx instanceof ExpressionStmtAltContext eac )
-            return ast( expressionStatement(eac.expressionStatement()), eac );
+        else if( ctx instanceof ExpressionStmtAltContext eac )
+            result = ast( expressionStatement(eac.expressionStatement()), eac );
 
-        if( ctx instanceof EmptyStmtAltContext )
+        else if( ctx instanceof EmptyStmtAltContext )
             return EmptyStatement.INSTANCE;
 
-        throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
+        else
+            throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
+
+        prependComments(result, ctx);
+        return result;
     }
 
     private Statement ifElseStatement(IfElseStatementContext ctx) {
@@ -1040,7 +1058,7 @@ public class ConfigAstBuilder {
 
         var result = ast( args(arguments), ctx );
         if( !opts.isEmpty() )
-            result.putNodeMetaData(HAS_NAMED_ARGS, true);
+            result.putNodeMetaData(NAMED_ARGS, true);
         return result;
     }
 
@@ -1143,7 +1161,7 @@ public class ConfigAstBuilder {
         var text = ctx.getText();
         var classNode = ClassHelper.make(text);
         if( text.contains(".") )
-            classNode.putNodeMetaData(IS_FULLY_QUALIFIED, true);
+            classNode.putNodeMetaData(FULLY_QUALIFIED, true);
 
         if( classNode.isUsingGenerics() && allowProxy ) {
             var proxy = ClassHelper.makeWithoutCaching(classNode.getName());
@@ -1186,6 +1204,44 @@ public class ConfigAstBuilder {
     }
 
     /// HELPERS
+
+    private void prependComments(ASTNode node, ParserRuleContext ctx) {
+        var comments = new ArrayList<String>();
+
+        // find index of token among siblings
+        var siblings = ctx.getParent().children;
+        int i = 0;
+        while( i + 1 < siblings.size() && siblings.get(i + 1) != ctx ) {
+            i++;
+        }
+
+        // prepend each comment/newline to node
+        while( i >= 0 ) {
+            var sibling = siblings.get(i);
+            if( !(sibling instanceof NlsContext || sibling instanceof SepContext) )
+                break;
+
+            var newlines = sibling instanceof NlsContext
+                ? ((NlsContext) sibling).NL()
+                : ((SepContext) sibling).NL();
+
+            for( int k = newlines.size() - 1; k >= 0; k-- ) {
+                var text = newlines.get(k).getText();
+                comments.add(text);
+            }
+            i--;
+        }
+
+        // remove leading newline
+        if( !comments.isEmpty() ) {
+            var last = comments.get(comments.size() - 1);
+            if( "\n".equals(last) )
+                comments.remove(comments.size() - 1);
+        }
+
+        if( !comments.isEmpty() )
+            node.putNodeMetaData(PREPEND_COMMENTS, comments);
+    }
 
     private boolean isInsideParentheses(NodeMetaDataHandler nodeMetaDataHandler) {
         Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
@@ -1296,9 +1352,10 @@ public class ConfigAstBuilder {
     private static final String SQ_STR = "'";
     private static final String DQ_STR = "\"";
 
-    private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG";
+    private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
-    private static final String IS_FULLY_QUALIFIED = "_IS_FULLY_QUALIFIED";
+    private static final String NAMED_ARGS = "_NAMED_ARGS";
+    private static final String PREPEND_COMMENTS = "_PREPEND_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
 
 }

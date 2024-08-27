@@ -15,6 +15,8 @@
  */
 package nextflow.lsp.services.config
 
+import java.util.regex.Pattern
+
 import groovy.transform.CompileStatic
 import nextflow.config.v2.ConfigAppendNode
 import nextflow.config.v2.ConfigAssignNode
@@ -117,6 +119,8 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
 
     private int indentCount = 0
 
+    private List<Integer> alignmentWidths = []
+
     FormattingVisitor(SourceUnit sourceUnit, CustomFormattingOptions options) {
         this.sourceUnit = sourceUnit
         this.options = options
@@ -157,6 +161,34 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
         indentCount--
     }
 
+    protected void pushAlignmentWidth(Integer width) {
+        alignmentWidths.push(width)
+    }
+
+    protected void popAlignmentWidth() {
+        alignmentWidths.pop()
+    }
+
+    protected Integer getAlignmentWidth() {
+        return alignmentWidths.size() > 0 ? alignmentWidths.first() : 0
+    }
+
+    protected void appendComments(ASTNode node) {
+        final comments = (List<String>) node.getNodeMetaData(PREPEND_COMMENTS)
+        if( !comments )
+            return
+
+        for( final line : comments.asReversed() ) {
+            if( line == '\n' ) {
+                append(line)
+            }
+            else {
+                appendIndent()
+                append(line.stripLeading())
+            }
+        }
+    }
+
     String toString() {
         return builder.toString()
     }
@@ -165,35 +197,69 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
 
     @Override
     void visitConfigAssign(ConfigAssignNode node) {
+        appendComments(node)
         appendIndent()
-        append(node.names.join('.'))
+        final name = node.names.join('.')
+        append(name)
+        final alignmentWidth = getAlignmentWidth()
+        if( alignmentWidth > 0 ) {
+            final padding = alignmentWidth - name.length()
+            append(' ' * padding)
+        }
         append(node instanceof ConfigAppendNode ? ' ' : ' = ')
         visit(node.value)
         appendNewLine()
     }
 
+    private static final Pattern IDENTIFIER = ~/[a-zA-Z_]+[a-zA-Z0-9_]*/
+
     @Override
     void visitConfigBlock(ConfigBlockNode node) {
-        appendNewLine()
+        appendComments(node)
         appendIndent()
         if( node.kind != null ) {
             append(node.kind)
-            append(':')
+            append(': ')
         }
-        append(node.name)
+        final name = node.name
+        if( IDENTIFIER.matcher(name).matches() ) {
+            append(name)
+        }
+        else {
+            append("'")
+            append(name)
+            append("'")
+        }
         append(' {')
         appendNewLine()
+
+        if( options.harshilAlignment() ) {
+            int maxWidth = 0
+            for( final stmt : node.statements ) {
+                if( stmt !instanceof ConfigAssignNode )
+                    continue
+                final width = ((ConfigAssignNode) stmt).names.join('.').length()
+                if( maxWidth < width )
+                    maxWidth = width
+            }
+            pushAlignmentWidth(maxWidth)
+        }
 
         incIndent()
         super.visitConfigBlock(node)
         decIndent()
 
+        if( options.harshilAlignment() )
+            popAlignmentWidth()
+
         appendIndent()
-        append('}\n')
+        append('}')
+        appendNewLine()
     }
 
     @Override
     void visitConfigInclude(ConfigIncludeNode node) {
+        appendComments(node)
         appendIndent()
         append('includeConfig ')
         visit(node.source)
@@ -208,8 +274,9 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
     }
 
     protected void visitIfElse(IfStatement node, boolean preIndent) {
+        appendComments(node)
         if( preIndent )
-        appendIndent()
+            appendIndent()
         append('if (')
         visit(node.booleanExpression)
         append(') {\n')
@@ -236,6 +303,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
 
     @Override
     void visitExpressionStatement(ExpressionStatement node) {
+        appendComments(node)
         appendIndent()
         visit(node.expression)
         appendNewLine()
@@ -243,6 +311,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
 
     @Override
     void visitReturnStatement(ReturnStatement node) {
+        appendComments(node)
         appendIndent()
         append('return ')
         visit(node.expression)
@@ -251,6 +320,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
 
     @Override
     void visitAssertStatement(AssertStatement node) {
+        appendComments(node)
         appendIndent()
         append('assert ')
         visit(node.booleanExpression)
@@ -384,7 +454,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
 
     @Override
     void visitTupleExpression(TupleExpression node) {
-        final hasNamedArgs = node.getNodeMetaData(HAS_NAMED_ARGS)
+        final hasNamedArgs = node.getNodeMetaData(NAMED_ARGS)
         final positionalArgs = hasNamedArgs ? node.expressions.tail() : node.expressions
         for( int i = 0; i < positionalArgs.size(); i++ ) {
             visit(positionalArgs[i])
@@ -590,8 +660,9 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
     private static final String SQ_STR = "'"
     private static final String DQ_STR = '"'
 
-    private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
+    private static final String NAMED_ARGS = "_NAMED_ARGS"
+    private static final String PREPEND_COMMENTS = "_PREPEND_COMMENTS"
     private static final String QUOTE_CHAR = "_QUOTE_CHAR"
 
 }

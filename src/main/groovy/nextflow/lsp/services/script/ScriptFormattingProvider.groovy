@@ -125,7 +125,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     private int indentCount = 0
 
-    private int maxIncludeLength
+    private int maxIncludeWidth = 0
 
     FormattingVisitor(SourceUnit sourceUnit, CustomFormattingOptions options) {
         this.sourceUnit = sourceUnit
@@ -142,18 +142,16 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         if( moduleNode !instanceof ScriptNode )
             return
         final scriptNode = (ScriptNode) moduleNode
-        maxIncludeLength = options.harshilAlignment()
-            ? getMaxIncludeLength(scriptNode.getIncludes())
-            : 0
+        if( options.harshilAlignment() )
+            maxIncludeWidth = getMaxIncludeWidth(scriptNode.getIncludes())
         for( final featureFlag : scriptNode.getFeatureFlags() )
             visitFeatureFlag(featureFlag)
-        if( scriptNode.getIncludes().size() > 0 )
-            append('\n')
         for( final includeNode : scriptNode.getIncludes() )
             visitInclude(includeNode)
-        for( final workflowNode : scriptNode.getWorkflows() )
-            if( workflowNode.name )
+        for( final workflowNode : scriptNode.getWorkflows() ) {
+            if( !workflowNode.isEntry() )
                 visitWorkflow(workflowNode)
+        }
         for( final functionNode : scriptNode.getFunctions() )
             visitFunction(functionNode)
         for( final processNode : scriptNode.getProcesses() )
@@ -164,19 +162,19 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             visitOutput(scriptNode.getOutput())
     }
 
-    protected int getMaxIncludeLength(List<IncludeNode> includes) {
-        int maxLength = 0
+    protected int getMaxIncludeWidth(List<IncludeNode> includes) {
+        int maxWidth = 0
         for( final includeNode : includes ) {
             for( final module : includeNode.modules ) {
-                final length = getIncludeLength(module)
-                if( maxLength < length )
-                    maxLength = length
+                final width = getIncludeWidth(module)
+                if( maxWidth < width )
+                    maxWidth = width
             }
         }
-        return maxLength
+        return maxWidth
     }
 
-    protected int getIncludeLength(IncludeVariable module) {
+    protected int getIncludeWidth(IncludeVariable module) {
         return module.alias
             ? module.@name.size() + 4 + module.alias.size()
             : module.@name.size()
@@ -205,6 +203,22 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         indentCount--
     }
 
+    protected void appendComments(ASTNode node) {
+        final comments = (List<String>) node.getNodeMetaData(PREPEND_COMMENTS)
+        if( !comments )
+            return
+
+        for( final line : comments.asReversed() ) {
+            if( line == '\n' ) {
+                append(line)
+            }
+            else {
+                appendIndent()
+                append(line.stripLeading())
+            }
+        }
+    }
+
     String toString() {
         return builder.toString()
     }
@@ -213,6 +227,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitFeatureFlag(FeatureFlagNode node) {
+        appendComments(node)
         append(node.name)
         append(' = ')
         visit(node.value)
@@ -221,26 +236,27 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitInclude(IncludeNode node) {
+        appendComments(node)
         for( final module : node.modules ) {
-            final padding = options.harshilAlignment()
-                ? maxIncludeLength - getIncludeLength(module)
-                : 0
             append('include { ')
             append(module.@name)
             if( module.alias ) {
                 append(' as ')
                 append(module.alias)
             }
-            append(' ' * padding)
+            if( options.harshilAlignment() ) {
+                final padding = maxIncludeWidth - getIncludeWidth(module)
+                append(' ' * padding)
+            }
             append(' } from ')
             visit(node.source)
-            append('\n')
+            appendNewLine()
         }
     }
 
     @Override
     void visitFunction(FunctionNode node) {
-        appendNewLine()
+        appendComments(node)
         append('def ')
         append(node.name)
         append('(')
@@ -258,7 +274,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitProcess(ProcessNode node) {
-        appendNewLine()
+        appendComments(node)
         append('process ')
         append(node.name)
         append(' {\n')
@@ -316,7 +332,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitWorkflow(WorkflowNode node) {
-        appendNewLine()
+        appendComments(node)
         append('workflow')
         if( node.name ) {
             append(' ')
@@ -355,7 +371,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitOutput(OutputNode node) {
-        appendNewLine()
+        appendComments(node)
         append('output {\n')
         incIndent()
         if( node.body instanceof BlockStatement )
@@ -428,31 +444,12 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     // statements
 
     @Override
-    void visitBlockStatement(BlockStatement block) {
-        for( int i = 0; i < block.statements.size(); i++ ) {
-            final stmt = block.statements[i]
-            if( i == 0 ) {
-                stmt.visit(this)
-                continue
-            }
-
-            if( stmt instanceof IfStatement )
-                append('\n')
-            if( stmt instanceof ExpressionStatement ) {
-                final expr = stmt.expression
-                if( expr instanceof MethodCallExpression )
-                    append('\n')
-            }
-            stmt.visit(this)
-        }
-    }
-
-    @Override
     void visitIfElse(IfStatement node) {
         visitIfElse(node, true)
     }
 
     protected void visitIfElse(IfStatement node, boolean preIndent) {
+        appendComments(node)
         if( preIndent )
             appendIndent()
         append('if (')
@@ -481,6 +478,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitExpressionStatement(ExpressionStatement node) {
+        appendComments(node)
         appendIndent()
         if( node.statementLabels ) {
             for( final label : node.statementLabels ) {
@@ -494,6 +492,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitReturnStatement(ReturnStatement node) {
+        appendComments(node)
         appendIndent()
         append('return ')
         visit(node.expression)
@@ -502,6 +501,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitAssertStatement(AssertStatement node) {
+        appendComments(node)
         appendIndent()
         append('assert ')
         visit(node.booleanExpression)
@@ -514,6 +514,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitTryCatchFinally(TryCatchStatement node) {
+        appendComments(node)
         appendIndent()
         append('try {\n')
         incIndent()
@@ -528,6 +529,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitCatchStatement(CatchStatement node) {
+        appendComments(node)
         appendIndent()
         append('catch (')
         visitParameter(node.variable)
@@ -671,7 +673,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
 
     @Override
     void visitTupleExpression(TupleExpression node) {
-        final hasNamedArgs = node.getNodeMetaData(HAS_NAMED_ARGS)
+        final hasNamedArgs = node.getNodeMetaData(NAMED_ARGS)
         final positionalArgs = hasNamedArgs ? node.expressions.tail() : node.expressions
         for( int i = 0; i < positionalArgs.size(); i++ ) {
             visit(positionalArgs[i])
@@ -806,7 +808,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     }
 
     protected visitTypeName(ClassNode type) {
-        final isFullyQualified = type.getNodeMetaData(IS_FULLY_QUALIFIED)
+        final isFullyQualified = type.getNodeMetaData(FULLY_QUALIFIED)
         append(isFullyQualified ? type.getName() : type.getNameWithoutPackage())
     }
 
@@ -882,9 +884,10 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     private static final String SQ_STR = "'"
     private static final String DQ_STR = '"'
 
-    private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG"
+    private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED"
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
-    private static final String IS_FULLY_QUALIFIED = "_IS_FULLY_QUALIFIED"
+    private static final String NAMED_ARGS = "_NAMED_ARGS"
+    private static final String PREPEND_COMMENTS = "_PREPEND_COMMENTS"
     private static final String QUOTE_CHAR = "_QUOTE_CHAR"
 
 }

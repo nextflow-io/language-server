@@ -241,6 +241,7 @@ public class ScriptAstBuilder {
     private void scriptStatement(ScriptStatementContext ctx, List<Statement> extraStatements) {
         if( ctx instanceof TopAssignmentStmtAltContext taac ) {
             var node = topAssignmentStatement(taac.topAssignmentStatement());
+            prependComments(node, ctx);
             if( node instanceof FeatureFlagNode ffn )
                 moduleNode.addFeatureFlag(ffn);
             else if( node instanceof ExpressionStatement es )
@@ -248,32 +249,40 @@ public class ScriptAstBuilder {
         }
 
         else if( ctx instanceof FunctionDefAltContext fdac ) {
-            moduleNode.addFunction(functionDef(fdac.functionDef()));
+            var node = functionDef(fdac.functionDef());
+            prependComments(node, ctx);
+            moduleNode.addFunction(node);
         }
 
         else if( ctx instanceof IncludeStmtAltContext iac ) {
-            moduleNode.addInclude(includeStatement(iac.includeStatement()));
+            var node = includeStatement(iac.includeStatement());
+            prependComments(node, ctx);
+            moduleNode.addInclude(node);
         }
 
         else if( ctx instanceof OutputDefAltContext odac ) {
-            var outputNode = outputDef(odac.outputDef());
+            var node = outputDef(odac.outputDef());
+            prependComments(node, ctx);
             if( moduleNode.getOutput() != null )
-                collectSyntaxError(new SyntaxException("Output block defined more than once", outputNode));
-            moduleNode.setOutput(outputNode);
+                collectSyntaxError(new SyntaxException("Output block defined more than once", node));
+            moduleNode.setOutput(node);
         }
 
         else if( ctx instanceof ProcessDefAltContext pdac ) {
-            moduleNode.addProcess(processDef(pdac.processDef()));
+            var node = processDef(pdac.processDef());
+            prependComments(node, ctx);
+            moduleNode.addProcess(node);
         }
 
         else if( ctx instanceof WorkflowDefAltContext wdac ) {
-            var workflowNode = workflowDef(wdac.workflowDef());
-            if( workflowNode.getName() == null ) {
+            var node = workflowDef(wdac.workflowDef());
+            prependComments(node, ctx);
+            if( node.getName() == null ) {
                 if( moduleNode.getEntry() != null )
-                    collectSyntaxError(new SyntaxException("Entry workflow defined more than once", workflowNode));
-                moduleNode.setEntry(workflowNode);
+                    collectSyntaxError(new SyntaxException("Entry workflow defined more than once", node));
+                moduleNode.setEntry(node);
             }
-            moduleNode.addWorkflow(workflowNode);
+            moduleNode.addWorkflow(node);
         }
 
         else if( ctx instanceof IncompleteScriptStmtAltContext iac ) {
@@ -610,37 +619,43 @@ public class ScriptAstBuilder {
     /// GROOVY STATEMENTS
 
     private Statement statement(StatementContext ctx) {
+        Statement result;
+
         if( ctx instanceof IfElseStmtAltContext ieac )
-            return ast( ifElseStatement(ieac.ifElseStatement()), ieac );
+            result = ast( ifElseStatement(ieac.ifElseStatement()), ieac );
 
-        if( ctx instanceof TryCatchStmtAltContext tcac )
-            return ast( tryCatchStatement(tcac.tryCatchStatement()), tcac );
+        else if( ctx instanceof TryCatchStmtAltContext tcac )
+            result = ast( tryCatchStatement(tcac.tryCatchStatement()), tcac );
 
-        if( ctx instanceof ReturnStmtAltContext rac )
-            return ast( returnStatement(rac.expression()), rac );
+        else if( ctx instanceof ReturnStmtAltContext rac )
+            result = ast( returnStatement(rac.expression()), rac );
 
-        if( ctx instanceof ThrowStmtAltContext tac )
-            return ast( throwStatement(tac.expression()), tac );
+        else if( ctx instanceof ThrowStmtAltContext tac )
+            result = ast( throwStatement(tac.expression()), tac );
 
-        if( ctx instanceof AssertStmtAltContext aac )
-            return ast( assertStatement(aac.assertStatement()), aac );
+        else if( ctx instanceof AssertStmtAltContext aac )
+            result = ast( assertStatement(aac.assertStatement()), aac );
 
-        if( ctx instanceof VariableDeclarationStmtAltContext vdac )
-            return ast( variableDeclaration(vdac.variableDeclaration()), vdac );
+        else if( ctx instanceof VariableDeclarationStmtAltContext vdac )
+            result = ast( variableDeclaration(vdac.variableDeclaration()), vdac );
 
-        if( ctx instanceof MultipleAssignmentStmtAltContext maac )
-            return ast( assignment(maac.multipleAssignmentStatement()), maac );
+        else if( ctx instanceof MultipleAssignmentStmtAltContext maac )
+            result = ast( assignment(maac.multipleAssignmentStatement()), maac );
 
-        if( ctx instanceof AssignmentStmtAltContext aac )
-            return ast( assignment(aac.assignmentStatement()), aac );
+        else if( ctx instanceof AssignmentStmtAltContext aac )
+            result = ast( assignment(aac.assignmentStatement()), aac );
 
-        if( ctx instanceof ExpressionStmtAltContext eac )
-            return ast( expressionStatement(eac.expressionStatement()), eac );
+        else if( ctx instanceof ExpressionStmtAltContext eac )
+            result = ast( expressionStatement(eac.expressionStatement()), eac );
 
-        if( ctx instanceof EmptyStmtAltContext )
+        else if( ctx instanceof EmptyStmtAltContext )
             return EmptyStatement.INSTANCE;
 
-        throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
+        else
+            throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
+
+        prependComments(result, ctx);
+        return result;
     }
 
     private Statement ifElseStatement(IfElseStatementContext ctx) {
@@ -1413,7 +1428,7 @@ public class ScriptAstBuilder {
 
         var result = ast( args(arguments), ctx );
         if( !opts.isEmpty() )
-            result.putNodeMetaData(HAS_NAMED_ARGS, true);
+            result.putNodeMetaData(NAMED_ARGS, true);
         return result;
     }
 
@@ -1523,7 +1538,7 @@ public class ScriptAstBuilder {
         var text = ctx.getText();
         var classNode = ClassHelper.make(text);
         if( text.contains(".") )
-            classNode.putNodeMetaData(IS_FULLY_QUALIFIED, true);
+            classNode.putNodeMetaData(FULLY_QUALIFIED, true);
 
         if( classNode.isUsingGenerics() && allowProxy ) {
             var proxy = ClassHelper.makeWithoutCaching(classNode.getName());
@@ -1566,6 +1581,44 @@ public class ScriptAstBuilder {
     }
 
     /// HELPERS
+
+    private void prependComments(ASTNode node, ParserRuleContext ctx) {
+        var comments = new ArrayList<String>();
+
+        // find index of token among siblings
+        var siblings = ctx.getParent().children;
+        int i = 0;
+        while( i + 1 < siblings.size() && siblings.get(i + 1) != ctx ) {
+            i++;
+        }
+
+        // prepend each comment/newline to node
+        while( i >= 0 ) {
+            var sibling = siblings.get(i);
+            if( !(sibling instanceof NlsContext || sibling instanceof SepContext) )
+                break;
+
+            var newlines = sibling instanceof NlsContext
+                ? ((NlsContext) sibling).NL()
+                : ((SepContext) sibling).NL();
+
+            for( int k = newlines.size() - 1; k >= 0; k-- ) {
+                var text = newlines.get(k).getText();
+                comments.add(text);
+            }
+            i--;
+        }
+
+        // remove leading newline
+        if( !comments.isEmpty() ) {
+            var last = comments.get(comments.size() - 1);
+            if( "\n".equals(last) )
+                comments.remove(comments.size() - 1);
+        }
+
+        if( !comments.isEmpty() )
+            node.putNodeMetaData(PREPEND_COMMENTS, comments);
+    }
 
     private boolean isInsideParentheses(NodeMetaDataHandler nodeMetaDataHandler) {
         Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
@@ -1676,9 +1729,10 @@ public class ScriptAstBuilder {
     private static final String SQ_STR = "'";
     private static final String DQ_STR = "\"";
 
-    private static final String HAS_NAMED_ARGS = "_HAS_NAMED_ARSG";
+    private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
-    private static final String IS_FULLY_QUALIFIED = "_IS_FULLY_QUALIFIED";
+    private static final String NAMED_ARGS = "_NAMED_ARGS";
+    private static final String PREPEND_COMMENTS = "_PREPEND_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
 
 }
