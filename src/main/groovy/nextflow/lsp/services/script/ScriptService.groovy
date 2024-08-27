@@ -15,6 +15,10 @@
  */
 package nextflow.lsp.services.script
 
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.stream.Collectors
+
 import groovy.lang.GroovyClassLoader
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
@@ -29,6 +33,7 @@ import nextflow.lsp.services.LanguageService
 import nextflow.lsp.services.LinkProvider
 import nextflow.lsp.services.ReferenceProvider
 import nextflow.lsp.services.SymbolProvider
+import nextflow.lsp.services.groovy.GroovyAstCache
 import nextflow.script.v2.ScriptParserPluginFactory
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.SourceUnit
@@ -44,9 +49,36 @@ class ScriptService extends LanguageService {
 
     private ScriptAstCache astCache = new ScriptAstCache(getCompiler())
 
+    private GroovyAstCache groovyAstCache = new GroovyAstCache()
+
     @Override
     boolean matchesFile(String uri) {
         uri.endsWith('.nf')
+    }
+
+    @Override
+    void initialize(String rootUri, List<String> excludes, boolean suppressWarnings) {
+        synchronized (this) {
+            compileLibDir(rootUri)
+        }
+        super.initialize(rootUri, excludes, suppressWarnings)
+    }
+
+    private void compileLibDir(String rootUri) {
+        final libDir = Path.of(URI.create(rootUri)).resolve("lib")
+        if( !libDir.isDirectory() )
+            return
+
+        final Set<URI> uris = []
+        for( final path : Files.walk(libDir) ) {
+            if( !path.toString().endsWith(".groovy") )
+                continue
+            uris.add(path.toUri())
+        }
+
+        if( uris.isEmpty() )
+            return
+        groovyAstCache.compile(uris)
     }
 
     @Override
@@ -60,7 +92,8 @@ class ScriptService extends LanguageService {
         final CompilerTransform transform = new CompilerTransform() {
             @Override
             void visit(SourceUnit sourceUnit) {
-                new ResolveVisitor(sourceUnit, config, classLoader).visit()
+                final libClasses = groovyAstCache.getClassNodes()
+                new ResolveVisitor(sourceUnit, config, classLoader, libClasses).visit()
             }
         }
         return new Compiler(config, classLoader, List.of(transform))

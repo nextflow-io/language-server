@@ -66,9 +66,12 @@ class ResolveVisitor extends ClassCodeExpressionTransformer implements ScriptVis
 
     private ClassNodeResolver classNodeResolver = new ClassNodeResolver()
 
-    ResolveVisitor(SourceUnit sourceUnit, CompilerConfiguration config, GroovyClassLoader classLoader) {
+    private List<ClassNode> libClasses
+
+    ResolveVisitor(SourceUnit sourceUnit, CompilerConfiguration config, GroovyClassLoader classLoader, List<ClassNode> libClasses) {
         this.sourceUnit = sourceUnit
         this.compilationUnit = new CompilationUnit(config, null, classLoader)
+        this.libClasses = libClasses
     }
 
     @Override
@@ -160,6 +163,13 @@ class ResolveVisitor extends ClassCodeExpressionTransformer implements ScriptVis
         // resolve from script imports
         final typeName = type.getName()
         for( final cn : ScriptDsl.TYPES ) {
+            if( typeName == cn.getNameWithoutPackage() || typeName == cn.getName() ) {
+                type.setRedirect(cn)
+                return true
+            }
+        }
+        // resolve from lib directory
+        for( final cn : libClasses ) {
             if( typeName == cn.getNameWithoutPackage() || typeName == cn.getName() ) {
                 type.setRedirect(cn)
                 return true
