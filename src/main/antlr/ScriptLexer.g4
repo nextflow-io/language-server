@@ -681,8 +681,8 @@ SPACESHIP               : '<=>';
 ARROW                   : '->';
 
 // !internalPromise will be parsed as !in ternalPromise, so semantic predicates are necessary
-// NOT_INSTANCEOF      : '!instanceof' { isFollowedBy(_input, ' ', '\t', '\r', '\n') }?;
-// NOT_IN              : '!in'         { isFollowedBy(_input, ' ', '\t', '\r', '\n', '[', '(', '{') }?;
+NOT_INSTANCEOF      : '!instanceof' { isFollowedBy(_input, ' ', '\t', '\r', '\n') }?;
+NOT_IN              : '!in'         { isFollowedBy(_input, ' ', '\t', '\r', '\n', '[', '(', '{') }?;
 
 
 //

@@ -259,8 +259,8 @@ expression
 
     // boolean relational expressions (level 7)
     |   left=expression nls op=AS nls type                                                  #relationalCastExprAlt
-    |   left=expression nls op=INSTANCEOF nls type                                          #relationalTypeExprAlt
-    |   left=expression nls op=(LE | GE | GT | LT | IN) nls right=expression                #relationalExprAlt
+    |   left=expression nls op=(INSTANCEOF | NOT_INSTANCEOF) nls type                       #relationalTypeExprAlt
+    |   left=expression nls op=(LE | GE | GT | LT | IN | NOT_IN) nls right=expression       #relationalExprAlt
 
     // equality/inequality (==/!=) (level 8)
     |   left=expression nls
