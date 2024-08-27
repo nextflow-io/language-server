@@ -340,11 +340,6 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         if( node.inputs instanceof BlockStatement )
             declareProcessInputs((BlockStatement) node.inputs)
 
-        pushState(ProcessDirectiveDsl)
-        checkDirectives(node.directives, 'process directive')
-        visit(node.directives)
-        popState()
-
         pushState(ProcessInputDsl)
         checkDirectives(node.inputs, 'process input qualifier')
         visit(node.inputs)
@@ -356,6 +351,11 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
         visit(node.exec)
         visit(node.stub)
+
+        pushState(ProcessDirectiveDsl)
+        checkDirectives(node.directives, 'process directive')
+        visit(node.directives)
+        popState()
 
         pushState(ProcessOutputDsl)
         if( node.exec instanceof BlockStatement )
@@ -381,13 +381,23 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
                     declareProcessInput((MethodCallExpression) arg)
                 }
             }
+            else if( call.getMethodAsString() == 'each' ) {
+                final args = (ArgumentListExpression) call.arguments
+                if( args.size() != 1 )
+                    continue
+                final firstArg = args.first()
+                if( firstArg instanceof MethodCallExpression )
+                    declareProcessInput((MethodCallExpression) firstArg)
+                else if( firstArg instanceof VariableExpression )
+                    declare(firstArg)
+            }
             else {
                 declareProcessInput(call)
             }
         }
     }
 
-    static private final List<String> DECLARING_INPUT_TYPES = ['val', 'file', 'path', 'each']
+    static private final List<String> DECLARING_INPUT_TYPES = ['val', 'file', 'path']
 
     private void declareProcessInput(MethodCallExpression call) {
         if( call.getMethodAsString() !in DECLARING_INPUT_TYPES )
@@ -695,6 +705,8 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
             if( !variable ) {
                 if( name == 'for' || name == 'while' )
                     addError("`${name}` loops are no longer supported", node)
+                else if( name == 'switch' )
+                    addError("switch statements are no longer supported", node)
                 else
                     addError("`${name}` is not defined", method)
             }

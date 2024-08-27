@@ -485,6 +485,13 @@ public class ScriptAstBuilder {
                 : null
         );
 
+        if( name == null ) {
+            if( takes instanceof BlockStatement )
+                collectSyntaxError(new SyntaxException("Entry workflow cannot have inputs", takes));
+            if( emits instanceof BlockStatement )
+                collectSyntaxError(new SyntaxException("Entry workflow cannot have outputs", emits));
+        }
+
         var result = ast( new WorkflowNode(name, takes, emits, publishers, main), ctx );
         groovydocManager.handle(result, ctx);
         return result;
