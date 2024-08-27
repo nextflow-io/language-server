@@ -371,7 +371,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
 
     protected void visitParameter(Parameter parameter) {
         final type = parameter.type
-        if( type != ClassHelper.OBJECT_TYPE ) {
+        if( !ClassHelper.isObjectType(type) ) {
             append(type.getNameWithoutPackage())
             append(' ')
         }

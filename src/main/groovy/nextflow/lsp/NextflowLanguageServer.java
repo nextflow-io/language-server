@@ -465,7 +465,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     public CompletableFuture<Either<List<? extends SymbolInformation>, List<? extends WorkspaceSymbol>>> symbol(WorkspaceSymbolParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled();
-            log.debug("workspace/symbol " + params);
+            log.debug("workspace/symbol " + params.getQuery());
             var result = new ArrayList<SymbolInformation>();
             for( var scriptService : scriptServices.values() )
                 result.addAll(scriptService.symbol(params));
