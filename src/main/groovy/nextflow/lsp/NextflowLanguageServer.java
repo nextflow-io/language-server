@@ -449,8 +449,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var name = workspaceFolder.getName();
             log.debug("workspace/didChangeWorkspaceFolders remove " + name);
             workspaceRoots.remove(name);
-            configServices.remove(name);
-            scriptServices.remove(name);
+            configServices.remove(name).clearDiagnostics();
+            scriptServices.remove(name).clearDiagnostics();
         }
         for( var workspaceFolder : event.getAdded() ) {
             var name = workspaceFolder.getName();

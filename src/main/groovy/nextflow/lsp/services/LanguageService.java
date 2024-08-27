@@ -323,4 +323,15 @@ public abstract class LanguageService {
         });
     }
 
+    /**
+     * Clear diagnostics when the language service is shut down.
+     */
+    public void clearDiagnostics() {
+        var errorsByUri = getAstCache().update(Collections.emptySet(), fileCache);
+        errorsByUri.forEach((uri, errors) -> {
+            var params = new PublishDiagnosticsParams(uri.toString(), Collections.emptyList());
+            client.publishDiagnostics(params);
+        });
+    }
+
 }
