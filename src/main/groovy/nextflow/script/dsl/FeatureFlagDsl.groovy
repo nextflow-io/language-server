@@ -21,6 +21,13 @@ import groovy.transform.CompileStatic
 class FeatureFlagDsl {
 
     @FeatureFlag(
+        name='nextflow.enable.configProcessNamesValidation',
+        description='''
+            When `true`, prints a warning for every `withName:` process selector that doesn't match a process in the pipeline (default: `true`).
+        ''')
+    boolean configProcessNamesValidation
+
+    @FeatureFlag(
         name='nextflow.enable.dsl',
         description='''
             Defines the DSL version (`1` or `2`).
