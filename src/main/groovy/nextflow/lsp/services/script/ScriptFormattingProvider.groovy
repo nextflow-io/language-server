@@ -610,9 +610,10 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
     private boolean inMultilineMethodChain
 
     protected void visitMethodCallExpression(MethodCallExpression node, boolean directive) {
-        final beginMultilineChain = currentStmtExpr == node && getPropertyMethodDepth(node) >= 2
+        final beginMultilineChain = currentStmtExpr == node && getMethodChainDepth(node) >= 2
         if( beginMultilineChain )
             inMultilineMethodChain = true
+
         if( !node.isImplicitThis() ) {
             visit(node.objectExpression)
             if( inMultilineMethodChain ) {
@@ -622,6 +623,7 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             }
             append('.')
         }
+
         final immc = inMultilineMethodChain
         inMultilineMethodChain = false
         visit(node.method, false)
@@ -650,15 +652,16 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
             visit(arguments.last())
         }
         inMultilineMethodChain = immc
+
         if( !node.isImplicitThis() && inMultilineMethodChain )
             decIndent()
         if( beginMultilineChain )
             inMultilineMethodChain = false
     }
 
-    protected int getPropertyMethodDepth(Expression node) {
+    protected int getMethodChainDepth(Expression node) {
         return node instanceof MethodCallExpression && !node.isImplicitThis()
-            ? 1 + getPropertyMethodDepth(node.getObjectExpression())
+            ? 1 + getMethodChainDepth(node.getObjectExpression())
             : 0
     }
 
@@ -678,31 +681,62 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor
         append(')')
     }
 
+    private boolean inMultilinePipeChain
+
     @Override
     void visitBinaryExpression(BinaryExpression node) {
-        if( node.operation.type == Types.LEFT_SQUARE_BRACKET ) {
-            visit(node.leftExpression)
+        if( node.getOperation().isA(Types.LEFT_SQUARE_BRACKET) ) {
+            visit(node.getLeftExpression())
             append('[')
-            visit(node.rightExpression)
+            visit(node.getRightExpression())
             append(']')
+            return
+        }
+
+        final beginMultilineChain = currentStmtExpr == node && getPipeChainDepth(node) >= 2
+        if( beginMultilineChain )
+            inMultilinePipeChain = true
+
+        Expression cse = null
+        if( currentStmtExpr == node && node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
+            cse = currentStmtExpr
+            currentStmtExpr = node.getRightExpression()
+        }
+
+        if( node instanceof DeclarationExpression )
+            append('def ')
+        visit(node.getLeftExpression())
+
+        if( inMultilinePipeChain ) {
+            appendNewLine()
+            incIndent()
+            appendIndent()
         }
         else {
-            Expression cse = null
-            if( currentStmtExpr == node && node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
-                cse = currentStmtExpr
-                currentStmtExpr = node.getRightExpression()
-            }
-            if( node instanceof DeclarationExpression ) {
-                append('def ')
-            }
-            visit(node.leftExpression)
             append(' ')
-            append(node.operation.text)
-            append(' ')
-            visit(node.rightExpression)
-            if( cse )
-                currentStmtExpr = cse
         }
+        append(node.getOperation().getText())
+        append(' ')
+
+        final impc = inMultilinePipeChain
+        inMultilinePipeChain = false
+        visit(node.getRightExpression())
+        inMultilinePipeChain = impc
+
+        if( inMultilinePipeChain )
+            decIndent()
+
+        if( cse )
+            currentStmtExpr = cse
+
+        if( beginMultilineChain )
+            inMultilinePipeChain = false
+    }
+
+    protected int getPipeChainDepth(Expression node) {
+        return node instanceof BinaryExpression && node.getOperation().isA(Types.BITWISE_OR)
+            ? 1 + getPipeChainDepth(node.getLeftExpression())
+            : 0
     }
 
     @Override
