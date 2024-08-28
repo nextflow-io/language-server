@@ -60,10 +60,12 @@ import org.codehaus.groovy.ast.expr.UnaryPlusExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.AssertStatement
 import org.codehaus.groovy.ast.stmt.BlockStatement
+import org.codehaus.groovy.ast.stmt.CatchStatement
 import org.codehaus.groovy.ast.stmt.EmptyStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.IfStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
+import org.codehaus.groovy.ast.stmt.TryCatchStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.Types
 import org.eclipse.lsp4j.Position
@@ -320,6 +322,35 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
         appendNewLine()
     }
 
+    @Override
+    void visitTryCatchFinally(TryCatchStatement node) {
+        appendComments(node)
+        appendIndent()
+        append('try {\n')
+        incIndent()
+        visit(node.tryStatement)
+        decIndent()
+        appendIndent()
+        append('}\n')
+        for( final catchStatement : node.catchStatements ) {
+            visit(catchStatement)
+        }
+    }
+
+    @Override
+    void visitCatchStatement(CatchStatement node) {
+        appendComments(node)
+        appendIndent()
+        append('catch (')
+        visitParameter(node.variable)
+        append(') {\n')
+        incIndent()
+        visit(node.code)
+        decIndent()
+        appendIndent()
+        append('}\n')
+    }
+
     // expressions
 
     @Override
@@ -447,12 +478,10 @@ class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor
         final positionalArgs = hasNamedArgs ? node.expressions.tail() : node.expressions
         for( int i = 0; i < positionalArgs.size(); i++ ) {
             visit(positionalArgs[i])
-            if( i + 1 < positionalArgs.size() )
+            if( i + 1 < positionalArgs.size() || hasNamedArgs )
                 append(', ')
         }
         if( hasNamedArgs ) {
-            if( positionalArgs )
-                append(', ')
             final mapX = (MapExpression)node.expressions.first()
             final namedArgs = mapX.mapEntryExpressions
             for( int i = 0; i < namedArgs.size(); i++ ) {

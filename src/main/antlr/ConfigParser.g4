@@ -148,14 +148,16 @@ configIncomplete
 // statements
 //
 statement
-    :   ifElseStatement             #ifElseStmtAlt
-    |   RETURN expression?          #returnStmtAlt
-    |   assertStatement             #assertStmtAlt
-    |   variableDeclaration         #variableDeclarationStmtAlt
-    |   multipleAssignmentStatement #multipleAssignmentStmtAlt
-    |   assignmentStatement         #assignmentStmtAlt
-    |   expressionStatement         #expressionStmtAlt
-    |   SEMI                        #emptyStmtAlt
+    :   ifElseStatement                 #ifElseStmtAlt
+    |   tryCatchStatement               #tryCatchStmtAlt
+    |   RETURN expression?              #returnStmtAlt
+    |   THROW expression                #throwStmtAlt
+    |   assertStatement                 #assertStmtAlt
+    |   variableDeclaration             #variableDeclarationStmtAlt
+    |   multipleAssignmentStatement     #multipleAssignmentStmtAlt
+    |   assignmentStatement             #assignmentStmtAlt
+    |   expressionStatement             #expressionStmtAlt
+    |   SEMI                            #emptyStmtAlt
     ;
 
 // -- if/else statement
@@ -170,6 +172,20 @@ statementOrBlock
 
 blockStatements
     :   statement (sep statement)* sep?
+    ;
+
+// -- try/catch statement
+
+tryCatchStatement
+    :   TRY nls statementOrBlock (nls catchClause)*
+    ;
+
+catchClause
+    :   CATCH LPAREN catchTypes? identifier rparen nls statementOrBlock
+    ;
+
+catchTypes
+    :   qualifiedClassName (BITOR qualifiedClassName)*
     ;
 
 // -- assert statement

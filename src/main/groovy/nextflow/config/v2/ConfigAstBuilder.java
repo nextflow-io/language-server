@@ -76,6 +76,7 @@ import org.codehaus.groovy.ast.expr.UnaryMinusExpression;
 import org.codehaus.groovy.ast.expr.UnaryPlusExpression;
 import org.codehaus.groovy.ast.stmt.AssertStatement;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
+import org.codehaus.groovy.ast.stmt.CatchStatement;
 import org.codehaus.groovy.ast.stmt.EmptyStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.CompilationFailedException;
@@ -333,8 +334,14 @@ public class ConfigAstBuilder {
         if( ctx instanceof IfElseStmtAltContext ieac )
             result = ast( ifElseStatement(ieac.ifElseStatement()), ieac );
 
+        else if( ctx instanceof TryCatchStmtAltContext tcac )
+            result = ast( tryCatchStatement(tcac.tryCatchStatement()), tcac );
+
         else if( ctx instanceof ReturnStmtAltContext rac )
             result = ast( returnStatement(rac.expression()), rac );
+
+        else if( ctx instanceof ThrowStmtAltContext tac )
+            result = ast( throwStatement(tac.expression()), tac );
 
         else if( ctx instanceof AssertStmtAltContext aac )
             result = ast( assertStatement(aac.assertStatement()), aac );
@@ -386,11 +393,51 @@ public class ConfigAstBuilder {
         return ast( block(new VariableScope(), statements), ctx );
     }
 
+    private Statement tryCatchStatement(TryCatchStatementContext ctx) {
+        var tryStatement = statementOrBlock(ctx.statementOrBlock());
+        var catchClauses = ctx.catchClause().stream()
+            .map(this::catchClause)
+            .collect(Collectors.toList());
+        var result = tryCatchS(tryStatement);
+        for( var clause : catchClauses )
+            for( var stmt : clause )
+                result.addCatch(stmt);
+        return result;
+    }
+
+    private List<CatchStatement> catchClause(CatchClauseContext ctx) {
+        var types = catchTypes(ctx.catchTypes());
+        return types.stream()
+            .map(type -> {
+                var name = identifier(ctx.identifier());
+                var variable = ast( param(type, name), ctx.identifier() );
+                var code = statementOrBlock(ctx.statementOrBlock());
+                return ast( new CatchStatement(variable, code), ctx );
+            })
+            .collect(Collectors.toList());
+    }
+
+    private List<ClassNode> catchTypes(CatchTypesContext ctx) {
+        if( ctx == null )
+            return Collections.singletonList( ClassHelper.dynamicType() );
+
+        return ctx.qualifiedClassName().stream()
+            .map(this::qualifiedClassName)
+            .collect(Collectors.toList());
+    }
+
     private Statement returnStatement(ExpressionContext ctx) {
         var result = ctx != null
             ? expression(ctx)
             : ConstantExpression.EMPTY_EXPRESSION;
         return returnS(result);
+    }
+
+    private Statement throwStatement(ExpressionContext ctx) {
+        var result = ctx != null
+            ? expression(ctx)
+            : ConstantExpression.EMPTY_EXPRESSION;
+        return throwS(result);
     }
 
     private Statement assertStatement(AssertStatementContext ctx) {
