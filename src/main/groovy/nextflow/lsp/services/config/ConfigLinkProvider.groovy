@@ -54,10 +54,10 @@ class ConfigLinkProvider implements LinkProvider {
         }
 
         final uri = URI.create(textDocument.getUri())
-        final sourceUnit = ast.getSourceUnit(uri)
-        if( !sourceUnit.getAST() )
+        if( !ast.hasAST(uri) )
             return Collections.emptyList()
 
+        final sourceUnit = ast.getSourceUnit(uri)
         final visitor = new ConfigLinkVisitor(sourceUnit)
         visitor.visit()
 
