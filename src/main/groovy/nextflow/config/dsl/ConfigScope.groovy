@@ -61,6 +61,7 @@ class ConfigSchema {
         new nextflow.config.scopes.GoogleBatchConfig(),
         new nextflow.config.scopes.K8sConfig(),
         new nextflow.config.scopes.Manifest(),
+        new nextflow.config.scopes.ParamsConfig(),
         new nextflow.config.scopes.PluginsConfig(),
         new nextflow.config.scopes.PodmanConfig(),
         new nextflow.config.scopes.ProcessConfig(),
