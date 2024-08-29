@@ -16,6 +16,7 @@
 package nextflow.script.v2;
 
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Variable;
@@ -50,12 +51,12 @@ public class IncludeVariable extends ASTNode implements Variable {
 
     @Override
     public ClassNode getType() {
-        return method.getReturnType();
+        return method != null ? method.getReturnType() : ClassHelper.dynamicType();
     }
 
     @Override
     public ClassNode getOriginType() {
-        return method.getReturnType();
+        return method != null ? method.getReturnType() : ClassHelper.dynamicType();
     }
 
     @Override
@@ -80,7 +81,7 @@ public class IncludeVariable extends ASTNode implements Variable {
 
     @Override
     public boolean isDynamicTyped() {
-        return method.isDynamicReturnType();
+        return method == null || method.isDynamicReturnType();
     }
 
     @Override
@@ -93,6 +94,6 @@ public class IncludeVariable extends ASTNode implements Variable {
 
     @Override
     public int getModifiers() {
-        return method.getModifiers();
+        return method != null ? method.getModifiers() : 0;
     }
 }
