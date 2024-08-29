@@ -32,6 +32,18 @@ import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
 
+import nextflow.lsp.compiler.SyntaxWarning
+import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.ClassCodeVisitorSupport
+import org.codehaus.groovy.ast.expr.BinaryExpression
+import org.codehaus.groovy.ast.expr.Expression
+import org.codehaus.groovy.ast.expr.MethodCall
+import org.codehaus.groovy.ast.stmt.BlockStatement
+import org.codehaus.groovy.ast.stmt.ExpressionStatement
+import org.codehaus.groovy.ast.stmt.Statement
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage
+import org.codehaus.groovy.syntax.Types
+
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
@@ -65,6 +77,14 @@ class ScriptAstCache extends ASTNodeCache {
             final visitor = new MethodCallVisitor(sourceUnit, this)
             visitor.visit()
             errorsByUri[uri].removeIf((error) -> error instanceof MethodCallException)
+            errorsByUri[uri].addAll(visitor.getErrors())
+        }
+
+        for( final uri : changedUris ) {
+            final sourceUnit = getSourceUnit(uri)
+            final visitor = new UselessCodeVisitor(sourceUnit)
+            visitor.visit()
+            errorsByUri[uri].removeIf((error) -> error instanceof UselessCodeWarning)
             errorsByUri[uri].addAll(visitor.getErrors())
         }
 
@@ -245,6 +265,74 @@ class ScriptAstCache extends ASTNodeCache {
             finally {
                 popASTNode()
             }
+        }
+    }
+
+    private static class UselessCodeVisitor extends ClassCodeVisitorSupport implements ScriptVisitor {
+
+        private SourceUnit sourceUnit
+
+        private List<SyntaxException> errors = []
+
+        public UselessCodeVisitor(SourceUnit sourceUnit) {
+            this.sourceUnit = sourceUnit
+        }
+
+        @Override
+        protected SourceUnit getSourceUnit() {
+            return sourceUnit
+        }
+
+        void visit() {
+            final moduleNode = sourceUnit.getAST()
+            if( moduleNode !instanceof ScriptNode )
+                return
+            visit((ScriptNode) moduleNode)
+        }
+
+        private Statement currentImplicitReturn
+
+        @Override
+        public void visitBlockStatement(BlockStatement node) {
+            // TODO: implicit return is only for function or closure
+            final cir = currentImplicitReturn
+            currentImplicitReturn = node.statements.size() > 0 ? node.statements.last() : null
+            super.visitBlockStatement(node)
+            currentImplicitReturn = cir
+        }
+
+        @Override
+        public void visitExpressionStatement(ExpressionStatement node) {
+            if( node != currentImplicitReturn && !isEffectful(node.expression) )
+                addWarning("Statement has no effect", node)
+            super.visitExpressionStatement(node)
+        }
+
+        protected boolean isEffectful(Expression node) {
+            if( node instanceof MethodCall )
+                return true
+            if( node instanceof BinaryExpression ) {
+                // TODO: << or >> on a string, collection, or file
+                // TODO: property or pipe chain ending in set/subscribe/view
+                return node.getOperation().isA(Types.ASSIGNMENT_OPERATOR)
+            }
+            return false
+        }
+
+        protected void addWarning(String message, ASTNode node) {
+            errors.add(new UselessCodeWarning(message, node))
+        }
+
+        List<SyntaxException> getErrors() {
+            return errors
+        }
+
+    }
+
+    private static class UselessCodeWarning extends SyntaxWarning {
+
+        public UselessCodeWarning(String message, ASTNode node) {
+            super(message, node);
         }
     }
 
