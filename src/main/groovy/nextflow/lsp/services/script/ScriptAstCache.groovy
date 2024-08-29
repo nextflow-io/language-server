@@ -45,6 +45,7 @@ class ScriptAstCache extends ASTNodeCache {
 
     @Override
     Map<URI, List<SyntaxException>> update(Set<URI> uris, FileCache fileCache) {
+        final changedUris = new HashSet<>(uris)
         final errorsByUri = super.update(uris, fileCache)
 
         for( final sourceUnit : getSourceUnits() ) {
@@ -52,9 +53,18 @@ class ScriptAstCache extends ASTNodeCache {
             visitor.visit()
 
             final uri = sourceUnit.getSource().getURI()
-            if( !errorsByUri.containsKey(uri) )
-                errorsByUri.put(uri, [])
+            errorsByUri.computeIfAbsent(uri, (k) -> [])
             errorsByUri[uri].removeIf((error) -> error instanceof IncludeException)
+            errorsByUri[uri].addAll(visitor.getErrors())
+            if( visitor.isChanged() )
+                changedUris.add(uri)
+        }
+
+        for( final uri : changedUris ) {
+            final sourceUnit = getSourceUnit(uri)
+            final visitor = new MethodCallVisitor(sourceUnit, this)
+            visitor.visit()
+            errorsByUri[uri].removeIf((error) -> error instanceof MethodCallException)
             errorsByUri[uri].addAll(visitor.getErrors())
         }
 

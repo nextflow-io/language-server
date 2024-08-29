@@ -43,6 +43,8 @@ class ResolveIncludeVisitor extends ClassCodeVisitorSupport implements ScriptVis
 
     private List<SyntaxException> errors = []
 
+    private boolean changed
+
     ResolveIncludeVisitor(SourceUnit sourceUnit, ScriptAstCache astCache, Set<URI> changedUris) {
         this.sourceUnit = sourceUnit
         this.uri = sourceUnit.getSource().getURI()
@@ -72,6 +74,7 @@ class ResolveIncludeVisitor extends ClassCodeVisitorSupport implements ScriptVis
         final includeUri = getIncludeUri(uri, source)
         if( !isIncludeStale(node, includeUri) )
             return
+        changed = true
         for( final module : node.modules )
             module.setMethod(null)
         final includeUnit = astCache.getSourceUnit(includeUri)
@@ -116,12 +119,16 @@ class ResolveIncludeVisitor extends ClassCodeVisitorSupport implements ScriptVis
         return false
     }
 
+    @Override
+    void addError(String message, ASTNode node) {
+        errors.add(new IncludeException(message, node))
+    }
+
     List<SyntaxException> getErrors() {
         return errors
     }
 
-    @Override
-    void addError(String message, ASTNode node) {
-        errors.add(new IncludeException(message, node))
+    boolean isChanged() {
+        return changed
     }
 }
