@@ -15,8 +15,6 @@
  */
 package nextflow.lsp.services.config
 
-import java.nio.file.Path
-
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.compiler.Compiler
@@ -27,9 +25,6 @@ import nextflow.config.v2.ConfigIncludeNode
 import nextflow.config.v2.ConfigIncompleteNode
 import nextflow.config.v2.ConfigNode
 import nextflow.config.v2.ConfigVisitor
-import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
-import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
 
@@ -121,74 +116,6 @@ class ConfigAstCache extends ASTNodeCache {
             finally {
                 popASTNode()
             }
-        }
-    }
-
-    private class ResolveIncludeVisitor extends ClassCodeVisitorSupport implements ConfigVisitor {
-
-        private SourceUnit sourceUnit
-
-        private URI uri
-
-        private ConfigAstCache astCache
-
-        private Set<URI> changedUris
-
-        private List<SyntaxException> errors = []
-
-        ResolveIncludeVisitor(SourceUnit sourceUnit, ConfigAstCache astCache, Set<URI> changedUris) {
-            this.sourceUnit = sourceUnit
-            this.uri = sourceUnit.getSource().getURI()
-            this.astCache = astCache
-            this.changedUris = changedUris
-        }
-
-        @Override
-        protected SourceUnit getSourceUnit() {
-            return sourceUnit
-        }
-
-        void visit() {
-            final moduleNode = sourceUnit.getAST()
-            if( moduleNode !instanceof ConfigNode )
-                return
-            super.visit((ConfigNode) moduleNode)
-        }
-
-        @Override
-        void visitConfigInclude(ConfigIncludeNode node) {
-            if( node.source !instanceof ConstantExpression )
-                return
-            final source = node.source.getText()
-            final includeUri = getIncludeUri(uri, source)
-            if( !isIncludeLocal(includeUri) || !isIncludeStale(includeUri) )
-                return
-            final includeUnit = astCache.getSourceUnit(includeUri)
-            if( !includeUnit ) {
-                addError("Invalid include source: '${includeUri}'", node)
-                return
-            }
-        }
-
-        protected static URI getIncludeUri(URI uri, String source) {
-            return Path.of(uri).getParent().resolve(source).normalize().toUri()
-        }
-
-        protected static boolean isIncludeLocal(URI includeUri) {
-            return includeUri.getScheme() == 'file'
-        }
-
-        protected boolean isIncludeStale(URI includeUri) {
-            return uri in changedUris || includeUri in changedUris
-        }
-
-        List<SyntaxException> getErrors() {
-            return errors
-        }
-
-        @Override
-        void addError(String message, ASTNode node) {
-            errors.add(new SyntaxException(message, node))
         }
     }
 
