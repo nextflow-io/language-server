@@ -130,7 +130,7 @@ public class ASTNodeCache {
             }
             sourcesByUri.remove(uri);
 
-            var sourceUnit = sources.get(uri);
+            var sourceUnit = sources.get(uri).orElse(null);
             if( sourceUnit == null ) {
                 errorsByUri.put(uri, new ArrayList<>());
                 continue;

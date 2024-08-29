@@ -23,6 +23,7 @@ import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -64,12 +65,11 @@ public class Compiler {
      * @param uris
      * @param fileCache
      */
-    public Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache) {
+    public Map<URI, Optional<SourceUnit>> compile(Set<URI> uris, FileCache fileCache) {
         return uris.parallelStream()
             .map((uri) -> {
                 var sourceUnit = getSourceUnit(uri, fileCache);
-                if( sourceUnit != null )
-                    compile(sourceUnit);
+                sourceUnit.ifPresent(this::compile);
                 return new AbstractMap.SimpleEntry<>(uri, sourceUnit);
             })
             .sequential()
@@ -89,25 +89,25 @@ public class Compiler {
      *
      * @param uri
      */
-    protected SourceUnit getSourceUnit(URI uri, FileCache fileCache) {
+    protected Optional<SourceUnit> getSourceUnit(URI uri, FileCache fileCache) {
         if( fileCache.isOpen(uri) ) {
             var contents = fileCache.getContents(uri);
-            return new SourceUnit(
+            return Optional.of(new SourceUnit(
                     uri.toString(),
                     new StringReaderSourceWithURI(contents, uri, config),
                     config,
                     classLoader,
-                    newErrorCollector());
+                    newErrorCollector()));
         }
         else if( Files.exists(Path.of(uri)) ) {
-            return new SourceUnit(
+            return Optional.of(new SourceUnit(
                     new File(uri),
                     config,
                     classLoader,
-                    newErrorCollector());
+                    newErrorCollector()));
         }
         else
-            return null;
+            return Optional.empty();
     }
 
     protected ErrorCollector newErrorCollector() {
