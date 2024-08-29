@@ -304,6 +304,7 @@ public abstract class LanguageService {
                     continue;
                 }
 
+                var message = error.getMessage();
                 var severity = error instanceof SyntaxWarning
                     ? DiagnosticSeverity.Warning
                     : DiagnosticSeverity.Error;
@@ -311,10 +312,7 @@ public abstract class LanguageService {
                 if( suppressWarnings && severity == DiagnosticSeverity.Warning )
                     continue;
 
-                var diagnostic = new Diagnostic();
-                diagnostic.setRange(range);
-                diagnostic.setSeverity(severity);
-                diagnostic.setMessage(error.getMessage());
+                var diagnostic = new Diagnostic(range, message, severity, "nextflow");
                 diagnostics.add(diagnostic);
             }
 
