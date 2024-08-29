@@ -131,8 +131,10 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
     private void declare(Variable variable, ASTNode context) {
         VariableScope scope = currentScope
         while( scope != null ) {
-            if( variable.name in scope.getDeclaredVariables() ) {
-                addError("`${variable.name}` is already declared", context)
+            final other = scope.getDeclaredVariable(variable.name)
+            if( other != null ) {
+                final otherNode = other instanceof ASTNode ? (ASTNode) other : null
+                addError(new RedeclaredVariableException("`${variable.name}` is already declared", context, otherNode))
                 break
             }
             scope = scope.parent
@@ -807,7 +809,10 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
 
     @Override
     void addError(String message, ASTNode node) {
-        final cause = new SyntaxException(message, node)
+        addError(new SyntaxException(message, node))
+    }
+
+    protected void addError(SyntaxException cause) {
         final errorMessage = new SyntaxErrorMessage(cause, sourceUnit)
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage)
     }

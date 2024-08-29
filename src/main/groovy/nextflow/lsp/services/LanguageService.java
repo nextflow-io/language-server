@@ -70,6 +70,9 @@ import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
 
+import nextflow.lsp.services.script.RedeclaredVariableException;
+import org.eclipse.lsp4j.DiagnosticRelatedInformation;
+
 /**
  * Base language service which handles document updates,
  * publishes diagnostics, and provides language features.
@@ -313,12 +316,26 @@ public abstract class LanguageService {
                     continue;
 
                 var diagnostic = new Diagnostic(range, message, severity, "nextflow");
+                diagnostic.setRelatedInformation(getRelatedInformation(error, uri));
                 diagnostics.add(diagnostic);
             }
 
             var params = new PublishDiagnosticsParams(uri.toString(), diagnostics);
             client.publishDiagnostics(params);
         });
+    }
+
+    protected List<DiagnosticRelatedInformation> getRelatedInformation(SyntaxException error, URI uri) {
+        var result = new ArrayList<DiagnosticRelatedInformation>();
+        if( error instanceof RedeclaredVariableException rve ) {
+            var other = rve.getOtherDeclaration();
+            if( other != null ) {
+                var location = LanguageServerUtils.astNodeToLocation(other, uri);
+                var dri = new DiagnosticRelatedInformation(location, "First declared here");
+                result.add(dri);
+            }
+        }
+        return result;
     }
 
     /**
