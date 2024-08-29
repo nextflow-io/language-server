@@ -241,6 +241,15 @@ class WorkflowDsl implements DslScope {
 
     @Operator
     @Function('''
+        The `randomSample` operator emits a randomly-selected subset of values from a source channel.
+
+        [Read more](https://nextflow.io/docs/latest/operator.html#randomsample)
+    ''')
+    DataflowWriteChannel randomSample(DataflowReadChannel source, int n, Long seed=null) {
+    }
+
+    @Operator
+    @Function('''
         The `reduce` operator applies an accumulator function sequentially to each value from a source channel, and emits the accumulated value. The accumulator function takes two parameters -- the accumulated value and the *i*-th emitted value -- and it should return the accumulated result, which is passed to the next invocation with the *i+1*-th value. This process is repeated for each value in the source channel.
 
         [Read more](https://nextflow.io/docs/latest/operator.html#reduce)
