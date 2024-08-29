@@ -139,6 +139,7 @@ public class ConfigAstBuilder {
                 if( t instanceof GroovySyntaxError gse && gse.getSource() == GroovySyntaxError.LEXER )
                     throw t;
 
+                // System.err.println("SLL parsing failed: " + sourceUnit.getSource().getURI().toString());
                 tokenStream.seek(0);
                 return buildCST(PredictionMode.LL);
             }
@@ -1157,7 +1158,7 @@ public class ConfigAstBuilder {
     }
 
     private Parameter parameter(FormalParameterContext ctx) {
-        var type = type(ctx.type());
+        var type = ClassHelper.dynamicType();
         var name = identifier(ctx.identifier());
         var defaultValue = ctx.expression() != null
             ? expression(ctx.expression())

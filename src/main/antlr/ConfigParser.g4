@@ -417,7 +417,7 @@ formalParameterList
     ;
 
 formalParameter
-    :   type? identifier (nls ASSIGN nls expression)?
+    :   identifier (nls ASSIGN nls expression)?
     ;
 
 // -- list expression
