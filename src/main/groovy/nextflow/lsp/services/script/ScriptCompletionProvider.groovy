@@ -387,7 +387,12 @@ class ScriptCompletionProvider implements CompletionProvider {
             item.setLabel(method.getName())
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(method))
 
-            if( method.getDeclaringClass().implementsAnyInterfaces(DSL_SCOPE_TYPE) ) {
+            if( method instanceof FunctionNode || method instanceof ProcessNode || method instanceof WorkflowNode ) {
+                final documentation = ASTNodeStringUtils.getDocumentation(method)
+                if( documentation != null )
+                    item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
+            }
+            else if( method.getDeclaringClass().implementsAnyInterfaces(DSL_SCOPE_TYPE) ) {
                 final annot = method.getAnnotations().find(an -> an.getClassNode() == DSL_FUNCTION_TYPE)
                 if( !annot )
                     continue
