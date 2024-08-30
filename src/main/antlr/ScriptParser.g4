@@ -302,13 +302,13 @@ variableDeclaration
     |   DEF variableNames nls ASSIGN nls initializer=expression
     ;
 
+variableNames
+    :   LPAREN identifier (COMMA identifier)+ rparen
+    ;
+
 // -- assignment statement
 multipleAssignmentStatement
     :   variableNames nls ASSIGN nls expression
-    ;
-
-variableNames
-    :   LPAREN identifier (COMMA identifier)+ rparen
     ;
 
 assignmentStatement
@@ -423,7 +423,7 @@ primary
     :   identifier                  #identifierPrmrAlt
     |   literal                     #literalPrmrAlt
     |   gstring                     #gstringPrmrAlt
-    |   NEW nls creator             #newPrmrAlt
+    |   NEW creator                 #newPrmrAlt
     |   parExpression               #parenPrmrAlt
     |   closure                     #closurePrmrAlt
     |   list                        #listPrmrAlt
@@ -438,7 +438,7 @@ pathElement
         |   SPREAD_DOT          // spread operator:         x*.y === x?.collect { it.y }
         |   SAFE_DOT            // optional-null operator:  x?.y === (x!=null) ? x.y : null
         )
-        nls namePart                                    #propertyPathExprAlt
+        namedProperty                                   #propertyPathExprAlt
 
     // method call expression (with closure)
     |   closure                                         #closurePathExprAlt
@@ -451,7 +451,7 @@ pathElement
     |   indexPropertyArgs                               #indexPathExprAlt
     ;
 
-namePart
+namedProperty
     :   identifier
     |   stringLiteral
     |   keywords
@@ -515,7 +515,7 @@ gstringTdqPart
 
 // -- constructor method call
 creator
-    :   createdName nls arguments
+    :   createdName arguments
     ;
 
 createdName
@@ -598,10 +598,7 @@ arguments
     ;
 
 argumentList
-    :   argumentListElement
-        (   COMMA nls
-            argumentListElement
-        )*
+    :   argumentListElement (COMMA nls argumentListElement)*
     ;
 
 argumentListElement
@@ -610,15 +607,8 @@ argumentListElement
     ;
 
 namedArg
-    :   namedArgLabel COLON nls expression
+    :   namedProperty COLON nls expression
     |   MUL COLON nls expression
-    ;
-
-namedArgLabel
-    :   keywords
-    |   identifier
-    |   literal
-    |   gstring
     ;
 
 // -- incomplete expression
@@ -658,7 +648,7 @@ className
     ;
 
 typeArguments
-    :   LT nls type (COMMA nls type)* nls GT
+    :   LT type (COMMA type)* GT
     ;
 
 

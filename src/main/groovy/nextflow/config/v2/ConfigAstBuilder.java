@@ -680,7 +680,7 @@ public class ConfigAstBuilder {
     }
 
     private Expression pathPropertyElement(Expression expression, PropertyPathExprAltContext ctx) {
-        var property = ast( constX(namePart(ctx.namePart())), ctx.namePart() );
+        var property = ast( constX(namedProperty(ctx.namedProperty())), ctx.namedProperty() );
         var safe = ctx.SAFE_DOT() != null || ctx.SPREAD_DOT() != null;
         var result = new PropertyExpression(expression, property, safe);
         if( ctx.SPREAD_DOT() != null )
@@ -688,7 +688,7 @@ public class ConfigAstBuilder {
         return result;
     }
 
-    private String namePart(NamePartContext ctx) {
+    private String namedProperty(NamedPropertyContext ctx) {
         if( ctx.keywords() != null )
             return keywords(ctx.keywords());
 
@@ -1114,24 +1114,8 @@ public class ConfigAstBuilder {
         var value = expression(ctx.expression());
         var key = ctx.MUL() != null
             ? new SpreadMapExpression(value)
-            : ast( namedArgLabel(ctx.namedArgLabel()), ctx.namedArgLabel() );
+            : ast( constX(namedProperty(ctx.namedProperty())), ctx.namedProperty() );
         return ast( new MapEntryExpression(key, value), ctx );
-    }
-
-    private Expression namedArgLabel(NamedArgLabelContext ctx) {
-        if( ctx.keywords() != null )
-            return constX(keywords(ctx.keywords()));
-
-        if( ctx.identifier() != null )
-            return constX(identifier(ctx.identifier()));
-
-        if( ctx.literal() != null )
-            return literal(ctx.literal());
-
-        if( ctx.gstring() != null )
-            return gstring(ctx.gstring());
-
-        throw createParsingFailedException("Invalid method named argument: " + ctx.getText(), ctx);
     }
 
     /// MISCELLANEOUS
