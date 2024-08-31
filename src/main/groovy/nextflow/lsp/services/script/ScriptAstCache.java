@@ -106,6 +106,8 @@ public class ScriptAstCache extends ASTNodeCache {
 
         for( var uri : changedUris ) {
             var sourceUnit = getSourceUnit(uri);
+            if( sourceUnit == null )
+                continue;
             var visitor = new MethodCallVisitor(sourceUnit, this);
             visitor.visit();
             errorsByUri.get(uri).removeIf((error) -> error instanceof MethodCallException);
