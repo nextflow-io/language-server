@@ -522,7 +522,7 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
     private void declareWorkflowInputs(BlockStatement block) {
         for( final stmt : block.statements ) {
             final varX = asVarX(stmt)
-            if( !varX || varX.name == 'this' )
+            if( !varX )
                 continue
             declare(varX)
         }
@@ -717,7 +717,10 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
                     addError("`${name}` is not defined", method)
             }
         }
-        super.visitMethodCallExpression(node)
+        if( !node.isImplicitThis() )
+            visit(node.getObjectExpression())
+        visit(node.getMethod())
+        visit(node.getArguments())
     }
 
     /**
@@ -762,8 +765,6 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
     @Override
     void visitVariableExpression(VariableExpression node) {
         final name = node.name
-        if( name == 'this' )
-            return
         Variable variable = findVariableDeclaration(name, node)
         if( !variable ) {
             if( name == 'it' ) {

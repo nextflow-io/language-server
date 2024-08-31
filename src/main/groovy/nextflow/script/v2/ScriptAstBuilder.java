@@ -320,7 +320,7 @@ public class ScriptAstBuilder {
 
     private Expression propertyExpression(List<IdentifierContext> idents) {
         var head = idents.get(0);
-        Expression result = ast( varX(identifier(head)), head );
+        Expression result = variableName(head);
         for( int i = 1; i < idents.size(); i++ ) {
             var ident = idents.get(i);
             var name = ast( constX(identifier(ident)), ident );
@@ -546,7 +546,7 @@ public class ScriptAstBuilder {
     }
 
     private Statement workflowTake(IdentifierContext ctx) {
-        return stmt(ast( varX(ctx.getText()), ctx ));
+        return stmt(variableName(ctx));
     }
 
     private Statement workflowEmits(WorkflowEmitsContext ctx) {
@@ -607,6 +607,7 @@ public class ScriptAstBuilder {
         var code = blockStatements(ctx.blockStatements());
 
         var result = ast( new FunctionNode(name, null, params, code), ctx );
+        checkInvalidVarName(name, result);
         groovydocManager.handle(result, ctx);
         return result;
     }
@@ -702,6 +703,7 @@ public class ScriptAstBuilder {
             .map(type -> {
                 var name = identifier(ctx.identifier());
                 var variable = ast( param(type, name), ctx.identifier() );
+                checkInvalidVarName(name, variable);
                 var code = statementOrBlock(ctx.statementOrBlock());
                 return ast( new CatchStatement(variable, code), ctx );
             })
@@ -742,10 +744,7 @@ public class ScriptAstBuilder {
         if( ctx.variableNames() != null ) {
             // multiple assignment
             var variables = ctx.variableNames().identifier().stream()
-                .map(ident -> {
-                    var name = identifier(ident);
-                    return (Expression) ast( varX(name), ident );
-                })
+                .map(ident -> (Expression) variableName(ident))
                 .collect(Collectors.toList());
             var target = new ArgumentListExpression(variables);
             var initializer = expression(ctx.initializer);
@@ -753,8 +752,7 @@ public class ScriptAstBuilder {
         }
         else {
             // single assignment
-            var name = identifier(ctx.identifier());
-            var target = ast( varX(name), ctx.identifier() );
+            var target = variableName(ctx.identifier());
             var initializer = ctx.initializer != null
                 ? expression(ctx.initializer)
                 : EmptyExpression.INSTANCE;
@@ -776,7 +774,15 @@ public class ScriptAstBuilder {
     }
 
     private Expression variableName(IdentifierContext ctx) {
-        return ast( varX(identifier(ctx)), ctx );
+        var name = identifier(ctx);
+        var result = ast( varX(name), ctx );
+        checkInvalidVarName(name, result);
+        return result;
+    }
+
+    private void checkInvalidVarName(String name, ASTNode node) {
+        if( GROOVY_KEYWORDS.contains(name) )
+            collectSyntaxError(new SyntaxException("`" + name + "` is not allowed as an identifier because it is a Groovy keyword", node));
     }
 
     private Statement assignment(AssignmentStatementContext ctx) {
@@ -1067,7 +1073,7 @@ public class ScriptAstBuilder {
 
     private Expression primary(PrimaryContext ctx) {
         if( ctx instanceof IdentifierPrmrAltContext iac )
-            return ast( varX(identifier(iac.identifier())), iac );
+            return ast( variableName(iac.identifier()), iac );
 
         if( ctx instanceof LiteralPrmrAltContext lac )
             return ast( literal(lac.literal()), lac );
@@ -1477,7 +1483,9 @@ public class ScriptAstBuilder {
         var defaultValue = ctx.expression() != null
             ? expression(ctx.expression())
             : null;
-        return ast( param(type, name, defaultValue), ctx );
+        var result = ast( param(type, name, defaultValue), ctx );
+        checkInvalidVarName(name, result);
+        return result;
     }
 
     private org.codehaus.groovy.syntax.Token token(Token token) {
@@ -1719,5 +1727,40 @@ public class ScriptAstBuilder {
     private static final String NAMED_ARGS = "_NAMED_ARGS";
     private static final String PREPEND_COMMENTS = "_PREPEND_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
+
+    private static final List<String> GROOVY_KEYWORDS = List.of(
+        Types.getText(Types.KEYWORD_ABSTRACT),
+        Types.getText(Types.KEYWORD_ASSERT),
+        Types.getText(Types.KEYWORD_BREAK),
+        Types.getText(Types.KEYWORD_CASE),
+        Types.getText(Types.KEYWORD_CLASS),
+        Types.getText(Types.KEYWORD_CONST),
+        Types.getText(Types.KEYWORD_CONTINUE),
+        Types.getText(Types.KEYWORD_DEFAULT),
+        Types.getText(Types.KEYWORD_DO),
+        Types.getText(Types.KEYWORD_EXTENDS),
+        Types.getText(Types.KEYWORD_FINAL),
+        Types.getText(Types.KEYWORD_FINALLY),
+        Types.getText(Types.KEYWORD_FOR),
+        Types.getText(Types.KEYWORD_GOTO),
+        Types.getText(Types.KEYWORD_IMPLEMENTS),
+        Types.getText(Types.KEYWORD_IMPORT),
+        Types.getText(Types.KEYWORD_INTERFACE),
+        Types.getText(Types.KEYWORD_NATIVE),
+        Types.getText(Types.KEYWORD_PACKAGE),
+        Types.getText(Types.KEYWORD_PRIVATE),
+        Types.getText(Types.KEYWORD_PROTECTED),
+        Types.getText(Types.KEYWORD_PUBLIC),
+        Types.getText(Types.KEYWORD_STATIC),
+        Types.getText(Types.KEYWORD_SUPER),
+        Types.getText(Types.KEYWORD_SWITCH),
+        Types.getText(Types.KEYWORD_SYNCHRONIZED),
+        Types.getText(Types.KEYWORD_THIS),
+        Types.getText(Types.KEYWORD_THROWS),
+        Types.getText(Types.KEYWORD_TRANSIENT),
+        Types.getText(Types.KEYWORD_VOID),
+        Types.getText(Types.KEYWORD_VOLATILE),
+        Types.getText(Types.KEYWORD_WHILE)
+    );
 
 }
