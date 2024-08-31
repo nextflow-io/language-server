@@ -173,6 +173,30 @@ public abstract class LanguageService {
 
     // --- REQUESTS
 
+    public List<CallHierarchyItem> prepareCallHierarchy(CallHierarchyPrepareParams params) {
+        var provider = getCallHierarchyProvider();
+        if( provider == null )
+            return Collections.emptyList();
+
+        return provider.prepare(params.getTextDocument(), params.getPosition());
+    }
+
+    public List<CallHierarchyIncomingCall> callHierarchyIncomingCalls(CallHierarchyItem item) {
+        var provider = getCallHierarchyProvider();
+        if( provider == null )
+            return Collections.emptyList();
+
+        return provider.incomingCalls(item);
+    }
+
+    public List<CallHierarchyOutgoingCall> callHierarchyOutgoingCalls(CallHierarchyItem item) {
+        var provider = getCallHierarchyProvider();
+        if( provider == null )
+            return Collections.emptyList();
+
+        return provider.outgoingCalls(item);
+    }
+
     public Either<List<CompletionItem>, CompletionList> completion(CompletionParams params) {
         var provider = getCompletionProvider();
         if( provider == null )
@@ -221,30 +245,6 @@ public abstract class LanguageService {
             return null;
 
         return provider.hover(params.getTextDocument(), params.getPosition());
-    }
-
-    public List<CallHierarchyItem> prepareCallHierarchy(CallHierarchyPrepareParams params) {
-        var provider = getCallHierarchyProvider();
-        if( provider == null )
-            return Collections.emptyList();
-
-        return provider.prepare(params.getTextDocument(), params.getPosition());
-    }
-
-    public List<CallHierarchyIncomingCall> callHierarchyIncomingCalls(CallHierarchyItem item) {
-        var provider = getCallHierarchyProvider();
-        if( provider == null )
-            return Collections.emptyList();
-
-        return provider.incomingCalls(item);
-    }
-
-    public List<CallHierarchyOutgoingCall> callHierarchyOutgoingCalls(CallHierarchyItem item) {
-        var provider = getCallHierarchyProvider();
-        if( provider == null )
-            return Collections.emptyList();
-
-        return provider.outgoingCalls(item);
     }
 
     public List<? extends Location> references(ReferenceParams params) {

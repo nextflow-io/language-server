@@ -646,17 +646,18 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
      * In processes and workflows, variables can be declared without `def`
      * and are treated as variables scoped to the process or workflow.
      *
-     * @param left
+     * @param node
      */
-    void declareAssignedVariable(Expression left) {
-        if( left instanceof TupleExpression ) {
-            for( final el : left.expressions ) {
+    void declareAssignedVariable(Expression node) {
+        if( node instanceof TupleExpression ) {
+            for( final el : node.expressions ) {
                 if( el instanceof VariableExpression )
                     declareAssignedVariable(el)
             }
+            return
         }
 
-        final varX = getAssignmentTargetVariable(left)
+        final varX = getAssignmentTarget(node)
         if( varX == null )
             return
         final name = varX.name
@@ -673,16 +674,16 @@ class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisi
         }
     }
 
-    private VariableExpression getAssignmentTargetVariable(Expression left) {
+    private VariableExpression getAssignmentTarget(Expression node) {
         // e.g. p = 123
-        if( left instanceof VariableExpression )
-            return left
+        if( node instanceof VariableExpression )
+            return node
         // e.g. obj.p = 123
-        if( left instanceof PropertyExpression )
-            return getAssignmentTargetVariable(left.objectExpression)
+        if( node instanceof PropertyExpression )
+            return getAssignmentTarget(node.objectExpression)
         // e.g. list[1] = 123 OR map['a'] = 123
-        if( left instanceof BinaryExpression && left.operation.type == Types.LEFT_SQUARE_BRACKET )
-            return getAssignmentTargetVariable(left.leftExpression)
+        if( node instanceof BinaryExpression && node.operation.type == Types.LEFT_SQUARE_BRACKET )
+            return getAssignmentTarget(node.leftExpression)
         return null
     }
 

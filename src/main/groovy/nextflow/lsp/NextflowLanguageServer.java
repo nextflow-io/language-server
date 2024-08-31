@@ -229,6 +229,47 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     }
 
     @Override
+    public CompletableFuture<List<CallHierarchyItem>> prepareCallHierarchy(CallHierarchyPrepareParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var uri = params.getTextDocument().getUri();
+            log.debug("textDocument/prepareCallHierarchy " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return null;
+            return service.prepareCallHierarchy(params);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<CallHierarchyIncomingCall>> callHierarchyIncomingCalls(CallHierarchyIncomingCallsParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var item = params.getItem();
+            var uri = item.getUri();
+            log.debug("textDocument/callHierarchyIncomingCalls " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return null;
+            return service.callHierarchyIncomingCalls(item);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<CallHierarchyOutgoingCall>> callHierarchyOutgoingCalls(CallHierarchyOutgoingCallsParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var item = params.getItem();
+            var uri = item.getUri();
+            log.debug("textDocument/callHierarchyOutgoingCalls " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return null;
+            return service.callHierarchyOutgoingCalls(item);
+        });
+    }
+
+    @Override
     public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled();
@@ -307,47 +348,6 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             if( service == null )
                 return null;
             return service.hover(params);
-        });
-    }
-
-    @Override
-    public CompletableFuture<List<CallHierarchyItem>> prepareCallHierarchy(CallHierarchyPrepareParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            log.debug("textDocument/prepareCallHierarchy " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return null;
-            return service.prepareCallHierarchy(params);
-        });
-    }
-
-    @Override
-    public CompletableFuture<List<CallHierarchyIncomingCall>> callHierarchyIncomingCalls(CallHierarchyIncomingCallsParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var item = params.getItem();
-            var uri = item.getUri();
-            log.debug("textDocument/callHierarchyIncomingCalls " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return null;
-            return service.callHierarchyIncomingCalls(item);
-        });
-    }
-
-    @Override
-    public CompletableFuture<List<CallHierarchyOutgoingCall>> callHierarchyOutgoingCalls(CallHierarchyOutgoingCallsParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var item = params.getItem();
-            var uri = item.getUri();
-            log.debug("textDocument/callHierarchyOutgoingCalls " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return null;
-            return service.callHierarchyOutgoingCalls(item);
         });
     }
 

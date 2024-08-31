@@ -100,10 +100,10 @@ class ScriptFormattingProvider implements FormattingProvider {
             return Collections.emptyList()
         }
 
-        final sourceUnit = ast.getSourceUnit(uri)
-        if( !sourceUnit.getAST() || ast.hasErrors(uri) )
+        if( !ast.hasAST(uri) || ast.hasErrors(uri) )
             return Collections.emptyList()
 
+        final sourceUnit = ast.getSourceUnit(uri)
         final oldText = sourceUnit.getSource().getReader().getText()
         final range = new Range(new Position(0, 0), Positions.getPosition(oldText, oldText.size()))
         final visitor = new FormattingVisitor(sourceUnit, options, ast)

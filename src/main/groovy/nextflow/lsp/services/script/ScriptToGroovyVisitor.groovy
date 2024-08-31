@@ -110,8 +110,8 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
 
     @Override
     void visitProcess(ProcessNode node) {
-        convertProcessInputs(node.inputs)
-        convertProcessOutputs(node.outputs)
+        visitProcessInputs(node.inputs)
+        visitProcessOutputs(node.outputs)
 
         final when = processWhen(node.when)
         final bodyDef = stmt(createX(
@@ -136,42 +136,36 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
         moduleNode.addStatement(result)
     }
 
-    private void convertProcessInputs(Statement inputs) {
+    private void visitProcessInputs(Statement inputs) {
         if( inputs !instanceof BlockStatement )
             return
         final code = (BlockStatement)inputs
         for( final stmt : code.statements ) {
             final stmtX = (ExpressionStatement)stmt
-            final methodCall = (MethodCallExpression)stmtX.expression
-            convertProcessInput(methodCall)
+            final call = (MethodCallExpression)stmtX.expression
+            final name = call.getMethodAsString()
+            varToConstX(call.getArguments(), name == 'tuple', name == 'each')
+            call.setMethod( constX('_in_' + name) )
         }
     }
 
-    private void convertProcessInput(MethodCallExpression input) {
-        final name = input.getMethodAsString()
-        varToConstX(input.getArguments(), name == 'tuple', name == 'each')
-        input.setMethod( constX('_in_' + name) )
-    }
-
-    private void convertProcessOutputs(Statement outputs) {
+    private void visitProcessOutputs(Statement outputs) {
         if( outputs !instanceof BlockStatement )
             return
         final code = (BlockStatement)outputs
         for( final stmt : code.statements ) {
             final stmtX = (ExpressionStatement)stmt
-            final methodCall = (MethodCallExpression)stmtX.expression
-            convertProcessOutput(methodCall)
+            final call = (MethodCallExpression)stmtX.expression
+            final name = call.getMethodAsString()
+            varToConstX(call.getArguments(), name == 'tuple', name == 'each')
+            call.setMethod( constX('_out_' + name) )
+            visitProcessOutputEmitAndTopic(call)
         }
     }
 
-    private void convertProcessOutput(MethodCallExpression output) {
-        final name = output.getMethodAsString()
-        varToConstX(output.getArguments(), name == 'tuple', name == 'each')
-        output.setMethod( constX('_out_' + name) )
-        convertEmitAndTopicOptions(output)
-    }
+    private static final List<String> EMIT_AND_TOPIC = List.of('emit', 'topic')
 
-    private void convertEmitAndTopicOptions(MethodCallExpression output) {
+    private void visitProcessOutputEmitAndTopic(MethodCallExpression output) {
         final args = isTupleX(output.arguments)?.expressions
         if( !args )
             return
@@ -182,7 +176,7 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
             final entry = map.mapEntryExpressions[i]
             final key = isConstX(entry.keyExpression)
             final value = isVariableX(entry.valueExpression)
-            if( value && key?.text in ['emit', 'topic'] ) {
+            if( value && key?.text in EMIT_AND_TOPIC ) {
                 map.mapEntryExpressions[i] = entryX(key, constX(value.text))
             }
         }
@@ -261,9 +255,9 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
 
     @Override
     void visitWorkflow(WorkflowNode node) {
-        convertWorkflowTakes(node.takes)
-        convertWorkflowEmits(node.emits, node.main)
-        convertWorkflowPublishers(node.publishers, node.main)
+        visitWorkflowTakes(node.takes)
+        visitWorkflowEmits(node.emits, node.main)
+        visitWorkflowPublishers(node.publishers, node.main)
 
         final bodyDef = stmt(createX(
             BodyDef,
@@ -286,7 +280,7 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
         moduleNode.addStatement(result)
     }
 
-    private void convertWorkflowTakes(Statement takes) {
+    private void visitWorkflowTakes(Statement takes) {
         if( takes !instanceof BlockStatement )
             return
         final code = (BlockStatement)takes
@@ -297,7 +291,7 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
         }
     }
 
-    private void convertWorkflowEmits(Statement emits, Statement main) {
+    private void visitWorkflowEmits(Statement emits, Statement main) {
         if( emits !instanceof BlockStatement )
             return
         final mainCode = (BlockStatement)main
@@ -322,7 +316,7 @@ class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVis
         }
     }
 
-    private void convertWorkflowPublishers(Statement publishers, Statement main) {
+    private void visitWorkflowPublishers(Statement publishers, Statement main) {
         if( publishers !instanceof BlockStatement )
             return
         final mainCode = (BlockStatement)main
