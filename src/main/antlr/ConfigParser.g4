@@ -232,10 +232,9 @@ assignmentStatement
 expressionStatement
     :   expression
         (
-            { !SemanticPredicates.isFollowingArgumentsOrClosure($expression.ctx) }?
-            argumentList
+            { SemanticPredicates.isValidDirective($expression.ctx) }? argumentList
         |
-            /* if expression is a method call, no need to have any more arguments */
+            /* only certain expressions can be called as a directive (no parens) */
         )
     ;
 

@@ -728,7 +728,7 @@ public class ConfigAstBuilder {
         if( expression instanceof PropertyExpression pe )
             return propMethodCall(pe, arguments);
 
-        // e.g. m { }, "$m" { }, "m" { }
+        // e.g. m { }, "m" { }
         if( isConstMethodName(expression) )
             return thisMethodCall(expression, arguments);
 
@@ -1033,7 +1033,7 @@ public class ConfigAstBuilder {
         if( caller instanceof PropertyExpression pe )
             return propMethodCall(pe, arguments);
 
-        // e.g. m(), "$m"(), "m"()
+        // e.g. m(), "m"()
         if( isConstMethodName(caller) )
             return thisMethodCall(caller, arguments);
 

@@ -89,38 +89,38 @@ public class SemanticPredicates {
     }
 
     /**
-     * Check whether following a method name of command expression.
-     * Method name should not end with "2: arguments" or "3: closure"
+     * Check whether an expression is allowed to be a method call
+     * without parentheses (i.e. directive).
      *
-     * @param context the preceding expression
+     * @param context
      */
-    public static boolean isFollowingArgumentsOrClosure(nextflow.antlr.ConfigParser.ExpressionContext context) {
-        if (context instanceof nextflow.antlr.ConfigParser.PathExprAltContext)
+    public static boolean isValidDirective(nextflow.antlr.ConfigParser.ExpressionContext context) {
+        if (!(context instanceof nextflow.antlr.ConfigParser.PathExprAltContext))
             return false;
 
         try {
-            var pathExpression = (nextflow.antlr.ConfigParser.PathExprAltContext) context;
-            var pathElement = pathExpression.children.get(0);
-            return pathElement instanceof nextflow.antlr.ConfigParser.ClosurePathExprAltContext || pathElement instanceof nextflow.antlr.ConfigParser.ArgumentsPathExprAltContext;
+            var peac = (nextflow.antlr.ConfigParser.PathExprAltContext) context;
+            var last = peac.getChild(peac.getChildCount() - 1);
+            return last instanceof nextflow.antlr.ConfigParser.IdentifierPrmrAltContext || last instanceof nextflow.antlr.ConfigParser.PropertyPathExprAltContext;
         } catch (IndexOutOfBoundsException | ClassCastException e) {
             throw new GroovyBugError("Unexpected structure of expression context: " + context, e);
         }
     }
 
     /**
-     * Check whether following a method name of command expression.
-     * Method name should not end with "2: arguments" or "3: closure"
+     * Check whether an expression is allowed to be a method call
+     * without parentheses (i.e. directive).
      *
-     * @param context the preceding expression
+     * @param context
      */
-    public static boolean isFollowingArgumentsOrClosure(nextflow.antlr.ScriptParser.ExpressionContext context) {
-        if (context instanceof nextflow.antlr.ScriptParser.PathExprAltContext)
+    public static boolean isValidDirective(nextflow.antlr.ScriptParser.ExpressionContext context) {
+        if (!(context instanceof nextflow.antlr.ScriptParser.PathExprAltContext))
             return false;
 
         try {
-            var pathExpression = (nextflow.antlr.ScriptParser.PathExprAltContext) context;
-            var pathElement = pathExpression.children.get(0);
-            return pathElement instanceof nextflow.antlr.ScriptParser.ClosurePathExprAltContext || pathElement instanceof nextflow.antlr.ScriptParser.ArgumentsPathExprAltContext;
+            var peac = (nextflow.antlr.ScriptParser.PathExprAltContext) context;
+            var last = peac.getChild(peac.getChildCount() - 1);
+            return last instanceof nextflow.antlr.ScriptParser.IdentifierPrmrAltContext || last instanceof nextflow.antlr.ScriptParser.PropertyPathExprAltContext;
         } catch (IndexOutOfBoundsException | ClassCastException e) {
             throw new GroovyBugError("Unexpected structure of expression context: " + context, e);
         }
