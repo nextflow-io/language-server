@@ -19,10 +19,9 @@ import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTUtils
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
-import nextflow.script.v2.ScriptVisitor
+import nextflow.script.v2.ScriptVisitorSupport
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.ClosureExpression
@@ -37,7 +36,7 @@ import org.codehaus.groovy.syntax.SyntaxException
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class MethodCallVisitor extends ClassCodeVisitorSupport implements ScriptVisitor {
+class MethodCallVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit
 

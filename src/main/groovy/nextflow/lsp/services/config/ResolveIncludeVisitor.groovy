@@ -20,9 +20,8 @@ import java.nio.file.Path
 import groovy.transform.CompileStatic
 import nextflow.config.v2.ConfigIncludeNode
 import nextflow.config.v2.ConfigNode
-import nextflow.config.v2.ConfigVisitor
+import nextflow.config.v2.ConfigVisitorSupport
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
@@ -32,7 +31,7 @@ import org.codehaus.groovy.syntax.SyntaxException
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ResolveIncludeVisitor extends ClassCodeVisitorSupport implements ConfigVisitor {
+class ResolveIncludeVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit
 

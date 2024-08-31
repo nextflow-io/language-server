@@ -15,64 +15,22 @@
  */
 package nextflow.script.v2;
 
-import nextflow.script.v2.FeatureFlagNode;
-import nextflow.script.v2.FunctionNode;
-import nextflow.script.v2.IncludeNode;
-import nextflow.script.v2.OutputNode;
-import nextflow.script.v2.ProcessNode;
-import nextflow.script.v2.ScriptNode;
-import nextflow.script.v2.WorkflowNode;
-import org.codehaus.groovy.ast.expr.Expression;
-import org.codehaus.groovy.ast.stmt.Statement;
+import org.codehaus.groovy.ast.GroovyCodeVisitor;
 
-public interface ScriptVisitor {
+public interface ScriptVisitor extends GroovyCodeVisitor {
 
-    default void visit(ScriptNode script) {
-        for( var featureFlag : script.getFeatureFlags() )
-            visitFeatureFlag(featureFlag);
-        for( var includeNode : script.getIncludes() )
-            visitInclude(includeNode);
-        for( var functionNode : script.getFunctions() )
-            visitFunction(functionNode);
-        for( var processNode : script.getProcesses() )
-            visitProcess(processNode);
-        for( var workflowNode : script.getWorkflows() )
-            visitWorkflow(workflowNode);
-        if( script.getOutput() != null )
-            visitOutput(script.getOutput());
-    }
+    void visit(ScriptNode node);
 
-    default void visitFeatureFlag(FeatureFlagNode node) {}
+    void visitFeatureFlag(FeatureFlagNode node);
 
-    default void visitFunction(FunctionNode node) {
-        visit(node.getCode());
-    }
+    void visitInclude(IncludeNode node);
 
-    default void visitInclude(IncludeNode node) {
-        visit(node.source);
-    }
+    void visitWorkflow(WorkflowNode node);
 
-    default void visitProcess(ProcessNode node) {
-        visit(node.directives);
-        visit(node.inputs);
-        visit(node.outputs);
-        visit(node.when);
-        visit(node.exec);
-        visit(node.stub);
-    }
+    void visitProcess(ProcessNode node);
 
-    default void visitWorkflow(WorkflowNode node) {
-        visit(node.takes);
-        visit(node.main);
-        visit(node.emits);
-        visit(node.publishers);
-    }
+    void visitFunction(FunctionNode node);
 
-    default void visitOutput(OutputNode node) {
-        visit(node.body);
-    }
-
-    void visit(Statement node);
-    void visit(Expression node);
+    void visitOutput(OutputNode node);
 
 }

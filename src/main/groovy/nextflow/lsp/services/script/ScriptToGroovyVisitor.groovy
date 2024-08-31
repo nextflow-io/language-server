@@ -31,9 +31,8 @@ import nextflow.script.v2.IncludeNode
 import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
-import nextflow.script.v2.ScriptVisitor
+import nextflow.script.v2.ScriptVisitorSupport
 import nextflow.script.v2.WorkflowNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.EmptyExpression
@@ -58,7 +57,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ScriptToGroovyVisitor extends ClassCodeVisitorSupport implements ScriptVisitor {
+class ScriptToGroovyVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit
 

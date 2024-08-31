@@ -15,43 +15,20 @@
  */
 package nextflow.config.v2;
 
-import nextflow.config.v2.ConfigAssignNode;
-import nextflow.config.v2.ConfigBlockNode;
-import nextflow.config.v2.ConfigIncludeNode;
-import nextflow.config.v2.ConfigIncompleteNode;
-import nextflow.config.v2.ConfigNode;
-import nextflow.config.v2.ConfigStatement;
-import org.codehaus.groovy.ast.ModuleNode;
-import org.codehaus.groovy.ast.expr.Expression;
-import org.codehaus.groovy.ast.stmt.Statement;
+import org.codehaus.groovy.ast.GroovyCodeVisitor;
 
-public interface ConfigVisitor {
+public interface ConfigVisitor extends GroovyCodeVisitor {
 
-    default void visit(ConfigNode moduleNode) {
-        for( var stmt : moduleNode.getConfigStatements() )
-            visit(stmt);
-    }
+    void visit(ConfigNode node);
 
-    default void visit(ConfigStatement node) {
-        node.visit(this);
-    }
+    void visit(ConfigStatement node);
 
-    default void visitConfigAssign(ConfigAssignNode node) {
-        visit(node.value);
-    }
+    void visitConfigAssign(ConfigAssignNode node);
 
-    default void visitConfigBlock(ConfigBlockNode node) {
-        for( var stmt : node.statements )
-            visit(stmt);
-    }
+    void visitConfigBlock(ConfigBlockNode node);
 
-    default void visitConfigInclude(ConfigIncludeNode node) {
-        visit(node.source);
-    }
+    void visitConfigInclude(ConfigIncludeNode node);
 
-    default void visitConfigIncomplete(ConfigIncompleteNode node) {
-    }
-
-    void visit(Expression node);
+    void visitConfigIncomplete(ConfigIncompleteNode node);
 
 }

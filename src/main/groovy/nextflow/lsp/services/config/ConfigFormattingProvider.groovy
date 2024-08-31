@@ -23,14 +23,13 @@ import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
 import nextflow.config.v2.ConfigNode
-import nextflow.config.v2.ConfigVisitor
+import nextflow.config.v2.ConfigVisitorSupport
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.services.CustomFormattingOptions
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Positions
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.ast.expr.BinaryExpression
@@ -111,7 +110,7 @@ class ConfigFormattingProvider implements FormattingProvider {
 }
 
 @CompileStatic
-class FormattingVisitor extends ClassCodeVisitorSupport implements ConfigVisitor {
+class FormattingVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit
 

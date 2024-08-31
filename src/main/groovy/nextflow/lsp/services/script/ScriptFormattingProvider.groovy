@@ -29,10 +29,9 @@ import nextflow.script.v2.IncludeVariable
 import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
-import nextflow.script.v2.ScriptVisitor
+import nextflow.script.v2.ScriptVisitorSupport
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.Parameter
@@ -116,7 +115,7 @@ class ScriptFormattingProvider implements FormattingProvider {
 }
 
 @CompileStatic
-class FormattingVisitor extends ClassCodeVisitorSupport implements ScriptVisitor {
+class FormattingVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit
 

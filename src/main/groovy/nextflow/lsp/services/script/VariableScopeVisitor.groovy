@@ -43,12 +43,11 @@ import nextflow.script.v2.IncludeNode
 import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
-import nextflow.script.v2.ScriptVisitor
+import nextflow.script.v2.ScriptVisitorSupport
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.DynamicVariable
@@ -87,7 +86,7 @@ import org.codehaus.groovy.syntax.Types
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class VariableScopeVisitor extends ClassCodeVisitorSupport implements ScriptVisitor {
+class VariableScopeVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit
 

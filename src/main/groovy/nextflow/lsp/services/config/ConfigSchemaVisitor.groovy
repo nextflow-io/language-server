@@ -21,10 +21,9 @@ import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
 import nextflow.config.v2.ConfigNode
-import nextflow.config.v2.ConfigVisitor
+import nextflow.config.v2.ConfigVisitorSupport
 import nextflow.lsp.compiler.SyntaxWarning
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 
@@ -33,7 +32,7 @@ import org.codehaus.groovy.control.messages.SyntaxErrorMessage
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ConfigSchemaVisitor extends ClassCodeVisitorSupport implements ConfigVisitor {
+class ConfigSchemaVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit
 

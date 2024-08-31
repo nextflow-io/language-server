@@ -21,8 +21,7 @@ import nextflow.config.v2.ConfigAssignNode
 import nextflow.config.v2.ConfigBlockNode
 import nextflow.config.v2.ConfigIncludeNode
 import nextflow.config.v2.ConfigNode
-import nextflow.config.v2.ConfigVisitor
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
+import nextflow.config.v2.ConfigVisitorSupport
 import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.ReturnStatement
@@ -36,7 +35,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ConfigToGroovyVisitor extends ClassCodeVisitorSupport implements ConfigVisitor {
+class ConfigToGroovyVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit
 

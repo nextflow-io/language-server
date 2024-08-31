@@ -21,12 +21,11 @@ import groovy.transform.CompileStatic
 import nextflow.lsp.compiler.SyntaxWarning
 import nextflow.script.dsl.ScriptDsl
 import nextflow.script.v2.FunctionNode
+import nextflow.script.v2.ScriptExpressionTransformer
 import nextflow.script.v2.ScriptNode
-import nextflow.script.v2.ScriptVisitor
+import nextflow.script.v2.ScriptVisitorSupport
 import org.codehaus.groovy.GroovyBugError
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassCodeExpressionTransformer
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.DynamicVariable
@@ -55,7 +54,7 @@ import static groovy.lang.Tuple.tuple
 import static org.codehaus.groovy.ast.tools.ClosureUtils.getParametersSafe
 
 @CompileStatic
-class ResolveVisitor extends ClassCodeExpressionTransformer implements ScriptVisitor {
+class ResolveVisitor extends ScriptExpressionTransformer {
 
     static final String[] DEFAULT_IMPORTS = [ 'java.lang.', 'java.util.', 'java.io.', 'java.net.', 'groovy.lang.', 'groovy.util.' ]
     static final String[] EMPTY_STRING_ARRAY = new String[0]
@@ -415,7 +414,7 @@ class ResolveVisitor extends ClassCodeExpressionTransformer implements ScriptVis
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage)
     }
 
-    private class DynamicVariablesVisitor extends ClassCodeVisitorSupport implements ScriptVisitor {
+    private class DynamicVariablesVisitor extends ScriptVisitorSupport {
 
         @Override
         protected SourceUnit getSourceUnit() {

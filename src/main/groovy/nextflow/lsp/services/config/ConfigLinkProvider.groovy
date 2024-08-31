@@ -20,11 +20,10 @@ import java.nio.file.Path
 import groovy.transform.CompileStatic
 import nextflow.config.v2.ConfigIncludeNode
 import nextflow.config.v2.ConfigNode
-import nextflow.config.v2.ConfigVisitor
+import nextflow.config.v2.ConfigVisitorSupport
 import nextflow.lsp.services.LinkProvider
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.LanguageServerUtils
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.control.SourceUnit
 import org.eclipse.lsp4j.DocumentLink
@@ -67,7 +66,7 @@ class ConfigLinkProvider implements LinkProvider {
 }
 
 @CompileStatic
-class ConfigLinkVisitor extends ClassCodeVisitorSupport implements ConfigVisitor {
+class ConfigLinkVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit
 

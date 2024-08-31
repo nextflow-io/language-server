@@ -20,9 +20,8 @@ import java.nio.file.Path
 import groovy.transform.CompileStatic
 import nextflow.script.v2.IncludeNode
 import nextflow.script.v2.ScriptNode
-import nextflow.script.v2.ScriptVisitor
+import nextflow.script.v2.ScriptVisitorSupport
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
 
@@ -31,7 +30,7 @@ import org.codehaus.groovy.syntax.SyntaxException
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @CompileStatic
-class ResolveIncludeVisitor extends ClassCodeVisitorSupport implements ScriptVisitor {
+class ResolveIncludeVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit
 
