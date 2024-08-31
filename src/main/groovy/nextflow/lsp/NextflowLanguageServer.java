@@ -111,8 +111,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private LanguageClient client = null;
 
     private Map<String, String> workspaceRoots = new HashMap<>();
-    private Map<String, LanguageService> configServices = new HashMap<>();
     private Map<String, LanguageService> scriptServices = new HashMap<>();
+    private Map<String, LanguageService> configServices = new HashMap<>();
 
     private List<String> excludePatterns;
     private boolean harshilAlignment;
@@ -406,8 +406,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 count++;
 
                 var uri = workspaceRoots.get(name);
-                configServices.get(name).initialize(uri, this.excludePatterns, this.suppressWarnings);
                 scriptServices.get(name).initialize(uri, this.excludePatterns, this.suppressWarnings);
+                configServices.get(name).initialize(uri, this.excludePatterns, this.suppressWarnings);
             }
 
             progressEnd(progressToken);
@@ -449,16 +449,16 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var name = workspaceFolder.getName();
             log.debug("workspace/didChangeWorkspaceFolders remove " + name);
             workspaceRoots.remove(name);
-            configServices.remove(name).clearDiagnostics();
             scriptServices.remove(name).clearDiagnostics();
+            configServices.remove(name).clearDiagnostics();
         }
         for( var workspaceFolder : event.getAdded() ) {
             var name = workspaceFolder.getName();
             var uri = workspaceFolder.getUri();
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
             addWorkspaceFolder(name, uri);
-            configServices.get(name).initialize(uri, excludePatterns, suppressWarnings);
             scriptServices.get(name).initialize(uri, excludePatterns, suppressWarnings);
+            configServices.get(name).initialize(uri, excludePatterns, suppressWarnings);
         }
     }
 
@@ -494,13 +494,13 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private void addWorkspaceFolder(String name, String uri) {
         workspaceRoots.put(name, uri);
 
-        var configService = new ConfigService();
-        configService.connect(client);
-        configServices.put(name, configService);
-
         var scriptService = new ScriptService();
         scriptService.connect(client);
         scriptServices.put(name, scriptService);
+
+        var configService = new ConfigService();
+        configService.connect(client);
+        configServices.put(name, configService);
     }
 
     private String relativePath(String uri) {
