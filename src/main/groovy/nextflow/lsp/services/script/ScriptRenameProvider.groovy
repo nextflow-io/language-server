@@ -60,7 +60,7 @@ class ScriptRenameProvider implements RenameProvider {
 
         // built-in names can't be renamed
         final defNode = ASTUtils.getDefinition(offsetNode, false, ast)
-        if( !ast.getURI(defNode) )
+        if( !defNode || !ast.getURI(defNode) )
             return null
 
         final oldName = getOldName(defNode)
@@ -68,7 +68,7 @@ class ScriptRenameProvider implements RenameProvider {
             return null
 
         final Map<String,List<TextEdit>> changes = [:]
-        final references = ASTUtils.getReferences(offsetNode, ast, true, true)
+        final references = ASTUtils.getReferences(defNode, ast, true, true)
         for( final refNode : references ) {
             final refUri = ast.getURI(refNode).toString()
             if( !changes.containsKey(refUri) )
