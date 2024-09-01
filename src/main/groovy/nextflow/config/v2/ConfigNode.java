@@ -13,29 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.v2
+package nextflow.config.v2;
 
-import groovy.transform.CompileStatic
-import org.codehaus.groovy.ast.ModuleNode
-import org.codehaus.groovy.control.SourceUnit
+import java.util.ArrayList;
+import java.util.List;
+
+import org.codehaus.groovy.ast.ModuleNode;
+import org.codehaus.groovy.control.SourceUnit;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class ConfigNode extends ModuleNode {
-    private List<ConfigStatement> configStatements = []
+public class ConfigNode extends ModuleNode {
 
-    ConfigNode(SourceUnit sourceUnit) {
-        super(sourceUnit)
+    private List<ConfigStatement> configStatements = new ArrayList<>();
+
+    public ConfigNode(SourceUnit sourceUnit) {
+        super(sourceUnit);
     }
 
-    List<ConfigStatement> getConfigStatements() {
-        return configStatements
+    public List<ConfigStatement> getConfigStatements() {
+        return configStatements;
     }
 
-    void addConfigStatement(ConfigStatement statement) {
-        configStatements.add(statement)
+    public void addConfigStatement(ConfigStatement statement) {
+        configStatements.add(statement);
     }
 }

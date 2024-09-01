@@ -15,22 +15,33 @@
  */
 package nextflow.lsp.ast;
 
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import groovy.lang.groovydoc.Groovydoc;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTUtils;
+import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
+import nextflow.script.dsl.Function;
+import nextflow.script.dsl.Operator;
+import nextflow.script.dsl.OutputDsl;
+import nextflow.script.dsl.ProcessDirectiveDsl;
+import nextflow.script.dsl.ProcessInputDsl;
+import nextflow.script.dsl.ProcessOutputDsl;
 import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
+import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.FieldNode;
+import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
@@ -49,14 +60,8 @@ public class ASTNodeStringUtils {
         if( node instanceof FeatureFlagNode ffn )
             return toString(ffn);
 
-        if( node instanceof FunctionNode fn )
-            return toString(fn, ast);
-
-        if( node instanceof ProcessNode pn )
-            return toString(pn, ast);
-
-        if( node instanceof WorkflowNode wn )
-            return toString(wn, ast);
+        if( node instanceof MethodNode mn )
+            return toString(mn, ast);
 
         if( node instanceof Variable var )
             return toString(var, ast);
@@ -81,8 +86,22 @@ public class ASTNodeStringUtils {
         return builder.toString();
     }
 
-    public static String toString(FunctionNode node, ASTNodeCache ast) {
-        var label = (String) node.getNodeMetaData("type.label");
+    public static String toString(MethodNode node, ASTNodeCache ast) {
+        if( node instanceof WorkflowNode wn ) {
+            var builder = new StringBuilder();
+            builder.append("workflow ");
+            builder.append(wn.isEntry() ? "<entry>" : wn.getName());
+            return builder.toString();
+        }
+
+        if( node instanceof ProcessNode pn ) {
+            var builder = new StringBuilder();
+            builder.append("process ");
+            builder.append(pn.getName());
+            return builder.toString();
+        }
+
+        var label = getMethodTypeLabel(node);
         if( label != null ) {
             var builder = new StringBuilder();
             builder.append("(");
@@ -106,24 +125,27 @@ public class ASTNodeStringUtils {
         return builder.toString();
     }
 
+    private static String getMethodTypeLabel(MethodNode mn) {
+        if( mn instanceof FunctionNode )
+            return null;
+        if( findAnnotation(mn, Operator.class).isPresent() )
+            return "operator";
+        var type = mn.getDeclaringClass().getTypeClass();
+        if( type == ProcessDirectiveDsl.class )
+            return "process directive";
+        if( type == ProcessInputDsl.class )
+            return "process input";
+        if( type == ProcessOutputDsl.class )
+            return "process output";
+        if( type == OutputDsl.class )
+            return "output directive";
+        return null;
+    }
+
     public static String toString(Parameter[] params, ASTNodeCache ast) {
         return Stream.of(params)
             .map(param -> toString(param, ast))
             .collect(Collectors.joining(", "));
-    }
-
-    public static String toString(ProcessNode node, ASTNodeCache ast) {
-        var builder = new StringBuilder();
-        builder.append("process ");
-        builder.append(node.getName());
-        return builder.toString();
-    }
-
-    public static String toString(WorkflowNode node, ASTNodeCache ast) {
-        var builder = new StringBuilder();
-        builder.append("workflow ");
-        builder.append(node.getName() != null ? node.getName() : "<entry>");
-        return builder.toString();
     }
 
     public static String toString(Variable variable, ASTNodeCache ast) {
@@ -144,9 +166,7 @@ public class ASTNodeStringUtils {
             return getFeatureFlagDescription(ffn);
 
         if( node instanceof FunctionNode fn )
-            return fn.documentation != null
-                ? fn.documentation
-                : groovydocToMarkdown(fn.getGroovydoc());
+            return groovydocToMarkdown(fn.getGroovydoc());
 
         if( node instanceof ProcessNode pn )
             return groovydocToMarkdown(pn.getGroovydoc());
@@ -154,8 +174,11 @@ public class ASTNodeStringUtils {
         if( node instanceof WorkflowNode wn )
             return groovydocToMarkdown(wn.getGroovydoc());
 
-        if( node instanceof AnnotatedNode an )
-            return groovydocToMarkdown(an.getGroovydoc());
+        if( node instanceof FieldNode fn )
+            return getAnnotationDescription(fn, Constant.class);
+
+        if( node instanceof MethodNode mn )
+            return getAnnotationDescription(mn, Function.class);
 
         return null;
     }
@@ -168,6 +191,21 @@ public class ASTNodeStringUtils {
                 return StringGroovyMethods.stripIndent(annot.description(), true).trim();
         }
         throw new IllegalStateException();
+    }
+
+    private static String getAnnotationDescription(AnnotatedNode node, Class type) {
+        return findAnnotation(node, type)
+            .map((an) -> {
+                var description = an.getMember("value").getText();
+                return StringGroovyMethods.stripIndent(description, true).trim();
+            })
+            .orElse((String) null);
+    }
+
+    private static Optional<AnnotationNode> findAnnotation(AnnotatedNode node, Class type) {
+        return node.getAnnotations().stream()
+            .filter(an -> an.getClassNode().getName().equals(type.getName()))
+            .findFirst();
     }
 
     private static String groovydocToMarkdown(Groovydoc groovydoc) {

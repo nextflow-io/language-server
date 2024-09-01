@@ -81,9 +81,9 @@ class ConfigSchema {
         new nextflow.config.scopes.WaveSpackConfig(),
     ]
 
-    static final Map<String, ConfigScope> SCOPES = getConfigScopes()
+    public static final Map<String, ConfigScope> SCOPES = getConfigScopes()
 
-    static final Map<String, String> OPTIONS = getConfigOptions()
+    public static final Map<String, String> OPTIONS = getConfigOptions()
 
     private static Map<String, ConfigScope> getConfigScopes() {
         final Map<String, ConfigScope> result = [:]
