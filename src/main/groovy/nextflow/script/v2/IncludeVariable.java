@@ -39,6 +39,13 @@ public class IncludeVariable extends ASTNode implements Variable {
         this(name, null);
     }
 
+    @Override
+    public String getText() {
+        return alias != null
+            ? name + " as " + alias
+            : name;
+    }
+
     private MethodNode method;
 
     public void setMethod(MethodNode method) {

@@ -69,6 +69,7 @@ import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.ReferenceParams;
+import org.eclipse.lsp4j.RenameParams;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.SetTraceParams;
 import org.eclipse.lsp4j.SymbolInformation;
@@ -78,6 +79,7 @@ import org.eclipse.lsp4j.WorkDoneProgressBegin;
 import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
 import org.eclipse.lsp4j.WorkDoneProgressEnd;
 import org.eclipse.lsp4j.WorkDoneProgressReport;
+import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.WorkspaceFoldersOptions;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceSymbol;
@@ -151,6 +153,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         serverCapabilities.setDocumentSymbolProvider(true);
         serverCapabilities.setHoverProvider(true);
         serverCapabilities.setReferencesProvider(true);
+        serverCapabilities.setRenameProvider(true);
         serverCapabilities.setWorkspaceSymbolProvider(true);
 
         var initializeResult = new InitializeResult(serverCapabilities);
@@ -362,6 +365,20 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             if( service == null )
                 return Collections.emptyList();
             return service.references(params);
+        });
+    }
+
+    @Override
+    public CompletableFuture<WorkspaceEdit> rename(RenameParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var uri = params.getTextDocument().getUri();
+            var position = params.getPosition();
+            log.debug(String.format("textDocument/rename %s [ %d, %d ] -> %s", relativePath(uri), position.getLine(), position.getCharacter(), params.getNewName()));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return null;
+            return service.rename(params);
         });
     }
 

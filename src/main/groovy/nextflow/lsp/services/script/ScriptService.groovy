@@ -28,6 +28,7 @@ import nextflow.lsp.services.HoverProvider
 import nextflow.lsp.services.LanguageService
 import nextflow.lsp.services.LinkProvider
 import nextflow.lsp.services.ReferenceProvider
+import nextflow.lsp.services.RenameProvider
 import nextflow.lsp.services.SymbolProvider
 import nextflow.script.v2.ScriptParserPluginFactory
 import org.codehaus.groovy.control.CompilerConfiguration
@@ -109,6 +110,11 @@ class ScriptService extends LanguageService {
     @Override
     protected ReferenceProvider getReferenceProvider() {
         new ScriptReferenceProvider(astCache)
+    }
+
+    @Override
+    protected RenameProvider getRenameProvider() {
+        new ScriptRenameProvider(astCache)
     }
 
     @Override

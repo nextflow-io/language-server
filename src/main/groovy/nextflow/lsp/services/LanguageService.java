@@ -64,8 +64,10 @@ import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.eclipse.lsp4j.ReferenceParams;
+import org.eclipse.lsp4j.RenameParams;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextEdit;
+import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -103,6 +105,7 @@ public abstract class LanguageService {
     protected HoverProvider getHoverProvider() { return null; }
     protected LinkProvider getLinkProvider() { return null; }
     protected ReferenceProvider getReferenceProvider() { return null; }
+    protected RenameProvider getRenameProvider() { return null; }
     protected SymbolProvider getSymbolProvider() { return null; }
 
     public void initialize(String rootUri, List<String> excludes, boolean suppressWarnings) {
@@ -253,6 +256,14 @@ public abstract class LanguageService {
             return Collections.emptyList();
 
         return provider.references(params.getTextDocument(), params.getPosition(), params.getContext().isIncludeDeclaration());
+    }
+
+    public WorkspaceEdit rename(RenameParams params) {
+        var provider = getRenameProvider();
+        if( provider == null )
+            return null;
+
+        return provider.rename(params.getTextDocument(), params.getPosition(), params.getNewName());
     }
 
     public List<? extends SymbolInformation> symbol(WorkspaceSymbolParams params) {
