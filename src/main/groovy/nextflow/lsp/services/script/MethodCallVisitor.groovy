@@ -23,10 +23,17 @@ import nextflow.script.v2.ScriptVisitorSupport
 import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.MethodNode
-import org.codehaus.groovy.ast.expr.ArgumentListExpression
+import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.ClosureExpression
+import org.codehaus.groovy.ast.expr.ConstantExpression
+import org.codehaus.groovy.ast.expr.Expression
+import org.codehaus.groovy.ast.expr.MapExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
+import org.codehaus.groovy.ast.expr.PropertyExpression
+import org.codehaus.groovy.ast.expr.TupleExpression
+import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.BlockStatement
+import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
 
@@ -90,7 +97,7 @@ class MethodCallVisitor extends ScriptVisitorSupport {
             addError("${defNode instanceof ProcessNode ? 'Processes' : 'Workflows'} cannot be called from within a closure", node)
             return
         }
-        final argsCount = ((ArgumentListExpression) node.arguments).size()
+        final argsCount = ((TupleExpression) node.arguments).size()
         final paramsCount = getNumberOfParameters(defNode)
         if( argsCount != paramsCount )
             addError("Incorrect number of call arguments, expected ${paramsCount} but received ${argsCount}", node)
@@ -120,6 +127,86 @@ class MethodCallVisitor extends ScriptVisitorSupport {
         inClosure = true
         super.visitClosureExpression(node)
         inClosure = ic
+    }
+
+    @Override
+    void visitPropertyExpression(PropertyExpression node) {
+        final mn = asOutputProperty(node)
+        if( mn instanceof ProcessNode )
+            checkProcessOut(node, mn)
+        else if( mn instanceof WorkflowNode )
+            checkWorkflowOut(node, mn)
+        else
+            super.visitPropertyExpression(node)
+    }
+
+    private MethodNode asOutputProperty(PropertyExpression node) {
+        if( node.getObjectExpression() instanceof PropertyExpression ) {
+            final pe = (PropertyExpression) node.getObjectExpression()
+            if( pe.getObjectExpression() instanceof VariableExpression && pe.getPropertyAsString() == 'out' ) {
+                final defNode = ASTUtils.getDefinition(pe.getObjectExpression(), false, astCache)
+                if( defNode instanceof MethodNode )
+                    return defNode
+            }
+        }
+        return null
+    }
+
+    private void checkProcessOut(PropertyExpression node, ProcessNode process) {
+        final property = node.getPropertyAsString()
+        if( process.outputs instanceof BlockStatement ) {
+            final block = (BlockStatement) process.outputs
+            for( final stmt : block.statements ) {
+                final stmtX = (ExpressionStatement)stmt
+                final call = (MethodCallExpression)stmtX.expression
+                if( property == getProcessEmitName(call) )
+                    return
+            }
+        }
+        addError("Unrecognized output `${property}` for process `${process.getName()}`", node)
+    }
+
+    private String getProcessEmitName(MethodCallExpression output) {
+        if( output.arguments !instanceof TupleExpression )
+            return null
+        final args = (TupleExpression) output.arguments
+        if( args.size() == 0 || args.getExpression(0) !instanceof MapExpression )
+            return null
+        final namedArgs = (MapExpression) args.getExpression(0)
+        return namedArgs.mapEntryExpressions.stream()
+            .filter(entry -> ((ConstantExpression) entry.keyExpression).text == 'emit')
+            .findFirst()
+            .map((entry) -> {
+                entry.valueExpression instanceof VariableExpression
+                    ? ((VariableExpression) entry.valueExpression).name
+                    : null
+            })
+            .orElse(null)
+    }
+
+    private void checkWorkflowOut(PropertyExpression node, WorkflowNode workflow) {
+        final property = node.getPropertyAsString()
+        if( workflow.emits instanceof BlockStatement ) {
+            final block = (BlockStatement) workflow.emits
+            for( final stmt : block.statements ) {
+                final stmtX = (ExpressionStatement)stmt
+                final emit = stmtX.expression
+                if( property == getWorkflowEmitName(emit) )
+                    return
+            }
+        }
+        addError("Unrecognized output `${property}` for workflow `${workflow.getName()}`", node)
+    }
+
+    private String getWorkflowEmitName(Expression emit) {
+        if( emit instanceof VariableExpression ) {
+            return emit.name
+        }
+        else if( emit instanceof BinaryExpression ) {
+            final left = (VariableExpression)emit.leftExpression
+            return left.name
+        }
+        return null
     }
 
     @Override
