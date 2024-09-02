@@ -17,6 +17,7 @@ package nextflow.lsp.services.script
 
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTUtils
+import nextflow.script.dsl.Operator
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
 import nextflow.script.v2.ScriptVisitorSupport
@@ -36,6 +37,7 @@ import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
+import org.codehaus.groovy.syntax.Types
 
 /**
  * Validate process and workflow invocations.
@@ -127,6 +129,39 @@ class MethodCallVisitor extends ScriptVisitorSupport {
         inClosure = true
         super.visitClosureExpression(node)
         inClosure = ic
+    }
+
+    @Override
+    void visitBinaryExpression(BinaryExpression node) {
+        if( node.getOperation().getType() == Types.PIPE ) {
+            checkPipeline(node)
+        }
+
+        super.visitBinaryExpression(node)
+    }
+
+    private void checkPipeline(BinaryExpression node) {
+        final lhs = node.leftExpression
+        final rhs = node.rightExpression
+
+        if( lhs instanceof VariableExpression ) {
+            final defNode = ASTUtils.getDefinition(lhs, false, astCache)
+            if( defNode instanceof MethodNode )
+                addError("Invalid pipe expression -- left-hand side cannot be a callable", lhs)
+        }
+
+        if( rhs instanceof MethodCallExpression ) {
+            final defNode = ASTUtils.getMethodFromCallExpression(rhs, astCache)
+            if( defNode != null && !isOperator(defNode) )
+                addError("Invalid pipe expression -- only operators can be curried", rhs)
+        }
+    }
+
+    private boolean isOperator(MethodNode mn) {
+        return mn.getAnnotations().stream()
+            .filter(an -> an.getClassNode().getTypeClass() == Operator)
+            .findFirst()
+            .isPresent()
     }
 
     @Override
