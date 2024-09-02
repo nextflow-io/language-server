@@ -43,7 +43,7 @@ class ScriptReferenceProvider implements ReferenceProvider {
     @Override
     List<? extends Location> references(TextDocumentIdentifier textDocument, Position position, boolean includeDeclaration) {
         if( ast == null ) {
-            log.error("ast cache is empty while providing hover hint")
+            log.error("ast cache is empty while providing references")
             return Collections.emptyList()
         }
 

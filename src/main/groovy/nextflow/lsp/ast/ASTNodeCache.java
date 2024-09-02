@@ -30,13 +30,13 @@ import nextflow.lsp.compiler.SyntaxWarning;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Positions;
-import nextflow.lsp.util.Ranges;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.util.Ranges;
 
 /**
  * Cache the AST for each compiled source file for
@@ -80,7 +80,7 @@ public abstract class ASTNodeCache {
         var sources = compiler.compile(uris, fileCache);
 
         for( var uri : uris ) {
-            // remove any existing cache entries
+            // remove cache entries for source file
             var nodes = nodesByURI.remove(uri);
             if( nodes != null ) {
                 for( var node : nodes )
@@ -95,8 +95,9 @@ public abstract class ASTNodeCache {
             }
 
             // update cache
-            var parents = getParents(sourceUnit);
             sourcesByUri.put(uri, sourceUnit);
+
+            var parents = visitAST(sourceUnit);
             nodesByURI.put(uri, parents.keySet());
 
             for( var key : parents.keySet() ) {
@@ -119,7 +120,13 @@ public abstract class ASTNodeCache {
         return errorsByUri;
     }
 
-    protected abstract Map<ASTNode, ASTNode> getParents(SourceUnit sourceUnit);
+    /**
+     * Visit the AST of a source file and retrieve the set of relevant
+     * nodes and their corresponding parents.
+     *
+     * @param sourceUnit
+     */
+    protected abstract Map<ASTNode, ASTNode> visitAST(SourceUnit sourceUnit);
 
     /**
      * Get the list of source units for all cached files.
@@ -199,6 +206,16 @@ public abstract class ASTNodeCache {
     }
 
     /**
+     * Get the file that contains an ast node.
+     *
+     * @param node
+     */
+    public URI getURI(ASTNode node) {
+        var lookupData = lookup.get(node);
+        return lookupData != null ? lookupData.uri : null;
+    }
+
+    /**
      * Get the most specific ast node at a given location in a file.
      *
      * @param uri
@@ -213,24 +230,26 @@ public abstract class ASTNodeCache {
             return null;
 
         return nodes.stream()
-            .filter(node -> {
+            .filter((node) -> {
                 if( node.getLineNumber() == -1 )
                     return false;
                 var range = LanguageServerUtils.astNodeToRange(node);
-                if( !Ranges.contains(range, position) )
+                if( !Ranges.containsPosition(range, position) )
                     return false;
                 nodeToRange.put(node, range);
                 return true;
             })
             .sorted((n1, n2) -> {
-                // select node with higher start position
-                var cmp1 = Positions.COMPARATOR.compare(nodeToRange.get(n1).getStart(), nodeToRange.get(n2).getStart());
-                if( cmp1 != 0 )
-                    return -cmp1;
-                // select node with lower end position
-                var cmp2 = Positions.COMPARATOR.compare(nodeToRange.get(n1).getEnd(), nodeToRange.get(n2).getEnd());
-                if( cmp2 != 0 )
-                    return cmp2;
+                // select node with later start position
+                var p1 = nodeToRange.get(n1);
+                var p2 = nodeToRange.get(n2);
+                var cmpStart = Positions.COMPARATOR.compare(p1.getStart(), p2.getStart());
+                if( cmpStart != 0 )
+                    return -cmpStart;
+                // select node with earlier end position
+                var cmpEnd = Positions.COMPARATOR.compare(p1.getEnd(), p2.getEnd());
+                if( cmpEnd != 0 )
+                    return cmpEnd;
                 // select the most descendant node
                 if( contains(n1, n2) )
                     return 1;
@@ -260,25 +279,13 @@ public abstract class ASTNodeCache {
     }
 
     /**
-     * Get the parent of a given ast node.
-     *
-     * @param child
-     */
-    public ASTNode getParent(ASTNode child) {
-        if( child == null )
-            return null;
-        var lookupData = lookup.get(child);
-        return lookupData != null ? lookupData.parent : null;
-    }
-
-    /**
      * Determine whether an ast node is a direct or indirect
      * parent of another node.
      *
      * @param ancestor
      * @param descendant
      */
-    public boolean contains(ASTNode ancestor, ASTNode descendant) {
+    protected boolean contains(ASTNode ancestor, ASTNode descendant) {
         ASTNode current = getParent(descendant);
         while( current != null ) {
             if( current.equals(ancestor) )
@@ -289,13 +296,15 @@ public abstract class ASTNodeCache {
     }
 
     /**
-     * Get the file that contains an ast node.
+     * Get the parent of a given ast node.
      *
-     * @param node
+     * @param child
      */
-    public URI getURI(ASTNode node) {
-        var lookupData = lookup.get(node);
-        return lookupData != null ? lookupData.uri : null;
+    public ASTNode getParent(ASTNode child) {
+        if( child == null )
+            return null;
+        var lookupData = lookup.get(child);
+        return lookupData != null ? lookupData.parent : null;
     }
 
     private static record LookupData(

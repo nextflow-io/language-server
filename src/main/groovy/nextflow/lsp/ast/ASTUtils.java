@@ -105,7 +105,7 @@ public class ASTUtils {
         if( defNode == null )
             return Collections.emptyIterator();
         return ast.getNodes().stream()
-            .filter(otherNode -> {
+            .filter((otherNode) -> {
                 if( otherNode.getLineNumber() == -1 || otherNode.getColumnNumber() == -1 )
                     return false;
                 if( defNode == otherNode )
@@ -183,7 +183,7 @@ public class ASTUtils {
      */
     public static Iterator<FieldNode> getFieldsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
         return classNode.getFields().stream()
-            .filter(fieldNode -> {
+            .filter((fieldNode) -> {
                 if( !fieldNode.isPublic() )
                     return false;
                 return isStatic ? fieldNode.isStatic() : !fieldNode.isStatic();
@@ -199,7 +199,7 @@ public class ASTUtils {
      */
     public static Iterator<MethodNode> getMethodsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
         return classNode.getMethods().stream()
-            .filter(methodNode -> {
+            .filter((methodNode) -> {
                 if( !methodNode.isPublic() )
                     return false;
                 return isStatic ? methodNode.isStatic() : !methodNode.isStatic();

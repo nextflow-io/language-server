@@ -45,7 +45,7 @@ class ScriptDefinitionProvider implements DefinitionProvider {
     @Override
     Either<List<? extends Location>, List<? extends LocationLink>> definition(TextDocumentIdentifier textDocument, Position position) {
         if( ast == null ) {
-            log.error("ast cache is empty while providing hover hint")
+            log.error("ast cache is empty while providing definition")
             return Either.forLeft(Collections.emptyList())
         }
 

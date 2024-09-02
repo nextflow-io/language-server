@@ -98,7 +98,8 @@ public class ConfigAstCache extends ASTNodeCache {
         return errorsByUri;
     }
 
-    protected Map<ASTNode, ASTNode> getParents(SourceUnit sourceUnit) {
+    @Override
+    protected Map<ASTNode, ASTNode> visitAST(SourceUnit sourceUnit) {
         var visitor = new Visitor(sourceUnit);
         visitor.visit();
         return visitor.getLookup().getParents();

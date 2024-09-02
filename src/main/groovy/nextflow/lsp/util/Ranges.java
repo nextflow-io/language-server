@@ -19,19 +19,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 
-import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
 public class Ranges {
-
-    public static boolean contains(Range range, Position position) {
-        return Positions.COMPARATOR.compare(position, range.getStart()) >= 0
-            && Positions.COMPARATOR.compare(position, range.getEnd()) <= 0;
-    }
-
-    public static boolean intersect(Range r1, Range r2) {
-        return contains(r1, r2.getStart()) || contains(r1, r2.getEnd());
-    }
 
     public static String getSubstring(String string, Range range) {
         return getSubstring(string, range, 0);

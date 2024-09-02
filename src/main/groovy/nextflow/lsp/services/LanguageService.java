@@ -85,10 +85,10 @@ public abstract class LanguageService {
     private static Logger log = Logger.getInstance();
 
     private LanguageClient client;
+
     private FileCache fileCache = new FileCache();
+
     private DebouncingExecutor updateExecutor;
-    private volatile boolean initialized;
-    private boolean suppressWarnings;
 
     public LanguageService() {
         this.updateExecutor = new DebouncingExecutor(DEBOUNCE_MILLIS, (key) -> update());
@@ -105,10 +105,14 @@ public abstract class LanguageService {
     protected ReferenceProvider getReferenceProvider() { return null; }
     protected SymbolProvider getSymbolProvider() { return null; }
 
+    private volatile boolean initialized;
+
+    private volatile boolean suppressWarnings;
+
     public void initialize(String rootUri, List<String> excludes, boolean suppressWarnings) {
-        this.suppressWarnings = suppressWarnings;
         synchronized (this) {
             this.initialized = false;
+            this.suppressWarnings = suppressWarnings;
 
             var uris = rootUri != null
                 ? getWorkspaceFiles(rootUri, excludes)
