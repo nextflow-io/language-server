@@ -28,6 +28,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.Compiler;
@@ -223,6 +227,7 @@ public abstract class LanguageService {
         if( provider == null )
             return Collections.emptyList();
 
+        awaitUpdate();
         return provider.documentLink(params.getTextDocument());
     }
 
@@ -231,6 +236,7 @@ public abstract class LanguageService {
         if( provider == null )
             return Collections.emptyList();
 
+        awaitUpdate();
         return provider.documentSymbol(params.getTextDocument());
     }
 
@@ -269,7 +275,14 @@ public abstract class LanguageService {
 
     // --- INTERNAL
 
+    private Lock updateLock = new ReentrantLock();
+
+    private Condition updateCondition = updateLock.newCondition();
+
+    private volatile boolean awaitingUpdate;
+
     protected void updateLater() {
+        awaitingUpdate = true;
         updateExecutor.submit(DEBOUNCE_KEY);
     }
 
@@ -277,19 +290,42 @@ public abstract class LanguageService {
         updateExecutor.executeNow(DEBOUNCE_KEY);
     }
 
+    protected void awaitUpdate() {
+        if( !awaitingUpdate )
+            return;
+
+        updateLock.lock();
+        try {
+            updateCondition.await(DEBOUNCE_MILLIS * 2, TimeUnit.MILLISECONDS);
+        }
+        catch( InterruptedException e ) {
+        }
+        finally {
+            updateLock.unlock();
+        }
+    }
+
     /**
      * Re-compile any changed files.
      */
     protected void update() {
         synchronized (this) {
-            if( !initialized )
-                return;
+            if( initialized ) {
+                var uris = fileCache.removeChangedFiles();
 
-            var uris = fileCache.removeChangedFiles();
+                log.debug("update " + DefaultGroovyMethods.join(uris, " , "));
+                var errors = getAstCache().update(uris, fileCache);
+                publishDiagnostics(errors);
+            }
+        }
 
-            log.debug("update " + DefaultGroovyMethods.join(uris, " , "));
-            var errors = getAstCache().update(uris, fileCache);
-            publishDiagnostics(errors);
+        updateLock.lock();
+        try {
+            updateCondition.signalAll();
+            awaitingUpdate = false;
+        }
+        finally {
+            updateLock.unlock();
         }
     }
 
