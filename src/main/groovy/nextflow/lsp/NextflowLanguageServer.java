@@ -145,8 +145,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         serverCapabilities.setCompletionProvider(completionOptions);
         serverCapabilities.setDefinitionProvider(true);
         serverCapabilities.setDocumentFormattingProvider(true);
-        var documentLinkOptions = new DocumentLinkOptions();
-        documentLinkOptions.setResolveProvider(false);
+        var documentLinkOptions = new DocumentLinkOptions(false);
         serverCapabilities.setDocumentLinkProvider(documentLinkOptions);
         serverCapabilities.setDocumentSymbolProvider(true);
         serverCapabilities.setHoverProvider(true);
@@ -274,6 +273,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled();
             var uri = params.getTextDocument().getUri();
+            var position = params.getPosition();
+            log.debug(String.format("textDocument/completion %s [ %d, %d ]", relativePath(uri), position.getLine(), position.getCharacter()));
             var service = getLanguageService(uri);
             if( service == null )
                 return Either.forLeft(Collections.emptyList());

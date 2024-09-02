@@ -23,11 +23,8 @@ import nextflow.lsp.ast.ASTUtils
 import nextflow.lsp.services.CompletionProvider
 import nextflow.lsp.util.LanguageServerUtils
 import nextflow.lsp.util.Logger
-import nextflow.script.dsl.Constant
-import nextflow.script.dsl.DslScope
 import nextflow.script.dsl.FeatureFlag
 import nextflow.script.dsl.FeatureFlagDsl
-import nextflow.script.dsl.Function
 import nextflow.script.dsl.ScriptDsl
 import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.OutputNode
@@ -345,10 +342,6 @@ class ScriptCompletionProvider implements CompletionProvider {
         populateItemsFromMethods(methods, namePrefix, existingNames, items)
     }
 
-    static private final ClassNode DSL_SCOPE_TYPE = new ClassNode(DslScope)
-    static private final ClassNode DSL_CONSTANT_TYPE = new ClassNode(Constant)
-    static private final ClassNode DSL_FUNCTION_TYPE = new ClassNode(Function)
-
     private void populateItemsFromFields(Iterator<FieldNode> fields, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
         for( final field : fields ) {
             final name = field.getName()
@@ -360,13 +353,9 @@ class ScriptCompletionProvider implements CompletionProvider {
             item.setLabel(field.getName())
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(field))
 
-            if( field.getDeclaringClass().implementsAnyInterfaces(DSL_SCOPE_TYPE) ) {
-                final annot = field.getAnnotations().find(an -> an.getClassNode() == DSL_CONSTANT_TYPE)
-                if( !annot )
-                    continue
-                final documentation = annot.getMember('value').getText().stripIndent(true).trim()
+            final documentation = ASTNodeStringUtils.getDocumentation(field)
+            if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
-            }
 
             if( Logger.isDebugEnabled() )
                 item.setDetail(field.getDeclaringClass().getNameWithoutPackage())
@@ -387,18 +376,9 @@ class ScriptCompletionProvider implements CompletionProvider {
             item.setLabel(method.getName())
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(method))
 
-            if( method instanceof FunctionNode || method instanceof ProcessNode || method instanceof WorkflowNode ) {
-                final documentation = ASTNodeStringUtils.getDocumentation(method)
-                if( documentation != null )
-                    item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
-            }
-            else if( method.getDeclaringClass().implementsAnyInterfaces(DSL_SCOPE_TYPE) ) {
-                final annot = method.getAnnotations().find(an -> an.getClassNode() == DSL_FUNCTION_TYPE)
-                if( !annot )
-                    continue
-                final documentation = annot.getMember('value').getText().stripIndent(true).trim()
+            final documentation = ASTNodeStringUtils.getDocumentation(method)
+            if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
-            }
 
             if( Logger.isDebugEnabled() )
                 item.setDetail(method.getDeclaringClass().getNameWithoutPackage())
