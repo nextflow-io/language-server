@@ -23,8 +23,8 @@ import groovy.lang.groovydoc.Groovydoc;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTUtils;
 import nextflow.script.dsl.Constant;
+import nextflow.script.dsl.DslType;
 import nextflow.script.dsl.FeatureFlag;
-import nextflow.script.dsl.FeatureFlagDsl;
 import nextflow.script.dsl.Function;
 import nextflow.script.dsl.Operator;
 import nextflow.script.dsl.OutputDsl;
@@ -162,8 +162,10 @@ public class ASTNodeStringUtils {
     }
 
     public static String getDocumentation(ASTNode node) {
-        if( node instanceof FeatureFlagNode ffn )
-            return getFeatureFlagDescription(ffn);
+        if( node instanceof FeatureFlagNode ffn ) {
+            if( ffn.accessedVariable instanceof AnnotatedNode an )
+                return annotationValueToMarkdown(an, FeatureFlag.class, "description");
+        }
 
         if( node instanceof FunctionNode fn )
             return groovydocToMarkdown(fn.getGroovydoc());
@@ -174,32 +176,29 @@ public class ASTNodeStringUtils {
         if( node instanceof WorkflowNode wn )
             return groovydocToMarkdown(wn.getGroovydoc());
 
+        if( node instanceof ClassNode cn )
+            return annotationValueToMarkdown(cn, DslType.class);
+
         if( node instanceof FieldNode fn )
-            return getAnnotationDescription(fn, Constant.class);
+            return annotationValueToMarkdown(fn, Constant.class);
 
         if( node instanceof MethodNode mn )
-            return getAnnotationDescription(mn, Function.class);
+            return annotationValueToMarkdown(mn, Function.class);
 
         return null;
     }
 
-    private static String getFeatureFlagDescription(FeatureFlagNode node) {
-        var clazz = FeatureFlagDsl.class;
-        for( var field : clazz.getDeclaredFields() ) {
-            var annot = field.getAnnotation(FeatureFlag.class);
-            if( annot != null && annot.name().equals(node.name) )
-                return StringGroovyMethods.stripIndent(annot.description(), true).trim();
-        }
-        throw new IllegalStateException();
-    }
-
-    private static String getAnnotationDescription(AnnotatedNode node, Class type) {
+    private static String annotationValueToMarkdown(AnnotatedNode node, Class type, String member) {
         return findAnnotation(node, type)
             .map((an) -> {
-                var description = an.getMember("value").getText();
+                var description = an.getMember(member).getText();
                 return StringGroovyMethods.stripIndent(description, true).trim();
             })
             .orElse((String) null);
+    }
+
+    private static String annotationValueToMarkdown(AnnotatedNode node, Class type) {
+        return annotationValueToMarkdown(node, type, "value");
     }
 
     private static Optional<AnnotationNode> findAnnotation(AnnotatedNode node, Class type) {

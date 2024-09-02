@@ -64,21 +64,21 @@ class ScriptHoverProvider implements HoverProvider {
             return null
 
         final offsetNode = nodeTree.first()
-        final definitionNode = ASTUtils.getDefinition(offsetNode, false, ast)
-        final label = ASTNodeStringUtils.getLabel(definitionNode, ast)
-        final detail = ASTNodeStringUtils.getDocumentation(definitionNode)
+        final defNode = ASTUtils.getDefinition(offsetNode, false, ast)
 
         final builder = new StringBuilder()
 
+        final label = ASTNodeStringUtils.getLabel(defNode, ast)
         if( label != null ) {
             builder.append('```groovy\n')
             builder.append(label)
             builder.append('\n```')
         }
 
-        if( detail != null ) {
+        final documentation = ASTNodeStringUtils.getDocumentation(defNode)
+        if( documentation != null ) {
             builder.append('\n\n---\n\n')
-            builder.append(detail)
+            builder.append(documentation)
         }
 
         if( Logger.isDebugEnabled() ) {

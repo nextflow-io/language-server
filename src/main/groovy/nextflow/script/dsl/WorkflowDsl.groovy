@@ -18,7 +18,7 @@ package nextflow.script.dsl
 import groovy.transform.CompileStatic
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
-import nextflow.Channel
+import nextflow.script.types.Channel
 import nextflow.script.ChannelOut
 
 @CompileStatic

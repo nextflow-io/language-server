@@ -136,17 +136,19 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     @Override
     public void visitFeatureFlag(FeatureFlagNode node) {
         var cn = ClassHelper.makeCached(FeatureFlagDsl.class);
-        for( var fn : cn.getFields() ) {
-            var an = findAnnotation(fn, FeatureFlag.class).orElse(null);
-            if( an == null )
-                continue;
-            var name = an.getMember("name").getText();
-            if( name.equals(node.name) ) {
-                node.accessedVariable = fn;
-                return;
-            }
-        }
-        addError("Unrecognized feature flag '" + node.name + "'", node);
+        var result = cn.getFields().stream()
+            .filter(fn ->
+                findAnnotation(fn, FeatureFlag.class)
+                    .map(an -> an.getMember("name").getText())
+                    .map(name -> name.equals(node.name))
+                    .orElse(false)
+            )
+            .findFirst();
+
+        if( result.isPresent() )
+            node.accessedVariable = result.get();
+        else
+            addError("Unrecognized feature flag '" + node.name + "'", node);
     }
 
     @Override

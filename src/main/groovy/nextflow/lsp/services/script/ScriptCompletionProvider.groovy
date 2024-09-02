@@ -299,7 +299,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             //              ^
             final namePrefix = offsetNode.getType().getNameWithoutPackage()
             log.debug "completion constructor call -- '${namePrefix}'"
-            populateTypes(namePrefix, new HashSet<>(), items)
+            populateTypes(namePrefix, items)
         }
         else if( offsetNode instanceof PropertyExpression ) {
             // e.g. "foo.bar. "
@@ -405,7 +405,7 @@ class ScriptCompletionProvider implements CompletionProvider {
             populateExternalWorkflows(namePrefix, items)
         }
 
-        populateTypes(namePrefix, existingNames, items)
+        populateTypes(namePrefix, items)
     }
 
     private void populateItemsFromScope0(VariableScope scope, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
@@ -508,22 +508,21 @@ class ScriptCompletionProvider implements CompletionProvider {
         return new TextEdit(range, newText)
     }
 
-    private void populateTypes(String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
+    private void populateTypes(String namePrefix, List<CompletionItem> items) {
         // add built-in types
-        populateTypes0(ScriptDsl.TYPES, namePrefix, existingNames, items)
+        populateTypes0(ScriptDsl.TYPES, namePrefix, items)
     }
 
-    private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
+    private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, List<CompletionItem> items) {
         for( final classNode : classNodes ) {
-            final classNameWithoutPackage = classNode.getNameWithoutPackage()
-            final className = classNode.getName()
-            if( !classNameWithoutPackage.startsWith(namePrefix) || existingNames.contains(className) )
-                continue
-            existingNames.add(className)
-
             final item = new CompletionItem()
-            item.setLabel(classNameWithoutPackage)
+            item.setLabel(classNode.getNameWithoutPackage())
             item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(classNode))
+
+            final documentation = ASTNodeStringUtils.getDocumentation(classNode)
+            if( documentation != null )
+                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
+
             if( !addItem(item, items) )
                 break
         }
