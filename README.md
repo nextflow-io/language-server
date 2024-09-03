@@ -9,6 +9,7 @@ The following language features are currently supported:
 - diagnostics (errors, warnings)
 - formatting
 - hover hints
+- rename
 
 ## Build
 

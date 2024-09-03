@@ -98,9 +98,8 @@ public class ASTUtils {
      * @param node
      * @param ast
      * @param includeDeclaration
-     * @param includeIncludes
      */
-    public static Iterator<ASTNode> getReferences(ASTNode node, ASTNodeCache ast, boolean includeDeclaration, boolean includeIncludes) {
+    public static Iterator<ASTNode> getReferences(ASTNode node, ASTNodeCache ast, boolean includeDeclaration) {
         var defNode = getDefinition(node, true, ast);
         if( defNode == null )
             return Collections.emptyIterator();
@@ -110,8 +109,6 @@ public class ASTUtils {
                     return false;
                 if( defNode == otherNode )
                     return includeDeclaration;
-                if( !includeIncludes && otherNode instanceof IncludeVariable )
-                    return false;
                 return defNode == getDefinition(otherNode, false, ast);
             })
             .iterator();

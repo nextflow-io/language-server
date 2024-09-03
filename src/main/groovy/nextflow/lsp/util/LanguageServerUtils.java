@@ -40,22 +40,37 @@ import org.eclipse.lsp4j.SymbolKind;
  */
 public class LanguageServerUtils {
 
-    public static Position createGroovyPosition(int groovyLine, int groovyColumn) {
-        int lspLine = groovyLine > 0 ? groovyLine - 1 : groovyLine;
-        int lspColumn = groovyColumn > 0 ? groovyColumn - 1 : groovyColumn;
-        return new Position(lspLine, lspColumn);
+    public static int groovyToLspLine(int groovyLine) {
+        return groovyLine != -1 ? groovyLine - 1 : -1;
+    }
+
+    public static int groovyToLspCharacter(int groovyColumn) {
+        return groovyColumn > 0 ? groovyColumn - 1 : 0;
+    }
+
+    public static Position groovyToLspPosition(int groovyLine, int groovyColumn) {
+        int lspLine = groovyToLspLine(groovyLine);
+        if( lspLine == -1 )
+            return null;
+        return new Position(
+                lspLine,
+                groovyToLspCharacter(groovyColumn));
     }
 
     public static Range syntaxExceptionToRange(SyntaxException exception) {
         return new Range(
-                createGroovyPosition(exception.getStartLine(), exception.getStartColumn()),
-                createGroovyPosition(exception.getEndLine(), exception.getEndColumn()));
+                groovyToLspPosition(exception.getStartLine(), exception.getStartColumn()),
+                groovyToLspPosition(exception.getEndLine(), exception.getEndColumn()));
     }
 
     public static Range astNodeToRange(ASTNode node) {
-        return new Range(
-                createGroovyPosition(node.getLineNumber(), node.getColumnNumber()),
-                createGroovyPosition(node.getLastLineNumber(), node.getLastColumnNumber()));
+        var start = groovyToLspPosition(node.getLineNumber(), node.getColumnNumber());
+        if( start == null )
+            return null;
+        var end = groovyToLspPosition(node.getLastLineNumber(), node.getLastColumnNumber());
+        if( end == null )
+            end = start;
+        return new Range(start, end);
     }
 
     public static CompletionItemKind astNodeToCompletionItemKind(ASTNode node) {
@@ -97,30 +112,42 @@ public class LanguageServerUtils {
     }
 
     public static Location astNodeToLocation(ASTNode node, URI uri) {
-        return new Location(uri.toString(), astNodeToRange(node));
+        var range = astNodeToRange(node);
+        if( range == null )
+            return null;
+        return new Location(uri.toString(), range);
     }
 
     public static SymbolInformation astNodeToSymbolInformation(ClassNode node, URI uri) {
+        var location = astNodeToLocation(node, uri);
+        if( location == null )
+            return null;
         return new SymbolInformation(
                 node.getName(),
                 astNodeToSymbolKind(node),
-                astNodeToLocation(node, uri),
+                location,
                 null);
     }
 
     public static SymbolInformation astNodeToSymbolInformation(MethodNode node, URI uri) {
+        var location = astNodeToLocation(node, uri);
+        if( location == null )
+            return null;
         return new SymbolInformation(
                 node.getName(),
                 astNodeToSymbolKind(node),
-                astNodeToLocation(node, uri),
+                location,
                 null);
     }
 
     public static SymbolInformation astNodeToSymbolInformation(WorkflowNode node, URI uri) {
+        var location = astNodeToLocation(node, uri);
+        if( location == null )
+            return null;
         return new SymbolInformation(
                 node.getName() != null ? node.getName() : "<entry>",
                 astNodeToSymbolKind(node),
-                astNodeToLocation(node, uri),
+                location,
                 null);
     }
 
@@ -128,10 +155,13 @@ public class LanguageServerUtils {
         if( !(node instanceof ASTNode) )
             return null;
 
+        var location = astNodeToLocation((ASTNode) node, uri);
+        if( location == null )
+            return null;
         return new SymbolInformation(
                 node.getName(),
                 astNodeToSymbolKind((ASTNode) node),
-                astNodeToLocation((ASTNode) node, uri),
+                location,
                 parentName);
     }
 

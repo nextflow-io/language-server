@@ -27,6 +27,7 @@ import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
+import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.control.SourceUnit
 import org.eclipse.lsp4j.CallHierarchyIncomingCall
 import org.eclipse.lsp4j.CallHierarchyItem
@@ -120,9 +121,11 @@ class ScriptCallHierarchyProvider implements CallHierarchyProvider {
         if( !offsetNode )
             return Collections.emptyList()
 
-        final references = ASTUtils.getReferences(offsetNode, ast, false, false)
+        final references = ASTUtils.getReferences(offsetNode, ast, false)
         final Map<MethodNode, List<Range>> referencesMap = [:]
         for( final refNode : references ) {
+            if( !(refNode instanceof ConstantExpression || refNode instanceof VariableExpression) )
+                continue
             final fromNode = getTopLevelNode(refNode)
             if( !referencesMap.containsKey(fromNode) )
                 referencesMap.put(fromNode, [])

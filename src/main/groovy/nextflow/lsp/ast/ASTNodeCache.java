@@ -307,6 +307,50 @@ public abstract class ASTNodeCache {
         return lookupData != null ? lookupData.parent : null;
     }
 
+    /**
+     * Get the source text for an AST node.
+     *
+     * @param node
+     * @param leadingIndent
+     * @param maxLines
+     */
+    public String getSourceText(ASTNode node, boolean leadingIndent, int maxLines) {
+        var uri = getURI(node);
+        if( uri == null )
+            return null;
+        var sourceUnit = getSourceUnit(uri);
+        if( sourceUnit == null )
+            return null;
+        var builder = new StringBuilder();
+        var first = node.getLineNumber();
+        var last = node.getLastLineNumber();
+        var firstCol = node.getColumnNumber();
+        var lastCol = node.getLastColumnNumber();
+        if( maxLines != -1 && first + maxLines < last )
+            last = first + maxLines;
+        for( int i = first; i <= last; i++ ) {
+            var line = sourceUnit.getSource().getLine(i, null);
+
+            if( i == first && leadingIndent ) {
+                int k = 0;
+                while( k < line.length() && line.charAt(k) == ' ' )
+                    k++;
+                builder.append( line.substring(0, k) );
+            }
+
+            var begin = (i == first) ? firstCol - 1 : 0;
+            var end = (i == last) ? lastCol - 1 : line.length();
+            builder.append( line.substring(begin, end) );
+            builder.append('\n');
+        }
+
+        return builder.toString();
+    }
+
+    public String getSourceText(ASTNode node) {
+        return getSourceText(node, true, -1);
+    }
+
     private static record LookupData(
         URI uri,
         ASTNode parent

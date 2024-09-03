@@ -30,10 +30,6 @@ public class Positions {
             : a.getCharacter() - b.getCharacter();
     };
 
-    public static boolean isValid(Position p) {
-        return p.getLine() >= 0 || p.getCharacter() >= 0;
-    }
-
     /**
      * Map a two-dimensional position (line and character) to a
      * one-dimensional index in a string buffer.
