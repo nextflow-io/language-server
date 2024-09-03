@@ -798,7 +798,7 @@ public class ScriptAstBuilder {
         if ( isAssignmentLhsValid(left) )
             return stmt(ast( binX(left, token(ctx.op), expression(ctx.right)), ctx ));
 
-        throw createParsingFailedException("The left-hand side of an assignment should be a variable or a property expression", ctx);
+        throw createParsingFailedException("The left-hand side of an assignment should be either a variable or an index or property expression", ctx);
     }
 
     private boolean isAssignmentLhsValid(Expression left) {
