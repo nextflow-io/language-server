@@ -502,7 +502,7 @@ public class ScriptAstBuilder {
                 collectSyntaxError(new SyntaxException("Entry workflow cannot have outputs", emits));
         }
 
-        var result = ast( new WorkflowNode(name, takes, emits, publishers, main), ctx );
+        var result = ast( new WorkflowNode(name, takes, main, emits, publishers), ctx );
         groovydocManager.handle(result, ctx);
         return result;
     }
@@ -532,7 +532,7 @@ public class ScriptAstBuilder {
                 stmtX.setExpression(EmptyExpression.INSTANCE);
             }
         }
-        return new WorkflowNode(null, takes, emits, publishers, main);
+        return new WorkflowNode(null, takes, main, emits, publishers);
     }
 
     private Statement workflowTakes(WorkflowTakesContext ctx) {

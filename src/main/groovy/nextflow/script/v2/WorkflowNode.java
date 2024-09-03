@@ -27,16 +27,16 @@ import org.codehaus.groovy.ast.stmt.Statement;
  */
 public class WorkflowNode extends MethodNode {
     public final Statement takes;
+    public final Statement main;
     public final Statement emits;
     public final Statement publishers;
-    public final Statement main;
 
-    public WorkflowNode(String name, Statement takes, Statement emits, Statement publishers, Statement main) {
+    public WorkflowNode(String name, Statement takes, Statement main, Statement emits, Statement publishers) {
         super(name, 0, null, Parameter.EMPTY_ARRAY, ClassNode.EMPTY_ARRAY, EmptyStatement.INSTANCE);
         this.takes = takes;
+        this.main = main;
         this.emits = emits;
         this.publishers = publishers;
-        this.main = main;
     }
 
     public boolean isEntry() {
