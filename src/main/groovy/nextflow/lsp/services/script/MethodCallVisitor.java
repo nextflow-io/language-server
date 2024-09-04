@@ -168,15 +168,18 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
     }
 
     private String getProcessEmitName(MethodCallExpression output) {
-        if( !(output.getArguments() instanceof TupleExpression) )
-            return null;
-        var args = ((TupleExpression) output.getArguments()).getExpressions();
-        if( args.size() == 0 || !(args.get(0) instanceof MapExpression) )
-            return null;
-        var namedArgs = (MapExpression) args.get(0);
-        return namedArgs.getMapEntryExpressions().stream()
-            .filter(entry -> "emit".equals(((ConstantExpression) entry.getKeyExpression()).getText()))
-            .findFirst()
+        return Optional.of(output)
+            .flatMap(call -> Optional.ofNullable(
+                call.getArguments() instanceof TupleExpression te ? te.getExpressions() : null
+            ))
+            .flatMap(args -> Optional.ofNullable(
+                args.size() > 0 && args.get(0) instanceof MapExpression me ? me : null
+            ))
+            .flatMap(namedArgs ->
+                namedArgs.getMapEntryExpressions().stream()
+                    .filter(entry -> "emit".equals(entry.getKeyExpression().getText()))
+                    .findFirst()
+            )
             .flatMap(entry -> 
                 entry.getValueExpression() instanceof VariableExpression ve
                     ? Optional.of(ve.getName())
