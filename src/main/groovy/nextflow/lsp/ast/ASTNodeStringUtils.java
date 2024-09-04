@@ -194,7 +194,7 @@ public class ASTNodeStringUtils {
                 var description = an.getMember(member).getText();
                 return StringGroovyMethods.stripIndent(description, true).trim();
             })
-            .orElse((String) null);
+            .orElse(null);
     }
 
     private static String annotationValueToMarkdown(AnnotatedNode node, Class type) {
