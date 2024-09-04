@@ -49,7 +49,6 @@ import nextflow.script.v2.ScriptNode;
 import nextflow.script.v2.ScriptVisitorSupport;
 import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -80,6 +79,8 @@ import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Types;
+
+import static nextflow.script.v2.ASTHelpers.*;
 
 /**
  * Initialize the variable scopes for an AST.
@@ -160,8 +161,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         currentDefinition = node;
         node.setVariableScope(currentScope);
 
-        if( node.takes instanceof BlockStatement block )
-            declareWorkflowInputs(block);
+        declareWorkflowInputs(node.takes);
 
         visit(node.main);
         if( node.main instanceof BlockStatement block )
@@ -258,8 +258,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         return ClassHelper.dynamicType();
     }
 
-    private void declareWorkflowInputs(BlockStatement block) {
-        for( var stmt : block.getStatements() ) {
+    private void declareWorkflowInputs(Statement takes) {
+        for( var stmt : asBlockStatements(takes) ) {
             var varX = asVarX(stmt);
             if( varX == null )
                 continue;
@@ -273,8 +273,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         currentDefinition = node;
         node.setVariableScope(currentScope);
 
-        if( node.inputs instanceof BlockStatement block )
-            declareProcessInputs(block);
+        declareProcessInputs(node.inputs);
 
         pushState(ProcessInputDsl.class);
         checkDirectives(node.inputs, "process input qualifier");
@@ -304,23 +303,22 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         popState();
     }
 
-    private void declareProcessInputs(BlockStatement block) {
-        for( var stmt : block.getStatements() ) {
+    private void declareProcessInputs(Statement inputs) {
+        for( var stmt : asBlockStatements(inputs) ) {
             var call = asMethodCallX(stmt);
             if( call == null )
                 continue;
             if( "tuple".equals(call.getMethodAsString()) ) {
-                var args = (TupleExpression) call.getArguments();
-                for( var arg : args ) {
+                for( var arg : asMethodCallArguments(call) ) {
                     if( arg instanceof MethodCallExpression mce )
                         declareProcessInput(mce);
                 }
             }
             else if( "each".equals(call.getMethodAsString()) ) {
-                var args = (TupleExpression) call.getArguments();
-                if( args.getExpressions().size() != 1 )
+                var args = asMethodCallArguments(call);
+                if( args.size() != 1 )
                     continue;
-                var firstArg = args.getExpression(0);
+                var firstArg = args.get(0);
                 if( firstArg instanceof MethodCallExpression mce )
                     declareProcessInput(mce);
                 else if( firstArg instanceof VariableExpression ve )
@@ -337,23 +335,18 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void declareProcessInput(MethodCallExpression call) {
         if( !DECLARING_INPUT_TYPES.contains(call.getMethodAsString()) )
             return;
-        var args = (TupleExpression) call.getArguments();
-        var argsCount = args.getExpressions().size();
-        if( argsCount == 0 )
+        var args = asMethodCallArguments(call);
+        if( args.isEmpty() )
             return;
-        if( args.getExpression(argsCount - 1) instanceof VariableExpression ve )
+        if( args.get(args.size() - 1) instanceof VariableExpression ve )
             declare(ve);
     }
 
     private void checkDirectives(Statement node, String typeLabel, boolean checkSyntaxErrors) {
-        if( !(node instanceof BlockStatement) )
-            return;
-        var block = (BlockStatement) node;
-        for( var stmt : block.getStatements() ) {
+        for( var stmt : asBlockStatements(node) ) {
             var call = asMethodCallX(stmt);
-            if( call == null ) {
-                if( checkSyntaxErrors )
-                    addError("Invalid " + typeLabel, stmt);
+            if( checkSyntaxErrors && call == null ) {
+                addError("Invalid " + typeLabel, stmt);
                 continue;
             }
             var name = call.getMethodAsString();
@@ -415,17 +408,13 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void visitOutputBody(BlockStatement block) {
         block.setVariableScope(currentScope);
 
-        for( var stmt : block.getStatements() ) {
-            var call = asMethodCallX(stmt);
-            if( call == null )
-                continue;
-
+        asDirectives(block).forEach((call) -> {
             // treat as regular directive
             var name = call.getMethodAsString();
             var variable = findClassMember(currentScope.getClassScope(), name, call.getMethod());
             if( variable != null ) {
                 visit(call);
-                continue;
+                return;
             }
 
             // treat as target definition
@@ -435,21 +424,17 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                 checkDirectives(code, "output target directive", true);
                 visitTargetBody(code);
                 popState();
-                continue;
+                return;
             }
 
-            addError("Invalid output directive `" + name + "`", stmt);
-        }
+            addError("Invalid output directive `" + name + "`", call);
+        });
     }
 
     private void visitTargetBody(BlockStatement block) {
         block.setVariableScope(currentScope);
 
-        for( var stmt : block.getStatements() ) {
-            var call = asMethodCallX(stmt);
-            if( call == null )
-                continue;
-
+        asDirectives(block).forEach((call) -> {
             // treat as index definition
             var name = call.getMethodAsString();
             if( "index".equals(name) ) {
@@ -460,13 +445,13 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                     checkDirectives(code, "output index directive", true);
                     visit(code);
                     popState();
-                    continue;
+                    return;
                 }
             }
 
             // treat as regular directive
             visit(call);
-        }
+        });
     }
 
     // statements
@@ -774,12 +759,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         return null;
     }
 
-    private Optional<AnnotationNode> findAnnotation(AnnotatedNode node, Class type) {
-        return node.getAnnotations().stream()
-            .filter(an -> an.getClassNode().getName().equals(type.getName()))
-            .findFirst();
-    }
-
     private Variable wrapMethodAsVariable(MethodNode mn, ClassNode cn) {
         var fn = new FieldNode(mn.getName(), mn.getModifiers() & 0xF, ClassHelper.dynamicType(), cn, null);
         fn.setHasNoRealSourcePosition(true);
@@ -789,36 +768,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         pn.putNodeMetaData("access.method", mn);
         pn.setDeclaringClass(cn);
         return pn;
-    }
-
-    private BlockStatement asDslBlock(MethodCallExpression call, int paramsCount) {
-        var args = (TupleExpression) call.getArguments();
-        var argsCount = args.getExpressions().size();
-        if( argsCount != paramsCount )
-            return null;
-        var lastArg = args.getExpression(argsCount - 1);
-        if( !(lastArg instanceof ClosureExpression) )
-            return null;
-        var closure = (ClosureExpression) lastArg;
-        return (BlockStatement) closure.getCode();
-    }
-
-    private MethodCallExpression asMethodCallX(Statement stmt) {
-        if( !(stmt instanceof ExpressionStatement) )
-            return null;
-        var stmtX = (ExpressionStatement) stmt;
-        if( !(stmtX.getExpression() instanceof MethodCallExpression) )
-            return null;
-        return (MethodCallExpression) stmtX.getExpression();
-    }
-
-    private VariableExpression asVarX(Statement stmt) {
-        if( !(stmt instanceof ExpressionStatement) )
-            return null;
-        var stmtX = (ExpressionStatement) stmt;
-        if( !(stmtX.getExpression() instanceof VariableExpression) )
-            return null;
-        return (VariableExpression) stmtX.getExpression();
     }
 
     @Override

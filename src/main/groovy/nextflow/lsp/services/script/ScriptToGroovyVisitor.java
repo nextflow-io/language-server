@@ -51,7 +51,7 @@ import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
 
-import static nextflow.ast.ASTHelpers.*;
+import static nextflow.script.v2.ASTHelpers.*;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
 /**
@@ -141,48 +141,32 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
     }
 
     private void visitProcessInputs(Statement inputs) {
-        if( !(inputs instanceof BlockStatement) )
-            return;
-        var code = (BlockStatement)inputs;
-        for( var stmt : code.getStatements() ) {
-            var stmtX = (ExpressionStatement)stmt;
-            var call = (MethodCallExpression)stmtX.getExpression();
+        asDirectives(inputs).forEach((call) -> {
             var name = call.getMethodAsString();
             varToConstX(call.getArguments(), "tuple".equals(name), "each".equals(name));
             call.setMethod( constX("_in_" + name) );
-        }
+        });
     }
 
     private void visitProcessOutputs(Statement outputs) {
-        if( !(outputs instanceof BlockStatement) )
-            return;
-        var code = (BlockStatement)outputs;
-        for( var stmt : code.getStatements() ) {
-            var stmtX = (ExpressionStatement)stmt;
-            var call = (MethodCallExpression)stmtX.getExpression();
+        asDirectives(outputs).forEach((call) -> {
             var name = call.getMethodAsString();
             varToConstX(call.getArguments(), "tuple".equals(name), "each".equals(name));
             call.setMethod( constX("_out_" + name) );
             visitProcessOutputEmitAndTopic(call);
-        }
+        });
     }
 
     private static final List<String> EMIT_AND_TOPIC = List.of("emit", "topic");
 
     private void visitProcessOutputEmitAndTopic(MethodCallExpression output) {
-        var args = isTupleX(output.getArguments());
-        if( args == null )
-            return;
-        var namedArgs = isMapX(args.getExpression(0));
-        if( namedArgs == null )
-            return;
-        var mapEntryExpressions = namedArgs.getMapEntryExpressions();
-        for( int i = 0; i < mapEntryExpressions.size(); i++ ) {
-            var entry = mapEntryExpressions.get(i);
-            var key = isConstX(entry.getKeyExpression());
-            var value = isVariableX(entry.getValueExpression());
+        var namedArgs = asNamedArgs(output);
+        for( int i = 0; i < namedArgs.size(); i++ ) {
+            var entry = namedArgs.get(i);
+            var key = asConstX(entry.getKeyExpression());
+            var value = asVarX(entry.getValueExpression());
             if( value != null && key != null && EMIT_AND_TOPIC.contains(key.getText()) ) {
-                mapEntryExpressions.set(i, entryX(key, constX(value.getText())));
+                namedArgs.set(i, entryX(key, constX(value.getText())));
             }
         }
     }
@@ -283,10 +267,7 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
     }
 
     private void visitWorkflowTakes(Statement takes) {
-        if( !(takes instanceof BlockStatement) )
-            return;
-        var code = (BlockStatement)takes;
-        for( var stmt : code.getStatements() ) {
+        for( var stmt : asBlockStatements(takes) ) {
             var stmtX = (ExpressionStatement)stmt;
             var take = (VariableExpression)stmtX.getExpression();
             stmtX.setExpression(callThisX("_take_", args(constX(take.getName()))));
@@ -294,11 +275,8 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
     }
 
     private void visitWorkflowEmits(Statement emits, Statement main) {
-        if( !(emits instanceof BlockStatement) )
-            return;
-        var mainCode = (BlockStatement)main;
-        var emitCode = (BlockStatement)emits;
-        for( var stmt : emitCode.getStatements() ) {
+        var code = (BlockStatement)main;
+        for( var stmt : asBlockStatements(emits) ) {
             var stmtX = (ExpressionStatement)stmt;
             var emit = stmtX.getExpression();
             if( emit instanceof VariableExpression ve ) {
@@ -307,27 +285,24 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
             else if( emit instanceof BinaryExpression be ) {
                 var left = (VariableExpression)be.getLeftExpression();
                 stmtX.setExpression(callThisX("_emit_", args(constX(left.getName()))));
-                mainCode.addStatement(stmtX);
+                code.addStatement(stmtX);
             }
             else {
                 var target = varX("$out");
-                mainCode.addStatement(assignS(target, emit));
+                code.addStatement(assignS(target, emit));
                 stmtX.setExpression(callThisX("_emit_", args(constX(target.getName()))));
-                mainCode.addStatement(stmtX);
+                code.addStatement(stmtX);
             }
         }
     }
 
     private void visitWorkflowPublishers(Statement publishers, Statement main) {
-        if( !(publishers instanceof BlockStatement) )
-            return;
-        var mainCode = (BlockStatement)main;
-        var publishCode = (BlockStatement)publishers;
-        for( var stmt : publishCode.getStatements() ) {
+        var code = (BlockStatement)main;
+        for( var stmt : asBlockStatements(publishers) ) {
             var stmtX = (ExpressionStatement)stmt;
             var publish = (BinaryExpression)stmtX.getExpression();
             stmtX.setExpression(callThisX("_publish_target", args(publish.getLeftExpression(), publish.getRightExpression())));
-            mainCode.addStatement(stmtX);
+            code.addStatement(stmtX);
         }
     }
 

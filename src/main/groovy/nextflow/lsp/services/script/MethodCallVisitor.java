@@ -28,17 +28,15 @@ import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.expr.BinaryExpression;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
-import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
-import org.codehaus.groovy.ast.expr.MapExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
-import org.codehaus.groovy.ast.expr.TupleExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
-import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.syntax.SyntaxException;
+
+import static nextflow.script.v2.ASTHelpers.*;
 
 /**
  * Validate process and workflow invocations.
@@ -100,24 +98,18 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
             addError(type + " cannot be called from within a closure", node);
             return;
         }
-        var argsCount = ((TupleExpression) node.getArguments()).getExpressions().size();
+        var argsCount = asMethodCallArguments(node).size();
         var paramsCount = getNumberOfParameters(defNode);
         if( argsCount != paramsCount )
             addError(String.format("Incorrect number of call arguments, expected %d but received %d", paramsCount, argsCount), node);
     }
 
     protected static int getNumberOfParameters(MethodNode node) {
-        if( node instanceof ProcessNode process ) {
-            if( !(process.inputs instanceof BlockStatement) )
-                return 0;
-            var code = (BlockStatement) process.inputs;
-            return code.getStatements().size();
+        if( node instanceof ProcessNode pn ) {
+            return (int) asBlockStatements(pn.inputs).size();
         }
-        if( node instanceof WorkflowNode workflow ) {
-            if( !(workflow.takes instanceof BlockStatement) )
-                return 0;
-            var code = (BlockStatement) workflow.takes;
-            return code.getStatements().size();
+        if( node instanceof WorkflowNode wn ) {
+            return (int) asBlockStatements(wn.takes).size();
         }
         return node.getParameters().length;
     }
@@ -156,49 +148,37 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
 
     private void checkProcessOut(PropertyExpression node, ProcessNode process) {
         var property = node.getPropertyAsString();
-        if( process.outputs instanceof BlockStatement block ) {
-            for( var stmt : block.getStatements() ) {
-                var stmtX = (ExpressionStatement)stmt;
-                var call = (MethodCallExpression)stmtX.getExpression();
-                if( property.equals(getProcessEmitName(call)) )
-                    return;
-            }
-        }
-        addError("Unrecognized output `" + property + "` for process `" + process.getName() + "`", node);
+        var result = asDirectives(process.outputs)
+            .filter(call -> property.equals(getProcessEmitName(call)))
+            .findFirst();
+
+        if( !result.isPresent() )
+            addError("Unrecognized output `" + property + "` for process `" + process.getName() + "`", node);
     }
 
     private String getProcessEmitName(MethodCallExpression output) {
         return Optional.of(output)
-            .flatMap(call -> Optional.ofNullable(
-                call.getArguments() instanceof TupleExpression te ? te.getExpressions() : null
-            ))
-            .flatMap(args -> Optional.ofNullable(
-                args.size() > 0 && args.get(0) instanceof MapExpression me ? me : null
-            ))
+            .flatMap(call -> Optional.ofNullable(asNamedArgs(call)))
             .flatMap(namedArgs ->
-                namedArgs.getMapEntryExpressions().stream()
+                namedArgs.stream()
                     .filter(entry -> "emit".equals(entry.getKeyExpression().getText()))
                     .findFirst()
             )
-            .flatMap(entry -> 
-                entry.getValueExpression() instanceof VariableExpression ve
-                    ? Optional.of(ve.getName())
-                    : Optional.empty()
-            )
+            .flatMap(entry -> Optional.ofNullable(
+                entry.getValueExpression() instanceof VariableExpression ve ? ve.getName() : null
+            ))
             .orElse(null);
     }
 
     private void checkWorkflowOut(PropertyExpression node, WorkflowNode workflow) {
         var property = node.getPropertyAsString();
-        if( workflow.emits instanceof BlockStatement block ) {
-            for( var stmt : block.getStatements() ) {
-                var stmtX = (ExpressionStatement)stmt;
-                var emit = stmtX.getExpression();
-                if( property.equals(getWorkflowEmitName(emit)) )
-                    return;
-            }
-        }
-        addError("Unrecognized output `" + property + "` for workflow `" + workflow.getName() + "`", node);
+        var result = asBlockStatements(workflow.emits).stream()
+            .map(stmt -> ((ExpressionStatement) stmt).getExpression())
+            .filter(emit -> property.equals(getWorkflowEmitName(emit)))
+            .findFirst();
+
+        if( !result.isPresent() )
+            addError("Unrecognized output `" + property + "` for workflow `" + workflow.getName() + "`", node);
     }
 
     private String getWorkflowEmitName(Expression emit) {

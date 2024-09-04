@@ -46,6 +46,8 @@ import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 
+import static nextflow.script.v2.ASTHelpers.findAnnotation;
+
 /**
  * Utility methods for retreiving text information for ast nodes.
  *
@@ -199,12 +201,6 @@ public class ASTNodeStringUtils {
 
     private static String annotationValueToMarkdown(AnnotatedNode node, Class type) {
         return annotationValueToMarkdown(node, type, "value");
-    }
-
-    private static Optional<AnnotationNode> findAnnotation(AnnotatedNode node, Class type) {
-        return node.getAnnotations().stream()
-            .filter(an -> an.getClassNode().getName().equals(type.getName()))
-            .findFirst();
     }
 
     private static String groovydocToMarkdown(Groovydoc groovydoc) {

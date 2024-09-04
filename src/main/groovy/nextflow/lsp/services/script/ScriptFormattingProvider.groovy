@@ -69,12 +69,15 @@ import org.codehaus.groovy.ast.stmt.EmptyStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.IfStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
+import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.ast.stmt.TryCatchStatement
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.Types
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.TextEdit
+
+import static nextflow.script.v2.ASTHelpers.*
 
 /**
  * Provide formatting for a script.
@@ -283,19 +286,19 @@ class FormattingVisitor extends ScriptVisitorSupport {
         append(' {\n')
         incIndent()
         if( node.directives instanceof BlockStatement ) {
-            visitDirectives((BlockStatement) node.directives)
+            visitDirectives(node.directives)
             appendNewLine()
         }
         if( node.inputs instanceof BlockStatement ) {
             appendIndent()
             append('input:\n')
-            visitDirectives((BlockStatement) node.inputs)
+            visitDirectives(node.inputs)
             appendNewLine()
         }
         if( node.outputs instanceof BlockStatement ) {
             appendIndent()
             append('output:\n')
-            visitDirectives((BlockStatement) node.outputs)
+            visitDirectives(node.outputs)
             appendNewLine()
         }
         if( node.when !instanceof EmptyExpression ) {
@@ -319,17 +322,13 @@ class FormattingVisitor extends ScriptVisitorSupport {
         append('}\n')
     }
 
-    protected void visitDirectives(BlockStatement code) {
-        for( final statement : code.statements ) {
-            final stmtX = (ExpressionStatement)statement
-            final methodCall = (MethodCallExpression)stmtX.expression
-            visitDirective(methodCall)
-        }
+    protected void visitDirectives(Statement statement) {
+        asDirectives(statement).forEach(this::visitDirective);
     }
 
-    protected void visitDirective(MethodCallExpression methodCall) {
+    protected void visitDirective(MethodCallExpression call) {
         appendIndent()
-        visitMethodCallExpression(methodCall, true)
+        visitMethodCallExpression(call, true)
         appendNewLine()
     }
 
@@ -360,7 +359,7 @@ class FormattingVisitor extends ScriptVisitorSupport {
             appendNewLine()
             appendIndent()
             append('emit:\n')
-            visitWorkflowEmits((BlockStatement) node.emits)
+            visitWorkflowEmits(asBlockStatements(node.emits))
         }
         if( node.publishers instanceof BlockStatement ) {
             appendNewLine()
@@ -372,12 +371,12 @@ class FormattingVisitor extends ScriptVisitorSupport {
         append('}\n')
     }
 
-    protected void visitWorkflowEmits(BlockStatement block) {
+    protected void visitWorkflowEmits(List<Statement> emits) {
         final alignmentWidth = options.harshilAlignment()
-            ? getWorkflowEmitWidth(block)
+            ? getWorkflowEmitWidth(emits)
             : 0
 
-        for( final stmt : block.statements ) {
+        for( final stmt : emits ) {
             final stmtX = (ExpressionStatement)stmt
             if( stmtX.expression instanceof BinaryExpression ) {
                 final binX = (BinaryExpression)stmtX.expression
@@ -398,12 +397,12 @@ class FormattingVisitor extends ScriptVisitorSupport {
         }
     }
 
-    protected int getWorkflowEmitWidth(BlockStatement block) {
-        if( block.statements.size() == 1 )
+    protected int getWorkflowEmitWidth(List<Statement> emits) {
+        if( emits.size() == 1 )
             return 0
 
         int maxWidth = 0
-        for( final stmt : block.statements ) {
+        for( final stmt : emits ) {
             final stmtX = (ExpressionStatement)stmt
             int width = 0
             if( stmtX.expression instanceof VariableExpression ) {
@@ -427,71 +426,56 @@ class FormattingVisitor extends ScriptVisitorSupport {
         appendComments(node)
         append('output {\n')
         incIndent()
-        if( node.body instanceof BlockStatement )
-            visitOutputBody((BlockStatement) node.body)
+        visitOutputBody(node.body)
         decIndent()
         append('}\n')
     }
 
-    protected void visitOutputBody(BlockStatement block) {
-        for( final stmt : block.statements ) {
-            if( stmt !instanceof ExpressionStatement )
-                continue
-            final stmtX = (ExpressionStatement) stmt
-            final call = (MethodCallExpression) stmtX.expression
-
+    protected void visitOutputBody(Statement body) {
+        asDirectives(body).forEach((call) -> {
             // treat as target definition
-            final args = (ArgumentListExpression) call.arguments
-            if( args.size() == 1 && args.first() instanceof ClosureExpression ) {
-                final closure = (ClosureExpression) args.first()
-                final target = (BlockStatement) closure.code
+            final code = asDslBlock(call, 1)
+            if( code != null ) {
                 appendNewLine()
                 appendIndent()
                 visit(call.getMethod())
                 append(' {\n')
                 incIndent()
-                visitTargetBody(target)
+                visitTargetBody(code)
                 decIndent()
                 appendIndent()
                 append('}\n')
-                continue
+                return
             }
 
             // treat as regular directive
             visitDirective(call)
-        }
+        });
     }
 
     protected void visitTargetBody(BlockStatement block) {
-        for( final stmt : block.statements ) {
-            if( stmt !instanceof ExpressionStatement )
-                continue
-            final stmtX = (ExpressionStatement) stmt
-            if( stmtX.expression !instanceof MethodCallExpression )
-                continue
-            final call = (MethodCallExpression) stmtX.expression
-
+        asDirectives(block).forEach((call) -> {
             // treat as index definition
             final name = call.getMethodAsString()
-            final args = (ArgumentListExpression) call.arguments
-            if( name == 'index' && args.size() == 1 && args.first() instanceof ClosureExpression ) {
-                final closure = (ClosureExpression) args.first()
-                final index = (BlockStatement) closure.code
-                appendNewLine()
-                appendIndent()
-                append(name)
-                append(' {\n')
-                incIndent()
-                visitDirectives(index)
-                decIndent()
-                appendIndent()
-                append('}\n')
-                continue
+            if( name == 'index' ) {
+                final code = asDslBlock(call, 1)
+                if( code != null ) {
+                    appendNewLine()
+                    appendIndent()
+                    append(name)
+                    append(' {\n')
+                    incIndent()
+                    visitDirectives(code)
+                    decIndent()
+                    appendIndent()
+                    append('}\n')
+                    return
+                }
             }
 
             // treat as regular directive
             visitDirective(call)
-        }
+        });
     }
 
     // statements
