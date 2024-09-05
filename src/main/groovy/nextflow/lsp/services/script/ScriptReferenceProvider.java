@@ -70,13 +70,13 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
             return Collections.emptyList();
 
         var defNode = ASTUtils.getDefinition(offsetNode, false, ast);
-        var isAlias = symbolName != getSymbolName(defNode, null);
+        var isAlias = !symbolName.equals(getSymbolName(defNode, null));
         var references = ASTUtils.getReferences(defNode, ast, includeDeclaration);
         var result = new ArrayList<Location>();
         references.forEachRemaining((refNode) -> {
             var refUri = ast.getURI(refNode);
             if( isAlias ) {
-                if( refUri != uri || !isSameAlias(refNode, symbolName) )
+                if( !uri.equals(refUri) || !isSameAlias(refNode, symbolName) )
                     return;
             }
             var location = LanguageServerUtils.astNodeToLocation(refNode, refUri);
@@ -108,13 +108,13 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
         if( defNode == null || ast.getURI(defNode) == null )
             return null;
 
-        var isAlias = oldName != getSymbolName(defNode, null);
+        var isAlias = oldName.equals(getSymbolName(defNode, null));
         var references = ASTUtils.getReferences(defNode, ast, true);
         var changes = new HashMap<String,List<TextEdit>>();
         references.forEachRemaining((refNode) -> {
             var refUri = ast.getURI(refNode);
             if( isAlias ) {
-                if( refUri != uri || !isSameAlias(refNode, oldName) )
+                if( !uri.equals(refUri) || !isSameAlias(refNode, oldName) )
                     return;
             }
             var key = refUri.toString();
