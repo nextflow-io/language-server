@@ -27,9 +27,12 @@ import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.MethodNode;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.SymbolInformation;
+import org.eclipse.lsp4j.SymbolKind;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.WorkspaceSymbol;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 /**
@@ -62,17 +65,21 @@ public class ScriptSymbolProvider implements SymbolProvider {
         var definitions = ast.getDefinitions(uri);
         var result = new ArrayList<Either<SymbolInformation, DocumentSymbol>>();
         for( var node : definitions ) {
-            if( node.getLineNumber() < 0 )
+            if( !(node instanceof MethodNode) )
                 continue;
-            var symbolInfo = getSymbolInformation(node, uri);
-            result.add(Either.forLeft(symbolInfo));
+            var name = getSymbolName(node);
+            var range = LanguageServerUtils.astNodeToRange(node);
+            if( range == null )
+                continue;
+            var symbol = new DocumentSymbol(name, SymbolKind.Method, range, range);
+            result.add(Either.forRight(symbol));
         }
 
         return result;
     }
 
     @Override
-    public List<? extends SymbolInformation> symbol(String query) {
+    public List<? extends WorkspaceSymbol> symbol(String query) {
         if( ast == null ) {
             log.error("ast cache is empty while peoviding workspace symbols");
             return Collections.emptyList();
@@ -80,42 +87,32 @@ public class ScriptSymbolProvider implements SymbolProvider {
 
         var lowerCaseQuery = query.toLowerCase();
         var definitions = ast.getDefinitions();
-        var result = new ArrayList<SymbolInformation>();
+        var result = new ArrayList<WorkspaceSymbol>();
         for( var node : definitions ) {
-            String name = null;
-            if( node instanceof FunctionNode fn )
-                name = fn.getName();
-            else if( node instanceof ProcessNode pn )
-                name = pn.getName();
-            else if( node instanceof WorkflowNode wn )
-                name = wn.isEntry() ?  "<entry>" : wn.getName();
-
+            if( !(node instanceof MethodNode) )
+                continue;
+            var name = getSymbolName(node);
             if( name == null || !name.toLowerCase().contains(lowerCaseQuery) )
                 continue;
-
             var uri = ast.getURI(node);
-            var symbolInfo = getSymbolInformation(node, uri);
-            if( symbolInfo == null )
+            var location = LanguageServerUtils.astNodeToLocation(node, uri);
+            if( location == null )
                 continue;
-
-            result.add(symbolInfo);
+            var symbol = new WorkspaceSymbol(name, SymbolKind.Method, Either.forLeft(location));
+            result.add(symbol);
         }
 
         return result;
     }
 
-    private SymbolInformation getSymbolInformation(ASTNode node, URI uri) {
+    private static String getSymbolName(ASTNode node) {
         if( node instanceof FunctionNode fn )
-            return LanguageServerUtils.astNodeToSymbolInformation(fn, uri);
-
-        else if( node instanceof ProcessNode pn )
-            return LanguageServerUtils.astNodeToSymbolInformation(pn, uri);
-
-        else if( node instanceof WorkflowNode wn )
-            return LanguageServerUtils.astNodeToSymbolInformation(wn, uri);
-
-        else
-            return null;
+            return fn.getName();
+        if( node instanceof ProcessNode pn )
+            return pn.getName();
+        if( node instanceof WorkflowNode wn )
+            return wn.isEntry() ?  "<entry>" : wn.getName();
+        return null;
     }
 
 }

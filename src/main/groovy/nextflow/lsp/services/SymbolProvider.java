@@ -20,12 +20,13 @@ import java.util.List;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.WorkspaceSymbol;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 public interface SymbolProvider {
 
     List<Either<SymbolInformation, DocumentSymbol>> documentSymbol(TextDocumentIdentifier textDocument);
 
-    List<? extends SymbolInformation> symbol(String query);
+    List<? extends WorkspaceSymbol> symbol(String query);
 
 }

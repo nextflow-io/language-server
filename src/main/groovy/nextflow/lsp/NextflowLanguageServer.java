@@ -500,10 +500,10 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled();
             log.debug("workspace/symbol " + params.getQuery());
-            var result = new ArrayList<SymbolInformation>();
+            var result = new ArrayList<WorkspaceSymbol>();
             for( var scriptService : scriptServices.values() )
                 result.addAll(scriptService.symbol(params));
-            return Either.forLeft(result);
+            return Either.forRight(result);
         });
     }
 

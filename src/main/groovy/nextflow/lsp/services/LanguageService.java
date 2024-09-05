@@ -68,6 +68,7 @@ import org.eclipse.lsp4j.RenameParams;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
+import org.eclipse.lsp4j.WorkspaceSymbol;
 import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -270,7 +271,7 @@ public abstract class LanguageService {
         return provider.rename(params.getTextDocument(), params.getPosition(), params.getNewName());
     }
 
-    public List<? extends SymbolInformation> symbol(WorkspaceSymbolParams params) {
+    public List<? extends WorkspaceSymbol> symbol(WorkspaceSymbolParams params) {
         var provider = getSymbolProvider();
         if( provider == null )
             return Collections.emptyList();

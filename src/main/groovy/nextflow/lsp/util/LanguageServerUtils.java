@@ -17,7 +17,6 @@ package nextflow.lsp.util;
 
 import java.net.URI;
 
-import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -29,8 +28,6 @@ import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
-import org.eclipse.lsp4j.SymbolInformation;
-import org.eclipse.lsp4j.SymbolKind;
 
 /**
  * Utility methods for mapping compiler data structures
@@ -92,77 +89,11 @@ public class LanguageServerUtils {
         return CompletionItemKind.Property;
     }
 
-    public static SymbolKind astNodeToSymbolKind(ASTNode node) {
-        if( node instanceof ClassNode ) {
-            if( ((ClassNode) node).isEnum() )
-                return SymbolKind.Enum;
-            else
-                return SymbolKind.Class;
-        }
-        else if( node instanceof MethodNode ) {
-            return SymbolKind.Method;
-        }
-        else if( node instanceof Variable ) {
-            if( node instanceof FieldNode || node instanceof PropertyNode )
-                return SymbolKind.Field;
-            else
-                return SymbolKind.Variable;
-        }
-        return SymbolKind.Property;
-    }
-
     public static Location astNodeToLocation(ASTNode node, URI uri) {
         var range = astNodeToRange(node);
         if( range == null )
             return null;
         return new Location(uri.toString(), range);
-    }
-
-    public static SymbolInformation astNodeToSymbolInformation(ClassNode node, URI uri) {
-        var location = astNodeToLocation(node, uri);
-        if( location == null )
-            return null;
-        return new SymbolInformation(
-                node.getName(),
-                astNodeToSymbolKind(node),
-                location,
-                null);
-    }
-
-    public static SymbolInformation astNodeToSymbolInformation(MethodNode node, URI uri) {
-        var location = astNodeToLocation(node, uri);
-        if( location == null )
-            return null;
-        return new SymbolInformation(
-                node.getName(),
-                astNodeToSymbolKind(node),
-                location,
-                null);
-    }
-
-    public static SymbolInformation astNodeToSymbolInformation(WorkflowNode node, URI uri) {
-        var location = astNodeToLocation(node, uri);
-        if( location == null )
-            return null;
-        return new SymbolInformation(
-                node.getName() != null ? node.getName() : "<entry>",
-                astNodeToSymbolKind(node),
-                location,
-                null);
-    }
-
-    public static SymbolInformation astNodeToSymbolInformation(Variable node, URI uri, String parentName) {
-        if( !(node instanceof ASTNode) )
-            return null;
-
-        var location = astNodeToLocation((ASTNode) node, uri);
-        if( location == null )
-            return null;
-        return new SymbolInformation(
-                node.getName(),
-                astNodeToSymbolKind((ASTNode) node),
-                location,
-                parentName);
     }
 
 }
