@@ -15,11 +15,11 @@
  */
 package nextflow.lsp.services.script;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 import nextflow.lsp.ast.ASTUtils;
+import nextflow.lsp.compiler.PhaseAware;
+import nextflow.lsp.compiler.Phases;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.ScriptNode;
 import nextflow.script.v2.ScriptVisitorSupport;
@@ -34,6 +34,7 @@ import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 import static nextflow.script.v2.ASTHelpers.*;
@@ -48,8 +49,6 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
     private SourceUnit sourceUnit;
 
     private ScriptAstCache astCache;
-
-    private List<SyntaxException> errors = new ArrayList<>();
 
     public MethodCallVisitor(SourceUnit sourceUnit, ScriptAstCache astCache) {
         this.sourceUnit = sourceUnit;
@@ -194,10 +193,20 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
 
     @Override
     public void addError(String message, ASTNode node) {
-        errors.add(new MethodCallException(message, node));
+        var cause = new MethodCallException(message, node);
+        var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
+        sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    public List<SyntaxException> getErrors() {
-        return errors;
+    private class MethodCallException extends SyntaxException implements PhaseAware {
+
+        public MethodCallException(String message, ASTNode node) {
+            super(message, node);
+        }
+
+        @Override
+        public int getPhase() {
+            return Phases.TYPE_INFERENCE;
+        }
     }
 }

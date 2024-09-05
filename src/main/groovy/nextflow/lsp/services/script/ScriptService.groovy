@@ -15,11 +15,8 @@
  */
 package nextflow.lsp.services.script
 
-import groovy.lang.GroovyClassLoader
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
-import nextflow.lsp.compiler.Compiler
-import nextflow.lsp.compiler.CompilerTransform
 import nextflow.lsp.services.CallHierarchyProvider
 import nextflow.lsp.services.CompletionProvider
 import nextflow.lsp.services.DefinitionProvider
@@ -30,10 +27,6 @@ import nextflow.lsp.services.LinkProvider
 import nextflow.lsp.services.ReferenceProvider
 import nextflow.lsp.services.RenameProvider
 import nextflow.lsp.services.SymbolProvider
-import nextflow.script.v2.ScriptParserPluginFactory
-import org.codehaus.groovy.control.CompilerConfiguration
-import org.codehaus.groovy.control.SourceUnit
-import org.codehaus.groovy.control.customizers.ImportCustomizer
 
 /**
  * Implementation of language services for Nextflow scripts.
@@ -43,7 +36,7 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
 @CompileStatic
 class ScriptService extends LanguageService {
 
-    private ScriptAstCache astCache = new ScriptAstCache(getCompiler())
+    private ScriptAstCache astCache = new ScriptAstCache()
 
     @Override
     boolean matchesFile(String uri) {
@@ -53,28 +46,6 @@ class ScriptService extends LanguageService {
     @Override
     protected ASTNodeCache getAstCache() {
         return astCache
-    }
-
-    protected Compiler getCompiler() {
-        final config = createConfiguration()
-        final classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true)
-        final CompilerTransform transform = new CompilerTransform() {
-            @Override
-            void visit(SourceUnit sourceUnit) {
-                new ResolveVisitor(sourceUnit, config, classLoader).visit()
-            }
-        }
-        return new Compiler(config, classLoader, List.of(transform))
-    }
-
-    protected CompilerConfiguration createConfiguration() {
-        final config = new CompilerConfiguration()
-        config.setPluginFactory(new ScriptParserPluginFactory())
-
-        final optimizationOptions = config.getOptimizationOptions()
-        optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true)
-
-        return config
     }
 
     @Override

@@ -15,8 +15,15 @@
  */
 package nextflow.lsp.compiler;
 
-import org.codehaus.groovy.control.SourceUnit;
+/**
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public class Phases {
+    public static final int SYNTAX = 1;
+    public static final int NAME_RESOLUTION = 2;
+    public static final int INCLUDE_RESOLUTION = 3;
+    public static final int TYPE_INFERENCE = 4;
 
-public interface CompilerTransform {
-    void visit(SourceUnit sourceUnit);
+    public static final int ALL = TYPE_INFERENCE;
 }

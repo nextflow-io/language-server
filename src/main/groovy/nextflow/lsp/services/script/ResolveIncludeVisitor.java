@@ -22,11 +22,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import nextflow.lsp.compiler.PhaseAware;
+import nextflow.lsp.compiler.Phases;
 import nextflow.script.v2.IncludeNode;
 import nextflow.script.v2.ScriptNode;
 import nextflow.script.v2.ScriptVisitorSupport;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 /**
@@ -43,7 +46,7 @@ class ResolveIncludeVisitor extends ScriptVisitorSupport {
 
     private Set<URI> changedUris;
 
-    private List<SyntaxException> errors = new ArrayList<>();
+    private List<SyntaxErrorMessage> errors = new ArrayList<>();
 
     private boolean changed;
 
@@ -120,14 +123,28 @@ class ResolveIncludeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void addError(String message, ASTNode node) {
-        errors.add(new IncludeException(message, node));
+        var cause = new ResolveIncludeException(message, node);
+        var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
+        errors.add(errorMessage);
     }
 
-    public List<SyntaxException> getErrors() {
+    public List<SyntaxErrorMessage> getErrors() {
         return errors;
     }
 
     public boolean isChanged() {
         return changed;
+    }
+
+    private class ResolveIncludeException extends SyntaxException implements PhaseAware {
+
+        public ResolveIncludeException(String message, ASTNode node) {
+            super(message, node);
+        }
+
+        @Override
+        public int getPhase() {
+            return Phases.INCLUDE_RESOLUTION;
+        }
     }
 }

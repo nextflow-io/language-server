@@ -27,6 +27,7 @@ import nextflow.config.v2.ConfigVisitorSupport;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 /**
@@ -43,7 +44,9 @@ public class ResolveIncludeVisitor extends ConfigVisitorSupport {
 
     private Set<URI> changedUris;
 
-    private List<SyntaxException> errors = new ArrayList<>();
+    private List<SyntaxErrorMessage> errors = new ArrayList<>();
+
+    private boolean changed;
 
     ResolveIncludeVisitor(SourceUnit sourceUnit, ConfigAstCache astCache, Set<URI> changedUris) {
         this.sourceUnit = sourceUnit;
@@ -71,6 +74,7 @@ public class ResolveIncludeVisitor extends ConfigVisitorSupport {
         var includeUri = getIncludeUri(uri, source);
         if( !isIncludeLocal(includeUri) || !isIncludeStale(includeUri) )
             return;
+        changed = true;
         var includeUnit = astCache.getSourceUnit(includeUri);
         if( includeUnit == null ) {
             addError("Invalid include source: '" + includeUri + "'", node);
@@ -90,12 +94,18 @@ public class ResolveIncludeVisitor extends ConfigVisitorSupport {
         return changedUris.contains(uri) || changedUris.contains(includeUri);
     }
 
-    public List<SyntaxException> getErrors() {
+    @Override
+    public void addError(String message, ASTNode node) {
+        var cause = new SyntaxException(message, node);
+        var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
+        errors.add(errorMessage);
+    }
+
+    public List<SyntaxErrorMessage> getErrors() {
         return errors;
     }
 
-    @Override
-    public void addError(String message, ASTNode node) {
-        errors.add(new SyntaxException(message, node));
+    public boolean isChanged() {
+        return changed;
     }
 }

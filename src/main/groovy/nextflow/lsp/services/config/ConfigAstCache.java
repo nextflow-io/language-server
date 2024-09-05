@@ -21,15 +21,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTNodeLookup;
 import nextflow.lsp.compiler.Compiler;
+import nextflow.lsp.compiler.LanguageServerErrorCollector;
+import nextflow.lsp.compiler.Phases;
 import nextflow.lsp.file.FileCache;
 import nextflow.config.v2.ConfigAssignNode;
 import nextflow.config.v2.ConfigBlockNode;
 import nextflow.config.v2.ConfigIncludeNode;
 import nextflow.config.v2.ConfigIncompleteNode;
 import nextflow.config.v2.ConfigNode;
+import nextflow.config.v2.ConfigParserPluginFactory;
 import nextflow.config.v2.ConfigVisitorSupport;
 import org.codehaus.groovy.ast.ASTNode;;
 import org.codehaus.groovy.ast.Parameter;
@@ -68,6 +72,8 @@ import org.codehaus.groovy.ast.stmt.IfStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.ThrowStatement;
 import org.codehaus.groovy.ast.stmt.TryCatchStatement;
+import org.codehaus.groovy.control.CompilationUnit;
+import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.syntax.SyntaxException;
 
@@ -77,29 +83,57 @@ import org.codehaus.groovy.syntax.SyntaxException;
  */
 public class ConfigAstCache extends ASTNodeCache {
 
-    public ConfigAstCache(Compiler compiler) {
-        super(compiler);
+    private Compiler compiler;
+
+    private CompilationUnit compilationUnit;
+
+    public ConfigAstCache() {
+        var config = createConfiguration();
+        var classLoader = new GroovyClassLoader(ClassLoader.getSystemClassLoader().getParent(), config, true);
+        compiler = new Compiler(config, classLoader);
+        compilationUnit = new CompilationUnit(config, null, classLoader);
+    }
+
+    protected CompilerConfiguration createConfiguration() {
+        var config = new CompilerConfiguration();
+        config.setPluginFactory(new ConfigParserPluginFactory());
+        return config;
     }
 
     @Override
-    public Map<URI, List<SyntaxException>> update(Set<URI> uris, FileCache fileCache) {
-        var errorsByUri = super.update(uris, fileCache);
+    protected Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache) {
+        // phase 1: syntax resolution
+        var sources = compiler.compile(uris, fileCache);
 
-        for( var sourceUnit : getSourceUnits() ) {
+        // phase 2: name resolution
+        sources.forEach((uri, sourceUnit) -> {
+            new ConfigSchemaVisitor(sourceUnit).visit();
+        });
+
+        // phase 3: include resolution
+        var allSources = new ArrayList<>(sources.values());
+        allSources.addAll(getSourceUnits());
+
+        for( var sourceUnit : allSources ) {
             var visitor = new ResolveIncludeVisitor(sourceUnit, this, uris);
             visitor.visit();
 
             var uri = sourceUnit.getSource().getURI();
-            if( !errorsByUri.containsKey(uri) )
-                errorsByUri.put(uri, new ArrayList<>());
-            errorsByUri.get(uri).addAll(visitor.getErrors());
+            if( visitor.isChanged() && !uris.contains(uri) ) {
+                var errorCollector = (LanguageServerErrorCollector) sourceUnit.getErrorCollector();
+                errorCollector.updatePhase(Phases.INCLUDE_RESOLUTION, visitor.getErrors());
+                sources.put(uri, null);
+            }
         }
 
-        return errorsByUri;
+        // phase 4: type inference
+        // TODO
+
+        return sources;
     }
 
     @Override
-    protected Map<ASTNode, ASTNode> visitAST(SourceUnit sourceUnit) {
+    protected Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit) {
         var visitor = new Visitor(sourceUnit);
         visitor.visit();
         return visitor.getLookup().getParents();

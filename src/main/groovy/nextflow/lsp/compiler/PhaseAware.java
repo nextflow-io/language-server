@@ -13,18 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services.script;
-
-import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.syntax.SyntaxException;
+package nextflow.lsp.compiler;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class MethodCallException extends SyntaxException {
-
-    public MethodCallException(String message, ASTNode node) {
-        super(message, node);
-    }
+public interface PhaseAware {
+    int getPhase();
 }

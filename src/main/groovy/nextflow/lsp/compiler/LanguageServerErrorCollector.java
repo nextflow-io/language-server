@@ -15,8 +15,12 @@
  */
 package nextflow.lsp.compiler;
 
+import java.util.List;
+
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.ErrorCollector;
+import org.codehaus.groovy.control.messages.Message;
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 
 /**
  * Error collector that does not throw exceptions.
@@ -33,6 +37,28 @@ public class LanguageServerErrorCollector extends ErrorCollector {
 
     @Override
     protected void failIfErrors() {
+    }
+
+    /**
+     * Remove all errors on or after a given phase and replace them
+     * with new errors.
+     *
+     * @param phase
+     * @param newErrors
+     */
+    public void updatePhase(int phase, List<? extends Message> newErrors) {
+        // var oldErrors = errors;
+        // errors = null;
+        if( errors != null )
+            errors.removeIf(message -> isErrorPhase(message, phase));
+        for( var errorMessage : newErrors )
+            addErrorAndContinue(errorMessage);
+    }
+
+    private static boolean isErrorPhase(Message message, int phase) {
+        return message instanceof SyntaxErrorMessage sem
+            && sem.getCause() instanceof PhaseAware pae
+            && pae.getPhase() >= phase;
     }
 
 }

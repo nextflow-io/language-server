@@ -23,9 +23,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTNodeLookup;
 import nextflow.lsp.compiler.Compiler;
+import nextflow.lsp.compiler.LanguageServerErrorCollector;
+import nextflow.lsp.compiler.Phases;
 import nextflow.lsp.file.FileCache;
 import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
@@ -34,6 +37,7 @@ import nextflow.script.v2.IncludeVariable;
 import nextflow.script.v2.OutputNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.ScriptNode;
+import nextflow.script.v2.ScriptParserPluginFactory;
 import nextflow.script.v2.ScriptVisitorSupport;
 import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
@@ -74,7 +78,10 @@ import org.codehaus.groovy.ast.stmt.IfStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.ThrowStatement;
 import org.codehaus.groovy.ast.stmt.TryCatchStatement;
+import org.codehaus.groovy.control.CompilationUnit;
+import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 /**
@@ -83,42 +90,66 @@ import org.codehaus.groovy.syntax.SyntaxException;
  */
 public class ScriptAstCache extends ASTNodeCache {
 
-    public ScriptAstCache(Compiler compiler) {
-        super(compiler);
+    private Compiler compiler;
+
+    private CompilationUnit compilationUnit;
+
+    public ScriptAstCache() {
+        var config = createConfiguration();
+        var classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true);
+        compiler = new Compiler(config, classLoader);
+        compilationUnit = new CompilationUnit(config, null, classLoader);
+    }
+
+    private CompilerConfiguration createConfiguration() {
+        var config = new CompilerConfiguration();
+        config.setPluginFactory(new ScriptParserPluginFactory());
+
+        var optimizationOptions = config.getOptimizationOptions();
+        optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true);
+
+        return config;
     }
 
     @Override
-    public Map<URI, List<SyntaxException>> update(Set<URI> uris, FileCache fileCache) {
-        var changedUris = new HashSet<>(uris);
-        var errorsByUri = super.update(uris, fileCache);
+    protected Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache) {
+        // phase 1: syntax resolution
+        var sources = compiler.compile(uris, fileCache);
 
-        for( var sourceUnit : getSourceUnits() ) {
+        // phase 2: name resolution
+        sources.forEach((uri, sourceUnit) -> {
+            new ResolveVisitor(sourceUnit, compilationUnit).visit();
+        });
+
+        // phase 3: include resolution
+        var allSources = new ArrayList<>(sources.values());
+        allSources.addAll(getSourceUnits());
+        var changedSources = new ArrayList<>(sources.values());
+
+        for( var sourceUnit : allSources ) {
             var visitor = new ResolveIncludeVisitor(sourceUnit, this, uris);
             visitor.visit();
 
             var uri = sourceUnit.getSource().getURI();
-            errorsByUri.computeIfAbsent(uri, (k) -> new ArrayList<>());
-            errorsByUri.get(uri).removeIf((error) -> error instanceof IncludeException);
-            errorsByUri.get(uri).addAll(visitor.getErrors());
-            if( visitor.isChanged() )
-                changedUris.add(uri);
+            if( visitor.isChanged() && !uris.contains(uri) ) {
+                var errorCollector = (LanguageServerErrorCollector) sourceUnit.getErrorCollector();
+                errorCollector.updatePhase(Phases.INCLUDE_RESOLUTION, visitor.getErrors());
+                sources.put(uri, null);
+                changedSources.add(sourceUnit);
+            }
         }
 
-        for( var uri : changedUris ) {
-            var sourceUnit = getSourceUnit(uri);
-            if( sourceUnit == null )
-                continue;
+        // phase 4: type inference
+        for( var sourceUnit : changedSources ) {
             var visitor = new MethodCallVisitor(sourceUnit, this);
             visitor.visit();
-            errorsByUri.get(uri).removeIf((error) -> error instanceof MethodCallException);
-            errorsByUri.get(uri).addAll(visitor.getErrors());
         }
 
-        return errorsByUri;
+        return sources;
     }
 
     @Override
-    protected Map<ASTNode, ASTNode> visitAST(SourceUnit sourceUnit) {
+    protected Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit) {
         var visitor = new Visitor(sourceUnit);
         visitor.visit();
         return visitor.getLookup().getParents();

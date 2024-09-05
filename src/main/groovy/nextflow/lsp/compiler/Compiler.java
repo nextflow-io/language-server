@@ -20,10 +20,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.AbstractMap;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -47,16 +44,13 @@ public class Compiler {
 
     private static Logger log = Logger.getInstance();
 
-    private CompilerConfiguration config;
+    private CompilerConfiguration configuration;
 
     private GroovyClassLoader classLoader;
 
-    private List<CompilerTransform> transforms;
-
-    public Compiler(CompilerConfiguration config, GroovyClassLoader classLoader, List<CompilerTransform> transforms) {
-        this.config = config;
+    public Compiler(CompilerConfiguration configuration, GroovyClassLoader classLoader) {
+        this.configuration = configuration;
         this.classLoader = classLoader;
-        this.transforms = transforms;
     }
 
     /**
@@ -65,13 +59,15 @@ public class Compiler {
      * @param uris
      * @param fileCache
      */
-    public Map<URI, Optional<SourceUnit>> compile(Set<URI> uris, FileCache fileCache) {
+    public Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache) {
         return uris.parallelStream()
             .map((uri) -> {
                 var sourceUnit = getSourceUnit(uri, fileCache);
-                sourceUnit.ifPresent(this::compile);
+                if( sourceUnit != null )
+                    compile(sourceUnit);
                 return new AbstractMap.SimpleEntry<>(uri, sourceUnit);
             })
+            .filter(entry -> entry.getValue() != null)
             .sequential()
             .collect(Collectors.toMap(
                 Map.Entry::getKey,
@@ -89,29 +85,29 @@ public class Compiler {
      *
      * @param uri
      */
-    protected Optional<SourceUnit> getSourceUnit(URI uri, FileCache fileCache) {
+    protected SourceUnit getSourceUnit(URI uri, FileCache fileCache) {
         if( fileCache.isOpen(uri) ) {
             var contents = fileCache.getContents(uri);
-            return Optional.of(new SourceUnit(
+            return new SourceUnit(
                     uri.toString(),
-                    new StringReaderSourceWithURI(contents, uri, config),
-                    config,
+                    new StringReaderSourceWithURI(contents, uri, configuration),
+                    configuration,
                     classLoader,
-                    newErrorCollector()));
+                    newErrorCollector());
         }
         else if( Files.exists(Path.of(uri)) ) {
-            return Optional.of(new SourceUnit(
+            return new SourceUnit(
                     new File(uri),
-                    config,
+                    configuration,
                     classLoader,
-                    newErrorCollector()));
+                    newErrorCollector());
         }
         else
-            return Optional.empty();
+            return null;
     }
 
     protected ErrorCollector newErrorCollector() {
-        return new LanguageServerErrorCollector(config);
+        return new LanguageServerErrorCollector(configuration);
     }
 
     /**
@@ -124,8 +120,6 @@ public class Compiler {
         try {
             sourceUnit.parse();
             sourceUnit.buildAST();
-            for( var transform : transforms )
-                transform.visit(sourceUnit);
         }
         catch( RecognitionException e ) {
         }

@@ -123,8 +123,8 @@ public abstract class LanguageService {
 
             var astCache = getAstCache();
             astCache.clear();
-            var errors = astCache.update(uris, fileCache);
-            publishDiagnostics(errors);
+            astCache.update(uris, fileCache);
+            publishDiagnostics(astCache.getErrors());
 
             this.initialized = true;
         }
@@ -299,8 +299,9 @@ public abstract class LanguageService {
             var uris = fileCache.removeChangedFiles();
 
             log.debug("update " + DefaultGroovyMethods.join(uris, " , "));
-            var errors = getAstCache().update(uris, fileCache);
-            publishDiagnostics(errors);
+            var astCache = getAstCache();
+            astCache.update(uris, fileCache);
+            publishDiagnostics(astCache.getErrors());
         }
     }
 
@@ -340,8 +341,7 @@ public abstract class LanguageService {
      * Clear diagnostics when the language service is shut down.
      */
     public void clearDiagnostics() {
-        var errorsByUri = getAstCache().update(Collections.emptySet(), fileCache);
-        errorsByUri.forEach((uri, errors) -> {
+        getAstCache().getErrors().forEach((uri, errors) -> {
             var params = new PublishDiagnosticsParams(uri.toString(), Collections.emptyList());
             client.publishDiagnostics(params);
         });

@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import nextflow.lsp.compiler.Compiler;
 import nextflow.lsp.compiler.SyntaxWarning;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.util.LanguageServerUtils;
@@ -46,8 +45,6 @@ import org.eclipse.lsp4j.util.Ranges;
  */
 public abstract class ASTNodeCache {
 
-    private Compiler compiler;
-
     private Map<URI, SourceUnit> sourcesByUri = new HashMap<>();
 
     private Map<URI, List<SyntaxException>> errorsByUri = new HashMap<>();
@@ -55,10 +52,6 @@ public abstract class ASTNodeCache {
     private Map<URI, Set<ASTNode>> nodesByURI = new HashMap<>();
 
     private Map<ASTNode, LookupData> lookup = new IdentityHashMap<>();
-
-    public ASTNodeCache(Compiler compiler) {
-        this.compiler = compiler;
-    }
 
     /**
      * Clear the cache.
@@ -76,36 +69,40 @@ public abstract class ASTNodeCache {
      * @param uris
      * @param fileCache
      */
-    public Map<URI, List<SyntaxException>> update(Set<URI> uris, FileCache fileCache) {
-        var sources = compiler.compile(uris, fileCache);
-
+    public void update(Set<URI> uris, FileCache fileCache) {
+        // invalidate cache for each source file
         for( var uri : uris ) {
-            // remove cache entries for source file
             var nodes = nodesByURI.remove(uri);
             if( nodes != null ) {
                 for( var node : nodes )
                     lookup.remove(node);
             }
             sourcesByUri.remove(uri);
+            errorsByUri.put(uri, new ArrayList<>());
+        }
 
-            var sourceUnit = sources.get(uri).orElse(null);
-            if( sourceUnit == null ) {
-                errorsByUri.put(uri, new ArrayList<>());
-                continue;
-            }
+        // compile source files
+        var sources = compile(uris, fileCache);
 
-            // update cache
+        // update ast node cache
+        sources.forEach((uri, sourceUnit) -> {
+            if( sourceUnit == null )
+                return;
+
             sourcesByUri.put(uri, sourceUnit);
 
-            var parents = visitAST(sourceUnit);
+            var parents = visitParents(sourceUnit);
             nodesByURI.put(uri, parents.keySet());
 
             for( var key : parents.keySet() ) {
                 var parent = parents.get(key);
                 lookup.put(key, new LookupData(uri, parent));
             }
+        });
 
-            // collect errors
+        // update error cache
+        for( var uri : sources.keySet() ) {
+            var sourceUnit = sourcesByUri.get(uri);
             var errors = new ArrayList<SyntaxException>();
             var messages = sourceUnit.getErrorCollector().getErrors();
             if( messages != null ) {
@@ -116,9 +113,18 @@ public abstract class ASTNodeCache {
             }
             errorsByUri.put(uri, errors);
         }
-
-        return errorsByUri;
     }
+
+    /**
+     * Compile a set of source files.
+     *
+     * Implementing class may include uris in the result without a source file,
+     * to indicate that only the errors for the source file have changed.
+     *
+     * @param uris
+     * @param fileCache
+     */
+    protected abstract Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache);
 
     /**
      * Visit the AST of a source file and retrieve the set of relevant
@@ -126,7 +132,7 @@ public abstract class ASTNodeCache {
      *
      * @param sourceUnit
      */
-    protected abstract Map<ASTNode, ASTNode> visitAST(SourceUnit sourceUnit);
+    protected abstract Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit);
 
     /**
      * Get the list of source units for all cached files.
@@ -184,6 +190,13 @@ public abstract class ASTNodeCache {
                 return true;
         }
         return false;
+    }
+
+    /**
+     * Get the list of errors for each source file.
+     */
+    public Map<URI, List<SyntaxException>> getErrors() {
+        return errorsByUri;
     }
 
     /**
