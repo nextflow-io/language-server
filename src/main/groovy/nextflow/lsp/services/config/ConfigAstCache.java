@@ -16,8 +16,7 @@
 package nextflow.lsp.services.config;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -101,20 +100,23 @@ public class ConfigAstCache extends ASTNodeCache {
     }
 
     @Override
-    protected Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache) {
+    protected Map<URI, SourceUnit> buildAST(Set<URI> uris, FileCache fileCache) {
         // phase 1: syntax resolution
-        var sources = compiler.compile(uris, fileCache);
+        return compiler.compile(uris, fileCache);
+    }
 
+    @Override
+    protected Set<URI> visitAST(Set<URI> uris) {
         // phase 2: name resolution
-        sources.forEach((uri, sourceUnit) -> {
+        for( var uri : uris ) {
+            var sourceUnit = getSourceUnit(uri);
             new ConfigSchemaVisitor(sourceUnit).visit();
-        });
+        }
 
         // phase 3: include resolution
-        var allSources = new ArrayList<>(sources.values());
-        allSources.addAll(getSourceUnits());
+        var changedUris = new HashSet<>(uris);
 
-        for( var sourceUnit : allSources ) {
+        for( var sourceUnit : getSourceUnits() ) {
             var visitor = new ResolveIncludeVisitor(sourceUnit, this, uris);
             visitor.visit();
 
@@ -122,14 +124,14 @@ public class ConfigAstCache extends ASTNodeCache {
             if( visitor.isChanged() && !uris.contains(uri) ) {
                 var errorCollector = (LanguageServerErrorCollector) sourceUnit.getErrorCollector();
                 errorCollector.updatePhase(Phases.INCLUDE_RESOLUTION, visitor.getErrors());
-                sources.put(uri, null);
+                changedUris.add(uri);
             }
         }
 
         // phase 4: type inference
         // TODO
 
-        return sources;
+        return changedUris;
     }
 
     @Override

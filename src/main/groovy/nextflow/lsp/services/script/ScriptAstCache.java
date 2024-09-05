@@ -112,21 +112,23 @@ public class ScriptAstCache extends ASTNodeCache {
     }
 
     @Override
-    protected Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache) {
+    protected Map<URI, SourceUnit> buildAST(Set<URI> uris, FileCache fileCache) {
         // phase 1: syntax resolution
-        var sources = compiler.compile(uris, fileCache);
+        return compiler.compile(uris, fileCache);
+    }
 
+    @Override
+    protected Set<URI> visitAST(Set<URI> uris) {
         // phase 2: name resolution
-        sources.forEach((uri, sourceUnit) -> {
+        for( var uri : uris ) {
+            var sourceUnit = getSourceUnit(uri);
             new ResolveVisitor(sourceUnit, compilationUnit).visit();
-        });
+        }
 
         // phase 3: include resolution
-        var allSources = new ArrayList<>(sources.values());
-        allSources.addAll(getSourceUnits());
-        var changedSources = new ArrayList<>(sources.values());
+        var changedUris = new HashSet<>(uris);
 
-        for( var sourceUnit : allSources ) {
+        for( var sourceUnit : getSourceUnits() ) {
             var visitor = new ResolveIncludeVisitor(sourceUnit, this, uris);
             visitor.visit();
 
@@ -134,18 +136,18 @@ public class ScriptAstCache extends ASTNodeCache {
             if( visitor.isChanged() && !uris.contains(uri) ) {
                 var errorCollector = (LanguageServerErrorCollector) sourceUnit.getErrorCollector();
                 errorCollector.updatePhase(Phases.INCLUDE_RESOLUTION, visitor.getErrors());
-                sources.put(uri, null);
-                changedSources.add(sourceUnit);
+                changedUris.add(uri);
             }
         }
 
         // phase 4: type inference
-        for( var sourceUnit : changedSources ) {
+        for( var uri : changedUris ) {
+            var sourceUnit = getSourceUnit(uri);
             var visitor = new MethodCallVisitor(sourceUnit, this);
             visitor.visit();
         }
 
-        return sources;
+        return changedUris;
     }
 
     @Override

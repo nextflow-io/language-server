@@ -81,8 +81,8 @@ public abstract class ASTNodeCache {
             errorsByUri.put(uri, new ArrayList<>());
         }
 
-        // compile source files
-        var sources = compile(uris, fileCache);
+        // parse source files
+        var sources = buildAST(uris, fileCache);
 
         // update ast node cache
         sources.forEach((uri, sourceUnit) -> {
@@ -100,8 +100,11 @@ public abstract class ASTNodeCache {
             }
         });
 
+        // perform additional AST analysis
+        var changedUris = visitAST(sources.keySet());
+
         // update error cache
-        for( var uri : sources.keySet() ) {
+        for( var uri : changedUris ) {
             var sourceUnit = sourcesByUri.get(uri);
             var errors = new ArrayList<SyntaxException>();
             var messages = sourceUnit.getErrorCollector().getErrors();
@@ -116,15 +119,21 @@ public abstract class ASTNodeCache {
     }
 
     /**
-     * Compile a set of source files.
-     *
-     * Implementing class may include uris in the result without a source file,
-     * to indicate that only the errors for the source file have changed.
+     * Parse the AST for a set of source files.
      *
      * @param uris
      * @param fileCache
      */
-    protected abstract Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache);
+    protected abstract Map<URI, SourceUnit> buildAST(Set<URI> uris, FileCache fileCache);
+
+    /**
+     * Perform additional AST analysis for a set of source files.
+     * Return the set of files whose errors have changed, which may
+     * include any files in the cache.
+     *
+     * @param uris
+     */
+    protected abstract Set<URI> visitAST(Set<URI> uris);
 
     /**
      * Visit the AST of a source file and retrieve the set of relevant
