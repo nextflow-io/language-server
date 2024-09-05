@@ -13,54 +13,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services.config
+package nextflow.lsp.services.config;
 
-import groovy.transform.CompileStatic
-import nextflow.lsp.ast.ASTNodeCache
-import nextflow.lsp.services.CompletionProvider
-import nextflow.lsp.services.FormattingProvider
-import nextflow.lsp.services.HoverProvider
-import nextflow.lsp.services.LanguageService
-import nextflow.lsp.services.LinkProvider
+import nextflow.lsp.ast.ASTNodeCache;
+import nextflow.lsp.services.CompletionProvider;
+import nextflow.lsp.services.FormattingProvider;
+import nextflow.lsp.services.HoverProvider;
+import nextflow.lsp.services.LanguageService;
+import nextflow.lsp.services.LinkProvider;
 
 /**
  * Implementation of language services for Nextflow config files.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class ConfigService extends LanguageService {
+public class ConfigService extends LanguageService {
 
-    private ConfigAstCache astCache = new ConfigAstCache()
+    private ConfigAstCache astCache = new ConfigAstCache();
 
     @Override
-    boolean matchesFile(String uri) {
-        uri.endsWith('.config') && !uri.endsWith('nf-test.config')
+    public boolean matchesFile(String uri) {
+        return uri.endsWith(".config") && !uri.endsWith("nf-test.config");
     }
 
     @Override
     protected ASTNodeCache getAstCache() {
-        return astCache
+        return astCache;
     }
 
     @Override
     protected CompletionProvider getCompletionProvider() {
-        new ConfigCompletionProvider(astCache)
+        return new ConfigCompletionProvider(astCache);
     }
 
     @Override
     protected FormattingProvider getFormattingProvider() {
-        new ConfigFormattingProvider(astCache)
+        return new ConfigFormattingProvider(astCache);
     }
 
     @Override
     protected HoverProvider getHoverProvider() {
-        new ConfigHoverProvider(astCache)
+        return new ConfigHoverProvider(astCache);
     }
 
     @Override
     protected LinkProvider getLinkProvider() {
-        new ConfigLinkProvider(astCache)
+        return new ConfigLinkProvider(astCache);
     }
 
 }

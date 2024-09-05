@@ -13,84 +13,82 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services.script
+package nextflow.lsp.services.script;
 
-import groovy.transform.CompileStatic
-import nextflow.lsp.ast.ASTNodeCache
-import nextflow.lsp.services.CallHierarchyProvider
-import nextflow.lsp.services.CompletionProvider
-import nextflow.lsp.services.DefinitionProvider
-import nextflow.lsp.services.FormattingProvider
-import nextflow.lsp.services.HoverProvider
-import nextflow.lsp.services.LanguageService
-import nextflow.lsp.services.LinkProvider
-import nextflow.lsp.services.ReferenceProvider
-import nextflow.lsp.services.RenameProvider
-import nextflow.lsp.services.SymbolProvider
+import nextflow.lsp.ast.ASTNodeCache;
+import nextflow.lsp.services.CallHierarchyProvider;
+import nextflow.lsp.services.CompletionProvider;
+import nextflow.lsp.services.DefinitionProvider;
+import nextflow.lsp.services.FormattingProvider;
+import nextflow.lsp.services.HoverProvider;
+import nextflow.lsp.services.LanguageService;
+import nextflow.lsp.services.LinkProvider;
+import nextflow.lsp.services.ReferenceProvider;
+import nextflow.lsp.services.RenameProvider;
+import nextflow.lsp.services.SymbolProvider;
 
 /**
  * Implementation of language services for Nextflow scripts.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@CompileStatic
-class ScriptService extends LanguageService {
+public class ScriptService extends LanguageService {
 
-    private ScriptAstCache astCache = new ScriptAstCache()
+    private ScriptAstCache astCache = new ScriptAstCache();
 
     @Override
-    boolean matchesFile(String uri) {
-        uri.endsWith('.nf')
+    public boolean matchesFile(String uri) {
+        return uri.endsWith(".nf");
     }
 
     @Override
     protected ASTNodeCache getAstCache() {
-        return astCache
+        return astCache;
     }
 
     @Override
     protected CallHierarchyProvider getCallHierarchyProvider() {
-        new ScriptCallHierarchyProvider(astCache)
+        return new ScriptCallHierarchyProvider(astCache);
     }
 
     @Override
     protected CompletionProvider getCompletionProvider() {
-        new ScriptCompletionProvider(astCache)
+        return new ScriptCompletionProvider(astCache);
     }
 
     @Override
     protected DefinitionProvider getDefinitionProvider() {
-        new ScriptDefinitionProvider(astCache)
+        return new ScriptDefinitionProvider(astCache);
     }
 
     @Override
     protected FormattingProvider getFormattingProvider() {
-        new ScriptFormattingProvider(astCache)
+        return new ScriptFormattingProvider(astCache);
     }
 
     @Override
     protected HoverProvider getHoverProvider() {
-        new ScriptHoverProvider(astCache)
+        return new ScriptHoverProvider(astCache);
     }
 
     @Override
     protected LinkProvider getLinkProvider() {
-        new ScriptLinkProvider(astCache)
+        return new ScriptLinkProvider(astCache);
     }
 
     @Override
     protected ReferenceProvider getReferenceProvider() {
-        new ScriptReferenceProvider(astCache)
+        return new ScriptReferenceProvider(astCache);
     }
 
     @Override
     protected RenameProvider getRenameProvider() {
-        new ScriptReferenceProvider(astCache)
+        return new ScriptReferenceProvider(astCache);
     }
 
     @Override
     protected SymbolProvider getSymbolProvider() {
-        new ScriptSymbolProvider(astCache)
+        return new ScriptSymbolProvider(astCache);
     }
 
 }
