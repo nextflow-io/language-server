@@ -93,6 +93,13 @@ class ScriptDsl implements DslScope {
     void error(String message=null) {
     }
 
+    @Deprecated
+    @Function('''
+        Stop the pipeline execution and return an exit code and optional error message.
+    ''')
+    void exit(int exitCode=0, String message=null) {
+    }
+
     @Function('''
         Get one or more files from a path or glob pattern. Returns a Path or list of Paths if there are multiple files.
     ''')
