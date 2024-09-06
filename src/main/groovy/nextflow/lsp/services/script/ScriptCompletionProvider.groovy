@@ -318,28 +318,32 @@ class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateItemsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
-        final classNode = ASTUtils.getTypeOfNode(object, ast)
-        if( classNode == null || ClassHelper.isObjectType(classNode) )
-            return
-        final isStatic = object instanceof ClassExpression
-        final Set<String> existingNames = []
+        ClassNode cn = ASTUtils.getTypeOfNode(object, ast)
+        while( cn != null && !ClassHelper.isObjectType(cn) ) {
+            final isStatic = object instanceof ClassExpression
+            final Set<String> existingNames = []
 
-        final fields = ASTUtils.getFieldsForType(classNode, isStatic, ast)
-        populateItemsFromFields(fields, namePrefix, existingNames, items)
+            final fields = ASTUtils.getFieldsForType(cn, isStatic, ast)
+            populateItemsFromFields(fields, namePrefix, existingNames, items)
 
-        final methods = ASTUtils.getMethodsForType(classNode, isStatic, ast)
-        populateItemsFromMethods(methods, namePrefix, existingNames, items)
+            final methods = ASTUtils.getMethodsForType(cn, isStatic, ast)
+            populateItemsFromMethods(methods, namePrefix, existingNames, items)
+
+            cn = cn.getSuperClass()
+        }
     }
 
     private void populateMethodsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
-        final classNode = ASTUtils.getTypeOfNode(object, ast)
-        if( classNode == null || ClassHelper.isObjectType(classNode) )
-            return
-        final isStatic = object instanceof ClassExpression
-        final Set<String> existingNames = []
+        ClassNode cn = ASTUtils.getTypeOfNode(object, ast)
+        while( cn != null && !ClassHelper.isObjectType(cn) ) {
+            final isStatic = object instanceof ClassExpression
+            final Set<String> existingNames = []
 
-        final methods = ASTUtils.getMethodsForType(classNode, isStatic, ast)
-        populateItemsFromMethods(methods, namePrefix, existingNames, items)
+            final methods = ASTUtils.getMethodsForType(cn, isStatic, ast)
+            populateItemsFromMethods(methods, namePrefix, existingNames, items)
+
+            cn = cn.getSuperClass()
+        }
     }
 
     private void populateItemsFromFields(Iterator<FieldNode> fields, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
@@ -424,10 +428,11 @@ class ScriptCompletionProvider implements CompletionProvider {
                 break
         }
 
-        if( scope.isClassScope() ) {
-            final cn = scope.getClassScope()
+        ClassNode cn = scope.getClassScope()
+        while( cn != null && !ClassHelper.isObjectType(cn) ) {
             populateItemsFromFields(cn.getFields().iterator(), namePrefix, existingNames, items)
             populateItemsFromMethods(cn.getMethods().iterator(), namePrefix, existingNames, items)
+            cn = cn.getSuperClass()
         }
     }
 
@@ -514,12 +519,12 @@ class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, List<CompletionItem> items) {
-        for( final classNode : classNodes ) {
+        for( final cn : classNodes ) {
             final item = new CompletionItem()
-            item.setLabel(classNode.getNameWithoutPackage())
-            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(classNode))
+            item.setLabel(cn.getNameWithoutPackage())
+            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(cn))
 
-            final documentation = ASTNodeStringUtils.getDocumentation(classNode)
+            final documentation = ASTNodeStringUtils.getDocumentation(cn)
             if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
 
