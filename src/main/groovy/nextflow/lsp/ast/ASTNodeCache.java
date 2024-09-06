@@ -84,12 +84,21 @@ public abstract class ASTNodeCache {
         // parse source files
         var sources = buildAST(uris, fileCache);
 
-        // update ast node cache
+        // update source cache
         sources.forEach((uri, sourceUnit) -> {
             if( sourceUnit == null )
                 return;
 
             sourcesByUri.put(uri, sourceUnit);
+        });
+
+        // perform pre-parent AST analysis
+        var changedUris = preVisitParents(sources.keySet());
+
+        // update ast node cache
+        sources.forEach((uri, sourceUnit) -> {
+            if( sourceUnit == null )
+                return;
 
             var parents = visitParents(sourceUnit);
             nodesByURI.put(uri, parents.keySet());
@@ -100,8 +109,8 @@ public abstract class ASTNodeCache {
             }
         });
 
-        // perform additional AST analysis
-        var changedUris = visitAST(sources.keySet());
+        // perform post-parent AST analysis
+        postVisitParents(changedUris);
 
         // update error cache
         for( var uri : changedUris ) {
@@ -128,12 +137,11 @@ public abstract class ASTNodeCache {
 
     /**
      * Perform additional AST analysis for a set of source files.
-     * Return the set of files whose errors have changed, which may
-     * include any files in the cache.
+     * Return the set of files which require post-parent AST analysis.
      *
      * @param uris
      */
-    protected abstract Set<URI> visitAST(Set<URI> uris);
+    protected abstract Set<URI> preVisitParents(Set<URI> uris);
 
     /**
      * Visit the AST of a source file and retrieve the set of relevant
@@ -142,6 +150,14 @@ public abstract class ASTNodeCache {
      * @param sourceUnit
      */
     protected abstract Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit);
+
+    /**
+     * Perform additional AST analysis for a set of source files, after
+     * parent links have been updated.
+     *
+     * @param uris
+     */
+    protected abstract void postVisitParents(Set<URI> uris);
 
     /**
      * Get the list of source units for all cached files.
@@ -307,7 +323,7 @@ public abstract class ASTNodeCache {
      * @param ancestor
      * @param descendant
      */
-    protected boolean contains(ASTNode ancestor, ASTNode descendant) {
+    private boolean contains(ASTNode ancestor, ASTNode descendant) {
         ASTNode current = getParent(descendant);
         while( current != null ) {
             if( current.equals(ancestor) )

@@ -106,7 +106,7 @@ public class ConfigAstCache extends ASTNodeCache {
     }
 
     @Override
-    protected Set<URI> visitAST(Set<URI> uris) {
+    protected Set<URI> preVisitParents(Set<URI> uris) {
         // phase 2: name resolution
         for( var uri : uris ) {
             var sourceUnit = getSourceUnit(uri);
@@ -128,9 +128,6 @@ public class ConfigAstCache extends ASTNodeCache {
             }
         }
 
-        // phase 4: type inference
-        // TODO
-
         return changedUris;
     }
 
@@ -139,6 +136,12 @@ public class ConfigAstCache extends ASTNodeCache {
         var visitor = new Visitor(sourceUnit);
         visitor.visit();
         return visitor.getLookup().getParents();
+    }
+
+    @Override
+    protected void postVisitParents(Set<URI> uris) {
+        // phase 4: type inference
+        // TODO
     }
 
     private static class Visitor extends ConfigVisitorSupport {
