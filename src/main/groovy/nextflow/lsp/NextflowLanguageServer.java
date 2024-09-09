@@ -27,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.services.CustomFormattingOptions;
@@ -40,6 +41,9 @@ import org.eclipse.lsp4j.CallHierarchyItem;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCall;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams;
 import org.eclipse.lsp4j.CallHierarchyPrepareParams;
+import org.eclipse.lsp4j.CodeLens;
+import org.eclipse.lsp4j.CodeLensOptions;
+import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionOptions;
@@ -60,6 +64,8 @@ import org.eclipse.lsp4j.DocumentLinkOptions;
 import org.eclipse.lsp4j.DocumentLinkParams;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.DocumentSymbolParams;
+import org.eclipse.lsp4j.ExecuteCommandOptions;
+import org.eclipse.lsp4j.ExecuteCommandParams;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.InitializeParams;
@@ -143,6 +149,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         serverCapabilities.setWorkspace(workspaceCapabilities);
 
         serverCapabilities.setCallHierarchyProvider(true);
+        var codeLensOptions = new CodeLensOptions(false);
+        serverCapabilities.setCodeLensProvider(codeLensOptions);
         var completionOptions = new CompletionOptions(false, List.of("."));
         serverCapabilities.setCompletionProvider(completionOptions);
         serverCapabilities.setDefinitionProvider(true);
@@ -150,6 +158,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var documentLinkOptions = new DocumentLinkOptions(false);
         serverCapabilities.setDocumentLinkProvider(documentLinkOptions);
         serverCapabilities.setDocumentSymbolProvider(true);
+        var executeCommandOptions = new ExecuteCommandOptions(List.of("nextflow.server.previewDag"));
+        serverCapabilities.setExecuteCommandProvider(executeCommandOptions);
         serverCapabilities.setHoverProvider(true);
         serverCapabilities.setReferencesProvider(true);
         serverCapabilities.setRenameProvider(true);
@@ -268,6 +278,19 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             if( service == null )
                 return null;
             return service.callHierarchyOutgoingCalls(item);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var uri = params.getTextDocument().getUri();
+            log.debug("textDocument/codeLens " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return Collections.emptyList();
+            return service.codeLens(params);
         });
     }
 
@@ -493,6 +516,27 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     @Override
     public void didRenameFiles(RenameFilesParams params) {
         log.debug("workspace/didRenameFiles " + params);
+    }
+
+    @Override
+    public CompletableFuture<Object> executeCommand(ExecuteCommandParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var command = params.getCommand();
+            var arguments = params.getArguments();
+            if( !"nextflow.server.previewDag".equals(command) || arguments.size() != 2 )
+                return null;
+            var uri = getJsonString(arguments.get(0));
+            log.debug(String.format("textDocument/executeCommand %s %s", command, arguments.toString()));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return null;
+            return service.executeCommand(command, arguments);
+        });
+    }
+
+    private String getJsonString(Object json) {
+        return json instanceof JsonPrimitive jp ? jp.getAsString() : null;
     }
 
     @Override

@@ -50,6 +50,7 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.syntax.Types;
 
 import static nextflow.script.v2.ASTHelpers.*;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
@@ -282,7 +283,7 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
             if( emit instanceof VariableExpression ve ) {
                 stmtX.setExpression(callThisX("_emit_", args(constX(ve.getName()))));
             }
-            else if( emit instanceof BinaryExpression be ) {
+            else if( emit instanceof BinaryExpression be && be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
                 var left = (VariableExpression)be.getLeftExpression();
                 stmtX.setExpression(callThisX("_emit_", args(constX(left.getName()))));
                 code.addStatement(stmtX);

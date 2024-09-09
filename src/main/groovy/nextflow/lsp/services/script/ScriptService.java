@@ -15,8 +15,12 @@
  */
 package nextflow.lsp.services.script;
 
+import java.util.List;
+
+import com.google.gson.JsonPrimitive;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.services.CallHierarchyProvider;
+import nextflow.lsp.services.CodeLensProvider;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.services.DefinitionProvider;
 import nextflow.lsp.services.FormattingProvider;
@@ -49,6 +53,11 @@ public class ScriptService extends LanguageService {
     @Override
     protected CallHierarchyProvider getCallHierarchyProvider() {
         return new ScriptCallHierarchyProvider(astCache);
+    }
+
+    @Override
+    protected CodeLensProvider getCodeLensProvider() {
+        return new ScriptCodeLensProvider(astCache);
     }
 
     @Override
@@ -89,6 +98,20 @@ public class ScriptService extends LanguageService {
     @Override
     protected SymbolProvider getSymbolProvider() {
         return new ScriptSymbolProvider(astCache);
+    }
+
+    @Override
+    public Object executeCommand(String command, List<Object> arguments) {
+        if( !"nextflow.server.previewDag".equals(command) || arguments.size() != 2 )
+            return null;
+        var uri = getJsonString(arguments.get(0));
+        var name = getJsonString(arguments.get(1));
+        var provider = new ScriptCodeLensProvider(astCache);
+        return provider.previewDag(uri, name);
+    }
+
+    private String getJsonString(Object json) {
+        return json instanceof JsonPrimitive jp ? jp.getAsString() : null;
     }
 
 }

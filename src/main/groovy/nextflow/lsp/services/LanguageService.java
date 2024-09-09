@@ -28,6 +28,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.Compiler;
@@ -44,6 +48,8 @@ import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyItem;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCall;
 import org.eclipse.lsp4j.CallHierarchyPrepareParams;
+import org.eclipse.lsp4j.CodeLens;
+import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionParams;
@@ -100,6 +106,7 @@ public abstract class LanguageService {
     public abstract boolean matchesFile(String uri);
     protected abstract ASTNodeCache getAstCache();
     protected CallHierarchyProvider getCallHierarchyProvider() { return null; }
+    protected CodeLensProvider getCodeLensProvider() { return null; }
     protected CompletionProvider getCompletionProvider() { return null; }
     protected DefinitionProvider getDefinitionProvider() { return null; }
     protected FormattingProvider getFormattingProvider() { return null; }
@@ -205,6 +212,15 @@ public abstract class LanguageService {
         return provider.outgoingCalls(item);
     }
 
+    public List<CodeLens> codeLens(CodeLensParams params) {
+        var provider = getCodeLensProvider();
+        if( provider == null )
+            return Collections.emptyList();
+
+        awaitUpdate();
+        return provider.codeLens(params.getTextDocument());
+    }
+
     public Either<List<CompletionItem>, CompletionList> completion(CompletionParams params) {
         var provider = getCompletionProvider();
         if( provider == null )
@@ -227,6 +243,7 @@ public abstract class LanguageService {
         if( provider == null )
             return Collections.emptyList();
 
+        awaitUpdate();
         return provider.documentLink(params.getTextDocument());
     }
 
@@ -235,7 +252,12 @@ public abstract class LanguageService {
         if( provider == null )
             return Collections.emptyList();
 
+        awaitUpdate();
         return provider.documentSymbol(params.getTextDocument());
+    }
+
+    public Object executeCommand(String command, List<Object> arguments) {
+        return null;
     }
 
     public List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options) {
@@ -281,7 +303,14 @@ public abstract class LanguageService {
 
     // --- INTERNAL
 
+    private Lock updateLock = new ReentrantLock();
+
+    private Condition updateCondition = updateLock.newCondition();
+
+    private volatile boolean awaitingUpdate;
+
     protected void updateLater() {
+        awaitingUpdate = true;
         updateExecutor.submit(DEBOUNCE_KEY);
     }
 
@@ -289,20 +318,43 @@ public abstract class LanguageService {
         updateExecutor.executeNow(DEBOUNCE_KEY);
     }
 
+    protected void awaitUpdate() {
+        if( !awaitingUpdate )
+            return;
+
+        updateLock.lock();
+        try {
+            updateCondition.await(DEBOUNCE_MILLIS * 2, TimeUnit.MILLISECONDS);
+        }
+        catch( InterruptedException e ) {
+        }
+        finally {
+            updateLock.unlock();
+        }
+    }
+
     /**
      * Re-compile any changed files.
      */
     protected void update() {
         synchronized (this) {
-            if( !initialized )
-                return;
+            if( initialized ) {
+                var uris = fileCache.removeChangedFiles();
 
-            var uris = fileCache.removeChangedFiles();
+                log.debug("update " + DefaultGroovyMethods.join(uris, " , "));
+                var astCache = getAstCache();
+                astCache.update(uris, fileCache);
+                publishDiagnostics(astCache.getErrors());
+            }
+        }
 
-            log.debug("update " + DefaultGroovyMethods.join(uris, " , "));
-            var astCache = getAstCache();
-            astCache.update(uris, fileCache);
-            publishDiagnostics(astCache.getErrors());
+        updateLock.lock();
+        try {
+            updateCondition.signalAll();
+            awaitingUpdate = false;
+        }
+        finally {
+            updateLock.unlock();
         }
     }
 
