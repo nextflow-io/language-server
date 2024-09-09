@@ -494,26 +494,60 @@ class FormattingVisitor extends ConfigVisitorSupport {
 
     @Override
     void visitListExpression(ListExpression node) {
+        final wrap = shouldWrapExpression(node)
+        final comma = wrap ? ',' : ', '
         append('[')
+        if( wrap ) {
+            appendNewLine()
+            incIndent()
+        }
         for( int i = 0; i < node.expressions.size(); i++ ) {
+            if( wrap )
+                appendIndent()
             visit(node.expressions[i])
             if( i + 1 < node.expressions.size() )
-                append(', ')
+                append(comma)
+            if( wrap )
+                appendNewLine()
+        }
+        if( wrap ) {
+            decIndent()
+            appendIndent()
         }
         append(']')
     }
 
     @Override
     void visitMapExpression(MapExpression node) {
+        if( !node.mapEntryExpressions ) {
+            append('[:]')
+            return
+        }
+        final wrap = shouldWrapExpression(node)
+        final comma = wrap ? ',' : ', '
         append('[')
-        if( !node.mapEntryExpressions )
-            append(':')
+        if( wrap ) {
+            appendNewLine()
+            incIndent()
+        }
         for( int i = 0; i < node.mapEntryExpressions.size(); i++ ) {
+            if( wrap )
+                appendIndent()
             visit(node.mapEntryExpressions[i])
             if( i + 1 < node.mapEntryExpressions.size() )
-                append(', ')
+                append(comma)
+            if( wrap )
+                appendNewLine()
+        }
+        if( wrap ) {
+            decIndent()
+            appendIndent()
         }
         append(']')
+    }
+
+    private boolean shouldWrapExpression(Expression node) {
+        return node.getLineNumber() < node.getLastLineNumber()
     }
 
     @Override
