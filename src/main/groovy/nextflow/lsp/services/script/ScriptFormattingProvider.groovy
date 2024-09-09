@@ -15,6 +15,8 @@
  */
 package nextflow.lsp.services.script
 
+import java.util.stream.Stream
+
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
 import nextflow.lsp.ast.ASTUtils
@@ -929,9 +931,10 @@ class FormattingVisitor extends ScriptVisitorSupport {
     }
 
     private String replaceEscapes(String value, String quoteChar) {
-        value = value.replace(quoteChar, '\\' + quoteChar)
-        if( quoteChar == SQ_STR || quoteChar == DQ_STR )
+        if( quoteChar == SQ_STR || quoteChar == DQ_STR ) {
             value = value.replace('\n', '\\n')
+            value = value.replace('\t', '\\t')
+        }
         return value
     }
 
@@ -960,36 +963,25 @@ class FormattingVisitor extends ScriptVisitorSupport {
     @Override
     void visitGStringExpression(GStringExpression node) {
         final quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> DQ_STR)
-        final strings = node.strings
-        final values = node.values
         append(quoteChar)
-        int i = 0
-        int j = 0
-        while( i < strings.size() || j < values.size() ) {
-            final string = i < strings.size() ? strings[i] : null
-            final value = j < values.size() ? values[j] : null
-            if( isNodeBefore(string, value) ) {
-                append(replaceEscapes(string.text, quoteChar))
-                i++
-            }
-            else {
-                append('${')
-                visit(value)
-                append('}')
-                j++
-            }
-        }
+        Stream.of((List<Expression>) node.strings, node.values)
+            .flatMap(v -> v.stream())
+            .sorted((a, b) ->
+                a.getLineNumber() != b.getLineNumber()
+                    ? a.getLineNumber() - b.getLineNumber()
+                    : a.getColumnNumber() - b.getColumnNumber()
+            )
+            .forEach((part) -> {
+                if( part instanceof ConstantExpression && part.getValue() instanceof String ) {
+                    append(replaceEscapes(part.getText(), quoteChar))
+                }
+                else {
+                    append('${')
+                    visit(part)
+                    append('}')
+                }
+            })
         append(quoteChar)
-    }
-
-    protected boolean isNodeBefore(ASTNode a, ASTNode b) {
-        if( !a )
-            return false
-        if( !b )
-            return true
-        if( a.getLineNumber() < b.getLineNumber() )
-            return true
-        return a.getLineNumber() == b.getLineNumber() && a.getColumnNumber() < b.getColumnNumber()
     }
 
     @Override
