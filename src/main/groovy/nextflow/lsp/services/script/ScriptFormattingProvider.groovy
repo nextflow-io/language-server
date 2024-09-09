@@ -726,11 +726,26 @@ class FormattingVisitor extends ScriptVisitorSupport {
 
     @Override
     void visitTernaryExpression(TernaryExpression node) {
-        visit(node.booleanExpression)
-        append(' ? ')
-        visit(node.trueExpression)
-        append(' : ')
-        visit(node.falseExpression)
+        if( shouldWrapExpression(node) ) {
+            visit(node.booleanExpression)
+            incIndent()
+            appendNewLine()
+            appendIndent()
+            append('? ')
+            visit(node.trueExpression)
+            appendNewLine()
+            appendIndent()
+            append(': ')
+            visit(node.falseExpression)
+            decIndent()
+        }
+        else {
+            visit(node.booleanExpression)
+            append(' ? ')
+            visit(node.trueExpression)
+            append(' : ')
+            visit(node.falseExpression)
+        }
     }
 
     @Override
