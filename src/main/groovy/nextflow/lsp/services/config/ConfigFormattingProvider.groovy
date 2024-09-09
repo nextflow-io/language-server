@@ -394,10 +394,13 @@ class FormattingVisitor extends ConfigVisitorSupport {
             append(']')
         }
         else {
-            if( node instanceof DeclarationExpression ) {
+            if( node instanceof DeclarationExpression )
                 append('def ')
-            }
+            if( node.leftExpression instanceof TupleExpression )
+                append('(')
             visit(node.leftExpression)
+            if( node.leftExpression instanceof TupleExpression )
+                append(')')
             append(' ')
             append(node.operation.text)
             append(' ')

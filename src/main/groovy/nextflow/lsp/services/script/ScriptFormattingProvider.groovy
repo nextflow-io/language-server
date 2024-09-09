@@ -690,7 +690,11 @@ class FormattingVisitor extends ScriptVisitorSupport {
 
         if( node instanceof DeclarationExpression )
             append('def ')
+        if( node.getLeftExpression() instanceof TupleExpression )
+            append('(')
         visit(node.getLeftExpression())
+        if( node.getLeftExpression() instanceof TupleExpression )
+            append(')')
 
         if( inMultilinePipeChain ) {
             appendNewLine()
