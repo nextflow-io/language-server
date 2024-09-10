@@ -461,7 +461,7 @@ class FormattingVisitor extends ConfigVisitorSupport {
         if( code.statements.size() == 0 ) {
             append(' }')
         }
-        else if( code.statements.size() == 1 && code.statements.first() instanceof ExpressionStatement ) {
+        else if( code.statements.size() == 1 && code.statements.first() instanceof ExpressionStatement && !shouldWrapExpression(node) ) {
             final stmt = (ExpressionStatement) code.statements.first()
             append(' ')
             visit(stmt.expression)
