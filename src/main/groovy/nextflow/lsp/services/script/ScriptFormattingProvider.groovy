@@ -666,7 +666,7 @@ class FormattingVisitor extends ScriptVisitorSupport {
         append(')')
     }
 
-    private boolean inMultilinePipeChain
+    private boolean inWrappedPipeChain
 
     @Override
     void visitBinaryExpression(BinaryExpression node) {
@@ -678,9 +678,9 @@ class FormattingVisitor extends ScriptVisitorSupport {
             return
         }
 
-        final beginMultilineChain = currentStmtExpr == node && getPipeChainDepth(node) >= 2
-        if( beginMultilineChain )
-            inMultilinePipeChain = true
+        final beginWrappedPipeChain = shouldWrapPipeExpression(node)
+        if( beginWrappedPipeChain )
+            inWrappedPipeChain = true
 
         Expression cse = null
         if( currentStmtExpr == node && node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
@@ -696,7 +696,7 @@ class FormattingVisitor extends ScriptVisitorSupport {
         if( node.getLeftExpression() instanceof TupleExpression )
             append(')')
 
-        if( inMultilinePipeChain ) {
+        if( inWrappedPipeChain ) {
             appendNewLine()
             incIndent()
             appendIndent()
@@ -707,25 +707,23 @@ class FormattingVisitor extends ScriptVisitorSupport {
         append(node.getOperation().getText())
         append(' ')
 
-        final impc = inMultilinePipeChain
-        inMultilinePipeChain = false
+        final iwpc = inWrappedPipeChain
+        inWrappedPipeChain = false
         visit(node.getRightExpression())
-        inMultilinePipeChain = impc
+        inWrappedPipeChain = iwpc
 
-        if( inMultilinePipeChain )
+        if( inWrappedPipeChain )
             decIndent()
 
         if( cse )
             currentStmtExpr = cse
 
-        if( beginMultilineChain )
-            inMultilinePipeChain = false
+        if( beginWrappedPipeChain )
+            inWrappedPipeChain = false
     }
 
-    protected int getPipeChainDepth(Expression node) {
-        return node instanceof BinaryExpression && node.getOperation().isA(Types.BITWISE_OR)
-            ? 1 + getPipeChainDepth(node.getLeftExpression())
-            : 0
+    protected boolean shouldWrapPipeExpression(BinaryExpression node) {
+        return currentStmtExpr == node && node.getOperation().isA(Types.BITWISE_OR) && shouldWrapExpression(node)
     }
 
     @Override
