@@ -1577,17 +1577,34 @@ public class ScriptAstBuilder {
 
     private void prependComments(ASTNode node, ParserRuleContext ctx) {
         var comments = new ArrayList<String>();
+        var child = ctx;
+        while( prependComments0(child, comments) )
+            child = child.getParent();
+
+        if( !comments.isEmpty() )
+            node.putNodeMetaData(PREPEND_COMMENTS, comments);
+    }
+
+    private boolean prependComments0(ParserRuleContext ctx, List<String> comments) {
+        var parent = ctx.getParent();
+        if( parent == null )
+            return false;
 
         // find index of token among siblings
-        var siblings = ctx.getParent().children;
+        var siblings = parent.children;
         int i = 0;
-        while( i + 1 < siblings.size() && siblings.get(i + 1) != ctx ) {
+        while( i < siblings.size() && siblings.get(i) != ctx ) {
             i++;
         }
 
+        // check parent context for additional comments
+        if( i == 0 )
+            return true;
+
         // prepend each comment/newline to node
-        while( i >= 0 ) {
-            var sibling = siblings.get(i);
+        var added = false;
+        for( int j = i - 1; j >= 0; j-- ) {
+            var sibling = siblings.get(j);
             if( !(sibling instanceof NlsContext || sibling instanceof SepContext) )
                 break;
 
@@ -1598,19 +1615,18 @@ public class ScriptAstBuilder {
             for( int k = newlines.size() - 1; k >= 0; k-- ) {
                 var text = newlines.get(k).getText();
                 comments.add(text);
+                added = true;
             }
-            i--;
         }
 
         // remove leading newline
-        if( !comments.isEmpty() ) {
+        if( added ) {
             var last = comments.get(comments.size() - 1);
             if( "\n".equals(last) )
                 comments.remove(comments.size() - 1);
         }
 
-        if( !comments.isEmpty() )
-            node.putNodeMetaData(PREPEND_COMMENTS, comments);
+        return false;
     }
 
     private boolean isInsideParentheses(NodeMetaDataHandler nodeMetaDataHandler) {
