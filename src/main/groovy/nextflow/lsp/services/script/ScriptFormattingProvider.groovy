@@ -592,16 +592,16 @@ class FormattingVisitor extends ScriptVisitorSupport {
         visitMethodCallExpression(node, false)
     }
 
-    private boolean inMultilineMethodChain
+    private boolean inWrappedMethodChain
 
     protected void visitMethodCallExpression(MethodCallExpression node, boolean directive) {
-        final beginMultilineChain = currentStmtExpr == node && getMethodChainDepth(node) >= 2
-        if( beginMultilineChain )
-            inMultilineMethodChain = true
+        final beginWrappedMethodChain = shouldWrapMethodChain(node)
+        if( beginWrappedMethodChain )
+            inWrappedMethodChain = true
 
         if( !node.isImplicitThis() ) {
             visit(node.objectExpression)
-            if( inMultilineMethodChain ) {
+            if( inWrappedMethodChain ) {
                 appendNewLine()
                 incIndent()
                 appendIndent()
@@ -609,8 +609,8 @@ class FormattingVisitor extends ScriptVisitorSupport {
             append('.')
         }
 
-        final immc = inMultilineMethodChain
-        inMultilineMethodChain = false
+        final iwmc = inWrappedMethodChain
+        inWrappedMethodChain = false
         visit(node.method, false)
         final arguments = (TupleExpression) node.arguments
         if( directive ) {
@@ -636,18 +636,30 @@ class FormattingVisitor extends ScriptVisitorSupport {
             append(' ')
             visit(arguments.last())
         }
-        inMultilineMethodChain = immc
+        inWrappedMethodChain = iwmc
 
-        if( !node.isImplicitThis() && inMultilineMethodChain )
+        if( !node.isImplicitThis() && inWrappedMethodChain )
             decIndent()
-        if( beginMultilineChain )
-            inMultilineMethodChain = false
+        if( beginWrappedMethodChain )
+            inWrappedMethodChain = false
     }
 
-    protected int getMethodChainDepth(Expression node) {
-        return node instanceof MethodCallExpression && !node.isImplicitThis()
-            ? 1 + getMethodChainDepth(node.getObjectExpression())
-            : 0
+    protected boolean shouldWrapMethodChain(MethodCallExpression node) {
+        if( currentStmtExpr != node )
+            return false
+        if( !shouldWrapExpression(node) )
+            return false
+
+        Expression root = node
+        int depth = 0
+        while( root instanceof MethodCallExpression && !root.isImplicitThis() ) {
+            root = root.getObjectExpression()
+            depth += 1
+        }
+
+        return shouldWrapExpression(root)
+            ? false
+            : depth >= 2
     }
 
     protected boolean shouldWrapMethodCall(MethodCallExpression node) {
