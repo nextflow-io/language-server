@@ -15,12 +15,10 @@
  */
 package nextflow.lsp.services.script
 
-import java.util.stream.Stream
-
 import groovy.transform.CompileStatic
 import nextflow.lsp.ast.ASTNodeCache
-import nextflow.lsp.ast.ASTUtils
-import nextflow.lsp.services.CustomFormattingOptions
+import nextflow.lsp.services.util.CustomFormattingOptions
+import nextflow.lsp.services.util.Formatter
 import nextflow.lsp.services.FormattingProvider
 import nextflow.lsp.util.Logger
 import nextflow.lsp.util.Positions
@@ -33,48 +31,15 @@ import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.ScriptNode
 import nextflow.script.v2.ScriptVisitorSupport
 import nextflow.script.v2.WorkflowNode
-import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassHelper
-import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.Parameter
-import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.BinaryExpression
-import org.codehaus.groovy.ast.expr.BitwiseNegationExpression
-import org.codehaus.groovy.ast.expr.CastExpression
-import org.codehaus.groovy.ast.expr.ClassExpression
-import org.codehaus.groovy.ast.expr.ClosureExpression
-import org.codehaus.groovy.ast.expr.ConstantExpression
-import org.codehaus.groovy.ast.expr.ConstructorCallExpression
-import org.codehaus.groovy.ast.expr.DeclarationExpression
-import org.codehaus.groovy.ast.expr.ElvisOperatorExpression
 import org.codehaus.groovy.ast.expr.EmptyExpression
-import org.codehaus.groovy.ast.expr.Expression
-import org.codehaus.groovy.ast.expr.GStringExpression
-import org.codehaus.groovy.ast.expr.ListExpression
-import org.codehaus.groovy.ast.expr.MapEntryExpression
-import org.codehaus.groovy.ast.expr.MapExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
-import org.codehaus.groovy.ast.expr.NotExpression
-import org.codehaus.groovy.ast.expr.PropertyExpression
-import org.codehaus.groovy.ast.expr.RangeExpression
-import org.codehaus.groovy.ast.expr.SpreadExpression
-import org.codehaus.groovy.ast.expr.SpreadMapExpression
-import org.codehaus.groovy.ast.expr.TernaryExpression
-import org.codehaus.groovy.ast.expr.TupleExpression
-import org.codehaus.groovy.ast.expr.UnaryMinusExpression
-import org.codehaus.groovy.ast.expr.UnaryPlusExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
-import org.codehaus.groovy.ast.stmt.AssertStatement
 import org.codehaus.groovy.ast.stmt.BlockStatement
-import org.codehaus.groovy.ast.stmt.CatchStatement
 import org.codehaus.groovy.ast.stmt.EmptyStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
-import org.codehaus.groovy.ast.stmt.IfStatement
-import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
-import org.codehaus.groovy.ast.stmt.TryCatchStatement
 import org.codehaus.groovy.control.SourceUnit
-import org.codehaus.groovy.syntax.Types
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.TextEdit
@@ -128,9 +93,7 @@ class FormattingVisitor extends ScriptVisitorSupport {
 
     private ASTNodeCache ast
 
-    private StringBuilder builder = new StringBuilder()
-
-    private int indentCount = 0
+    private Formatter fmt
 
     private int maxIncludeWidth = 0
 
@@ -138,6 +101,7 @@ class FormattingVisitor extends ScriptVisitorSupport {
         this.sourceUnit = sourceUnit
         this.options = options
         this.ast = ast
+        this.fmt = new Formatter(options)
     }
 
     @Override
@@ -188,189 +152,136 @@ class FormattingVisitor extends ScriptVisitorSupport {
             : module.@name.size()
     }
 
-    protected void append(String value) {
-        builder.append(value)
-    }
-
-    protected void appendIndent() {
-        final indent = options.insertSpaces()
-            ? ' ' * options.tabSize()
-            : '\t'
-        builder.append(indent * indentCount)
-    }
-
-    protected void appendNewLine() {
-        append('\n')
-    }
-
-    protected void incIndent() {
-        indentCount++
-    }
-
-    protected void decIndent() {
-        indentCount--
-    }
-
-    protected void appendComments(ASTNode node) {
-        final comments = (List<String>) node.getNodeMetaData(PREPEND_COMMENTS)
-        if( !comments )
-            return
-
-        for( final line : comments.asReversed() ) {
-            if( line == '\n' ) {
-                append(line)
-            }
-            else {
-                appendIndent()
-                append(line.stripLeading())
-            }
-        }
-    }
-
     String toString() {
-        return builder.toString()
+        return fmt.toString()
     }
 
     // script statements
 
     @Override
     void visitFeatureFlag(FeatureFlagNode node) {
-        appendComments(node)
-        append(node.name)
-        append(' = ')
-        visit(node.value)
-        appendNewLine()
+        fmt.appendComments(node)
+        fmt.append(node.name)
+        fmt.append(' = ')
+        fmt.visit(node.value)
+        fmt.appendNewLine()
     }
 
     @Override
     void visitInclude(IncludeNode node) {
-        appendComments(node)
+        fmt.appendComments(node)
         for( final module : node.modules ) {
-            append('include { ')
-            append(module.@name)
+            fmt.append('include { ')
+            fmt.append(module.@name)
             if( module.alias ) {
-                append(' as ')
-                append(module.alias)
+                fmt.append(' as ')
+                fmt.append(module.alias)
             }
             if( options.harshilAlignment() ) {
                 final padding = maxIncludeWidth - getIncludeWidth(module)
-                append(' ' * padding)
+                fmt.append(' ' * padding)
             }
-            append(' } from ')
-            visit(node.source)
-            appendNewLine()
+            fmt.append(' } from ')
+            fmt.visit(node.source)
+            fmt.appendNewLine()
         }
     }
 
     @Override
     void visitFunction(FunctionNode node) {
-        appendComments(node)
-        append('def ')
-        append(node.name)
-        append('(')
-        for( int i = 0; i < node.parameters.size(); i++ ) {
-            visitParameter(node.parameters[i])
-            if( i + 1 < node.parameters.size() )
-                append(', ')
-        }
-        append(') {\n')
-        incIndent()
-        visit(node.code)
-        decIndent()
-        append('}\n')
+        fmt.appendComments(node)
+        fmt.append('def ')
+        fmt.append(node.name)
+        fmt.append('(')
+        fmt.visitParameters(node.parameters)
+        fmt.append(') {\n')
+        fmt.incIndent()
+        fmt.visit(node.code)
+        fmt.decIndent()
+        fmt.append('}\n')
     }
 
     @Override
     void visitProcess(ProcessNode node) {
-        appendComments(node)
-        append('process ')
-        append(node.name)
-        append(' {\n')
-        incIndent()
+        fmt.appendComments(node)
+        fmt.append('process ')
+        fmt.append(node.name)
+        fmt.append(' {\n')
+        fmt.incIndent()
         if( node.directives instanceof BlockStatement ) {
             visitDirectives(node.directives)
-            appendNewLine()
+            fmt.appendNewLine()
         }
         if( node.inputs instanceof BlockStatement ) {
-            appendIndent()
-            append('input:\n')
+            fmt.appendIndent()
+            fmt.append('input:\n')
             visitDirectives(node.inputs)
-            appendNewLine()
+            fmt.appendNewLine()
         }
         if( node.outputs instanceof BlockStatement ) {
-            appendIndent()
-            append('output:\n')
+            fmt.appendIndent()
+            fmt.append('output:\n')
             visitDirectives(node.outputs)
-            appendNewLine()
+            fmt.appendNewLine()
         }
         if( node.when !instanceof EmptyExpression ) {
-            appendIndent()
-            append('when:\n')
-            appendIndent()
-            visit(node.when)
-            append('\n\n')
+            fmt.appendIndent()
+            fmt.append('when:\n')
+            fmt.appendIndent()
+            fmt.visit(node.when)
+            fmt.append('\n\n')
         }
-        appendIndent()
-        append(node.type)
-        append(':\n')
-        visit(node.exec)
+        fmt.appendIndent()
+        fmt.append(node.type)
+        fmt.append(':\n')
+        fmt.visit(node.exec)
         if( node.stub !instanceof EmptyStatement ) {
-            appendNewLine()
-            appendIndent()
-            append('stub:\n')
-            visit(node.stub)
+            fmt.appendNewLine()
+            fmt.appendIndent()
+            fmt.append('stub:\n')
+            fmt.visit(node.stub)
         }
-        decIndent()
-        append('}\n')
-    }
-
-    protected void visitDirectives(Statement statement) {
-        asDirectives(statement).forEach(this::visitDirective);
-    }
-
-    protected void visitDirective(MethodCallExpression call) {
-        appendIndent()
-        visitMethodCallExpression(call, true)
-        appendNewLine()
+        fmt.decIndent()
+        fmt.append('}\n')
     }
 
     @Override
     void visitWorkflow(WorkflowNode node) {
-        appendComments(node)
-        append('workflow')
+        fmt.appendComments(node)
+        fmt.append('workflow')
         if( node.name ) {
-            append(' ')
-            append(node.name)
+            fmt.append(' ')
+            fmt.append(node.name)
         }
-        append(' {\n')
-        incIndent()
+        fmt.append(' {\n')
+        fmt.incIndent()
         if( node.takes instanceof BlockStatement ) {
-            appendIndent()
-            append('take:\n')
-            visit(node.takes)
-            appendNewLine()
+            fmt.appendIndent()
+            fmt.append('take:\n')
+            fmt.visit(node.takes)
+            fmt.appendNewLine()
         }
         if( node.main instanceof BlockStatement ) {
             if( node.takes instanceof BlockStatement || node.emits instanceof BlockStatement || node.publishers instanceof BlockStatement ) {
-                appendIndent()
-                append('main:\n')
+                fmt.appendIndent()
+                fmt.append('main:\n')
             }
-            visit(node.main)
+            fmt.visit(node.main)
         }
         if( node.emits instanceof BlockStatement ) {
-            appendNewLine()
-            appendIndent()
-            append('emit:\n')
+            fmt.appendNewLine()
+            fmt.appendIndent()
+            fmt.append('emit:\n')
             visitWorkflowEmits(asBlockStatements(node.emits))
         }
         if( node.publishers instanceof BlockStatement ) {
-            appendNewLine()
-            appendIndent()
-            append('publish:\n')
-            visit(node.publishers)
+            fmt.appendNewLine()
+            fmt.appendIndent()
+            fmt.append('publish:\n')
+            fmt.visit(node.publishers)
         }
-        decIndent()
-        append('}\n')
+        fmt.decIndent()
+        fmt.append('}\n')
     }
 
     protected void visitWorkflowEmits(List<Statement> emits) {
@@ -383,18 +294,18 @@ class FormattingVisitor extends ScriptVisitorSupport {
             if( stmtX.expression instanceof BinaryExpression ) {
                 final binX = (BinaryExpression)stmtX.expression
                 final varX = (VariableExpression)binX.getLeftExpression()
-                appendIndent()
-                visit(varX)
+                fmt.appendIndent()
+                fmt.visit(varX)
                 if( alignmentWidth > 0 ) {
                     final padding = alignmentWidth - varX.name.length()
-                    append(' ' * padding)
+                    fmt.append(' ' * padding)
                 }
-                append(' = ')
-                visit(binX.getRightExpression())
-                appendNewLine()
+                fmt.append(' = ')
+                fmt.visit(binX.getRightExpression())
+                fmt.appendNewLine()
             }
             else {
-                visit(stmt)
+                fmt.visit(stmt)
             }
         }
     }
@@ -425,12 +336,12 @@ class FormattingVisitor extends ScriptVisitorSupport {
 
     @Override
     void visitOutput(OutputNode node) {
-        appendComments(node)
-        append('output {\n')
-        incIndent()
+        fmt.appendComments(node)
+        fmt.append('output {\n')
+        fmt.incIndent()
         visitOutputBody(node.body)
-        decIndent()
-        append('}\n')
+        fmt.decIndent()
+        fmt.append('}\n')
     }
 
     protected void visitOutputBody(Statement body) {
@@ -438,15 +349,15 @@ class FormattingVisitor extends ScriptVisitorSupport {
             // treat as target definition
             final code = asDslBlock(call, 1)
             if( code != null ) {
-                appendNewLine()
-                appendIndent()
-                visit(call.getMethod())
-                append(' {\n')
-                incIndent()
+                fmt.appendNewLine()
+                fmt.appendIndent()
+                fmt.visit(call.getMethod())
+                fmt.append(' {\n')
+                fmt.incIndent()
                 visitTargetBody(code)
-                decIndent()
-                appendIndent()
-                append('}\n')
+                fmt.decIndent()
+                fmt.appendIndent()
+                fmt.append('}\n')
                 return
             }
 
@@ -462,15 +373,15 @@ class FormattingVisitor extends ScriptVisitorSupport {
             if( name == 'index' ) {
                 final code = asDslBlock(call, 1)
                 if( code != null ) {
-                    appendNewLine()
-                    appendIndent()
-                    append(name)
-                    append(' {\n')
-                    incIndent()
+                    fmt.appendNewLine()
+                    fmt.appendIndent()
+                    fmt.append(name)
+                    fmt.append(' {\n')
+                    fmt.incIndent()
                     visitDirectives(code)
-                    decIndent()
-                    appendIndent()
-                    append('}\n')
+                    fmt.decIndent()
+                    fmt.appendIndent()
+                    fmt.append('}\n')
                     return
                 }
             }
@@ -480,601 +391,16 @@ class FormattingVisitor extends ScriptVisitorSupport {
         });
     }
 
-    // statements
-
-    @Override
-    void visitIfElse(IfStatement node) {
-        visitIfElse(node, true)
+    protected void visitDirectives(Statement statement) {
+        asDirectives(statement).forEach(this::visitDirective);
     }
 
-    protected void visitIfElse(IfStatement node, boolean preIndent) {
-        appendComments(node)
-        if( preIndent )
-            appendIndent()
-        append('if (')
-        visit(node.booleanExpression)
-        append(') {\n')
-        incIndent()
-        visit(node.ifBlock)
-        decIndent()
-        appendIndent()
-        append('}\n')
-        if( node.elseBlock instanceof IfStatement ) {
-            appendIndent()
-            append('else ')
-            visitIfElse((IfStatement) node.elseBlock, false)
-        }
-        else if( node.elseBlock !instanceof EmptyStatement ) {
-            appendIndent()
-            append('else {\n')
-            incIndent()
-            visit(node.elseBlock)
-            decIndent()
-            appendIndent()
-            append('}\n')
-        }
+    protected void visitDirective(MethodCallExpression call) {
+        fmt.appendIndent()
+        fmt.append(call.getMethodAsString())
+        fmt.append(' ')
+        fmt.visitArguments(asMethodCallArguments(call), hasNamedArgs(call), false)
+        fmt.appendNewLine()
     }
-
-    private Expression currentStmtExpr
-
-    @Override
-    void visitExpressionStatement(ExpressionStatement node) {
-        final cse = currentStmtExpr
-        currentStmtExpr = node.expression
-        appendComments(node)
-        appendIndent()
-        if( node.statementLabels ) {
-            for( final label : node.statementLabels ) {
-                append(label)
-                append(': ')
-            }
-        }
-        visit(node.expression)
-        appendNewLine()
-        currentStmtExpr = cse
-    }
-
-    @Override
-    void visitReturnStatement(ReturnStatement node) {
-        appendComments(node)
-        appendIndent()
-        append('return ')
-        visit(node.expression)
-        appendNewLine()
-    }
-
-    @Override
-    void visitAssertStatement(AssertStatement node) {
-        appendComments(node)
-        appendIndent()
-        append('assert ')
-        visit(node.booleanExpression)
-        if( !(node.messageExpression instanceof ConstantExpression && node.messageExpression.isNullExpression()) ) {
-            append(', ')
-            visit(node.messageExpression)
-        }
-        appendNewLine()
-    }
-
-    @Override
-    void visitTryCatchFinally(TryCatchStatement node) {
-        appendComments(node)
-        appendIndent()
-        append('try {\n')
-        incIndent()
-        visit(node.tryStatement)
-        decIndent()
-        appendIndent()
-        append('}\n')
-        for( final catchStatement : node.catchStatements ) {
-            visit(catchStatement)
-        }
-    }
-
-    @Override
-    void visitCatchStatement(CatchStatement node) {
-        appendComments(node)
-        appendIndent()
-        append('catch (')
-        visitParameter(node.variable)
-        append(') {\n')
-        incIndent()
-        visit(node.code)
-        decIndent()
-        appendIndent()
-        append('}\n')
-    }
-
-    // expressions
-
-    @Override
-    void visitMethodCallExpression(MethodCallExpression node) {
-        visitMethodCallExpression(node, false)
-    }
-
-    private boolean inWrappedMethodChain
-
-    protected void visitMethodCallExpression(MethodCallExpression node, boolean directive) {
-        final beginWrappedMethodChain = shouldWrapMethodChain(node)
-        if( beginWrappedMethodChain )
-            inWrappedMethodChain = true
-
-        if( !node.isImplicitThis() ) {
-            visit(node.objectExpression)
-            if( inWrappedMethodChain ) {
-                appendNewLine()
-                incIndent()
-                appendIndent()
-            }
-            append('.')
-        }
-
-        final iwmc = inWrappedMethodChain
-        inWrappedMethodChain = false
-        visit(node.method, false)
-        final arguments = (TupleExpression) node.arguments
-        if( directive ) {
-            append(' ')
-            visit(arguments)
-            return
-        }
-        final lastClosureArg = arguments.size() > 0 && arguments.last() instanceof ClosureExpression
-        final parenArgs = lastClosureArg
-            ? new TupleExpression(arguments.expressions[0..<-1])
-            : arguments
-        if( parenArgs.size() > 0 || !lastClosureArg ) {
-            final wrap = shouldWrapMethodCall(node)
-            append('(')
-            if( wrap )
-                appendNewLine()
-            visitArguments(parenArgs, wrap)
-            if( wrap )
-                appendIndent()
-            append(')')
-        }
-        if( lastClosureArg ) {
-            append(' ')
-            visit(arguments.last())
-        }
-        inWrappedMethodChain = iwmc
-
-        if( !node.isImplicitThis() && inWrappedMethodChain )
-            decIndent()
-        if( beginWrappedMethodChain )
-            inWrappedMethodChain = false
-    }
-
-    protected boolean shouldWrapMethodChain(MethodCallExpression node) {
-        if( currentStmtExpr != node )
-            return false
-        if( !shouldWrapExpression(node) )
-            return false
-
-        Expression root = node
-        int depth = 0
-        while( root instanceof MethodCallExpression && !root.isImplicitThis() ) {
-            root = root.getObjectExpression()
-            depth += 1
-        }
-
-        return shouldWrapExpression(root)
-            ? false
-            : depth >= 2
-    }
-
-    protected boolean shouldWrapMethodCall(MethodCallExpression node) {
-        final start = node.getMethod()
-        final end = node.getArguments()
-        return start.getLineNumber() < end.getLastLineNumber()
-    }
-
-    @Override
-    void visitConstructorCallExpression(ConstructorCallExpression node) {
-        append('new ')
-        visitTypeName(node.type)
-        append('(')
-        visit(node.arguments)
-        append(')')
-    }
-
-    private boolean inWrappedPipeChain
-
-    @Override
-    void visitBinaryExpression(BinaryExpression node) {
-        if( node.getOperation().isA(Types.LEFT_SQUARE_BRACKET) ) {
-            visit(node.getLeftExpression())
-            append('[')
-            visit(node.getRightExpression())
-            append(']')
-            return
-        }
-
-        final beginWrappedPipeChain = shouldWrapPipeExpression(node)
-        if( beginWrappedPipeChain )
-            inWrappedPipeChain = true
-
-        Expression cse = null
-        if( currentStmtExpr == node && node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
-            cse = currentStmtExpr
-            currentStmtExpr = node.getRightExpression()
-        }
-
-        if( node instanceof DeclarationExpression )
-            append('def ')
-        if( node.getLeftExpression() instanceof TupleExpression )
-            append('(')
-        visit(node.getLeftExpression())
-        if( node.getLeftExpression() instanceof TupleExpression )
-            append(')')
-
-        if( inWrappedPipeChain ) {
-            appendNewLine()
-            incIndent()
-            appendIndent()
-        }
-        else {
-            append(' ')
-        }
-        append(node.getOperation().getText())
-        append(' ')
-
-        final iwpc = inWrappedPipeChain
-        inWrappedPipeChain = false
-        visit(node.getRightExpression())
-        inWrappedPipeChain = iwpc
-
-        if( inWrappedPipeChain )
-            decIndent()
-
-        if( cse )
-            currentStmtExpr = cse
-
-        if( beginWrappedPipeChain )
-            inWrappedPipeChain = false
-    }
-
-    protected boolean shouldWrapPipeExpression(BinaryExpression node) {
-        return currentStmtExpr == node && node.getOperation().isA(Types.BITWISE_OR) && shouldWrapExpression(node)
-    }
-
-    @Override
-    void visitTernaryExpression(TernaryExpression node) {
-        if( shouldWrapExpression(node) ) {
-            visit(node.booleanExpression)
-            incIndent()
-            appendNewLine()
-            appendIndent()
-            append('? ')
-            visit(node.trueExpression)
-            appendNewLine()
-            appendIndent()
-            append(': ')
-            visit(node.falseExpression)
-            decIndent()
-        }
-        else {
-            visit(node.booleanExpression)
-            append(' ? ')
-            visit(node.trueExpression)
-            append(' : ')
-            visit(node.falseExpression)
-        }
-    }
-
-    @Override
-    void visitShortTernaryExpression(ElvisOperatorExpression node) {
-        visit(node.trueExpression)
-        append(' ?: ')
-        visit(node.falseExpression)
-    }
-
-    @Override
-    void visitNotExpression(NotExpression node) {
-        append('!')
-        visit(node.expression)
-    }
-
-    @Override
-    void visitClosureExpression(ClosureExpression node) {
-        append('{')
-        if( node.parameters ) {
-            append(' ')
-            for( int i = 0; i < node.parameters.size(); i++ ) {
-                visitParameter(node.parameters[i])
-                if( i + 1 < node.parameters.size() )
-                    append(', ')
-            }
-            append(' ->')
-        }
-        final code = (BlockStatement) node.code
-        if( code.statements.size() == 0 ) {
-            append(' }')
-        }
-        else if( code.statements.size() == 1 && code.statements.first() instanceof ExpressionStatement && !shouldWrapExpression(node) ) {
-            final stmt = (ExpressionStatement) code.statements.first()
-            append(' ')
-            visit(stmt.expression)
-            append(' }')
-        }
-        else {
-            appendNewLine()
-            incIndent()
-            visit(code)
-            decIndent()
-            appendIndent()
-            append('}')
-        }
-    }
-
-    protected void visitParameter(Parameter parameter) {
-        final type = parameter.type
-        if( !ClassHelper.isObjectType(type) ) {
-            visitTypeName(type)
-            append(' ')
-        }
-        append(parameter.name)
-        if( parameter.hasInitialExpression() ) {
-            append('=')
-            visit(parameter.initialExpression)
-        }
-    }
-
-    @Override
-    void visitTupleExpression(TupleExpression node) {
-        visitArguments(node, false)
-    }
-
-    protected void visitArguments(TupleExpression node, boolean wrap) {
-        final hasNamedArgs = node.getNodeMetaData(NAMED_ARGS)
-        final positionalArgs = hasNamedArgs ? node.expressions.tail() : node.expressions
-        final comma = wrap ? ',' : ', '
-        if( wrap )
-            incIndent()
-        for( int i = 0; i < positionalArgs.size(); i++ ) {
-            if( wrap )
-                appendIndent()
-            visit(positionalArgs[i])
-            if( i + 1 < positionalArgs.size() || hasNamedArgs )
-                append(comma)
-            if( wrap )
-                appendNewLine()
-        }
-        if( hasNamedArgs ) {
-            final mapX = (MapExpression)node.expressions.first()
-            final namedArgs = mapX.mapEntryExpressions
-            for( int i = 0; i < namedArgs.size(); i++ ) {
-                if( wrap )
-                    appendIndent()
-                visit(namedArgs[i])
-                if( i + 1 < namedArgs.size() )
-                    append(comma)
-                if( wrap )
-                    appendNewLine()
-            }
-        }
-        if( wrap )
-            decIndent()
-    }
-
-    @Override
-    void visitListExpression(ListExpression node) {
-        final wrap = shouldWrapExpression(node)
-        final comma = wrap ? ',' : ', '
-        append('[')
-        if( wrap ) {
-            appendNewLine()
-            incIndent()
-        }
-        for( int i = 0; i < node.expressions.size(); i++ ) {
-            if( wrap )
-                appendIndent()
-            visit(node.expressions[i])
-            if( i + 1 < node.expressions.size() )
-                append(comma)
-            if( wrap )
-                appendNewLine()
-        }
-        if( wrap ) {
-            decIndent()
-            appendIndent()
-        }
-        append(']')
-    }
-
-    @Override
-    void visitMapExpression(MapExpression node) {
-        if( !node.mapEntryExpressions ) {
-            append('[:]')
-            return
-        }
-        final wrap = shouldWrapExpression(node)
-        final comma = wrap ? ',' : ', '
-        append('[')
-        if( wrap ) {
-            appendNewLine()
-            incIndent()
-        }
-        for( int i = 0; i < node.mapEntryExpressions.size(); i++ ) {
-            if( wrap )
-                appendIndent()
-            visit(node.mapEntryExpressions[i])
-            if( i + 1 < node.mapEntryExpressions.size() )
-                append(comma)
-            if( wrap )
-                appendNewLine()
-        }
-        if( wrap ) {
-            decIndent()
-            appendIndent()
-        }
-        append(']')
-    }
-
-    private boolean shouldWrapExpression(Expression node) {
-        return node.getLineNumber() < node.getLastLineNumber()
-    }
-
-    @Override
-    void visitMapEntryExpression(MapEntryExpression node) {
-        visit(node.keyExpression, false)
-        append(': ')
-        visit(node.valueExpression)
-    }
-
-    @Override
-    void visitRangeExpression(RangeExpression node) {
-        visit(node.from)
-        if( node.isExclusiveLeft() )
-            append('<')
-        append('..')
-        if( node.isExclusiveRight() )
-            append('<')
-        visit(node.to)
-    }
-
-    @Override
-    void visitSpreadExpression(SpreadExpression node) {
-        append('*')
-        visit(node.expression)
-    }
-
-    @Override
-    void visitSpreadMapExpression(SpreadMapExpression node) {
-        append('*:')
-        visit(node.expression)
-    }
-
-    @Override
-    void visitUnaryMinusExpression(UnaryMinusExpression node) {
-        append('-')
-        visit(node.expression)
-    }
-
-    @Override
-    void visitUnaryPlusExpression(UnaryPlusExpression node) {
-        append('+')
-        visit(node.expression)
-    }
-
-    @Override
-    void visitBitwiseNegationExpression(BitwiseNegationExpression node) {
-        append('~')
-        visit(node.expression)
-    }
-
-    @Override
-    void visitCastExpression(CastExpression node) {
-        visit(node.expression)
-        append(' as ')
-        visitTypeName(node.type)
-    }
-
-    @Override
-    void visitConstantExpression(ConstantExpression node) {
-        visitConstantExpression(node, true)
-    }
-
-    protected void visitConstantExpression(ConstantExpression node, boolean quote) {
-        if( node.value instanceof String ) {
-            final value = (String) node.value
-            if( quote ) {
-                final quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> SQ_STR)
-                append(quoteChar)
-                append(replaceEscapes(value, quoteChar))
-                append(quoteChar)
-            }
-            else {
-                append(value)
-            }
-        }
-        else {
-            append(node.text)
-        }
-    }
-
-    private String replaceEscapes(String value, String quoteChar) {
-        if( quoteChar == SQ_STR || quoteChar == DQ_STR ) {
-            value = value.replace('\n', '\\n')
-            value = value.replace('\t', '\\t')
-        }
-        return value
-    }
-
-    @Override
-    void visitClassExpression(ClassExpression node) {
-        visitTypeName(node.type)
-    }
-
-    protected visitTypeName(ClassNode type) {
-        final isFullyQualified = type.getNodeMetaData(FULLY_QUALIFIED)
-        append(isFullyQualified ? type.getName() : type.getNameWithoutPackage())
-    }
-
-    @Override
-    void visitVariableExpression(VariableExpression node) {
-        append(node.text)
-    }
-
-    @Override
-    void visitPropertyExpression(PropertyExpression node) {
-        visit(node.objectExpression)
-        append('.')
-        visit(node.property, false)
-    }
-
-    @Override
-    void visitGStringExpression(GStringExpression node) {
-        final quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> DQ_STR)
-        append(quoteChar)
-        Stream.of((List<Expression>) node.strings, node.values)
-            .flatMap(v -> v.stream())
-            .sorted((a, b) ->
-                a.getLineNumber() != b.getLineNumber()
-                    ? a.getLineNumber() - b.getLineNumber()
-                    : a.getColumnNumber() - b.getColumnNumber()
-            )
-            .forEach((part) -> {
-                if( part instanceof ConstantExpression && part.getValue() instanceof String ) {
-                    append(replaceEscapes(part.getText(), quoteChar))
-                }
-                else {
-                    append('${')
-                    visit(part)
-                    append('}')
-                }
-            })
-        append(quoteChar)
-    }
-
-    @Override
-    void visit(Expression node) {
-        visit(node, true)
-    }
-
-    protected void visit(Expression node, boolean quote) {
-        final number = (Number) node.getNodeMetaData(INSIDE_PARENTHESES_LEVEL)
-        if( number?.intValue() )
-            append('(')
-        if( node instanceof ConstantExpression ) {
-            visitConstantExpression(node, quote)
-        }
-        else {
-            super.visit(node)
-        }
-        if( number?.intValue() )
-            append(')')
-    }
-
-    private static final String SLASH_STR = '/'
-    private static final String TDQ_STR = '"""'
-    private static final String TSQ_STR = "'''"
-    private static final String SQ_STR = "'"
-    private static final String DQ_STR = '"'
-
-    private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED"
-    private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL"
-    private static final String NAMED_ARGS = "_NAMED_ARGS"
-    private static final String PREPEND_COMMENTS = "_PREPEND_COMMENTS"
-    private static final String QUOTE_CHAR = "_QUOTE_CHAR"
 
 }

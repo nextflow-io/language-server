@@ -30,7 +30,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.Logger;
-import nextflow.lsp.services.CustomFormattingOptions;
+import nextflow.lsp.services.util.CustomFormattingOptions;
 import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.config.ConfigService;
 import nextflow.lsp.services.script.ScriptService;

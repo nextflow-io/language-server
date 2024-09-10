@@ -29,6 +29,7 @@ import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MapExpression;
 import org.codehaus.groovy.ast.expr.MapEntryExpression;
+import org.codehaus.groovy.ast.expr.MethodCall;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.TupleExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
@@ -104,11 +105,16 @@ public class ASTHelpers {
         return (MethodCallExpression) stmtX.getExpression();
     }
 
-    public static List<Expression> asMethodCallArguments(MethodCallExpression call) {
+    public static List<Expression> asMethodCallArguments(MethodCall call) {
         return ((TupleExpression) call.getArguments()).getExpressions();
     }
 
-    public static List<MapEntryExpression> asNamedArgs(MethodCallExpression call) {
+    public static boolean hasNamedArgs(MethodCall call) {
+        var args = (TupleExpression) call.getArguments();
+        return args.getNodeMetaData(NAMED_ARGS) != null;
+    }
+
+    public static List<MapEntryExpression> asNamedArgs(MethodCall call) {
         var args = asMethodCallArguments(call);
         return args.size() > 0 && args.get(0) instanceof MapExpression me
             ? me.getMapEntryExpressions()
@@ -136,4 +142,5 @@ public class ASTHelpers {
             .findFirst();
     }
 
+    private static final String NAMED_ARGS = "_NAMED_ARGS";
 }

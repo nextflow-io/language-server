@@ -38,6 +38,7 @@ import nextflow.lsp.compiler.Compiler;
 import nextflow.lsp.compiler.SyntaxWarning;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.file.PathUtils;
+import nextflow.lsp.services.util.CustomFormattingOptions;
 import nextflow.lsp.util.DebouncingExecutor;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
