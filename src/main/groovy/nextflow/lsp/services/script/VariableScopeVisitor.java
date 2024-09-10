@@ -345,8 +345,9 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void checkDirectives(Statement node, String typeLabel, boolean checkSyntaxErrors) {
         for( var stmt : asBlockStatements(node) ) {
             var call = asMethodCallX(stmt);
-            if( checkSyntaxErrors && call == null ) {
-                addError("Invalid " + typeLabel, stmt);
+            if( call == null ) {
+                if( checkSyntaxErrors )
+                    addError("Invalid " + typeLabel, stmt);
                 continue;
             }
             var name = call.getMethodAsString();
