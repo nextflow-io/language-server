@@ -623,12 +623,12 @@ class FormattingVisitor extends ScriptVisitorSupport {
             ? new TupleExpression(arguments.expressions[0..<-1])
             : arguments
         if( parenArgs.size() > 0 || !lastClosureArg ) {
-            final newline = isMultilineMethodCall(node)
+            final wrap = shouldWrapMethodCall(node)
             append('(')
-            if( newline )
+            if( wrap )
                 appendNewLine()
-            visitArguments(parenArgs, newline)
-            if( newline )
+            visitArguments(parenArgs, wrap)
+            if( wrap )
                 appendIndent()
             append(')')
         }
@@ -650,11 +650,10 @@ class FormattingVisitor extends ScriptVisitorSupport {
             : 0
     }
 
-    protected boolean isMultilineMethodCall(MethodCallExpression node) {
-        if( currentStmtExpr != node )
-            return false
-        final defNode = ASTUtils.getMethodFromCallExpression(node, ast)
-        return defNode instanceof ProcessNode || defNode instanceof WorkflowNode
+    protected boolean shouldWrapMethodCall(MethodCallExpression node) {
+        final start = node.getMethod()
+        final end = node.getArguments()
+        return start.getLineNumber() < end.getLastLineNumber()
     }
 
     @Override
@@ -813,35 +812,35 @@ class FormattingVisitor extends ScriptVisitorSupport {
         visitArguments(node, false)
     }
 
-    protected void visitArguments(TupleExpression node, boolean newline) {
+    protected void visitArguments(TupleExpression node, boolean wrap) {
         final hasNamedArgs = node.getNodeMetaData(NAMED_ARGS)
         final positionalArgs = hasNamedArgs ? node.expressions.tail() : node.expressions
-        final comma = newline ? ',' : ', '
-        if( newline )
+        final comma = wrap ? ',' : ', '
+        if( wrap )
             incIndent()
         for( int i = 0; i < positionalArgs.size(); i++ ) {
-            if( newline )
+            if( wrap )
                 appendIndent()
             visit(positionalArgs[i])
             if( i + 1 < positionalArgs.size() || hasNamedArgs )
                 append(comma)
-            if( newline )
+            if( wrap )
                 appendNewLine()
         }
         if( hasNamedArgs ) {
             final mapX = (MapExpression)node.expressions.first()
             final namedArgs = mapX.mapEntryExpressions
             for( int i = 0; i < namedArgs.size(); i++ ) {
-                if( newline )
+                if( wrap )
                     appendIndent()
                 visit(namedArgs[i])
                 if( i + 1 < namedArgs.size() )
                     append(comma)
-                if( newline )
+                if( wrap )
                     appendNewLine()
             }
         }
-        if( newline )
+        if( wrap )
             decIndent()
     }
 
