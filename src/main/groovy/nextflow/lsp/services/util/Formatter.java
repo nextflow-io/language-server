@@ -41,8 +41,6 @@ import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.NotExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.RangeExpression;
-import org.codehaus.groovy.ast.expr.SpreadExpression;
-import org.codehaus.groovy.ast.expr.SpreadMapExpression;
 import org.codehaus.groovy.ast.expr.TernaryExpression;
 import org.codehaus.groovy.ast.expr.TupleExpression;
 import org.codehaus.groovy.ast.expr.UnaryMinusExpression;
@@ -533,18 +531,6 @@ public class Formatter extends CodeVisitorSupport {
         if( node.isExclusiveRight() )
             append('<');
         visit(node.getTo());
-    }
-
-    @Override
-    public void visitSpreadExpression(SpreadExpression node) {
-        append('*');
-        visit(node.getExpression());
-    }
-
-    @Override
-    public void visitSpreadMapExpression(SpreadMapExpression node) {
-        append("*:");
-        visit(node.getExpression());
     }
 
     @Override

@@ -68,8 +68,6 @@ import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.NotExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.RangeExpression;
-import org.codehaus.groovy.ast.expr.SpreadExpression;
-import org.codehaus.groovy.ast.expr.SpreadMapExpression;
 import org.codehaus.groovy.ast.expr.TupleExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.expr.UnaryMinusExpression;
@@ -756,12 +754,6 @@ public class ConfigAstBuilder {
             list.setWrapped(true);
             index = list;
         }
-        else if( elements.get(0) instanceof SpreadExpression ) {
-            // e.g. a[*[1, 2]]
-            var list = listX(elements);
-            list.setWrapped(false);
-            index = list;
-        }
         else {
             // e.g. a[1]
             index = elements.get(0);
@@ -985,16 +977,9 @@ public class ConfigAstBuilder {
         if( ctx == null )
             return Collections.emptyList();
         
-        return ctx.expressionListElement().stream()
-            .map(this::listElement)
+        return ctx.expression().stream()
+            .map(this::expression)
             .collect(Collectors.toList());
-    }
-
-    private Expression listElement(ExpressionListElementContext ctx) {
-        var element = expression(ctx.expression());
-        return ctx.MUL() != null
-            ? ast( new SpreadExpression(element), ctx )
-            : ast( element, ctx );
     }
 
     private Expression map(MapContext ctx) {
@@ -1008,10 +993,8 @@ public class ConfigAstBuilder {
     }
 
     private MapEntryExpression mapEntry(MapEntryContext ctx) {
+        var key = mapEntryLabel(ctx.mapEntryLabel());
         var value = expression(ctx.expression());
-        var key = ctx.MUL() != null
-            ? ast( new SpreadMapExpression(value), ctx )
-            : mapEntryLabel(ctx.mapEntryLabel());
         return ast( entryX(key, value), ctx );
     }
 
@@ -1091,14 +1074,14 @@ public class ConfigAstBuilder {
             return new ArgumentListExpression();
 
         var arguments = new ArrayList<Expression>();
-        var opts = new ArrayList<MapEntryExpression>();
+        var namedArgs = new ArrayList<MapEntryExpression>();
 
         for( var el : ctx.argumentListElement() ) {
-            if( el.expressionListElement() != null )
-                arguments.add(listElement(el.expressionListElement()));
+            if( el.expression() != null )
+                arguments.add(expression(el.expression()));
 
             else if( el.namedArg() != null )
-                opts.add(namedArg(el.namedArg()));
+                namedArgs.add(namedArg(el.namedArg()));
 
             else
                 throw createParsingFailedException("Invalid method argument: " + ctx.getText(), ctx);
@@ -1106,20 +1089,18 @@ public class ConfigAstBuilder {
 
         // TODO: validate duplicate named arguments ?
         // TODO: only named arguments -> TupleExpression ?
-        if( !opts.isEmpty() )
-            arguments.add(0, mapX(opts));
+        if( !namedArgs.isEmpty() )
+            arguments.add(0, mapX(namedArgs));
 
         var result = ast( args(arguments), ctx );
-        if( !opts.isEmpty() )
+        if( !namedArgs.isEmpty() )
             result.putNodeMetaData(NAMED_ARGS, true);
         return result;
     }
 
     private MapEntryExpression namedArg(NamedArgContext ctx) {
+        var key = ast( constX(namedProperty(ctx.namedProperty())), ctx.namedProperty() );
         var value = expression(ctx.expression());
-        var key = ctx.MUL() != null
-            ? new SpreadMapExpression(value)
-            : ast( constX(namedProperty(ctx.namedProperty())), ctx.namedProperty() );
         return ast( new MapEntryExpression(key, value), ctx );
     }
 

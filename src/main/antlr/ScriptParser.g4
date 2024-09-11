@@ -559,11 +559,7 @@ list
     ;
 
 expressionList
-    :   expressionListElement (COMMA nls expressionListElement)*
-    ;
-
-expressionListElement
-    :   MUL? expression
+    :   expression (COMMA nls expression)*
     ;
 
 // -- map expression
@@ -578,7 +574,6 @@ mapEntryList
 
 mapEntry
     :   mapEntryLabel COLON nls expression
-    |   MUL COLON nls expression
     ;
 
 mapEntryLabel
@@ -601,13 +596,12 @@ argumentList
     ;
 
 argumentListElement
-    :   expressionListElement
+    :   expression
     |   namedArg
     ;
 
 namedArg
     :   namedProperty COLON nls expression
-    |   MUL COLON nls expression
     ;
 
 // -- incomplete expression

@@ -54,8 +54,6 @@ import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.NotExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.RangeExpression;
-import org.codehaus.groovy.ast.expr.SpreadExpression;
-import org.codehaus.groovy.ast.expr.SpreadMapExpression;
 import org.codehaus.groovy.ast.expr.StaticMethodCallExpression;
 import org.codehaus.groovy.ast.expr.TernaryExpression;
 import org.codehaus.groovy.ast.expr.TupleExpression;
@@ -531,28 +529,6 @@ public class ConfigAstCache extends ASTNodeCache {
             lookup.push(node);
             try {
                 super.visitGStringExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitSpreadExpression(SpreadExpression node) {
-            lookup.push(node);
-            try {
-                super.visitSpreadExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitSpreadMapExpression(SpreadMapExpression node) {
-            lookup.push(node);
-            try {
-                super.visitSpreadMapExpression(node);
             }
             finally {
                 lookup.pop();
