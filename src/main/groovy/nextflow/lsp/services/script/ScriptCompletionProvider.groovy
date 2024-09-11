@@ -413,7 +413,8 @@ class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateItemsFromScope0(VariableScope scope, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
-        for( final variable : scope.getDeclaredVariables().values() ) {
+        for( final it = scope.getDeclaredVariablesIterator(); it.hasNext(); ) {
+            final variable = it.next()
             final name = variable.getName()
             if( !name.startsWith(namePrefix) )
                 continue

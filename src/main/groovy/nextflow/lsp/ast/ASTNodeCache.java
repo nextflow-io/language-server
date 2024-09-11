@@ -97,9 +97,9 @@ public abstract class ASTNodeCache {
             var parents = visitParents(sourceUnit);
             nodesByURI.put(uri, parents.keySet());
 
-            for( var key : parents.keySet() ) {
-                var parent = parents.get(key);
-                lookup.put(key, new LookupData(uri, parent));
+            for( var node : parents.keySet() ) {
+                var parent = parents.get(node);
+                lookup.put(node, new LookupData(uri, parent));
             }
         }
 

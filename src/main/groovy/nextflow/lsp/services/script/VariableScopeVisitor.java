@@ -362,8 +362,10 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     }
 
     private void copyVariableScope(VariableScope source) {
-        for( var variable : source.getDeclaredVariables().values() )
+        for( var it = source.getDeclaredVariablesIterator(); it.hasNext(); ) {
+            var variable = it.next();
             currentScope.putDeclaredVariable(variable);
+        }
     }
 
     private static final List<String> EMIT_AND_TOPIC = List.of("emit", "topic");
@@ -680,13 +682,11 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     private void declare(Variable variable, ASTNode context) {
         var name = variable.getName();
-        VariableScope scope = currentScope;
-        while( scope != null ) {
-            if( scope.getDeclaredVariables().containsKey(name) ) {
+        for( var scope = currentScope; scope != null; scope = scope.getParent() ) {
+            if( scope.getDeclaredVariable(name) != null ) {
                 addError("`" + name + "` is already declared", context);
                 break;
             }
-            scope = scope.getParent();
         }
         currentScope.putDeclaredVariable(variable);
     }

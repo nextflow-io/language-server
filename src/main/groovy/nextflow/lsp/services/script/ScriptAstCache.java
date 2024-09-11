@@ -112,7 +112,13 @@ public class ScriptAstCache extends ASTNodeCache {
     @Override
     protected SourceUnit buildAST(URI uri, FileCache fileCache) {
         // phase 1: syntax resolution
-        return compiler.compile(uri, fileCache);
+        var sourceUnit = compiler.compile(uri, fileCache);
+
+        // phase 2: name resolution
+        // NOTE: must be done before visiting parents because it transforms nodes
+        if( sourceUnit != null )
+            new ResolveVisitor(sourceUnit, compilationUnit).visit();
+        return sourceUnit;
     }
 
     @Override
@@ -124,12 +130,6 @@ public class ScriptAstCache extends ASTNodeCache {
 
     @Override
     protected Set<URI> visitAST(Set<URI> uris) {
-        // phase 2: name resolution
-        for( var uri : uris ) {
-            var sourceUnit = getSourceUnit(uri);
-            new ResolveVisitor(sourceUnit, compilationUnit).visit();
-        }
-
         // phase 3: include resolution
         var changedUris = new HashSet<>(uris);
 

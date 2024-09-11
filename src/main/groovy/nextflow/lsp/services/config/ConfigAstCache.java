@@ -100,7 +100,12 @@ public class ConfigAstCache extends ASTNodeCache {
     @Override
     protected SourceUnit buildAST(URI uri, FileCache fileCache) {
         // phase 1: syntax resolution
-        return compiler.compile(uri, fileCache);
+        var sourceUnit = compiler.compile(uri, fileCache);
+
+        // phase 2: name resolution
+        if( sourceUnit != null )
+            new ConfigSchemaVisitor(sourceUnit).visit();
+        return sourceUnit;
     }
 
     @Override
@@ -112,12 +117,6 @@ public class ConfigAstCache extends ASTNodeCache {
 
     @Override
     protected Set<URI> visitAST(Set<URI> uris) {
-        // phase 2: name resolution
-        for( var uri : uris ) {
-            var sourceUnit = getSourceUnit(uri);
-            new ConfigSchemaVisitor(sourceUnit).visit();
-        }
-
         // phase 3: include resolution
         var changedUris = new HashSet<>(uris);
 
