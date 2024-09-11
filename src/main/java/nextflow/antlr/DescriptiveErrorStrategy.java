@@ -80,7 +80,7 @@ public class DescriptiveErrorStrategy extends BailErrorStrategy {
             if (e.getStartToken().getType() == Token.EOF) {
                 input = "<EOF>";
             } else {
-                input = charStream.getText(Interval.of(e.getStartToken().getStartIndex(), e.getOffendingToken().getStopIndex()));
+                input = e.getOffendingToken().getText();
             }
         } else {
             input = "<unknown input>";
