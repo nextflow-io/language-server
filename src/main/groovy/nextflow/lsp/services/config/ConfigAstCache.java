@@ -126,7 +126,7 @@ public class ConfigAstCache extends ASTNodeCache {
             visitor.visit();
 
             var uri = sourceUnit.getSource().getURI();
-            if( visitor.isChanged() && !uris.contains(uri) ) {
+            if( visitor.isChanged() ) {
                 var errorCollector = (LanguageServerErrorCollector) sourceUnit.getErrorCollector();
                 errorCollector.updatePhase(Phases.INCLUDE_RESOLUTION, visitor.getErrors());
                 changedUris.add(uri);
