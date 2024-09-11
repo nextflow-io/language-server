@@ -19,10 +19,6 @@ import java.io.File;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.AbstractMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.file.FileCache;
@@ -54,25 +50,16 @@ public class Compiler {
     }
 
     /**
-     * Compile a set of source files.
+     * Compile a source file.
      *
-     * @param uris
+     * @param uri
      * @param fileCache
      */
-    public Map<URI, SourceUnit> compile(Set<URI> uris, FileCache fileCache) {
-        return uris.parallelStream()
-            .map((uri) -> {
-                var sourceUnit = getSourceUnit(uri, fileCache);
-                if( sourceUnit != null )
-                    compile(sourceUnit);
-                return new AbstractMap.SimpleEntry<>(uri, sourceUnit);
-            })
-            .filter(entry -> entry.getValue() != null)
-            .sequential()
-            .collect(Collectors.toMap(
-                Map.Entry::getKey,
-                Map.Entry::getValue
-            ));
+    public SourceUnit compile(URI uri, FileCache fileCache) {
+        var sourceUnit = getSourceUnit(uri, fileCache);
+        if( sourceUnit != null )
+            compile(sourceUnit);
+        return sourceUnit;
     }
 
     /**

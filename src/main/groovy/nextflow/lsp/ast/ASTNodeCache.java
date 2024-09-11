@@ -24,6 +24,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import nextflow.lsp.compiler.SyntaxWarning;
 import nextflow.lsp.file.FileCache;
@@ -82,23 +83,16 @@ public abstract class ASTNodeCache {
         }
 
         // parse source files
-        var sources = buildAST(uris, fileCache);
-
-        // update source cache
-        sources.forEach((uri, sourceUnit) -> {
-            if( sourceUnit == null )
-                return;
-
-            sourcesByUri.put(uri, sourceUnit);
-        });
-
-        // perform pre-parent AST analysis
-        var changedUris = preVisitParents(sources.keySet());
+        var sources = uris.parallelStream()
+            .map(uri -> buildAST(uri, fileCache))
+            .filter(sourceUnit -> sourceUnit != null)
+            .sequential()
+            .collect(Collectors.toSet());
 
         // update ast node cache
-        sources.forEach((uri, sourceUnit) -> {
-            if( sourceUnit == null )
-                return;
+        for( var sourceUnit : sources ) {
+            var uri = sourceUnit.getSource().getURI();
+            sourcesByUri.put(uri, sourceUnit);
 
             var parents = visitParents(sourceUnit);
             nodesByURI.put(uri, parents.keySet());
@@ -107,10 +101,14 @@ public abstract class ASTNodeCache {
                 var parent = parents.get(key);
                 lookup.put(key, new LookupData(uri, parent));
             }
-        });
+        }
 
-        // perform post-parent AST analysis
-        postVisitParents(changedUris);
+        // perform additional ast analysis
+        var changedUris = visitAST(
+            sources.stream()
+                .map(su -> su.getSource().getURI())
+                .collect(Collectors.toSet())
+        );
 
         // update error cache
         for( var uri : changedUris ) {
@@ -130,18 +128,10 @@ public abstract class ASTNodeCache {
     /**
      * Parse the AST for a set of source files.
      *
-     * @param uris
+     * @param uri
      * @param fileCache
      */
-    protected abstract Map<URI, SourceUnit> buildAST(Set<URI> uris, FileCache fileCache);
-
-    /**
-     * Perform additional AST analysis for a set of source files.
-     * Return the set of files which require post-parent AST analysis.
-     *
-     * @param uris
-     */
-    protected abstract Set<URI> preVisitParents(Set<URI> uris);
+    protected abstract SourceUnit buildAST(URI uri, FileCache fileCache);
 
     /**
      * Visit the AST of a source file and retrieve the set of relevant
@@ -152,12 +142,12 @@ public abstract class ASTNodeCache {
     protected abstract Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit);
 
     /**
-     * Perform additional AST analysis for a set of source files, after
-     * parent links have been updated.
+     * Perform additional AST analysis for a set of source files.
+     * Return the set of files whose errors have changed.
      *
      * @param uris
      */
-    protected abstract void postVisitParents(Set<URI> uris);
+    protected abstract Set<URI> visitAST(Set<URI> uris);
 
     /**
      * Get the list of source units for all cached files.

@@ -112,13 +112,20 @@ public class ScriptAstCache extends ASTNodeCache {
     }
 
     @Override
-    protected Map<URI, SourceUnit> buildAST(Set<URI> uris, FileCache fileCache) {
+    protected SourceUnit buildAST(URI uri, FileCache fileCache) {
         // phase 1: syntax resolution
-        return compiler.compile(uris, fileCache);
+        return compiler.compile(uri, fileCache);
     }
 
     @Override
-    protected Set<URI> preVisitParents(Set<URI> uris) {
+    protected Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit) {
+        var visitor = new Visitor(sourceUnit);
+        visitor.visit();
+        return visitor.getLookup().getParents();
+    }
+
+    @Override
+    protected Set<URI> visitAST(Set<URI> uris) {
         // phase 2: name resolution
         for( var uri : uris ) {
             var sourceUnit = getSourceUnit(uri);
@@ -140,24 +147,14 @@ public class ScriptAstCache extends ASTNodeCache {
             }
         }
 
-        return changedUris;
-    }
-
-    @Override
-    protected Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit) {
-        var visitor = new Visitor(sourceUnit);
-        visitor.visit();
-        return visitor.getLookup().getParents();
-    }
-
-    @Override
-    protected void postVisitParents(Set<URI> uris) {
         // phase 4: type inference
-        for( var uri : uris ) {
+        for( var uri : changedUris ) {
             var sourceUnit = getSourceUnit(uri);
             var visitor = new MethodCallVisitor(sourceUnit, this);
             visitor.visit();
         }
+
+        return changedUris;
     }
 
     public List<IncludeNode> getIncludeNodes(URI uri) {
