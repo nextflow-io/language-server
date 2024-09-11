@@ -110,7 +110,7 @@ includeStatement
     ;
 
 includeNames
-    :   LBRACE nls includeName (sep includeName)* nls RBRACE
+    :   LBRACE nls includeName (sep includeName)* sep? RBRACE
     ;
 
 includeName
