@@ -262,6 +262,8 @@ public abstract class ASTNodeCache {
                 if( node.getLineNumber() == -1 )
                     return false;
                 var range = LanguageServerUtils.astNodeToRange(node);
+                if( range == null )
+                    return false;
                 if( !Ranges.containsPosition(range, position) )
                     return false;
                 nodeToRange.put(node, range);
