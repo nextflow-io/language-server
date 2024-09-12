@@ -518,7 +518,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     public void visitBinaryExpression(BinaryExpression node) {
         if( node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
             visit(node.getRightExpression());
-            declareAssignedVariable(node.getLeftExpression());
+            visitAssignment(node.getLeftExpression());
             visit(node.getLeftExpression());
         }
         else {
@@ -532,45 +532,64 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
      *
      * @param node
      */
-    private void declareAssignedVariable(Expression node) {
+    private void visitAssignment(Expression node) {
         if( node instanceof TupleExpression te ) {
-            for( var el : te.getExpressions() ) {
-                if( el instanceof VariableExpression ve )
-                    declareAssignedVariable(ve);
-            }
-            return;
+            for( var el : te.getExpressions() )
+                declareAssignedVariable((VariableExpression) el);
         }
-
-        var varX = getAssignmentTarget(node);
-        if( varX == null )
-            return;
-        var name = varX.getName();
-        if( findVariableDeclaration(name, varX) != null )
-            return;
-        if( currentDefinition instanceof ProcessNode || currentDefinition instanceof WorkflowNode ) {
-            if( inClosure )
-                addError("Local variables in a closure should be declared with `def`", varX);
-            var scope = currentScope;
-            currentScope = currentDefinition.getVariableScope();
-            declare(varX);
-            currentScope = scope;
+        else if( node instanceof VariableExpression ve ) {
+            declareAssignedVariable(ve);
         }
         else {
-            addError("`" + name + "` was assigned but not declared", varX);
+            visitMutatedVariable(node);
         }
     }
 
-    private VariableExpression getAssignmentTarget(Expression node) {
-        // e.g. v = 123
-        if( node instanceof VariableExpression ve )
-            return ve;
-        // e.g. obj.prop = 123
-        if( node instanceof PropertyExpression pe )
-            return getAssignmentTarget(pe.getObjectExpression());
-        // e.g. list[1] = 123 OR map['a'] = 123
-        if( node instanceof BinaryExpression be && be.getOperation().getType() == Types.LEFT_SQUARE_BRACKET )
-            return getAssignmentTarget(be.getLeftExpression());
-        return null;
+    private void declareAssignedVariable(VariableExpression ve) {
+        var variable = findVariableDeclaration(ve.getName(), ve);
+        if( variable != null ) {
+            if( variable instanceof FieldNode fn && findAnnotation(fn, Constant.class).isPresent() )
+                addError("Built-in variable cannot be re-assigned", ve);
+        }
+        else if( currentDefinition instanceof ProcessNode || currentDefinition instanceof WorkflowNode ) {
+            if( inClosure )
+                addError("Local variables in a closure should be declared with `def`", ve);
+            var scope = currentScope;
+            currentScope = currentDefinition.getVariableScope();
+            declare(ve);
+            currentScope = scope;
+        }
+        else {
+            addError("`" + ve.getName() + "` was assigned but not declared", ve);
+        }
+    }
+
+    private void visitMutatedVariable(Expression node) {
+        VariableExpression target = null;
+        while( true ) {
+            // e.g. obj.prop = 123
+            if( node instanceof PropertyExpression pe ) {
+                node = pe.getObjectExpression();
+            }
+            // e.g. list[1] = 123 OR map['a'] = 123
+            else if( node instanceof BinaryExpression be && be.getOperation().getType() == Types.LEFT_SQUARE_BRACKET ) {
+                node = be.getLeftExpression();
+            }
+            else {
+                if( node instanceof VariableExpression ve )
+                    target = ve;
+                break;
+            }
+        }
+        if( target == null )
+            return;
+        var variable = findVariableDeclaration(target.getName(), target);
+        if( variable instanceof FieldNode fn && findAnnotation(fn, Constant.class).isPresent() ) {
+            if( "params".equals(variable.getName()) )
+                addWarning("Assigning params in the script will not be supported in a future version", target);
+            else
+                addError("Built-in variable cannot be mutated", target);
+        }
     }
 
     @Override
