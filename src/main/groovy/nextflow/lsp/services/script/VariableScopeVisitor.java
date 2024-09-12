@@ -157,7 +157,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( node.isEntry() )
             declareParameters();
 
-        pushState(node.isEntry() ? EntryWorkflowDsl.class : WorkflowDsl.class);
+        pushState(new ClassNode(node.isEntry() ? EntryWorkflowDsl.class : WorkflowDsl.class));
         currentDefinition = node;
         node.setVariableScope(currentScope);
 
@@ -259,17 +259,17 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     }
 
     private void declareWorkflowInputs(Statement takes) {
+        var cn = currentDefinition.getVariableScope().getClassScope();
         for( var stmt : asBlockStatements(takes) ) {
-            var varX = asVarX(stmt);
-            if( varX == null )
-                continue;
-            declare(varX);
+            var take = asVarX(stmt);
+            if( take != null )
+                declareAsField(take, cn);
         }
     }
 
     @Override
     public void visitProcess(ProcessNode node) {
-        pushState(ProcessDsl.class);
+        pushState(new ClassNode(ProcessDsl.class));
         currentDefinition = node;
         node.setVariableScope(currentScope);
 
@@ -322,7 +322,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                 if( firstArg instanceof MethodCallExpression mce )
                     declareProcessInput(mce);
                 else if( firstArg instanceof VariableExpression ve )
-                    declare(ve);
+                    declareProcessInput(ve);
             }
             else {
                 declareProcessInput(call);
@@ -339,7 +339,12 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( args.isEmpty() )
             return;
         if( args.get(args.size() - 1) instanceof VariableExpression ve )
-            declare(ve);
+            declareProcessInput(ve);
+    }
+
+    private void declareProcessInput(VariableExpression ve) {
+        var cn = currentDefinition.getVariableScope().getClassScope();
+        declareAsField(ve, cn);
     }
 
     private void checkDirectives(Statement node, String typeLabel, boolean checkSyntaxErrors) {
@@ -659,18 +664,40 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     // helpers
 
-    private void pushState(Class classScope) {
+    private void pushState(ClassNode classScope) {
         currentScope = new VariableScope(currentScope);
         if( classScope != null )
-            currentScope.setClassScope(ClassHelper.makeCached(classScope));
+            currentScope.setClassScope(classScope);
+    }
+
+    private void pushState(Class classScope) {
+        pushState(ClassHelper.makeCached(classScope));
     }
 
     private void pushState() {
-        pushState(null);
+        pushState((ClassNode) null);
     }
 
     private void popState() {
         currentScope = currentScope.getParent();
+    }
+
+    private void declareAsField(VariableExpression ve, ClassNode cn) {
+        if( cn.getDeclaredField(ve.getName()) != null ) {
+            addError("`" + ve.getName() + "` is already declared", ve);
+            return;
+        }
+
+        var type = ClassHelper.dynamicType();
+        var fn = new FieldNode(ve.getName(), Modifier.PUBLIC, type, cn, null);
+        fn.setSourcePosition(ve);
+        fn.setDeclaringClass(cn);
+        fn.setSynthetic(true);
+        var an = new AnnotationNode(ClassHelper.makeCached(Constant.class));
+        an.addMember("value", new ConstantExpression(""));
+        fn.addAnnotation(an);
+        cn.addField(fn);
+        ve.setAccessedVariable(fn);
     }
 
     private void declare(MethodNode mn) {
