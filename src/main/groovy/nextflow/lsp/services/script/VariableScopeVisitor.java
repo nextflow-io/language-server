@@ -673,15 +673,13 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         currentScope = currentScope.getParent();
     }
 
-    private void declare(MethodNode node) {
+    private void declare(MethodNode mn) {
         var cn = currentScope.getClassScope();
-        for( var mn : cn.getMethods() ) {
-            if( mn.getName().equals(node.getName()) ) {
-                addError("`" + node.getName() + "` is already defined", node);
-                break;
-            }
+        if( cn.getDeclaredMethods(mn.getName()).size() > 0 ) {
+            addError("`" + mn.getName() + "` is already declared", mn);
+            return;
         }
-        cn.addMethod(node);
+        cn.addMethod(mn);
     }
 
     private void declare(VariableExpression variable) {
@@ -743,26 +741,26 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     private Variable findClassMember(ClassNode cn, String name, ASTNode node) {
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
-            for( var fn : cn.getFields() ) {
-                if( !fn.getName().equals(name) )
-                    continue;
-                if( !findAnnotation(fn, Constant.class).isPresent() )
-                    continue;
+            var fn = cn.getDeclaredField(name);
+            if( fn != null && findAnnotation(fn, Constant.class).isPresent() ) {
                 if( findAnnotation(fn, Deprecated.class).isPresent() )
                     addWarning("`" + name + "` is deprecated and will be removed in a future version", node);
                 return fn;
             }
-            for( var mn : cn.getMethods() ) {
-                if( !mn.getName().equals(name) )
-                    continue;
-                if( mn instanceof FunctionNode || mn instanceof ProcessNode || mn instanceof WorkflowNode )
+
+            var methods = cn.getDeclaredMethods(name);
+            var mn = methods.size() > 0 ? methods.get(0) : null;
+            if( mn != null ) {
+                if( mn instanceof FunctionNode || mn instanceof ProcessNode || mn instanceof WorkflowNode ) {
                     return wrapMethodAsVariable(mn, cn);
-                if( !findAnnotation(mn, Function.class).isPresent() )
-                    continue;
-                if( findAnnotation(mn, Deprecated.class).isPresent() )
-                    addWarning("`" + name + "` is deprecated and will be removed in a future version", node);
-                return wrapMethodAsVariable(mn, cn);
+                }
+                if( findAnnotation(mn, Function.class).isPresent() ) {
+                    if( findAnnotation(mn, Deprecated.class).isPresent() )
+                        addWarning("`" + name + "` is deprecated and will be removed in a future version", node);
+                    return wrapMethodAsVariable(mn, cn);
+                }
             }
+
             cn = cn.getSuperClass();
         }
 
