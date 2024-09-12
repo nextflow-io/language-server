@@ -544,7 +544,7 @@ public class ScriptAstBuilder {
     }
 
     private Statement workflowTake(IdentifierContext ctx) {
-        return stmt(variableName(ctx));
+        return ast( stmt(variableName(ctx)), ctx );
     }
 
     private Statement workflowEmits(WorkflowEmitsContext ctx) {
@@ -559,9 +559,10 @@ public class ScriptAstBuilder {
 
     private Statement workflowEmit(WorkflowEmitContext ctx) {
         var varX = variableName(ctx.identifier());
-        return ctx.expression() != null
-            ? stmt(ast( assignX(varX, expression(ctx.expression())), ctx ))
-            : stmt(varX);
+        var emit = ctx.expression() != null
+            ? ast( assignX(varX, expression(ctx.expression())), ctx )
+            : varX;
+        return ast( stmt(emit), ctx );
     }
 
     private Statement workflowPublishers(WorkflowPublishersContext ctx) {
@@ -578,7 +579,7 @@ public class ScriptAstBuilder {
         var source = expression(ctx.source);
         var op = token(ctx.op, 2);
         var target = expression(ctx.target);
-        return stmt(ast( binX(source, op, target), ctx ));
+        return ast( stmt(ast( binX(source, op, target), ctx )), ctx );
     }
 
     private OutputNode outputDef(OutputDefContext ctx) {
