@@ -551,7 +551,7 @@ public class ScriptAstBuilder {
         if( ctx == null )
             return EmptyStatement.INSTANCE;
 
-        var statements = ctx.workflowEmit() != null
+        var statements = ctx.workflowEmit().size() > 0
             ? ctx.workflowEmit().stream().map(this::workflowEmit).collect(Collectors.toList())
             : List.of(ast( stmt(expression(ctx.expression())), ctx ));
         return ast( block(null, statements), ctx );

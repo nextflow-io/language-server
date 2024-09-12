@@ -45,6 +45,7 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
+import org.codehaus.groovy.syntax.Types;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
@@ -299,7 +300,8 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
             for( var stmt : emits ) {
                 var stmtX = (ExpressionStatement)stmt;
-                if( stmtX.getExpression() instanceof BinaryExpression be ) {
+                var emit = stmtX.getExpression();
+                if( emit instanceof BinaryExpression be && be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
                     var ve = (VariableExpression)be.getLeftExpression();
                     fmt.appendIndent();
                     fmt.visit(ve);
@@ -324,11 +326,12 @@ public class ScriptFormattingProvider implements FormattingProvider {
             int maxWidth = 0;
             for( var stmt : emits ) {
                 var stmtX = (ExpressionStatement)stmt;
+                var emit = stmtX.getExpression();
                 int width = 0;
-                if( stmtX.getExpression() instanceof VariableExpression ve ) {
+                if( emit instanceof VariableExpression ve ) {
                     width = ve.getName().length();
                 }
-                else if( stmtX.getExpression() instanceof BinaryExpression be ) {
+                else if( emit instanceof BinaryExpression be && be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
                     var ve = (VariableExpression)be.getLeftExpression();
                     width = ve.getName().length();
                 }
