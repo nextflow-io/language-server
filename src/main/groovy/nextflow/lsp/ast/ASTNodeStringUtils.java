@@ -22,6 +22,8 @@ import java.util.stream.Stream;
 import groovy.lang.groovydoc.Groovydoc;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTUtils;
+import nextflow.lsp.services.util.CustomFormattingOptions;
+import nextflow.lsp.services.util.Formatter;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.DslType;
 import nextflow.script.dsl.FeatureFlag;
@@ -46,7 +48,7 @@ import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 
-import static nextflow.script.v2.ASTHelpers.findAnnotation;
+import static nextflow.script.v2.ASTHelpers.*;
 
 /**
  * Utility methods for retreiving text information for ast nodes.
@@ -93,6 +95,13 @@ public class ASTNodeStringUtils {
             var builder = new StringBuilder();
             builder.append("workflow ");
             builder.append(wn.isEntry() ? "<entry>" : wn.getName());
+            builder.append("(");
+            builder.append(
+                asBlockStatements(wn.takes).stream()
+                    .map(take -> asVarX(take).getName())
+                    .collect(Collectors.joining(", "))
+            );
+            builder.append(")");
             return builder.toString();
         }
 
@@ -100,6 +109,15 @@ public class ASTNodeStringUtils {
             var builder = new StringBuilder();
             builder.append("process ");
             builder.append(pn.getName());
+            builder.append("\n\ninput:\n");
+            asDirectives(pn.inputs).forEach((call) -> {
+                var fmt = new Formatter(new CustomFormattingOptions(0, false, false));
+                fmt.append(call.getMethodAsString());
+                fmt.append(' ');
+                fmt.visitArguments(asMethodCallArguments(call), hasNamedArgs(call), false);
+                builder.append(fmt.toString());
+                builder.append('\n');
+            });
             return builder.toString();
         }
 

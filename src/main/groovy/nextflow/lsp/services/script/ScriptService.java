@@ -29,6 +29,7 @@ import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.LinkProvider;
 import nextflow.lsp.services.ReferenceProvider;
 import nextflow.lsp.services.RenameProvider;
+import nextflow.lsp.services.SignatureHelpProvider;
 import nextflow.lsp.services.SymbolProvider;
 
 /**
@@ -93,6 +94,11 @@ public class ScriptService extends LanguageService {
     @Override
     protected RenameProvider getRenameProvider() {
         return new ScriptReferenceProvider(astCache);
+    }
+
+    @Override
+    protected SignatureHelpProvider getSignatureHelpProvider() {
+        return new ScriptSignatureHelpProvider(astCache);
     }
 
     @Override

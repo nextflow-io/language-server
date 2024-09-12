@@ -78,6 +78,9 @@ import org.eclipse.lsp4j.ReferenceParams;
 import org.eclipse.lsp4j.RenameParams;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.SetTraceParams;
+import org.eclipse.lsp4j.SignatureHelp;
+import org.eclipse.lsp4j.SignatureHelpOptions;
+import org.eclipse.lsp4j.SignatureHelpParams;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.TextEdit;
@@ -163,6 +166,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         serverCapabilities.setHoverProvider(true);
         serverCapabilities.setReferencesProvider(true);
         serverCapabilities.setRenameProvider(true);
+        var signatureHelpOptions = new SignatureHelpOptions(List.of("(", ","));
+        serverCapabilities.setSignatureHelpProvider(signatureHelpOptions);
         serverCapabilities.setWorkspaceSymbolProvider(true);
 
         var initializeResult = new InitializeResult(serverCapabilities);
@@ -403,6 +408,20 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             if( service == null )
                 return null;
             return service.rename(params);
+        });
+    }
+
+	@Override
+	public CompletableFuture<SignatureHelp> signatureHelp(SignatureHelpParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var uri = params.getTextDocument().getUri();
+            var position = params.getPosition();
+            log.debug(String.format("textDocument/signatureHelp %s [ %d, %d ]", relativePath(uri), position.getLine(), position.getCharacter()));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return null;
+            return service.signatureHelp(params);
         });
     }
 
