@@ -318,7 +318,7 @@ public abstract class ASTNodeCache {
     private boolean contains(ASTNode ancestor, ASTNode descendant) {
         ASTNode current = getParent(descendant);
         while( current != null ) {
-            if( current.equals(ancestor) )
+            if( current == ancestor )
                 return true;
             current = getParent(current);
         }

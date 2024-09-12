@@ -219,18 +219,15 @@ public class ASTUtils {
      * @param argIndex
      */
     public static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache ast, int argIndex) {
-        if( !(node.getArguments() instanceof ArgumentListExpression) )
-            return null;
-
         var methods = getMethodOverloadsFromCallExpression(node, ast);
         var arguments = (ArgumentListExpression) node.getArguments();
-        var result = methods.stream().max((MethodNode m1, MethodNode m2) -> {
-            var score1 = getArgumentsScore(m1.getParameters(), arguments, argIndex);
-            var score2 = getArgumentsScore(m2.getParameters(), arguments, argIndex);
-            return Integer.compare(score1, score2);
-        });
-
-        return result.orElse(null);
+        return methods.stream()
+            .max((MethodNode m1, MethodNode m2) -> {
+                var score1 = getArgumentsScore(m1.getParameters(), arguments, argIndex);
+                var score2 = getArgumentsScore(m2.getParameters(), arguments, argIndex);
+                return Integer.compare(score1, score2);
+            })
+            .orElse(null);
     }
 
     public static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache ast) {

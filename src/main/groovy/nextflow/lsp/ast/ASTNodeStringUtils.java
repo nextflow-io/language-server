@@ -153,8 +153,8 @@ public class ASTNodeStringUtils {
     public static String toString(Variable variable, ASTNodeCache ast) {
         var builder = new StringBuilder();
         builder.append(variable.getName());
-        var type = variable instanceof ASTNode
-            ? ASTUtils.getTypeOfNode((ASTNode) variable, ast)
+        var type = variable instanceof ASTNode node
+            ? ASTUtils.getTypeOfNode(node, ast)
             : variable.getType();
         if( !ClassHelper.OBJECT_TYPE.equals(type) ) {
             builder.append(": ");
