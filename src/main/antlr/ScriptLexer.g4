@@ -266,7 +266,7 @@ fragment
 DOUBLE        : 'double';
 
 ELSE          : 'else';
-// ENUM          : 'enum';
+ENUM          : 'enum';
 // EXTENDS       : 'extends';
 // FINAL         : 'final';
 // FINALLY       : 'finally';

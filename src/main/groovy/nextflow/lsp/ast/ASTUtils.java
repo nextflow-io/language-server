@@ -54,10 +54,9 @@ public class ASTUtils {
      * class, method, or variable.
      *
      * @param node
-     * @param strict
      * @param ast
      */
-    public static ASTNode getDefinition(ASTNode node, boolean strict, ASTNodeCache ast) {
+    public static ASTNode getDefinition(ASTNode node, ASTNodeCache ast) {
         if( node instanceof VariableExpression ve ) {
             var variable = ve.getAccessedVariable();
             return getDefinitionFromVariable(variable);
@@ -72,16 +71,19 @@ public class ASTUtils {
         }
 
         if( node instanceof ClassExpression ce )
-            return getOriginalClassNode(ce.getType(), strict, ast);
+            return ce.getType().redirect();
 
         if( node instanceof ConstructorCallExpression cce )
-            return getOriginalClassNode(cce.getType(), strict, ast);
+            return cce.getType().redirect();
 
         if( node instanceof FeatureFlagNode ffn )
             return ffn.accessedVariable != null ? ffn : null;
 
         if( node instanceof IncludeVariable iv )
             return iv.getMethod();
+
+        if( node instanceof ClassNode cn )
+            return node;
 
         if( node instanceof MethodNode )
             return node;
@@ -100,7 +102,7 @@ public class ASTUtils {
      * @param includeDeclaration
      */
     public static Iterator<ASTNode> getReferences(ASTNode node, ASTNodeCache ast, boolean includeDeclaration) {
-        var defNode = getDefinition(node, true, ast);
+        var defNode = getDefinition(node, ast);
         if( defNode == null )
             return Collections.emptyIterator();
         return ast.getNodes().stream()
@@ -109,7 +111,7 @@ public class ASTUtils {
                     return false;
                 if( defNode == otherNode )
                     return includeDeclaration;
-                return defNode == getDefinition(otherNode, false, ast);
+                return defNode == getDefinition(otherNode, ast);
             })
             .iterator();
     }
@@ -147,7 +149,7 @@ public class ASTUtils {
 
         if( node instanceof Variable variable ) {
             if( variable.isDynamicTyped() ) {
-                var defNode = getDefinition(node, false, ast);
+                var defNode = getDefinition(node, ast);
                 if( defNode instanceof Variable defVar ) {
                     if( defVar.hasInitialExpression() ) {
                         return getTypeOfNode(defVar.getInitialExpression(), ast);
@@ -165,11 +167,6 @@ public class ASTUtils {
         return node instanceof Expression exp
             ? exp.getType()
             : null;
-    }
-
-    private static ClassNode getOriginalClassNode(ClassNode node, boolean strict, ASTNodeCache ast) {
-        // TODO: built-in types
-        return strict ? null : node;
     }
 
     /**

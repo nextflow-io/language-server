@@ -515,6 +515,9 @@ class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateTypes(String namePrefix, List<CompletionItem> items) {
+        // add user-defined types
+        populateTypes0(ast.getEnumNodes(uri), namePrefix, items)
+
         // add built-in types
         populateTypes0(ScriptDsl.TYPES, namePrefix, items)
     }

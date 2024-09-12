@@ -56,7 +56,7 @@ public class ScriptDefinitionProvider implements DefinitionProvider {
         if( offsetNode == null )
             return Either.forLeft(Collections.emptyList());
 
-        var defNode = ASTUtils.getDefinition(offsetNode, true, ast);
+        var defNode = ASTUtils.getDefinition(offsetNode, ast);
         if( defNode == null )
             return Either.forLeft(Collections.emptyList());
 

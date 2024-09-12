@@ -28,8 +28,10 @@ import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.script.v2.IncludeVariable;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.ast.expr.ClassExpression;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.eclipse.lsp4j.Location;
@@ -69,7 +71,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
         if( symbolName == null )
             return Collections.emptyList();
 
-        var defNode = ASTUtils.getDefinition(offsetNode, false, ast);
+        var defNode = ASTUtils.getDefinition(offsetNode, ast);
         var isAlias = !symbolName.equals(getSymbolName(defNode, null));
         var references = ASTUtils.getReferences(defNode, ast, includeDeclaration);
         var result = new ArrayList<Location>();
@@ -104,7 +106,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
             return null;
 
         // built-in names can't be renamed
-        var defNode = ASTUtils.getDefinition(offsetNode, false, ast);
+        var defNode = ASTUtils.getDefinition(offsetNode, ast);
         if( defNode == null || ast.getURI(defNode) == null )
             return null;
 
@@ -129,6 +131,9 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
     }
 
     private String getSymbolName(ASTNode node, Position position) {
+        if( node instanceof ClassNode cn )
+            return cn.getName();
+
         if( node instanceof MethodNode mn )
             return mn.getName();
 
@@ -138,7 +143,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
         if( node instanceof Variable v )
             return v.getName();
 
-        if( node instanceof ConstantExpression || node instanceof VariableExpression )
+        if( node instanceof ClassExpression || node instanceof ConstantExpression || node instanceof VariableExpression )
             return node.getText();
 
         return null;
@@ -172,6 +177,21 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
     private TextEdit getTextEdit(ASTNode node, String oldName, String newName) {
         var range = LanguageServerUtils.astNodeToRange(node);
 
+        if( node instanceof ClassNode ) {
+            var firstLine = ast.getSourceText(node, false, 1);
+            var oldNameStart = firstLine.indexOf(oldName);
+            if( oldNameStart == -1 )
+                return null;
+
+            var start = range.getStart();
+            var end = range.getEnd();
+            end.setLine(start.getLine());
+            end.setCharacter(start.getCharacter() + oldNameStart + oldName.length());
+            start.setCharacter(start.getCharacter() + oldNameStart);
+
+            return new TextEdit(range, newName);
+        }
+
         if( node instanceof MethodNode ) {
             var firstLine = ast.getSourceText(node, false, 1);
             var oldNameStart = firstLine.indexOf(oldName);
@@ -204,7 +224,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
             return new TextEdit(range, newText);
         }
 
-        if( node instanceof ConstantExpression || node instanceof VariableExpression ) {
+        if( node instanceof ClassExpression || node instanceof ConstantExpression || node instanceof VariableExpression ) {
             if( oldName.equals(node.getText()) )
                 return new TextEdit(range, newName);
         }

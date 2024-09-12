@@ -17,6 +17,7 @@ package nextflow.script.v2;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -47,6 +48,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.apache.groovy.parser.antlr4.GroovySyntaxError;
 import org.apache.groovy.parser.antlr4.util.StringUtils;
 import org.codehaus.groovy.GroovyBugError;
+import org.codehaus.groovy.antlr.EnumHelper;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -247,6 +249,12 @@ public class ScriptAstBuilder {
                 extraStatements.add(es);
         }
 
+        else if( ctx instanceof EnumDefAltContext edac ) {
+            var node = enumDef(edac.enumDef());
+            prependComments(node, ctx);
+            moduleNode.addClass(node);
+        }
+
         else if( ctx instanceof FunctionDefAltContext fdac ) {
             var node = functionDef(fdac.functionDef());
             prependComments(node, ctx);
@@ -338,6 +346,19 @@ public class ScriptAstBuilder {
             .collect(Collectors.toList());
 
         return ast( new IncludeNode(source, modules), ctx );
+    }
+
+    private ClassNode enumDef(EnumDefContext ctx) {
+        var name = identifier(ctx.identifier());
+        var result = ast( EnumHelper.makeEnumNode(name, Modifier.PUBLIC, null, null), ctx );
+        if( ctx.enumBody() != null ) {
+            for( var ident : ctx.enumBody().identifier() ) {
+                var fn = ast( EnumHelper.addEnumConstant(result, identifier(ident), null), ident );
+                groovydocManager.handle(fn, ident);
+            }
+        }
+        groovydocManager.handle(result, ctx);
+        return result;
     }
 
     private ProcessNode processDef(ProcessDefContext ctx) {

@@ -41,6 +41,8 @@ import nextflow.script.v2.ScriptParserPluginFactory;
 import nextflow.script.v2.ScriptVisitorSupport;
 import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.expr.BinaryExpression;
@@ -160,6 +162,27 @@ public class ScriptAstCache extends ASTNodeCache {
         if( scriptNode == null )
             return Collections.emptyList();
         return scriptNode.getIncludes();
+    }
+
+    public List<ClassNode> getEnumNodes() {
+        var result = new ArrayList<ClassNode>();
+        for( var sourceUnit : getSourceUnits() ) {
+            var uri = sourceUnit.getSource().getURI();
+            result.addAll(getEnumNodes(uri));
+        }
+        return result;
+    }
+
+    public List<ClassNode> getEnumNodes(URI uri) {
+        var scriptNode = getScriptNode(uri);
+        if( scriptNode == null )
+            return Collections.emptyList();
+        var result = new ArrayList<ClassNode>();
+        for( var cn : scriptNode.getClasses() ) {
+            if( cn.isEnum() )
+                result.add(cn);
+        }
+        return result;
     }
 
     public List<MethodNode> getDefinitions() {
@@ -285,6 +308,28 @@ public class ScriptAstCache extends ASTNodeCache {
         protected void visitIncludeVariable(IncludeVariable node) {
             lookup.push(node);
             try {
+            }
+            finally {
+                lookup.pop();
+            }
+        }
+
+        @Override
+        public void visitEnum(ClassNode node) {
+            lookup.push(node);
+            try {
+                super.visitEnum(node);
+            }
+            finally {
+                lookup.pop();
+            }
+        }
+
+        @Override
+        public void visitField(FieldNode node) {
+            lookup.push(node);
+            try {
+                super.visitField(node);
             }
             finally {
                 lookup.pop();

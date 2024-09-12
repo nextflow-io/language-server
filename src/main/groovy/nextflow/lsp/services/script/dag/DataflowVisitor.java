@@ -212,7 +212,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
         // x | f => f(x)
         if( rhs instanceof VariableExpression ) {
-            var defNode = ASTUtils.getDefinition(rhs, false, astCache);
+            var defNode = ASTUtils.getDefinition(rhs, astCache);
             if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
                 var label = ((MethodNode) defNode).getName();
                 var preds = visitWithPreds(lhs);
@@ -268,14 +268,14 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         // named output e.g. PROC.out.foo
         if( node.getObjectExpression() instanceof PropertyExpression pe ) {
             if( pe.getObjectExpression() instanceof VariableExpression ve && "out".equals(pe.getPropertyAsString()) ) {
-                var defNode = ASTUtils.getDefinition(ve, false, astCache);
+                var defNode = ASTUtils.getDefinition(ve, astCache);
                 if( defNode instanceof MethodNode mn )
                     return new Tuple3(mn, ve.getName(), node.getPropertyAsString());
             }
         }
         // single output e.g. PROC.out
         else if( node.getObjectExpression() instanceof VariableExpression ve && "out".equals(node.getPropertyAsString()) ) {
-            var defNode = ASTUtils.getDefinition(ve, false, astCache);
+            var defNode = ASTUtils.getDefinition(ve, astCache);
             if( defNode instanceof MethodNode mn )
                 return new Tuple3(mn, ve.getName(), null);
         }

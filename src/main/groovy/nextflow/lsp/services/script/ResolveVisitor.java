@@ -131,6 +131,8 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
             return true;
         if( type.isResolved() )
             return true;
+        if( resolveFromModule(type) )
+            return true;
         if( !type.hasPackageName() && resolveFromDefaultImports(type) )
             return true;
         return resolveFromClassResolver(type.getName()) != null;
@@ -155,6 +157,19 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         if( resolveGenericsTypes(type.getGenericsTypes()) )
             genericsType.setResolved(genericsType.getType().isResolved());
         return genericsType.isResolved();
+    }
+
+    protected boolean resolveFromModule(ClassNode type) {
+        var name = type.getName();
+        var module = sourceUnit.getAST();
+        for( var cn : module.getClasses() ) {
+            if( name.equals(cn.getName()) ) {
+                if( cn != type )
+                    type.setRedirect(cn);
+                return true;
+            }
+        }
+        return false;
     }
 
     protected boolean resolveFromDefaultImports(ClassNode type) {
@@ -262,9 +277,10 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
             // attempt to resolve variable as type name
             var name = ve.getName();
             var type = ClassHelper.make(name);
-            if( !type.isResolved() )
-                resolve(type);
-            if( type.isResolved() )
+            var isClass = type.isResolved();
+            if( !isClass )
+                isClass = resolve(type);
+            if( isClass )
                 return new ClassExpression(type);
         }
         if( inVariableDeclaration ) {
@@ -277,7 +293,6 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         // if the variable is still dynamic (i.e. unresolved), it will be handled by DynamicVariablesVisitor
         return ve;
     }
-
 
     protected Expression transformPropertyExpression(PropertyExpression pe) {
         Expression objectExpression;

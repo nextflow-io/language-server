@@ -71,13 +71,13 @@ public class ASTNodeStringUtils {
         return null;
     }
 
-    public static String toString(ClassNode classNode, ASTNodeCache ast) {
+    public static String toString(ClassNode node, ASTNodeCache ast) {
         var builder = new StringBuilder();
-        if( classNode.isEnum() )
+        if( node.isEnum() )
             builder.append("enum ");
         else
             builder.append("class ");
-        builder.append(classNode.toString(false));
+        builder.append(node.toString(false));
         return builder.toString();
     }
 
@@ -178,11 +178,19 @@ public class ASTNodeStringUtils {
         if( node instanceof WorkflowNode wn )
             return groovydocToMarkdown(wn.getGroovydoc());
 
-        if( node instanceof ClassNode cn )
-            return annotationValueToMarkdown(cn, DslType.class);
+        if( node instanceof ClassNode cn ) {
+            var result = groovydocToMarkdown(cn.getGroovydoc());
+            if( result == null )
+                result = annotationValueToMarkdown(cn, DslType.class);
+            return result;
+        }
 
-        if( node instanceof FieldNode fn )
-            return annotationValueToMarkdown(fn, Constant.class);
+        if( node instanceof FieldNode fn ) {
+            var result = groovydocToMarkdown(fn.getGroovydoc());
+            if( result == null )
+                result = annotationValueToMarkdown(fn, Constant.class);
+            return result;
+        }
 
         if( node instanceof MethodNode mn )
             return annotationValueToMarkdown(mn, Function.class);

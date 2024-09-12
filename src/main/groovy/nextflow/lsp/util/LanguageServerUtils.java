@@ -71,8 +71,8 @@ public class LanguageServerUtils {
     }
 
     public static CompletionItemKind astNodeToCompletionItemKind(ASTNode node) {
-        if( node instanceof ClassNode ) {
-            if( ((ClassNode) node).isEnum() )
+        if( node instanceof ClassNode cn ) {
+            if( cn.isEnum() )
                 return CompletionItemKind.Enum;
             else
                 return CompletionItemKind.Class;

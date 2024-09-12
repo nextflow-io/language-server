@@ -88,6 +88,7 @@ compilationUnit
 scriptStatement
     :   topAssignmentStatement      #topAssignmentStmtAlt
     |   includeStatement            #includeStmtAlt
+    |   enumDef                     #enumDefAlt
     |   processDef                  #processDefAlt
     |   workflowDef                 #workflowDefAlt
     |   outputDef                   #outputDefAlt
@@ -116,6 +117,17 @@ includeNames
 includeName
     :   name=identifier
     |   name=identifier AS alias=identifier
+    ;
+
+// -- enum definition
+enumDef
+    :   ENUM identifier nls LBRACE
+        nls enumBody? COMMA?
+        nls RBRACE
+    ;
+
+enumBody
+    :   identifier (nls COMMA nls identifier)*
     ;
 
 // -- process definition

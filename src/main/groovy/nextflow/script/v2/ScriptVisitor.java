@@ -15,6 +15,7 @@
  */
 package nextflow.script.v2;
 
+import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GroovyCodeVisitor;
 
 public interface ScriptVisitor extends GroovyCodeVisitor {
@@ -24,6 +25,8 @@ public interface ScriptVisitor extends GroovyCodeVisitor {
     void visitFeatureFlag(FeatureFlagNode node);
 
     void visitInclude(IncludeNode node);
+
+    void visitEnum(ClassNode node);
 
     void visitWorkflow(WorkflowNode node);
 

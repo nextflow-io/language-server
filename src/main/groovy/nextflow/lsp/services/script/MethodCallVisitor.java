@@ -137,7 +137,7 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
     private MethodNode asMethodOutput(PropertyExpression node) {
         if( node.getObjectExpression() instanceof PropertyExpression pe ) {
             if( pe.getObjectExpression() instanceof VariableExpression ve && "out".equals(pe.getPropertyAsString()) ) {
-                var defNode = ASTUtils.getDefinition(ve, false, astCache);
+                var defNode = ASTUtils.getDefinition(ve, astCache);
                 if( defNode instanceof MethodNode mn )
                     return mn;
             }

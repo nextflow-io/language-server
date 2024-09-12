@@ -27,6 +27,7 @@ import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.SymbolInformation;
@@ -62,20 +63,21 @@ public class ScriptSymbolProvider implements SymbolProvider {
         if( !ast.hasAST(uri) )
             return Collections.emptyList();
 
-        var definitions = ast.getDefinitions(uri);
         var result = new ArrayList<Either<SymbolInformation, DocumentSymbol>>();
-        for( var node : definitions ) {
-            if( !(node instanceof MethodNode) )
-                continue;
-            var name = getSymbolName(node);
-            var range = LanguageServerUtils.astNodeToRange(node);
-            if( range == null )
-                continue;
-            var symbol = new DocumentSymbol(name, SymbolKind.Method, range, range);
-            result.add(Either.forRight(symbol));
-        }
+        for( var node : ast.getEnumNodes(uri) )
+            addDocumentSymbol(node, result);
+        for( var node : ast.getDefinitions(uri) )
+            addDocumentSymbol(node, result);
 
         return result;
+    }
+
+    private void addDocumentSymbol(ASTNode node, List<Either<SymbolInformation, DocumentSymbol>> result) {
+        var name = getSymbolName(node);
+        var range = LanguageServerUtils.astNodeToRange(node);
+        if( range == null )
+            return;
+        result.add(Either.forRight(new DocumentSymbol(name, getSymbolKind(node), range, range)));
     }
 
     @Override
@@ -85,33 +87,43 @@ public class ScriptSymbolProvider implements SymbolProvider {
             return Collections.emptyList();
         }
 
-        var lowerCaseQuery = query.toLowerCase();
-        var definitions = ast.getDefinitions();
         var result = new ArrayList<WorkspaceSymbol>();
-        for( var node : definitions ) {
-            if( !(node instanceof MethodNode) )
-                continue;
-            var name = getSymbolName(node);
-            if( name == null || !name.toLowerCase().contains(lowerCaseQuery) )
-                continue;
-            var uri = ast.getURI(node);
-            var location = LanguageServerUtils.astNodeToLocation(node, uri);
-            if( location == null )
-                continue;
-            var symbol = new WorkspaceSymbol(name, SymbolKind.Method, Either.forLeft(location));
-            result.add(symbol);
-        }
+        for( var node : ast.getEnumNodes() )
+            addWorkspaceSymbol(node, query, result);
+        for( var node : ast.getDefinitions() )
+            addWorkspaceSymbol(node, query, result);
 
         return result;
     }
 
+    private void addWorkspaceSymbol(ASTNode node, String query, List<WorkspaceSymbol> result) {
+        var name = getSymbolName(node);
+        if( name == null || !name.toLowerCase().contains(query.toLowerCase()) )
+            return;
+        var uri = ast.getURI(node);
+        var location = LanguageServerUtils.astNodeToLocation(node, uri);
+        if( location == null )
+            return;
+        result.add(new WorkspaceSymbol(name, getSymbolKind(node), Either.forLeft(location)));
+    }
+
     private static String getSymbolName(ASTNode node) {
+        if( node instanceof ClassNode cn )
+            return cn.getName();
         if( node instanceof FunctionNode fn )
             return fn.getName();
         if( node instanceof ProcessNode pn )
             return pn.getName();
         if( node instanceof WorkflowNode wn )
             return wn.isEntry() ?  "<entry>" : wn.getName();
+        return null;
+    }
+
+    private static SymbolKind getSymbolKind(ASTNode node) {
+        if( node instanceof ClassNode cn && cn.isEnum() )
+            return SymbolKind.Enum;
+        if( node instanceof MethodNode mn )
+            return SymbolKind.Function;
         return null;
     }
 

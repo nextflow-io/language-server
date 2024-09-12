@@ -64,7 +64,7 @@ class ScriptHoverProvider implements HoverProvider {
             return null
 
         final offsetNode = nodeTree.first()
-        final defNode = ASTUtils.getDefinition(offsetNode, false, ast)
+        final defNode = ASTUtils.getDefinition(offsetNode, ast)
 
         final builder = new StringBuilder()
 

@@ -16,6 +16,7 @@
 package nextflow.script.v2;
 
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport;
+import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 
 public abstract class ScriptVisitorSupport extends ClassCodeVisitorSupport implements ScriptVisitor {
@@ -29,6 +30,10 @@ public abstract class ScriptVisitorSupport extends ClassCodeVisitorSupport imple
             visitFeatureFlag(featureFlag);
         for( var includeNode : script.getIncludes() )
             visitInclude(includeNode);
+        for( var classNode : script.getClasses() ) {
+            if( classNode.isEnum() )
+                visitEnum(classNode);
+        }
         for( var workflowNode : script.getWorkflows() )
             visitWorkflow(workflowNode);
         for( var processNode : script.getProcesses() )
@@ -46,6 +51,12 @@ public abstract class ScriptVisitorSupport extends ClassCodeVisitorSupport imple
     @Override
     public void visitInclude(IncludeNode node) {
         visit(node.source);
+    }
+
+    @Override
+    public void visitEnum(ClassNode node) {
+        for( var fn : node.getFields() )
+            visitField(fn);
     }
 
     @Override

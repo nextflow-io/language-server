@@ -179,7 +179,7 @@ class ScriptCallHierarchyProvider implements CallHierarchyProvider {
         if( !offsetNode )
             return Collections.emptyList()
 
-        final fromNode = ASTUtils.getDefinition(offsetNode, false, ast)
+        final fromNode = ASTUtils.getDefinition(offsetNode, ast)
         if( fromNode !instanceof MethodNode )
             return Collections.emptyList()
 
