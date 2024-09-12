@@ -548,6 +548,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( findVariableDeclaration(name, varX) != null )
             return;
         if( currentDefinition instanceof ProcessNode || currentDefinition instanceof WorkflowNode ) {
+            if( inClosure )
+                addError("Local variables in a closure should be declared with `def`", varX);
             var scope = currentScope;
             currentScope = currentDefinition.getVariableScope();
             declare(varX);
@@ -584,8 +586,13 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         }
     }
 
+    private boolean inClosure;
+
     @Override
     public void visitClosureExpression(ClosureExpression node) {
+        var ic = inClosure;
+        inClosure = true;
+
         pushState();
         node.setVariableScope(currentScope);
         if( node.getParameters() != null ) {
@@ -601,6 +608,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             variable.setClosureSharedVariable(true);
         }
         popState();
+
+        inClosure = false;
     }
 
     @Override
