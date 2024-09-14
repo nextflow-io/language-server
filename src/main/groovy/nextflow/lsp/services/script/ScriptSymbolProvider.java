@@ -108,14 +108,16 @@ public class ScriptSymbolProvider implements SymbolProvider {
     }
 
     private static String getSymbolName(ASTNode node) {
-        if( node instanceof ClassNode cn )
-            return cn.getName();
+        if( node instanceof ClassNode cn && cn.isEnum() )
+            return "enum " + cn.getName();
         if( node instanceof FunctionNode fn )
-            return fn.getName();
+            return "function " + fn.getName();
         if( node instanceof ProcessNode pn )
-            return pn.getName();
+            return "process " + pn.getName();
         if( node instanceof WorkflowNode wn )
-            return wn.isEntry() ?  "<entry>" : wn.getName();
+            return wn.isEntry()
+                ? "workflow <entry>"
+                : "workflow " + wn.getName();
         return null;
     }
 
