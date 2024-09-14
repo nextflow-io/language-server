@@ -20,6 +20,7 @@ import groovy.transform.CompileStatic
 @CompileStatic
 class FeatureFlagDsl {
 
+    @Deprecated
     @FeatureFlag(
         name='nextflow.enable.configProcessNamesValidation',
         description='''
@@ -27,6 +28,7 @@ class FeatureFlagDsl {
         ''')
     boolean configProcessNamesValidation
 
+    @Deprecated
     @FeatureFlag(
         name='nextflow.enable.dsl',
         description='''
