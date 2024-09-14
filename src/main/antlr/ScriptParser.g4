@@ -249,7 +249,7 @@ outputDirective
 
 // -- function definition
 functionDef
-    :   DEF identifier LPAREN formalParameterList? rparen nls LBRACE
+    :   DEF identifier LPAREN nls (formalParameterList nls)? rparen nls LBRACE
         nls blockStatements? RBRACE
     ;
 
@@ -571,7 +571,7 @@ list
     ;
 
 expressionList
-    :   expression (COMMA nls expression)*
+    :   expression (nls COMMA nls expression)*
     ;
 
 // -- map expression
@@ -581,7 +581,7 @@ map
     ;
 
 mapEntryList
-    :   mapEntry (COMMA nls mapEntry)*
+    :   mapEntry (nls COMMA nls mapEntry)*
     ;
 
 mapEntry
@@ -604,7 +604,7 @@ arguments
     ;
 
 argumentList
-    :   argumentListElement (COMMA nls argumentListElement)*
+    :   argumentListElement (nls COMMA nls argumentListElement)*
     ;
 
 argumentListElement
