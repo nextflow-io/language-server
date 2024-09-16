@@ -26,6 +26,7 @@ import org.codehaus.groovy.control.SourceUnit;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class ScriptNode extends ModuleNode {
+    private String shebang;
     private List<FeatureFlagNode> featureFlags = new ArrayList<>();
     private List<IncludeNode> includes = new ArrayList<>();
     private List<FunctionNode> functions = new ArrayList<>();
@@ -36,6 +37,10 @@ public class ScriptNode extends ModuleNode {
 
     public ScriptNode(SourceUnit sourceUnit) {
         super(sourceUnit);
+    }
+
+    public String getShebang() {
+        return shebang;
     }
 
     public List<FeatureFlagNode> getFeatureFlags() {
@@ -64,6 +69,10 @@ public class ScriptNode extends ModuleNode {
 
     public OutputNode getOutput() {
         return output;
+    }
+
+    public void setShebang(String shebang) {
+        this.shebang = shebang;
     }
 
     public void addFeatureFlag(FeatureFlagNode featureFlag) {

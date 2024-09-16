@@ -1635,8 +1635,13 @@ public class ScriptAstBuilder {
         // remove leading newline
         if( added ) {
             var last = comments.get(comments.size() - 1);
-            if( "\n".equals(last) )
+            if( "\n".equals(last) ) {
                 comments.remove(comments.size() - 1);
+            }
+            else if( last.startsWith("#!") ) {
+                moduleNode.setShebang(last);
+                comments.remove(comments.size() - 1);
+            }
         }
 
         return false;

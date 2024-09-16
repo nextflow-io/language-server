@@ -126,6 +126,8 @@ public class ScriptFormattingProvider implements FormattingProvider {
             var scriptNode = (ScriptNode) moduleNode;
             if( options.harshilAlignment() )
                 maxIncludeWidth = getMaxIncludeWidth(scriptNode.getIncludes());
+            if( scriptNode.getShebang() != null )
+                fmt.append(scriptNode.getShebang());
             for( var featureFlag : scriptNode.getFeatureFlags() )
                 visitFeatureFlag(featureFlag);
             for( var includeNode : scriptNode.getIncludes() )
