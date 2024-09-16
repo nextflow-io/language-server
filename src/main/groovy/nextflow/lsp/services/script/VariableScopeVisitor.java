@@ -502,7 +502,14 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     // statements
 
-    private static final List<String> KEYWORDS = List.of("for", "switch", "while");
+    private static final List<String> KEYWORDS = List.of(
+        "breaK",
+        "case",
+        "continue",
+        "for",
+        "switch",
+        "while"
+    );
 
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
@@ -541,7 +548,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
             visit(node.getRightExpression());
             visitAssignment(node.getLeftExpression());
-            visit(node.getLeftExpression());
         }
         else {
             super.visitBinaryExpression(node);
@@ -564,6 +570,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         }
         else {
             visitMutatedVariable(node);
+            visit(node);
         }
     }
 
