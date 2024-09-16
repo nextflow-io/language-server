@@ -800,8 +800,18 @@ public class ScriptAstBuilder {
         return result;
     }
 
+    private static final String KEYWORD_FOR = Types.getText(Types.KEYWORD_FOR);
+    private static final String KEYWORD_SWITCH = Types.getText(Types.KEYWORD_SWITCH);
+    private static final String KEYWORD_WHILE = Types.getText(Types.KEYWORD_WHILE);
+
     private void checkInvalidVarName(String name, ASTNode node) {
-        if( GROOVY_KEYWORDS.contains(name) )
+        if( !GROOVY_KEYWORDS.contains(name) )
+            return;
+        if( KEYWORD_FOR.equals(name) || KEYWORD_WHILE.equals(name) )
+            collectSyntaxError(new SyntaxException("`" + name + "` loops are no longer supported", node));
+        else if( KEYWORD_SWITCH.equals(name) )
+            collectSyntaxError(new SyntaxException("`switch` statements are no longer supported", node));
+        else
             collectSyntaxError(new SyntaxException("`" + name + "` is not allowed as an identifier because it is a Groovy keyword", node));
     }
 

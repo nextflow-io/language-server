@@ -478,6 +478,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     // statements
 
+    private static final List<String> KEYWORDS = List.of("for", "switch", "while");
+
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
         if( currentDefinition instanceof WorkflowNode ) {
@@ -487,11 +489,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             var name = node.getMethodAsString();
             var variable = findVariableDeclaration(name, node);
             if( variable == null ) {
-                if( "for".equals(name) || "while".equals(name) )
-                    addError("`" + name + "` loops are no longer supported", node);
-                else if( "switch".equals(name) )
-                    addError("switch statements are no longer supported", node);
-                else
+                if( !KEYWORDS.contains(name) )
                     addError("`" + name + "` is not defined", node.getMethod());
             }
         }
