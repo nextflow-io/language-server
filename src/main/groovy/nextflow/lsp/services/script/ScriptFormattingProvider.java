@@ -35,6 +35,7 @@ import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.ScriptNode;
 import nextflow.script.v2.ScriptVisitorSupport;
 import nextflow.script.v2.WorkflowNode;
+import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.expr.BinaryExpression;
 import org.codehaus.groovy.ast.expr.EmptyExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
@@ -141,6 +142,10 @@ public class ScriptFormattingProvider implements FormattingProvider {
                 visitProcess(processNode);
             for( var functionNode : scriptNode.getFunctions() )
                 visitFunction(functionNode);
+            for( var classNode : scriptNode.getClasses() ) {
+                if( classNode.isEnum() )
+                    visitEnum(classNode);
+            }
         }
 
         protected int getMaxIncludeWidth(List<IncludeNode> includes) {
@@ -194,6 +199,23 @@ public class ScriptFormattingProvider implements FormattingProvider {
                 fmt.visit(node.source);
                 fmt.appendNewLine();
             }
+        }
+
+        @Override
+        public void visitEnum(ClassNode node) {
+            fmt.appendComments(node);
+            fmt.append("enum ");
+            fmt.append(node.getName());
+            fmt.append(" {\n");
+            fmt.incIndent();
+            for( var fn : node.getFields() ) {
+                fmt.appendIndent();
+                fmt.append(fn.getName());
+                fmt.append(',');
+                fmt.appendNewLine();
+            }
+            fmt.decIndent();
+            fmt.append("}\n");
         }
 
         @Override
