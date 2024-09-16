@@ -59,6 +59,8 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
         var result = new ArrayList<CodeLens>();
         for( var wn : ast.getWorkflowNodes(uri) ) {
             var range = LanguageServerUtils.astNodeToRange(wn);
+            if( range == null )
+                continue;
             var name = wn.isEntry() ? JsonNull.INSTANCE : new JsonPrimitive(wn.getName());
             var arguments = List.of(new JsonPrimitive(uri.toString()), (Object) name);
             var command = new Command("Preview DAG", "nextflow.previewDag", arguments);
