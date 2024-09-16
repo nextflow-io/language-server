@@ -183,22 +183,42 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitInclude(IncludeNode node) {
+            var wrap = node.modules.size() > 1;
             fmt.appendComments(node);
-            for( var module : node.modules ) {
-                fmt.append("include { ");
+            fmt.append("include {");
+            if( wrap )
+                fmt.incIndent();
+            for( int i = 0; i < node.modules.size(); i++ ) {
+                if( wrap ) {
+                    fmt.appendNewLine();
+                    fmt.appendIndent();
+                }
+                else {
+                    fmt.append(' ');
+                }
+                var module = node.modules.get(i);
                 fmt.append(module.name);
                 if( module.alias != null ) {
                     fmt.append(" as ");
                     fmt.append(module.alias);
                 }
-                if( options.harshilAlignment() ) {
+                if( !wrap && options.harshilAlignment() ) {
                     var padding = maxIncludeWidth - getIncludeWidth(module);
                     fmt.append(" ".repeat(padding));
                 }
-                fmt.append(" } from ");
-                fmt.visit(node.source);
-                fmt.appendNewLine();
+                if( i + 1 < node.modules.size() )
+                    fmt.append(" ;");
             }
+            if( wrap ) {
+                fmt.appendNewLine();
+                fmt.decIndent();
+            }
+            else {
+                fmt.append(' ');
+            }
+            fmt.append("} from ");
+            fmt.visit(node.source);
+            fmt.appendNewLine();
         }
 
         @Override
