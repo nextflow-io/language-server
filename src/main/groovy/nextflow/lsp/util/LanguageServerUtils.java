@@ -18,13 +18,7 @@ package nextflow.lsp.util;
 import java.net.URI;
 
 import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.FieldNode;
-import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.PropertyNode;
-import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.syntax.SyntaxException;
-import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -68,25 +62,6 @@ public class LanguageServerUtils {
         if( end == null )
             end = start;
         return new Range(start, end);
-    }
-
-    public static CompletionItemKind astNodeToCompletionItemKind(ASTNode node) {
-        if( node instanceof ClassNode cn ) {
-            if( cn.isEnum() )
-                return CompletionItemKind.Enum;
-            else
-                return CompletionItemKind.Class;
-        }
-        else if( node instanceof MethodNode ) {
-            return CompletionItemKind.Method;
-        }
-        else if( node instanceof Variable ) {
-            if( node instanceof FieldNode || node instanceof PropertyNode )
-                return CompletionItemKind.Field;
-            else
-                return CompletionItemKind.Variable;
-        }
-        return CompletionItemKind.Property;
     }
 
     public static Location astNodeToLocation(ASTNode node, URI uri) {

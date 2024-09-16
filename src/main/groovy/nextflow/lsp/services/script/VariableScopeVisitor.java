@@ -20,6 +20,7 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,6 +44,7 @@ import nextflow.script.dsl.ScriptDsl;
 import nextflow.script.dsl.WorkflowDsl;
 import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
+import nextflow.script.v2.IncludeNode;
 import nextflow.script.v2.OutputNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.ScriptNode;
@@ -93,6 +95,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
+    private Map<String,Variable> includes = new HashMap<>();
+
     private MethodNode currentDefinition;
 
     private VariableScope currentScope;
@@ -117,21 +121,41 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var scriptNode = (ScriptNode) moduleNode;
 
         // declare top-level names
-        for( var includeNode : scriptNode.getIncludes() ) {
-            for( var module : includeNode.modules )
-                declare(module, includeNode);
-        }
+        for( var includeNode : scriptNode.getIncludes() )
+            declareInclude(includeNode);
         for( var workflowNode : scriptNode.getWorkflows() ) {
             if( !workflowNode.isEntry() )
-                declare(workflowNode);
+                declareMethod(workflowNode);
         }
         for( var processNode : scriptNode.getProcesses() )
-            declare(processNode);
+            declareMethod(processNode);
         for( var functionNode : scriptNode.getFunctions() )
-            declare(functionNode);
+            declareMethod(functionNode);
 
         // visit top-level definitions
         super.visit(scriptNode);
+    }
+
+    private void declareInclude(IncludeNode node) {
+        for( var module : node.modules ) {
+            var name = module.getName();
+            if( includes.containsKey(name) )
+                addError("`" + name + "` is already included", node);
+            includes.put(name, module);
+        }
+    }
+
+    private void declareMethod(MethodNode mn) {
+        var cn = currentScope.getClassScope();
+        var name = mn.getName();
+        if( includes.containsKey(name) ) {
+            addError("`" + name + "` is already included", mn);
+        }
+        if( cn.getDeclaredMethods(name).size() > 0 ) {
+            addError("`" + name + "` is already declared", mn);
+            return;
+        }
+        cn.addMethod(mn);
     }
 
     @Override
@@ -690,15 +714,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         currentScope = currentScope.getParent();
     }
 
-    private void declare(MethodNode mn) {
-        var cn = currentScope.getClassScope();
-        if( cn.getDeclaredMethods(mn.getName()).size() > 0 ) {
-            addError("`" + mn.getName() + "` is already declared", mn);
-            return;
-        }
-        cn.addMethod(mn);
-    }
-
     private void declare(VariableExpression variable) {
         declare(variable, variable);
         variable.setAccessedVariable(variable);
@@ -724,6 +739,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private Variable findVariableDeclaration(String name, ASTNode node) {
         Variable variable = null;
         VariableScope scope = currentScope;
+        boolean isClassVariable = false;
         while( scope != null ) {
             variable = scope.getDeclaredVariable(name);
             if( variable != null )
@@ -732,16 +748,24 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( variable != null )
                 break;
             variable = scope.getReferencedClassVariable(name);
-            if( variable != null )
+            if( variable != null ) {
+                isClassVariable = true;
                 break;
+            }
             variable = findClassMember(scope.getClassScope(), name, node);
-            if( variable != null )
+            if( variable != null ) {
+                isClassVariable = true;
                 break;
+            }
+            variable = includes.get(name);
+            if( variable != null ) {
+                isClassVariable = true;
+                break;
+            }
             scope = scope.getParent();
         }
         if( variable == null )
             return null;
-        var isClassVariable = scope.getDeclaredVariable(name) == null && ((scope.isClassScope() && !scope.isReferencedLocalVariable(name)) || scope.isReferencedClassVariable(name));
         VariableScope end = scope;
         scope = currentScope;
         while( true ) {

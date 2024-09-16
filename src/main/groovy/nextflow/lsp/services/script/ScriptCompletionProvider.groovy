@@ -30,11 +30,13 @@ import nextflow.script.v2.FunctionNode
 import nextflow.script.v2.OutputNode
 import nextflow.script.v2.ProcessNode
 import nextflow.script.v2.WorkflowNode
+import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
@@ -355,14 +357,12 @@ class ScriptCompletionProvider implements CompletionProvider {
 
             final item = new CompletionItem()
             item.setLabel(field.getName())
-            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(field))
+            item.setKind(astNodeToCompletionItemKind(field))
+            item.setDetail(astNodeToCompletionItemDetail(field))
 
             final documentation = ASTNodeStringUtils.getDocumentation(field)
             if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
-
-            if( Logger.isDebugEnabled() )
-                item.setDetail(field.getDeclaringClass().getNameWithoutPackage())
 
             if( !addItem(item, items) )
                 break
@@ -378,14 +378,12 @@ class ScriptCompletionProvider implements CompletionProvider {
 
             final item = new CompletionItem()
             item.setLabel(method.getName())
-            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(method))
+            item.setKind(astNodeToCompletionItemKind(method))
+            item.setDetail(astNodeToCompletionItemDetail(method))
 
             final documentation = ASTNodeStringUtils.getDocumentation(method)
             if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
-
-            if( Logger.isDebugEnabled() )
-                item.setDetail(method.getDeclaringClass().getNameWithoutPackage())
 
             if( !addItem(item, items) )
                 break
@@ -418,13 +416,13 @@ class ScriptCompletionProvider implements CompletionProvider {
             final name = variable.getName()
             if( !name.startsWith(namePrefix) )
                 continue
-            if( !((ASTNode) variable).getNodeMetaData('access.method') && existingNames.contains(name) )
+            if( existingNames.contains(name) )
                 continue
             existingNames.add(name)
 
             final item = new CompletionItem()
             item.setLabel(name)
-            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind((ASTNode) variable))
+            item.setKind(astNodeToCompletionItemKind((ASTNode) variable))
             if( !addItem(item, items) )
                 break
         }
@@ -440,55 +438,57 @@ class ScriptCompletionProvider implements CompletionProvider {
     private void populateExternalFunctions(String namePrefix, List<CompletionItem> items) {
         final localNodes = ast.getFunctionNodes(uri)
         final allNodes = ast.getFunctionNodes()
-        populateExternalMethods(namePrefix, 'function', localNodes, allNodes, items)
+        populateExternalMethods(namePrefix, localNodes, allNodes, items)
     }
 
     private void populateExternalProcesses(String namePrefix, List<CompletionItem> items) {
         final localNodes = ast.getProcessNodes(uri)
         final allNodes = ast.getProcessNodes()
-        populateExternalMethods(namePrefix, 'process', localNodes, allNodes, items)
+        populateExternalMethods(namePrefix, localNodes, allNodes, items)
     }
 
     private void populateExternalWorkflows(String namePrefix, List<CompletionItem> items) {
         final localNodes = ast.getWorkflowNodes(uri)
         final allNodes = ast.getWorkflowNodes()
-        populateExternalMethods(namePrefix, 'workflow', localNodes, allNodes, items)
+        populateExternalMethods(namePrefix, localNodes, allNodes, items)
     }
 
-    private void populateExternalMethods(String namePrefix, String label, List<? extends MethodNode> localNodes, List<? extends MethodNode> allNodes, List<CompletionItem> items) {
-        final includeNames = getIncludeNames(uri)
+    private void populateExternalMethods(String namePrefix, List<? extends MethodNode> localNodes, List<? extends MethodNode> allNodes, List<CompletionItem> items) {
         final addIncludeRange = getAddIncludeRange(uri)
 
         for( final node : allNodes ) {
             final name = node.getName()
             if( !name || !name.startsWith(namePrefix) )
                 continue
-            if( node in localNodes || name in includeNames )
+            if( node in localNodes )
                 continue
 
             final item = new CompletionItem(name)
-            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(node))
-            item.setDetail(label)
+            item.setKind(astNodeToCompletionItemKind(node))
+            item.setDetail(astNodeToCompletionItemDetail(node))
 
             final documentation = ASTNodeStringUtils.getDocumentation(node)
             if( documentation != null )
                 item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation))
 
-            final textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, node)
-            item.setAdditionalTextEdits( List.of(textEdit) )
+            if( !isIncluded(uri, node) ) {
+                final textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, node)
+                item.setAdditionalTextEdits( List.of(textEdit) )
+            }
 
             if( !addItem(item, items) )
                 break
         }
     }
 
-    private List<String> getIncludeNames(URI uri) {
-        final List<String> result = []
-        for( final node : ast.getIncludeNodes(uri) ) {
-            for( final module : node.modules )
-                result.add(module.getName())
+    private boolean isIncluded(URI uri, MethodNode node) {
+        for( final includeNode : ast.getIncludeNodes(uri) ) {
+            for( final module : includeNode.modules ) {
+                if( module.getMethod() == node )
+                    return true
+            }
         }
-        return result
+        return false
     }
 
     private Range getAddIncludeRange(URI uri) {
@@ -526,7 +526,7 @@ class ScriptCompletionProvider implements CompletionProvider {
         for( final cn : classNodes ) {
             final item = new CompletionItem()
             item.setLabel(cn.getNameWithoutPackage())
-            item.setKind(LanguageServerUtils.astNodeToCompletionItemKind(cn))
+            item.setKind(astNodeToCompletionItemKind(cn))
 
             final documentation = ASTNodeStringUtils.getDocumentation(cn)
             if( documentation != null )
@@ -535,6 +535,35 @@ class ScriptCompletionProvider implements CompletionProvider {
             if( !addItem(item, items) )
                 break
         }
+    }
+
+    private static String astNodeToCompletionItemDetail(ASTNode node) {
+        if( node instanceof FunctionNode )
+            return 'function'
+        if( node instanceof ProcessNode )
+            return 'process'
+        if( node instanceof WorkflowNode )
+            return 'workflow'
+        if( Logger.isDebugEnabled() && node instanceof AnnotatedNode )
+            return node.getDeclaringClass().getNameWithoutPackage()
+        return null
+    }
+
+    private static CompletionItemKind astNodeToCompletionItemKind(ASTNode node) {
+        if( node instanceof ClassNode ) {
+            return node.isEnum()
+                ? CompletionItemKind.Enum
+                : CompletionItemKind.Class
+        }
+        if( node instanceof MethodNode ) {
+            return CompletionItemKind.Method
+        }
+        if( node instanceof Variable ) {
+            return node instanceof FieldNode
+                ? CompletionItemKind.Field
+                : CompletionItemKind.Variable
+        }
+        return CompletionItemKind.Property
     }
 
     private boolean addItem(CompletionItem item, List<CompletionItem> items) {
