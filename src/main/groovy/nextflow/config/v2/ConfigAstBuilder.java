@@ -961,7 +961,7 @@ public class ConfigAstBuilder {
     }
 
     private Expression closure(ClosureContext ctx) {
-        var params = parameters(ctx.formalParameterList());
+        var params = formalParameterList(ctx.formalParameterList());
         var code = blockStatements(ctx.blockStatements());
         return ast( closureX(params, code), ctx );
     }
@@ -1106,13 +1106,13 @@ public class ConfigAstBuilder {
 
     /// MISCELLANEOUS
 
-    private Parameter[] parameters(FormalParameterListContext ctx) {
+    private Parameter[] formalParameterList(FormalParameterListContext ctx) {
         // NOTE: implicit `it` is not allowed
         if( ctx == null )
             return null;
 
         var params = ctx.formalParameter().stream()
-            .map(this::parameter)
+            .map(this::formalParameter)
             .collect(Collectors.toList());
         for( int n = params.size(), i = n - 1; i >= 0; i -= 1 ) {
             var param = params.get(i);
@@ -1127,7 +1127,7 @@ public class ConfigAstBuilder {
         return params.toArray(Parameter.EMPTY_ARRAY);
     }
 
-    private Parameter parameter(FormalParameterContext ctx) {
+    private Parameter formalParameter(FormalParameterContext ctx) {
         var type = ClassHelper.dynamicType();
         var name = identifier(ctx.identifier());
         var defaultValue = ctx.expression() != null

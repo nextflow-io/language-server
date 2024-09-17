@@ -306,7 +306,9 @@ public class ScriptAstBuilder {
     }
 
     private ASTNode topAssignmentStatement(TopAssignmentStatementContext ctx) {
-        var names = ctx.assignmentPath().identifier().stream()
+        checkLegacyType(ctx.legacyType());
+
+        var names = ctx.identifier().stream()
             .map(this::identifier)
             .collect(Collectors.toList());
         var value = expression(ctx.expression());
@@ -319,7 +321,7 @@ public class ScriptAstBuilder {
             return result;
         }
         else if( "params".equals(firstName) ) {
-            var left = propertyExpression(ctx.assignmentPath().identifier());
+            var left = propertyExpression(ctx.identifier());
             return stmt(ast( assignX(left, value), ctx ));
         }
         else {
@@ -627,8 +629,10 @@ public class ScriptAstBuilder {
     }
 
     private FunctionNode functionDef(FunctionDefContext ctx) {
+        checkLegacyType(ctx.legacyType());
+
         var name = identifier(ctx.identifier());
-        var params = Optional.ofNullable(parameters(ctx.formalParameterList())).orElse(Parameter.EMPTY_ARRAY);
+        var params = Optional.ofNullable(formalParameterList(ctx.formalParameterList())).orElse(Parameter.EMPTY_ARRAY);
         var code = blockStatements(ctx.blockStatements());
 
         var result = ast( new FunctionNode(name, null, params, code), ctx );
@@ -777,6 +781,8 @@ public class ScriptAstBuilder {
         }
         else {
             // single assignment
+            checkLegacyType(ctx.legacyType());
+
             var target = variableName(ctx.identifier());
             var initializer = ctx.initializer != null
                 ? expression(ctx.initializer)
@@ -1297,13 +1303,13 @@ public class ScriptAstBuilder {
     }
 
     private Expression closure(ClosureContext ctx) {
-        var params = parameters(ctx.formalParameterList());
+        var params = formalParameterList(ctx.formalParameterList());
         var code = blockStatements(ctx.blockStatements());
         return ast( closureX(params, code), ctx );
     }
 
     private Expression closureWithLabels(ClosureWithLabelsContext ctx) {
-        var params = parameters(ctx.formalParameterList());
+        var params = formalParameterList(ctx.formalParameterList());
         var code = blockStatementsWithLabels(ctx.blockStatementsWithLabels());
         return ast( closureX(params, code), ctx );
     }
@@ -1474,13 +1480,13 @@ public class ScriptAstBuilder {
 
     /// MISCELLANEOUS
 
-    private Parameter[] parameters(FormalParameterListContext ctx) {
+    private Parameter[] formalParameterList(FormalParameterListContext ctx) {
         // NOTE: implicit `it` is not allowed
         if( ctx == null )
             return null;
 
         var params = ctx.formalParameter().stream()
-            .map(this::parameter)
+            .map(this::formalParameter)
             .collect(Collectors.toList());
         for( int n = params.size(), i = n - 1; i >= 0; i -= 1 ) {
             var param = params.get(i);
@@ -1495,7 +1501,9 @@ public class ScriptAstBuilder {
         return params.toArray(Parameter.EMPTY_ARRAY);
     }
 
-    private Parameter parameter(FormalParameterContext ctx) {
+    private Parameter formalParameter(FormalParameterContext ctx) {
+        checkLegacyType(ctx.legacyType());
+
         var type = ClassHelper.dynamicType();
         var name = identifier(ctx.identifier());
         var defaultValue = ctx.expression() != null
@@ -1655,6 +1663,13 @@ public class ScriptAstBuilder {
     private boolean isInsideParentheses(NodeMetaDataHandler nodeMetaDataHandler) {
         Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
         return insideParenLevel != null && insideParenLevel.intValue() > 0;
+    }
+
+    private void checkLegacyType(ParserRuleContext ctx) {
+        if( ctx != null ) {
+            var node = ast( new EmptyStatement(), ctx );
+            collectSyntaxError(new SyntaxException("Groovy-style type annotations are not supported", node));
+        }
     }
 
     private CompilationFailedException createParsingFailedException(String msg, ParserRuleContext ctx) {

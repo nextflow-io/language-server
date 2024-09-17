@@ -99,11 +99,8 @@ scriptStatement
 
 // -- top-level assignment (feature flag, param)
 topAssignmentStatement
-    :   assignmentPath nls ASSIGN nls expression
-    ;
-
-assignmentPath
-    :   identifier (DOT identifier)*
+    :   identifier (DOT identifier)* nls ASSIGN nls expression
+    |   (DEF | legacyType | DEF legacyType) identifier nls ASSIGN nls expression
     ;
 
 // -- include statement
@@ -255,7 +252,7 @@ outputDirective
 
 // -- function definition
 functionDef
-    :   DEF identifier LPAREN nls (formalParameterList nls)? rparen nls LBRACE
+    :   (DEF | legacyType | DEF legacyType) identifier LPAREN nls (formalParameterList nls)? rparen nls LBRACE
         nls blockStatements? RBRACE
     ;
 
@@ -316,7 +313,7 @@ assertStatement
 
 // -- variable declaration
 variableDeclaration
-    :   DEF identifier (nls ASSIGN nls initializer=expression)?
+    :   (DEF | legacyType | DEF legacyType) identifier (nls ASSIGN nls initializer=expression)?
     |   DEF variableNames nls ASSIGN nls initializer=expression
     ;
 
@@ -555,7 +552,7 @@ formalParameterList
     ;
 
 formalParameter
-    :   identifier (nls ASSIGN nls expression)?
+    :   DEF? legacyType? identifier (nls ASSIGN nls expression)?
     ;
 
 closureWithLabels
@@ -660,6 +657,10 @@ className
 
 typeArguments
     :   LT type (COMMA type)* GT
+    ;
+
+legacyType
+    :   type (LBRACK RBRACK)*
     ;
 
 
