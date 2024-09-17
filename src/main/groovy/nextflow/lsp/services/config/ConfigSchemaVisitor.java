@@ -65,7 +65,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
             if( !names.isEmpty() ) names.remove(0);
         }
         if( "env".equals(scope) ) {
-            var envName = DefaultGroovyMethods.join(DefaultGroovyMethods.tail(names), ".");
+            var envName = String.join(".", DefaultGroovyMethods.tail(names));
             if( envName.contains(".") )
                 addWarning("Invalid environment variable name '" + envName + "'", node);
             return;
@@ -75,7 +75,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
             return;
         }
 
-        var fqName = DefaultGroovyMethods.join(names, ".");
+        var fqName = String.join(".", names);
         if( fqName.startsWith("process.ext.") )
             return;
         var option = ConfigSchema.OPTIONS.get(fqName);

@@ -34,7 +34,6 @@ import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -117,7 +116,7 @@ public class ConfigFormattingProvider implements FormattingProvider {
         public void visitConfigAssign(ConfigAssignNode node) {
             fmt.appendComments(node);
             fmt.appendIndent();
-            var name = DefaultGroovyMethods.join(node.names, ".");
+            var name = String.join(".", node.names);
             fmt.append(name);
             if( currentAlignmentWidth > 0 ) {
                 var padding = currentAlignmentWidth - name.length();
@@ -157,7 +156,7 @@ public class ConfigFormattingProvider implements FormattingProvider {
                 int maxWidth = 0;
                 for( var stmt : node.statements ) {
                     if( stmt instanceof ConfigAssignNode can ) {
-                        var width = DefaultGroovyMethods.join(can.names, ".").length();
+                        var width = String.join(".", can.names).length();
                         if( maxWidth < width )
                             maxWidth = width;
                     }

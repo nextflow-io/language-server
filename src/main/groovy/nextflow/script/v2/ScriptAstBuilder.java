@@ -314,7 +314,7 @@ public class ScriptAstBuilder {
         var value = expression(ctx.expression());
         var firstName = names.get(0);
         if( "nextflow".equals(firstName) ) {
-            var fullName = DefaultGroovyMethods.join(names, ".");
+            var fullName = String.join(".", names);
             var result = ast( new FeatureFlagNode(fullName, value), ctx );
             if( !(value instanceof ConstantExpression) )
                 collectSyntaxError(new SyntaxException("Feature flag value should be a literal value (number, string, true/false)", result));

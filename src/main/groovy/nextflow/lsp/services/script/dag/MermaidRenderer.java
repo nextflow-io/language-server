@@ -20,8 +20,6 @@ import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
-
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
@@ -110,7 +108,7 @@ public class MermaidRenderer {
         if( name != null )
             lines.add("    end");
 
-        return DefaultGroovyMethods.join(lines, "\n");
+        return String.join("\n", lines);
     }
 
     /**
