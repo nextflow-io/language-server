@@ -46,11 +46,11 @@ public class Positions {
             try {
                 int readLines = 0;
                 while( true ) {
-                    var currentChar = (char) reader.read();
-                    if( currentChar == -1 )
+                    var b = reader.read();
+                    if( b == -1 )
                         return -1;
                     currentIndex++;
-                    if( currentChar == '\n' ) {
+                    if( (char) b == '\n' ) {
                         readLines++;
                         if( readLines == line )
                             break;
@@ -84,12 +84,12 @@ public class Positions {
             var reader = new BufferedReader(new StringReader(string));
             try {
                 while( true ) {
-                    var currentChar = (char) reader.read();
-                    if( currentChar == -1 )
+                    var b = reader.read();
+                    if( b == -1 )
                         return new Position(-1, -1);
                     offset--;
                     character++;
-                    if( currentChar == '\n' ) {
+                    if( (char) b == '\n' ) {
                         line++;
                         character = 0;
                     }
