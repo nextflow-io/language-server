@@ -588,6 +588,17 @@ public class Formatter extends CodeVisitorSupport {
     protected void visitTypeName(ClassNode type) {
         var isFullyQualified = type.getNodeMetaData(FULLY_QUALIFIED) != null;
         append(isFullyQualified ? type.getName() : type.getNameWithoutPackage());
+
+        var genericsTypes = type.getGenericsTypes();
+        if( genericsTypes != null ) {
+            append('<');
+            for( int i = 0; i < genericsTypes.length; i++ ) {
+                if( i > 0 )
+                    append(", ");
+                visitTypeName(genericsTypes[i].getType());
+            }
+            append('>');
+        }
     }
 
     @Override

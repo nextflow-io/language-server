@@ -1192,6 +1192,10 @@ public class ConfigAstBuilder {
         return ast( classNode, ctx );
     }
 
+    private ClassNode type(TypeContext ctx) {
+        return type(ctx, true);
+    }
+
     private ClassNode type(TypeContext ctx, boolean allowProxy) {
         if( ctx == null )
             return ClassHelper.dynamicType();
@@ -1207,10 +1211,6 @@ public class ConfigAstBuilder {
             return primitiveType(ctx.primitiveType());
 
         throw createParsingFailedException("Unrecognized type: " + ctx.getText(), ctx);
-    }
-
-    private ClassNode type(TypeContext ctx) {
-        return type(ctx, true);
     }
 
     private GenericsType[] typeArguments(TypeArgumentsContext ctx) {
