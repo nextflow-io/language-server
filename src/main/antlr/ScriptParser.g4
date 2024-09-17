@@ -88,6 +88,7 @@ compilationUnit
 scriptStatement
     :   topAssignmentStatement      #topAssignmentStmtAlt
     |   includeStatement            #includeStmtAlt
+    |   importStatement             #importStmtAlt
     |   enumDef                     #enumDefAlt
     |   processDef                  #processDefAlt
     |   workflowDef                 #workflowDefAlt
@@ -117,6 +118,11 @@ includeNames
 includeName
     :   name=identifier
     |   name=identifier AS alias=identifier
+    ;
+
+// -- import statement (legacy)
+importStatement
+    :   IMPORT qualifiedClassName
     ;
 
 // -- enum definition
@@ -663,6 +669,7 @@ typeArguments
 keywords
     :   AS
     |   DEF
+    |   IMPORT
     |   IN
     |   INSTANCEOF
     |   RETURN

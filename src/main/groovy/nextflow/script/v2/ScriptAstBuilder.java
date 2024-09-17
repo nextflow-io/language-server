@@ -261,6 +261,11 @@ public class ScriptAstBuilder {
             moduleNode.addFunction(node);
         }
 
+        else if( ctx instanceof ImportStmtAltContext iac ) {
+            var node = ast( new EmptyStatement(), iac );
+            collectSyntaxError(new SyntaxException("Groovy `import` statements are not supported -- use fully-qualified name inline instead", node));
+        }
+
         else if( ctx instanceof IncludeStmtAltContext iac ) {
             var node = includeStatement(iac.includeStatement());
             prependComments(node, ctx);
@@ -1778,7 +1783,7 @@ public class ScriptAstBuilder {
         Types.getText(Types.KEYWORD_FOR),
         Types.getText(Types.KEYWORD_GOTO),
         Types.getText(Types.KEYWORD_IMPLEMENTS),
-        Types.getText(Types.KEYWORD_IMPORT),
+        // Types.getText(Types.KEYWORD_IMPORT),
         Types.getText(Types.KEYWORD_INTERFACE),
         Types.getText(Types.KEYWORD_NATIVE),
         Types.getText(Types.KEYWORD_PACKAGE),

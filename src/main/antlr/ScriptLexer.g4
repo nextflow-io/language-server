@@ -278,7 +278,7 @@ FLOAT         : 'float';
 IF            : 'if';
 // GOTO          : 'goto';
 // IMPLEMENTS    : 'implements';
-// IMPORT        : 'import';
+IMPORT        : 'import';
 INSTANCEOF    : 'instanceof';
 
 fragment
