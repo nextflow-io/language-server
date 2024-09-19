@@ -367,15 +367,14 @@ public abstract class LanguageService {
         changedUris.forEach((uri) -> {
             var diagnostics = new ArrayList<Diagnostic>();
             for( var error : astCache.getErrors(uri) ) {
+                var message = error.getOriginalMessage();
                 var range = LanguageServerUtils.errorToRange(error);
                 if( range == null ) {
-                    log.error(uri + ": invalid range for error: " + error.getMessage());
+                    log.error(uri + ": invalid range for error: " + message);
                     continue;
                 }
 
-                var message = error.getMessage();
-                var severity = DiagnosticSeverity.Error;
-                var diagnostic = new Diagnostic(range, message, severity, "nextflow");
+                var diagnostic = new Diagnostic(range, message, DiagnosticSeverity.Error, "nextflow");
                 diagnostics.add(diagnostic);
             }
 
@@ -383,15 +382,14 @@ public abstract class LanguageService {
                 if( suppressWarnings )
                     continue;
 
+                var message = warning.getMessage();
                 var range = LanguageServerUtils.warningToRange(warning);
                 if( range == null ) {
-                    log.error(uri + ": invalid range for warning: " + warning.getMessage());
+                    log.error(uri + ": invalid range for warning: " + message);
                     continue;
                 }
 
-                var message = warning.getMessage();
-                var severity = DiagnosticSeverity.Warning;
-                var diagnostic = new Diagnostic(range, message, severity, "nextflow");
+                var diagnostic = new Diagnostic(range, message, DiagnosticSeverity.Warning, "nextflow");
                 diagnostics.add(diagnostic);
             }
 
