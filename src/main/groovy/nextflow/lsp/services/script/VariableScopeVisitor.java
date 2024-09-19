@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import groovy.json.JsonSlurper;
+import nextflow.lsp.compiler.PhaseAware;
+import nextflow.lsp.compiler.Phases;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.EntryWorkflowDsl;
 import nextflow.script.dsl.FeatureFlag;
@@ -370,7 +372,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             var call = asMethodCallX(stmt);
             if( call == null ) {
                 if( checkSyntaxErrors )
-                    addError("Invalid " + typeLabel, stmt);
+                    addSyntaxError("Invalid " + typeLabel, stmt);
                 continue;
             }
             var name = call.getMethodAsString();
@@ -827,11 +829,29 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         return pn;
     }
 
-    @Override
-    public void addError(String message, ASTNode node) {
+    protected void addSyntaxError(String message, ASTNode node) {
         var cause = new SyntaxException(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
+    }
+
+    @Override
+    public void addError(String message, ASTNode node) {
+        var cause = new VariableScopeException(message, node);
+        var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
+        sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
+    }
+
+    private class VariableScopeException extends SyntaxException implements PhaseAware {
+
+        public VariableScopeException(String message, ASTNode node) {
+            super(message, node);
+        }
+
+        @Override
+        public int getPhase() {
+            return Phases.NAME_RESOLUTION;
+        }
     }
 
 }

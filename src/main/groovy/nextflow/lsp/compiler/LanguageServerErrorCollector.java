@@ -57,8 +57,8 @@ public class LanguageServerErrorCollector extends ErrorCollector {
 
     private static boolean isErrorPhase(Message message, int phase) {
         return message instanceof SyntaxErrorMessage sem
-            && sem.getCause() instanceof PhaseAware pae
-            && pae.getPhase() >= phase;
+            && sem.getCause() instanceof PhaseAware pa
+            && pa.getPhase() >= phase;
     }
 
 }

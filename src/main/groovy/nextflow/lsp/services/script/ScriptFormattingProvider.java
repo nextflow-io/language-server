@@ -20,7 +20,6 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
-import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.services.util.CustomFormattingOptions;
 import nextflow.lsp.services.util.Formatter;
 import nextflow.lsp.services.FormattingProvider;
@@ -62,9 +61,9 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ASTNodeCache ast;
+    private ScriptAstCache ast;
 
-    public ScriptFormattingProvider(ASTNodeCache ast) {
+    public ScriptFormattingProvider(ScriptAstCache ast) {
         this.ast = ast;
     }
 
@@ -75,7 +74,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
             return Collections.emptyList();
         }
 
-        if( !ast.hasAST(uri) || ast.hasErrors(uri) )
+        if( !ast.hasAST(uri) || ast.hasSyntaxErrors(uri) )
             return Collections.emptyList();
 
         var sourceUnit = ast.getSourceUnit(uri);
@@ -101,13 +100,13 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         private CustomFormattingOptions options;
 
-        private ASTNodeCache ast;
+        private ScriptAstCache ast;
 
         private Formatter fmt;
 
         private int maxIncludeWidth = 0;
 
-        public Visitor(SourceUnit sourceUnit, CustomFormattingOptions options, ASTNodeCache ast) {
+        public Visitor(SourceUnit sourceUnit, CustomFormattingOptions options, ScriptAstCache ast) {
             this.sourceUnit = sourceUnit;
             this.options = options;
             this.ast = ast;

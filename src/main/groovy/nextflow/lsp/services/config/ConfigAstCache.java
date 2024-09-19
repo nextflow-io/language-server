@@ -25,6 +25,7 @@ import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTNodeLookup;
 import nextflow.lsp.compiler.Compiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
+import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
 import nextflow.lsp.file.FileCache;
 import nextflow.config.v2.ConfigAssignNode;
@@ -137,6 +138,18 @@ public class ConfigAstCache extends ASTNodeCache {
         // TODO
 
         return changedUris;
+    }
+
+    /**
+     * Check whether a source file has any errors.
+     *
+     * @param uri
+     */
+    public boolean hasSyntaxErrors(URI uri) {
+        return getErrors(uri).stream()
+            .filter(error -> error instanceof PhaseAware pa ? pa.getPhase() == Phases.SYNTAX : true)
+            .findFirst()
+            .isPresent();
     }
 
     private static class Visitor extends ConfigVisitorSupport {

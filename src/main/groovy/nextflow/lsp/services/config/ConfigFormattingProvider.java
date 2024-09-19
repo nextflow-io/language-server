@@ -27,7 +27,6 @@ import nextflow.config.v2.ConfigBlockNode;
 import nextflow.config.v2.ConfigIncludeNode;
 import nextflow.config.v2.ConfigNode;
 import nextflow.config.v2.ConfigVisitorSupport;
-import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.services.util.CustomFormattingOptions;
 import nextflow.lsp.services.util.Formatter;
 import nextflow.lsp.services.FormattingProvider;
@@ -48,9 +47,9 @@ public class ConfigFormattingProvider implements FormattingProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ASTNodeCache ast;
+    private ConfigAstCache ast;
 
-    public ConfigFormattingProvider(ASTNodeCache ast) {
+    public ConfigFormattingProvider(ConfigAstCache ast) {
         this.ast = ast;
     }
 
@@ -61,7 +60,7 @@ public class ConfigFormattingProvider implements FormattingProvider {
             return Collections.emptyList();
         }
 
-        if( !ast.hasAST(uri) || ast.hasErrors(uri) )
+        if( !ast.hasAST(uri) || ast.hasSyntaxErrors(uri) )
             return Collections.emptyList();
 
         var sourceUnit = ast.getSourceUnit(uri);
