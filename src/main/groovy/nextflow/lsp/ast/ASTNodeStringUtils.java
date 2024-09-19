@@ -33,6 +33,7 @@ import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDirectiveDsl;
 import nextflow.script.dsl.ProcessInputDsl;
 import nextflow.script.dsl.ProcessOutputDsl;
+import nextflow.script.v2.AssignmentExpression;
 import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.ProcessNode;
@@ -46,10 +47,8 @@ import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.Variable;
-import org.codehaus.groovy.ast.expr.BinaryExpression;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
-import org.codehaus.groovy.syntax.Types;
 
 import static nextflow.script.v2.ASTHelpers.*;
 
@@ -111,8 +110,8 @@ public class ASTNodeStringUtils {
             asBlockStatements(wn.emits).stream().forEach((stmt) -> {
                 var emit = ((ExpressionStatement) stmt).getExpression();
                 fmt.appendIndent();
-                if( emit instanceof BinaryExpression be && be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) )
-                    fmt.visit(be.getLeftExpression());
+                if( emit instanceof AssignmentExpression assign )
+                    fmt.visit(assign.getLeftExpression());
                 else
                     fmt.visit(emit);
                 fmt.appendNewLine();

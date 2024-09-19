@@ -23,6 +23,7 @@ import groovy.lang.Tuple2;
 import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
 import nextflow.script.dsl.ScriptDsl;
+import nextflow.script.v2.AssignmentExpression;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.ScriptExpressionTransformer;
 import nextflow.script.v2.ScriptNode;
@@ -49,7 +50,6 @@ import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.runtime.memoize.UnlimitedConcurrentCache;
 import org.codehaus.groovy.syntax.SyntaxException;
-import org.codehaus.groovy.syntax.Types;
 import org.codehaus.groovy.vmplugin.VMPluginFactory;
 
 import static groovy.lang.Tuple.tuple;
@@ -376,7 +376,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
 
     protected Expression transformBinaryExpression(BinaryExpression be) {
         var left = transform(be.getLeftExpression());
-        if( be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) && left instanceof ClassExpression ) {
+        if( be instanceof AssignmentExpression && left instanceof ClassExpression ) {
             addError("`" + left.getType().getName() + "` is already defined as a type", be.getLeftExpression());
             return be;
         }

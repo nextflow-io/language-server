@@ -44,6 +44,7 @@ import nextflow.script.dsl.ProcessInputDsl;
 import nextflow.script.dsl.ProcessOutputDsl;
 import nextflow.script.dsl.ScriptDsl;
 import nextflow.script.dsl.WorkflowDsl;
+import nextflow.script.v2.AssignmentExpression;
 import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.IncludeNode;
@@ -549,7 +550,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitBinaryExpression(BinaryExpression node) {
-        if( node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
+        if( node instanceof AssignmentExpression ) {
             visit(node.getRightExpression());
             visitAssignmentTarget(node.getLeftExpression());
         }

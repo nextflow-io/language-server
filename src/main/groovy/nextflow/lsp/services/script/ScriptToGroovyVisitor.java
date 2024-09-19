@@ -28,6 +28,7 @@ import nextflow.script.TokenStdinCall;
 import nextflow.script.TokenStdoutCall;
 import nextflow.script.TokenValCall;
 import nextflow.script.TokenVar;
+import nextflow.script.v2.AssignmentExpression;
 import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.IncludeNode;
@@ -50,7 +51,6 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.syntax.Types;
 
 import static nextflow.script.v2.ASTHelpers.*;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
@@ -283,8 +283,8 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
             if( emit instanceof VariableExpression ve ) {
                 stmtX.setExpression(callThisX("_emit_", args(constX(ve.getName()))));
             }
-            else if( emit instanceof BinaryExpression be && be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
-                var left = (VariableExpression)be.getLeftExpression();
+            else if( emit instanceof AssignmentExpression assign ) {
+                var left = (VariableExpression)assign.getLeftExpression();
                 stmtX.setExpression(callThisX("_emit_", args(constX(left.getName()))));
                 code.addStatement(stmtX);
             }

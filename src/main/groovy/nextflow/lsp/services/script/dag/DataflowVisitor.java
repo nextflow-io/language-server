@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import groovy.lang.Tuple3;
 import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.script.ScriptAstCache;
+import nextflow.script.v2.AssignmentExpression;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.ScriptNode;
 import nextflow.script.v2.ScriptVisitorSupport;
@@ -119,8 +120,8 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             if( emit instanceof VariableExpression ve ) {
                 result.add(ve.getName());
             }
-            else if( emit instanceof BinaryExpression be && be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
-                var left = (VariableExpression) be.getLeftExpression();
+            else if( emit instanceof AssignmentExpression assign ) {
+                var left = (VariableExpression) assign.getLeftExpression();
                 visit(emit);
                 result.add(left.getName());
             }
@@ -160,7 +161,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitBinaryExpression(BinaryExpression node) {
-        if( node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
+        if( node instanceof AssignmentExpression ) {
             visitAssignment(node);
             return;
         }
@@ -333,8 +334,8 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         if( emit instanceof VariableExpression ve ) {
             return ve.getName();
         }
-        else if( emit instanceof BinaryExpression be && be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
-            var left = (VariableExpression) be.getLeftExpression();
+        else if( emit instanceof AssignmentExpression assign ) {
+            var left = (VariableExpression) assign.getLeftExpression();
             return left.getName();
         }
         return null;

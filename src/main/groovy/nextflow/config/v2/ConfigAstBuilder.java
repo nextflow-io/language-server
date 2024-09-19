@@ -467,12 +467,6 @@ public class ConfigAstBuilder {
         }
     }
 
-    private Statement assignment(MultipleAssignmentStatementContext ctx) {
-        var left = variableNames(ctx.variableNames());
-        var right = expression(ctx.expression());
-        return stmt(ast( assignX(left, right), ctx ));
-    }
-
     private Expression variableNames(VariableNamesContext ctx) {
         var vars = ctx.identifier().stream()
             .map(this::variableName)
@@ -492,6 +486,12 @@ public class ConfigAstBuilder {
             collectSyntaxError(new SyntaxException("`" + name + "` is not allowed as an identifier because it is a Groovy keyword", node));
     }
 
+    private Statement assignment(MultipleAssignmentStatementContext ctx) {
+        var left = variableNames(ctx.variableNames());
+        var right = expression(ctx.expression());
+        return stmt(ast( assignX(left, right), ctx ));
+    }
+
     private Statement assignment(AssignmentStatementContext ctx) {
         var left = expression(ctx.left);
         if( left instanceof VariableExpression && isInsideParentheses(left) ) {
@@ -505,7 +505,7 @@ public class ConfigAstBuilder {
         if ( isAssignmentLhsValid(left) )
             return stmt(ast( binX(left, token(ctx.op), expression(ctx.right)), ctx ));
 
-        throw createParsingFailedException("The left-hand side of an assignment should be either a variable or an index or property expression", ctx);
+        throw createParsingFailedException("Invalid assignment target -- should be a variable, index, or property expression", ctx);
     }
 
     private boolean isAssignmentLhsValid(Expression left) {

@@ -322,7 +322,7 @@ public class ScriptAstBuilder {
         }
         else if( "params".equals(firstName) ) {
             var left = propertyExpression(ctx.identifier());
-            return stmt(ast( assignX(left, value), ctx ));
+            return stmt(ast( new AssignmentExpression(left, value), ctx ));
         }
         else {
             var result = ast( new EmptyStatement(), ctx );
@@ -588,7 +588,7 @@ public class ScriptAstBuilder {
     private Statement workflowEmit(WorkflowEmitContext ctx) {
         var varX = variableName(ctx.identifier());
         var emit = ctx.expression() != null
-            ? ast( assignX(varX, expression(ctx.expression())), ctx )
+            ? ast( new AssignmentExpression(varX, expression(ctx.expression())), ctx )
             : varX;
         return ast( stmt(emit), ctx );
     }
@@ -791,12 +791,6 @@ public class ScriptAstBuilder {
         }
     }
 
-    private Statement assignment(MultipleAssignmentStatementContext ctx) {
-        var left = variableNames(ctx.variableNames());
-        var right = expression(ctx.expression());
-        return stmt(ast( assignX(left, right), ctx ));
-    }
-
     private Expression variableNames(VariableNamesContext ctx) {
         var vars = ctx.identifier().stream()
             .map(this::variableName)
@@ -826,6 +820,12 @@ public class ScriptAstBuilder {
             collectSyntaxError(new SyntaxException("`" + name + "` is not allowed as an identifier because it is a Groovy keyword", node));
     }
 
+    private Statement assignment(MultipleAssignmentStatementContext ctx) {
+        var left = variableNames(ctx.variableNames());
+        var right = expression(ctx.expression());
+        return stmt(ast( new AssignmentExpression(left, right), ctx ));
+    }
+
     private Statement assignment(AssignmentStatementContext ctx) {
         var left = expression(ctx.left);
         if( left instanceof VariableExpression && isInsideParentheses(left) ) {
@@ -833,13 +833,13 @@ public class ScriptAstBuilder {
                 throw createParsingFailedException("Nested parenthesis is not allowed in multiple assignment, e.g. ((a)) = b", ctx);
 
             var tuple = ast( new TupleExpression(left), ctx.left );
-            return stmt(ast( binX(tuple, token(ctx.op), expression(ctx.right)), ctx ));
+            return stmt(ast( new AssignmentExpression(tuple, token(ctx.op), expression(ctx.right)), ctx ));
         }
 
         if ( isAssignmentLhsValid(left) )
-            return stmt(ast( binX(left, token(ctx.op), expression(ctx.right)), ctx ));
+            return stmt(ast( new AssignmentExpression(left, token(ctx.op), expression(ctx.right)), ctx ));
 
-        throw createParsingFailedException("The left-hand side of an assignment should be either a variable or an index or property expression", ctx);
+        throw createParsingFailedException("Invalid assignment target -- should be a variable, index, or property expression", ctx);
     }
 
     private boolean isAssignmentLhsValid(Expression left) {

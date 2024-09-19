@@ -698,7 +698,7 @@ public class Formatter extends CodeVisitorSupport {
     }
 
     private boolean shouldWrapPipeExpression(BinaryExpression node) {
-        return currentStmtExpr == node && node.getOperation().isA(Types.BITWISE_OR) && shouldWrapExpression(node);
+        return currentStmtExpr == node && node.getOperation().isA(Types.PIPE) && shouldWrapExpression(node);
     }
 
     private static final String SLASH_STR = "/";

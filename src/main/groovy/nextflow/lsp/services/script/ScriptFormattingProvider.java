@@ -25,6 +25,7 @@ import nextflow.lsp.services.util.Formatter;
 import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
+import nextflow.script.v2.AssignmentExpression;
 import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.IncludeNode;
@@ -35,7 +36,6 @@ import nextflow.script.v2.ScriptNode;
 import nextflow.script.v2.ScriptVisitorSupport;
 import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.expr.BinaryExpression;
 import org.codehaus.groovy.ast.expr.EmptyExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
@@ -45,7 +45,6 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
-import org.codehaus.groovy.syntax.Types;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
@@ -344,8 +343,8 @@ public class ScriptFormattingProvider implements FormattingProvider {
             for( var stmt : emits ) {
                 var stmtX = (ExpressionStatement)stmt;
                 var emit = stmtX.getExpression();
-                if( emit instanceof BinaryExpression be && be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
-                    var ve = (VariableExpression)be.getLeftExpression();
+                if( emit instanceof AssignmentExpression assign ) {
+                    var ve = (VariableExpression)assign.getLeftExpression();
                     fmt.appendIndent();
                     fmt.visit(ve);
                     if( alignmentWidth > 0 ) {
@@ -353,7 +352,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
                         fmt.append(" ".repeat(padding));
                     }
                     fmt.append(" = ");
-                    fmt.visit(be.getRightExpression());
+                    fmt.visit(assign.getRightExpression());
                     fmt.appendNewLine();
                 }
                 else {
@@ -374,8 +373,8 @@ public class ScriptFormattingProvider implements FormattingProvider {
                 if( emit instanceof VariableExpression ve ) {
                     width = ve.getName().length();
                 }
-                else if( emit instanceof BinaryExpression be && be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
-                    var ve = (VariableExpression)be.getLeftExpression();
+                else if( emit instanceof AssignmentExpression assign ) {
+                    var ve = (VariableExpression)assign.getLeftExpression();
                     width = ve.getName().length();
                 }
 
