@@ -61,11 +61,11 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
     public void visitConfigAssign(ConfigAssignNode node) {
         var names = new ArrayList<>(scopes);
         names.addAll(node.names);
-        var scope = names.get(0);
-        if( "profiles".equals(scope) ) {
+        if( "profiles".equals(names.get(0)) ) {
             if( !names.isEmpty() ) names.remove(0);
             if( !names.isEmpty() ) names.remove(0);
         }
+        var scope = names.get(0);
         if( "env".equals(scope) ) {
             var envName = String.join(".", DefaultGroovyMethods.tail(names));
             if( envName.contains(".") )

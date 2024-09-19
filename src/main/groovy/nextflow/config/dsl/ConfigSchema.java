@@ -86,18 +86,18 @@ public class ConfigSchema {
                 var annot = field.getAnnotation(ConfigOption.class);
                 if( annot == null )
                     continue;
-                var name = scope.name() != null
-                    ? scope.name() + "." + field.getName()
-                    : field.getName();
+                var name = scope.name().isEmpty()
+                    ? field.getName()
+                    : scope.name() + "." + field.getName();
                 result.put(name, annot.value());
             }
             for( var method : scope.getClass().getDeclaredMethods() ) {
                 var annot = method.getAnnotation(ConfigOption.class);
                 if( annot == null )
                     continue;
-                var name = scope.name() != null
-                    ? scope.name() + "." + method.getName()
-                    : method.getName();
+                var name = scope.name().isEmpty()
+                    ? method.getName()
+                    : scope.name() + "." + method.getName();
                 result.put(name, annot.value());
             }
         }
