@@ -551,7 +551,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     public void visitBinaryExpression(BinaryExpression node) {
         if( node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
             visit(node.getRightExpression());
-            visitAssignment(node.getLeftExpression());
+            visitAssignmentTarget(node.getLeftExpression());
         }
         else {
             super.visitBinaryExpression(node);
@@ -564,7 +564,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
      *
      * @param node
      */
-    private void visitAssignment(Expression node) {
+    private void visitAssignmentTarget(Expression node) {
         if( node instanceof TupleExpression te ) {
             for( var el : te.getExpressions() )
                 declareAssignedVariable((VariableExpression) el);
@@ -583,9 +583,11 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( variable != null ) {
             if( variable instanceof FieldNode fn && findAnnotation(fn, Constant.class).isPresent() )
                 addError("Built-in variable cannot be re-assigned", ve);
+            else
+                checkExternalWriteInClosure(ve, variable);
         }
         else if( currentDefinition instanceof ProcessNode || currentDefinition instanceof WorkflowNode ) {
-            if( inClosure )
+            if( currentClosure != null )
                 addError("Local variables in a closure should be declared with `def`", ve);
             else
                 sourceUnit.addWarning("Local variables should be declared with `def`", ve);
@@ -625,6 +627,18 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             else
                 addError("Built-in variable cannot be mutated", target);
         }
+        else if( variable != null ) {
+            checkExternalWriteInClosure(target, variable);
+        }
+    }
+
+    private void checkExternalWriteInClosure(VariableExpression target, Variable variable) {
+        if( currentClosure == null )
+            return;
+        var scope = currentClosure.getVariableScope();
+        var name = variable.getName();
+        if( scope.isReferencedLocalVariable(name) && scope.getDeclaredVariable(name) == null )
+            addFutureWarning("Mutating an external variable in a closure may lead to a race condition", target);
     }
 
     @Override
@@ -640,12 +654,12 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         }
     }
 
-    private boolean inClosure;
+    private ClosureExpression currentClosure;
 
     @Override
     public void visitClosureExpression(ClosureExpression node) {
-        var ic = inClosure;
-        inClosure = true;
+        var cl = currentClosure;
+        currentClosure = node;
 
         pushState();
         node.setVariableScope(currentScope);
@@ -663,7 +677,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         }
         popState();
 
-        inClosure = false;
+        currentClosure = cl;
     }
 
     @Override
