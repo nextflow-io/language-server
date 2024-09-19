@@ -181,6 +181,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             addError("Unrecognized feature flag '" + node.name + "'", node);
     }
 
+    private boolean inWorkflowEmit;
+
     @Override
     public void visitWorkflow(WorkflowNode node) {
         if( node.isEntry() )
@@ -196,7 +198,10 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( node.main instanceof BlockStatement block )
             copyVariableScope(block.getVariableScope());
 
+        inWorkflowEmit = true;
         visit(node.emits);
+        inWorkflowEmit = false;
+
         visit(node.publishers);
 
         currentDefinition = null;
@@ -590,7 +595,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         else if( currentDefinition instanceof ProcessNode || currentDefinition instanceof WorkflowNode ) {
             if( currentClosure != null )
                 addError("Local variables in a closure should be declared with `def`", ve);
-            else
+            else if( !inWorkflowEmit )
                 sourceUnit.addWarning("Local variables should be declared with `def`", ve);
             var scope = currentScope;
             currentScope = currentDefinition.getVariableScope();
