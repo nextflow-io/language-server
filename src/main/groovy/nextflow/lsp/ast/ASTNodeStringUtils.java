@@ -22,6 +22,8 @@ import java.util.stream.Stream;
 import groovy.lang.groovydoc.Groovydoc;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTUtils;
+import nextflow.lsp.services.util.CustomFormattingOptions;
+import nextflow.lsp.services.util.Formatter;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.DslType;
 import nextflow.script.dsl.FeatureFlag;
@@ -44,9 +46,12 @@ import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.ast.expr.BinaryExpression;
+import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
+import org.codehaus.groovy.syntax.Types;
 
-import static nextflow.script.v2.ASTHelpers.findAnnotation;
+import static nextflow.script.v2.ASTHelpers.*;
 
 /**
  * Utility methods for retreiving text information for ast nodes.
@@ -90,17 +95,57 @@ public class ASTNodeStringUtils {
 
     public static String toString(MethodNode node, ASTNodeCache ast) {
         if( node instanceof WorkflowNode wn ) {
-            var builder = new StringBuilder();
-            builder.append("workflow ");
-            builder.append(wn.isEntry() ? "<entry>" : wn.getName());
-            return builder.toString();
+            var fmt = new Formatter(new CustomFormattingOptions(2, true, false));
+            fmt.append("workflow ");
+            fmt.append(wn.isEntry() ? "<entry>" : wn.getName());
+            fmt.append("\n\ntake:\n");
+            fmt.incIndent();
+            asBlockStatements(wn.takes).stream().forEach((take) -> {
+                fmt.appendIndent();
+                fmt.append(asVarX(take).getName());
+                fmt.appendNewLine();
+            });
+            fmt.decIndent();
+            fmt.append("\nemit:\n");
+            fmt.incIndent();
+            asBlockStatements(wn.emits).stream().forEach((stmt) -> {
+                var emit = ((ExpressionStatement) stmt).getExpression();
+                fmt.appendIndent();
+                if( emit instanceof BinaryExpression be && be.getOperation().isA(Types.ASSIGNMENT_OPERATOR) )
+                    fmt.visit(be.getLeftExpression());
+                else
+                    fmt.visit(emit);
+                fmt.appendNewLine();
+            });
+            fmt.decIndent();
+            return fmt.toString();
         }
 
         if( node instanceof ProcessNode pn ) {
-            var builder = new StringBuilder();
-            builder.append("process ");
-            builder.append(pn.getName());
-            return builder.toString();
+            var fmt = new Formatter(new CustomFormattingOptions(2, true, false));
+            fmt.append("process ");
+            fmt.append(pn.getName());
+            fmt.append("\n\ninput:\n");
+            fmt.incIndent();
+            asDirectives(pn.inputs).forEach((call) -> {
+                fmt.appendIndent();
+                fmt.append(call.getMethodAsString());
+                fmt.append(' ');
+                fmt.visitArguments(asMethodCallArguments(call), hasNamedArgs(call), false);
+                fmt.appendNewLine();
+            });
+            fmt.decIndent();
+            fmt.append("\noutput:\n");
+            fmt.incIndent();
+            asDirectives(pn.outputs).forEach((call) -> {
+                fmt.appendIndent();
+                fmt.append(call.getMethodAsString());
+                fmt.append(' ');
+                fmt.visitArguments(asMethodCallArguments(call), hasNamedArgs(call), false);
+                fmt.appendNewLine();
+            });
+            fmt.decIndent();
+            return fmt.toString();
         }
 
         var label = getMethodTypeLabel(node);
