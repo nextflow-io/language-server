@@ -124,7 +124,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     private List<String> excludePatterns;
     private boolean harshilAlignment;
-    private boolean suppressWarnings;
+    private boolean suppressFutureWarnings;
 
     // -- LanguageServer
 
@@ -428,9 +428,9 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         if( harshilAlignment != null )
             this.harshilAlignment = harshilAlignment;
 
-        var suppressWarnings = getJsonBoolean(params.getSettings(), "nextflow.suppressWarnings");
-        if( suppressWarnings != null && this.suppressWarnings != suppressWarnings ) {
-            this.suppressWarnings = suppressWarnings;
+        var suppressFutureWarnings = getJsonBoolean(params.getSettings(), "nextflow.suppressFutureWarnings");
+        if( suppressFutureWarnings != null && this.suppressFutureWarnings != suppressFutureWarnings ) {
+            this.suppressFutureWarnings = suppressFutureWarnings;
             shouldInitialize = true;
         }
 
@@ -447,8 +447,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 count++;
 
                 var uri = workspaceRoots.get(name);
-                scriptServices.get(name).initialize(uri, this.excludePatterns, this.suppressWarnings);
-                configServices.get(name).initialize(uri, this.excludePatterns, this.suppressWarnings);
+                scriptServices.get(name).initialize(uri, this.excludePatterns, this.suppressFutureWarnings);
+                configServices.get(name).initialize(uri, this.excludePatterns, this.suppressFutureWarnings);
             }
 
             progressEnd(progressToken);
@@ -498,8 +498,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var uri = workspaceFolder.getUri();
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
             addWorkspaceFolder(name, uri);
-            scriptServices.get(name).initialize(uri, excludePatterns, suppressWarnings);
-            configServices.get(name).initialize(uri, excludePatterns, suppressWarnings);
+            scriptServices.get(name).initialize(uri, excludePatterns, suppressFutureWarnings);
+            configServices.get(name).initialize(uri, excludePatterns, suppressFutureWarnings);
         }
     }
 

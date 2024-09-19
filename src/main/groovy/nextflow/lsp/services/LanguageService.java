@@ -35,6 +35,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.Compiler;
+import nextflow.lsp.compiler.FutureWarning;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.services.util.CustomFormattingOptions;
@@ -117,12 +118,12 @@ public abstract class LanguageService {
 
     private volatile boolean initialized;
 
-    private volatile boolean suppressWarnings;
+    private volatile boolean suppressFutureWarnings;
 
-    public void initialize(String rootUri, List<String> excludes, boolean suppressWarnings) {
+    public void initialize(String rootUri, List<String> excludes, boolean suppressFutureWarnings) {
         synchronized (this) {
             this.initialized = false;
-            this.suppressWarnings = suppressWarnings;
+            this.suppressFutureWarnings = suppressFutureWarnings;
 
             var uris = rootUri != null
                 ? getWorkspaceFiles(rootUri, excludes)
@@ -379,7 +380,7 @@ public abstract class LanguageService {
             }
 
             for( var warning : astCache.getWarnings(uri) ) {
-                if( suppressWarnings )
+                if( suppressFutureWarnings && warning instanceof FutureWarning )
                     continue;
 
                 var message = warning.getMessage();
