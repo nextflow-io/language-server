@@ -24,11 +24,11 @@ import nextflow.config.v2.ConfigBlockNode;
 import nextflow.config.v2.ConfigIncludeNode;
 import nextflow.config.v2.ConfigNode;
 import nextflow.config.v2.ConfigVisitorSupport;
-import nextflow.lsp.compiler.SyntaxWarning;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
+import org.codehaus.groovy.syntax.SyntaxException;
 
 /**
  *
@@ -67,7 +67,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
         if( "env".equals(scope) ) {
             var envName = String.join(".", DefaultGroovyMethods.tail(names));
             if( envName.contains(".") )
-                addWarning("Invalid environment variable name '" + envName + "'", node);
+                addError("Invalid environment variable name '" + envName + "'", node);
             return;
         }
         if( "params".equals(scope) ) {
@@ -80,7 +80,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
             return;
         var option = ConfigSchema.OPTIONS.get(fqName);
         if( option == null )
-            addWarning("Unrecognized config option '" + fqName + "'", node);
+            sourceUnit.addWarning("Unrecognized config option '" + fqName + "'", node);
     }
 
     @Override
@@ -98,8 +98,9 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
         // TODO: validate embedded config settings in this context?
     }
 
-    protected void addWarning(String message, ASTNode node) {
-        var cause = new SyntaxWarning(message, node);
+    @Override
+    public void addError(String message, ASTNode node) {
+        var cause = new SyntaxException(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }

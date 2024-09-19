@@ -28,7 +28,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import groovy.json.JsonSlurper;
-import nextflow.lsp.compiler.SyntaxWarning;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.EntryWorkflowDsl;
 import nextflow.script.dsl.FeatureFlag;
@@ -305,7 +304,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         popState();
 
         if( !(node.when instanceof EmptyExpression) )
-            addWarning("Process `when` section will not be supported in a future version", node.when);
+            sourceUnit.addWarning("Process `when` section will not be supported in a future version", node.when);
         visit(node.when);
 
         visit(node.exec);
@@ -584,7 +583,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( inClosure )
                 addError("Local variables in a closure should be declared with `def`", ve);
             else
-                addWarning("Local variables should be declared with `def`", ve);
+                sourceUnit.addWarning("Local variables should be declared with `def`", ve);
             var scope = currentScope;
             currentScope = currentDefinition.getVariableScope();
             declare(ve);
@@ -617,7 +616,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var variable = findVariableDeclaration(target.getName(), target);
         if( variable instanceof FieldNode fn && findAnnotation(fn, Constant.class).isPresent() ) {
             if( "params".equals(variable.getName()) )
-                addWarning("Assigning params in the script will not be supported in a future version", target);
+                sourceUnit.addWarning("Assigning params in the script will not be supported in a future version", target);
             else
                 addError("Built-in variable cannot be mutated", target);
         }
@@ -691,13 +690,13 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         Variable variable = findVariableDeclaration(name, node);
         if( variable == null ) {
             if( "it".equals(name) ) {
-                addWarning("Implicit variable `it` in closure will not be supported in a future version", node);
+                sourceUnit.addWarning("Implicit variable `it` in closure will not be supported in a future version", node);
             }
             else if( "args".equals(name) ) {
-                addWarning("The use of `args` outside the entry workflow will not be supported in a future version", node);
+                sourceUnit.addWarning("The use of `args` outside the entry workflow will not be supported in a future version", node);
             }
             else if( "params".equals(name) ) {
-                addWarning("The use of `params` outside the entry workflow will not be supported in a future version", node);
+                sourceUnit.addWarning("The use of `params` outside the entry workflow will not be supported in a future version", node);
             }
             else {
                 variable = new DynamicVariable(name, false);
@@ -794,7 +793,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             var fn = cn.getDeclaredField(name);
             if( fn != null && findAnnotation(fn, Constant.class).isPresent() ) {
                 if( findAnnotation(fn, Deprecated.class).isPresent() )
-                    addWarning("`" + name + "` is deprecated and will be removed in a future version", node);
+                    sourceUnit.addWarning("`" + name + "` is deprecated and will be removed in a future version", node);
                 return fn;
             }
 
@@ -806,7 +805,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                 }
                 if( findAnnotation(mn, Function.class).isPresent() ) {
                     if( findAnnotation(mn, Deprecated.class).isPresent() )
-                        addWarning("`" + name + "` is deprecated and will be removed in a future version", node);
+                        sourceUnit.addWarning("`" + name + "` is deprecated and will be removed in a future version", node);
                     return wrapMethodAsVariable(mn, cn);
                 }
             }
@@ -831,12 +830,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     @Override
     public void addError(String message, ASTNode node) {
         var cause = new SyntaxException(message, node);
-        var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
-        sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
-    }
-
-    protected void addWarning(String message, ASTNode node) {
-        var cause = new SyntaxWarning(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }

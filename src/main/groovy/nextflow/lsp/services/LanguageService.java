@@ -35,7 +35,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.Compiler;
-import nextflow.lsp.compiler.SyntaxWarning;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.services.util.CustomFormattingOptions;
@@ -44,7 +43,6 @@ import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
-import org.codehaus.groovy.syntax.SyntaxException;
 import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyItem;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCall;
@@ -132,8 +130,8 @@ public abstract class LanguageService {
 
             var astCache = getAstCache();
             astCache.clear();
-            astCache.update(uris, fileCache);
-            publishDiagnostics(astCache.getErrors());
+            var changedUris = astCache.update(uris, fileCache);
+            publishDiagnostics(changedUris);
 
             this.initialized = true;
         }
@@ -344,8 +342,8 @@ public abstract class LanguageService {
 
                 log.debug("update " + DefaultGroovyMethods.join(uris, " , "));
                 var astCache = getAstCache();
-                astCache.update(uris, fileCache);
-                publishDiagnostics(astCache.getErrors());
+                var changedUris = astCache.update(uris, fileCache);
+                publishDiagnostics(changedUris);
             }
         }
 
@@ -362,26 +360,37 @@ public abstract class LanguageService {
     /**
      * Publish diagnostics for a set of compilation errors.
      *
-     * @param errorsByUri
+     * @param changedUris
      */
-    protected void publishDiagnostics(Map<URI, List<SyntaxException>> errorsByUri) {
-        errorsByUri.forEach((uri, errors) -> {
+    protected void publishDiagnostics(Set<URI> changedUris) {
+        var astCache = getAstCache();
+        changedUris.forEach((uri) -> {
             var diagnostics = new ArrayList<Diagnostic>();
-            for( var error : errors ) {
-                var range = LanguageServerUtils.syntaxExceptionToRange(error);
+            for( var error : astCache.getErrors(uri) ) {
+                var range = LanguageServerUtils.errorToRange(error);
                 if( range == null ) {
                     log.error(uri + ": invalid range for error: " + error.getMessage());
                     continue;
                 }
 
                 var message = error.getMessage();
-                var severity = error instanceof SyntaxWarning
-                    ? DiagnosticSeverity.Warning
-                    : DiagnosticSeverity.Error;
+                var severity = DiagnosticSeverity.Error;
+                var diagnostic = new Diagnostic(range, message, severity, "nextflow");
+                diagnostics.add(diagnostic);
+            }
 
-                if( suppressWarnings && severity == DiagnosticSeverity.Warning )
+            for( var warning : astCache.getWarnings(uri) ) {
+                if( suppressWarnings )
                     continue;
 
+                var range = LanguageServerUtils.warningToRange(warning);
+                if( range == null ) {
+                    log.error(uri + ": invalid range for warning: " + warning.getMessage());
+                    continue;
+                }
+
+                var message = warning.getMessage();
+                var severity = DiagnosticSeverity.Warning;
                 var diagnostic = new Diagnostic(range, message, severity, "nextflow");
                 diagnostics.add(diagnostic);
             }
@@ -395,7 +404,7 @@ public abstract class LanguageService {
      * Clear diagnostics when the language service is shut down.
      */
     public void clearDiagnostics() {
-        getAstCache().getErrors().forEach((uri, errors) -> {
+        getAstCache().getUris().forEach((uri) -> {
             var params = new PublishDiagnosticsParams(uri.toString(), Collections.emptyList());
             client.publishDiagnostics(params);
         });

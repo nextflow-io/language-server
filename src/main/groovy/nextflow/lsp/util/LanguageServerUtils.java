@@ -18,6 +18,7 @@ package nextflow.lsp.util;
 import java.net.URI;
 
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
@@ -48,10 +49,25 @@ public class LanguageServerUtils {
                 groovyToLspCharacter(groovyColumn));
     }
 
-    public static Range syntaxExceptionToRange(SyntaxException exception) {
-        return new Range(
-                groovyToLspPosition(exception.getStartLine(), exception.getStartColumn()),
-                groovyToLspPosition(exception.getEndLine(), exception.getEndColumn()));
+    public static Range errorToRange(SyntaxException error) {
+        var start = groovyToLspPosition(error.getStartLine(), error.getStartColumn());
+        if( start == null )
+            return null;
+        var end = groovyToLspPosition(error.getEndLine(), error.getEndColumn());
+        if( end == null )
+            end = start;
+        return new Range(start, end);
+    }
+
+    public static Range warningToRange(WarningMessage warning) {
+        var token = warning.getContext().getRoot();
+        var start = groovyToLspPosition(token.getStartLine(), token.getStartColumn());
+        if( start == null )
+            return null;
+        var end = groovyToLspPosition(token.getStartLine(), token.getStartColumn() + token.getText().length());
+        if( end == null )
+            end = start;
+        return new Range(start, end);
     }
 
     public static Range astNodeToRange(ASTNode node) {

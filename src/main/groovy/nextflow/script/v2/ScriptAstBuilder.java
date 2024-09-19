@@ -1668,7 +1668,7 @@ public class ScriptAstBuilder {
     private void checkLegacyType(ParserRuleContext ctx) {
         if( ctx != null ) {
             var node = ast( new EmptyStatement(), ctx );
-            collectSyntaxError(new SyntaxException("Groovy-style type annotations are not supported", node));
+            collectWarning("Groovy-style type annotations are ignored", node);
         }
     }
 
@@ -1739,6 +1739,10 @@ public class ScriptAstBuilder {
 
     private void collectException(Exception e) {
         sourceUnit.getErrorCollector().addException(e, sourceUnit);
+    }
+
+    private void collectWarning(String text, ASTNode node) {
+        sourceUnit.addWarning(text, node);
     }
 
     private void removeErrorListeners() {

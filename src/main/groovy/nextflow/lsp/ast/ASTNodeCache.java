@@ -20,19 +20,20 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import nextflow.lsp.compiler.SyntaxWarning;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Positions;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
+import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -50,6 +51,8 @@ public abstract class ASTNodeCache {
 
     private Map<URI, List<SyntaxException>> errorsByUri = new HashMap<>();
 
+    private Map<URI, List<WarningMessage>> warningsByUri = new HashMap<>();
+
     private Map<URI, Set<ASTNode>> nodesByURI = new HashMap<>();
 
     private Map<ASTNode, LookupData> lookup = new IdentityHashMap<>();
@@ -60,6 +63,7 @@ public abstract class ASTNodeCache {
     public void clear() {
         sourcesByUri.clear();
         errorsByUri.clear();
+        warningsByUri.clear();
         nodesByURI.clear();
         lookup.clear();
     }
@@ -70,7 +74,7 @@ public abstract class ASTNodeCache {
      * @param uris
      * @param fileCache
      */
-    public void update(Set<URI> uris, FileCache fileCache) {
+    public Set<URI> update(Set<URI> uris, FileCache fileCache) {
         // invalidate cache for each source file
         for( var uri : uris ) {
             var nodes = nodesByURI.remove(uri);
@@ -110,19 +114,34 @@ public abstract class ASTNodeCache {
                 .collect(Collectors.toSet())
         );
 
-        // update error cache
+        // update diagnostics cache
         for( var uri : changedUris ) {
             var sourceUnit = sourcesByUri.get(uri);
+
             var errors = new ArrayList<SyntaxException>();
-            var messages = sourceUnit.getErrorCollector().getErrors();
-            if( messages != null ) {
-                for( var message : messages ) {
+            var errorMessages = sourceUnit.getErrorCollector().getErrors();
+            if( errorMessages != null ) {
+                for( var message : errorMessages ) {
                     if( message instanceof SyntaxErrorMessage sem )
                         errors.add(sem.getCause());
                 }
             }
             errorsByUri.put(uri, errors);
+
+            var warnings = new ArrayList<WarningMessage>();
+            var warningMessages = sourceUnit.getErrorCollector().getWarnings();
+            if( warningMessages != null ) {
+                for( var warning : warningMessages )
+                    warnings.add(warning);
+            }
+            warningsByUri.put(uri, warnings);
         }
+
+        // return the set of all invalidated files
+        var result = new HashSet<URI>();
+        result.addAll(uris);
+        result.addAll(changedUris);
+        return result;
     }
 
     /**
@@ -148,6 +167,13 @@ public abstract class ASTNodeCache {
      * @param uris
      */
     protected abstract Set<URI> visitAST(Set<URI> uris);
+
+    /**
+     * Get the list of uris.
+     */
+    public Set<URI> getUris() {
+        return sourcesByUri.keySet();
+    }
 
     /**
      * Get the list of source units for all cached files.
@@ -182,13 +208,7 @@ public abstract class ASTNodeCache {
      */
     public boolean hasErrors(URI uri) {
         var errors = errorsByUri.get(uri);
-        if( errors == null )
-            return false;
-        for( var error : errors ) {
-            if( !(error instanceof SyntaxWarning) )
-                return true;
-        }
-        return false;
+        return errors != null && errors.size() > 0;
     }
 
     /**
@@ -197,21 +217,24 @@ public abstract class ASTNodeCache {
      * @param uri
      */
     public boolean hasWarnings(URI uri) {
-        var errors = errorsByUri.get(uri);
-        if( errors == null )
-            return false;
-        for( var error : errors ) {
-            if( error instanceof SyntaxWarning )
-                return true;
-        }
-        return false;
+        var warnings = warningsByUri.get(uri);
+        return warnings != null && warnings.size() > 0;
     }
 
     /**
-     * Get the list of errors for each source file.
+     * Get the list of errors for a source file.
      */
-    public Map<URI, List<SyntaxException>> getErrors() {
-        return errorsByUri;
+    public List<SyntaxException> getErrors(URI uri) {
+        var errors = errorsByUri.get(uri);
+        return errors != null ? errors : Collections.emptyList();
+    }
+
+    /**
+     * Get the list of warnings for a source file.
+     */
+    public List<WarningMessage> getWarnings(URI uri) {
+        var warnings = warningsByUri.get(uri);
+        return warnings != null ? warnings : Collections.emptyList();
     }
 
     /**

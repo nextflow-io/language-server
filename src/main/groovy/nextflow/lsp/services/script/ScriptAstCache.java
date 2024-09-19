@@ -81,8 +81,7 @@ import org.codehaus.groovy.ast.stmt.TryCatchStatement;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
-import org.codehaus.groovy.syntax.SyntaxException;
+import org.codehaus.groovy.control.messages.WarningMessage;
 
 /**
  *
@@ -104,6 +103,7 @@ public class ScriptAstCache extends ASTNodeCache {
     private CompilerConfiguration createConfiguration() {
         var config = new CompilerConfiguration();
         config.setPluginFactory(new ScriptParserPluginFactory());
+        config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
 
         var optimizationOptions = config.getOptimizationOptions();
         optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true);
@@ -166,10 +166,8 @@ public class ScriptAstCache extends ASTNodeCache {
 
     public List<ClassNode> getEnumNodes() {
         var result = new ArrayList<ClassNode>();
-        for( var sourceUnit : getSourceUnits() ) {
-            var uri = sourceUnit.getSource().getURI();
+        for( var uri : getUris() )
             result.addAll(getEnumNodes(uri));
-        }
         return result;
     }
 

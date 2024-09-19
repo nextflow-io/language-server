@@ -72,7 +72,7 @@ import org.codehaus.groovy.ast.stmt.TryCatchStatement;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.syntax.SyntaxException;
+import org.codehaus.groovy.control.messages.WarningMessage;
 
 /**
  *
@@ -94,6 +94,7 @@ public class ConfigAstCache extends ASTNodeCache {
     protected CompilerConfiguration createConfiguration() {
         var config = new CompilerConfiguration();
         config.setPluginFactory(new ConfigParserPluginFactory());
+        config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
         return config;
     }
 
