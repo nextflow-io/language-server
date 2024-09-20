@@ -36,6 +36,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.Compiler;
 import nextflow.lsp.compiler.FutureWarning;
+import nextflow.lsp.compiler.RelatedInformationAware;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.services.util.CustomFormattingOptions;
@@ -55,6 +56,7 @@ import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionParams;
 import org.eclipse.lsp4j.DefinitionParams;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticRelatedInformation;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 import org.eclipse.lsp4j.DidCloseTextDocumentParams;
@@ -376,6 +378,8 @@ public abstract class LanguageService {
                 }
 
                 var diagnostic = new Diagnostic(range, message, DiagnosticSeverity.Error, "nextflow");
+                if( error instanceof RelatedInformationAware ria )
+                    diagnostic.setRelatedInformation(getRelatedInformation(ria, uri));
                 diagnostics.add(diagnostic);
             }
 
@@ -391,12 +395,26 @@ public abstract class LanguageService {
                 }
 
                 var diagnostic = new Diagnostic(range, message, DiagnosticSeverity.Warning, "nextflow");
+                if( warning instanceof RelatedInformationAware ria )
+                    diagnostic.setRelatedInformation(getRelatedInformation(ria, uri));
                 diagnostics.add(diagnostic);
             }
 
             var params = new PublishDiagnosticsParams(uri.toString(), diagnostics);
             client.publishDiagnostics(params);
         });
+    }
+
+    private List<DiagnosticRelatedInformation> getRelatedInformation(RelatedInformationAware ria, URI uri) {
+        var otherNode = ria.getOtherNode();
+        if( otherNode != null ) {
+            var result = new ArrayList<DiagnosticRelatedInformation>();
+            var location = LanguageServerUtils.astNodeToLocation(otherNode, uri);
+            var dri = new DiagnosticRelatedInformation(location, ria.getOtherMessage());
+            result.add(dri);
+            return result;
+        }
+        return null;
     }
 
     /**

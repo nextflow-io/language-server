@@ -418,7 +418,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
 
     @Override
     public void addError(String message, ASTNode node) {
-        var cause = new ResolveException(message, node);
+        var cause = new UnresolvedNameError(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
@@ -438,9 +438,9 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         }
     }
 
-    private class ResolveException extends SyntaxException implements PhaseAware {
+    private class UnresolvedNameError extends SyntaxException implements PhaseAware {
 
-        public ResolveException(String message, ASTNode node) {
+        public UnresolvedNameError(String message, ASTNode node) {
             super(message, node);
         }
 

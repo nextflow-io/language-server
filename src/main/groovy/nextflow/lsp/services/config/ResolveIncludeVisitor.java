@@ -98,7 +98,7 @@ public class ResolveIncludeVisitor extends ConfigVisitorSupport {
 
     @Override
     public void addError(String message, ASTNode node) {
-        var cause = new ResolveIncludeException(message, node);
+        var cause = new ResolveIncludeError(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         errors.add(errorMessage);
     }
@@ -111,9 +111,9 @@ public class ResolveIncludeVisitor extends ConfigVisitorSupport {
         return changed;
     }
 
-    private class ResolveIncludeException extends SyntaxException implements PhaseAware {
+    private class ResolveIncludeError extends SyntaxException implements PhaseAware {
 
-        public ResolveIncludeException(String message, ASTNode node) {
+        public ResolveIncludeError(String message, ASTNode node) {
             super(message, node);
         }
 

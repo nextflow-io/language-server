@@ -102,14 +102,14 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
 
     @Override
     public void addError(String message, ASTNode node) {
-        var cause = new SchemaException(message, node);
+        var cause = new ConfigSchemaError(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class SchemaException extends SyntaxException implements PhaseAware {
+    private class ConfigSchemaError extends SyntaxException implements PhaseAware {
 
-        public SchemaException(String message, ASTNode node) {
+        public ConfigSchemaError(String message, ASTNode node) {
             super(message, node);
         }
 

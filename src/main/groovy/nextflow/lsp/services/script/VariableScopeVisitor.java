@@ -31,6 +31,7 @@ import groovy.json.JsonSlurper;
 import nextflow.lsp.compiler.FutureWarning;
 import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
+import nextflow.lsp.compiler.RelatedInformationAware;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.EntryWorkflowDsl;
 import nextflow.script.dsl.FeatureFlag;
@@ -144,8 +145,9 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void declareInclude(IncludeNode node) {
         for( var module : node.modules ) {
             var name = module.getName();
-            if( includes.containsKey(name) )
-                addError("`" + name + "` is already included", node);
+            var otherInclude = includes.get(name);
+            if( otherInclude != null )
+                addError("`" + name + "` is already included", node, "First included here", (ASTNode) otherInclude);
             includes.put(name, module);
         }
     }
@@ -153,11 +155,13 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void declareMethod(MethodNode mn) {
         var cn = currentScope.getClassScope();
         var name = mn.getName();
-        if( includes.containsKey(name) ) {
-            addError("`" + name + "` is already included", mn);
+        var otherInclude = includes.get(name);
+        if( otherInclude != null ) {
+            addError("`" + name + "` is already included", mn, "First included here", (ASTNode) otherInclude);
         }
-        if( cn.getDeclaredMethods(name).size() > 0 ) {
-            addError("`" + name + "` is already declared", mn);
+        var otherMethods = cn.getDeclaredMethods(name);
+        if( otherMethods.size() > 0 ) {
+            addError("`" + name + "` is already declared", mn, "First declared here", otherMethods.get(0));
             return;
         }
         cn.addMethod(mn);
@@ -642,7 +646,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var scope = currentClosure.getVariableScope();
         var name = variable.getName();
         if( scope.isReferencedLocalVariable(name) && scope.getDeclaredVariable(name) == null )
-            addFutureWarning("Mutating an external variable in a closure may lead to a race condition", target);
+            addFutureWarning("Mutating an external variable in a closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
     }
 
     @Override
@@ -753,8 +757,9 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void declare(Variable variable, ASTNode context) {
         var name = variable.getName();
         for( var scope = currentScope; scope != null; scope = scope.getParent() ) {
-            if( scope.getDeclaredVariable(name) != null ) {
-                addError("`" + name + "` is already declared", context);
+            var other = scope.getDeclaredVariable(name);
+            if( other != null ) {
+                addError("`" + name + "` is already declared", context, "First declared here", (ASTNode) other);
                 break;
             }
         }
@@ -856,27 +861,63 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    protected void addFutureWarning(String message, ASTNode node) {
+    protected void addFutureWarning(String message, ASTNode node, String otherMessage, ASTNode otherNode) {
         var token = new Token(0, "", node.getLineNumber(), node.getColumnNumber()); // ASTNode to CSTNode
-        sourceUnit.getErrorCollector().addWarning(new FutureWarning(WarningMessage.POSSIBLE_ERRORS, message, token, sourceUnit));
+        var warning = new FutureWarning(WarningMessage.POSSIBLE_ERRORS, message, token, sourceUnit);
+        if( otherNode != null )
+            warning.setRelatedInformation(otherMessage, otherNode);
+        sourceUnit.getErrorCollector().addWarning(warning);
+    }
+
+    protected void addFutureWarning(String message, ASTNode node) {
+        addFutureWarning(message, node, null, null);
     }
 
     @Override
     public void addError(String message, ASTNode node) {
-        var cause = new VariableScopeException(message, node);
+        addError(new VariableScopeError(message, node));
+    }
+
+    protected void addError(String message, ASTNode node, String otherMessage, ASTNode otherNode) {
+        var cause = new VariableScopeError(message, node);
+        if( otherNode != null )
+            cause.setRelatedInformation(otherMessage, otherNode);
+        addError(cause);
+    }
+
+    protected void addError(SyntaxException cause) {
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class VariableScopeException extends SyntaxException implements PhaseAware {
+    private class VariableScopeError extends SyntaxException implements PhaseAware, RelatedInformationAware {
 
-        public VariableScopeException(String message, ASTNode node) {
+        private String otherMessage;
+
+        private ASTNode otherNode;
+
+        public VariableScopeError(String message, ASTNode node) {
             super(message, node);
+        }
+
+        public void setRelatedInformation(String otherMessage, ASTNode otherNode) {
+            this.otherMessage = otherMessage;
+            this.otherNode = otherNode;
         }
 
         @Override
         public int getPhase() {
             return Phases.NAME_RESOLUTION;
+        }
+
+        @Override
+        public String getOtherMessage() {
+            return otherMessage;
+        }
+
+        @Override
+        public ASTNode getOtherNode() {
+            return otherNode;
         }
     }
 

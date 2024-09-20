@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.compiler;
 
+import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.syntax.CSTNode;
@@ -23,9 +24,28 @@ import org.codehaus.groovy.syntax.CSTNode;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class FutureWarning extends WarningMessage {
+public class FutureWarning extends WarningMessage implements RelatedInformationAware {
+
+    private String otherMessage;
+
+    private ASTNode otherNode;
 
     public FutureWarning(int importance, String message, CSTNode context, SourceUnit owner) {
         super(importance, message, context, owner);
+    }
+
+    public void setRelatedInformation(String otherMessage, ASTNode otherNode) {
+        this.otherMessage = otherMessage;
+        this.otherNode = otherNode;
+    }
+
+    @Override
+    public String getOtherMessage() {
+        return otherMessage;
+    }
+
+    @Override
+    public ASTNode getOtherNode() {
+        return otherNode;
     }
 }

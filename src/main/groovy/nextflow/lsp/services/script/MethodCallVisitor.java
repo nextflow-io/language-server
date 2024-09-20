@@ -193,14 +193,14 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
 
     @Override
     public void addError(String message, ASTNode node) {
-        var cause = new MethodCallException(message, node);
+        var cause = new MethodCallError(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class MethodCallException extends SyntaxException implements PhaseAware {
+    private class MethodCallError extends SyntaxException implements PhaseAware {
 
-        public MethodCallException(String message, ASTNode node) {
+        public MethodCallError(String message, ASTNode node) {
             super(message, node);
         }
 
