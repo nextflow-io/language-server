@@ -38,6 +38,7 @@ import org.codehaus.groovy.ast.expr.ListExpression;
 import org.codehaus.groovy.ast.expr.MapEntryExpression;
 import org.codehaus.groovy.ast.expr.MapExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
+import org.codehaus.groovy.ast.expr.NamedArgumentListExpression;
 import org.codehaus.groovy.ast.expr.NotExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.RangeExpression;
@@ -269,7 +270,7 @@ public class Formatter extends CodeVisitorSupport {
             append('(');
             if( wrap )
                 incIndent();
-            visitArguments(parenArgs, hasNamedArgs(node), wrap);
+            visitArguments(parenArgs, wrap);
             if( wrap ) {
                 appendNewLine();
                 decIndent();
@@ -294,11 +295,12 @@ public class Formatter extends CodeVisitorSupport {
         append("new ");
         visitTypeName(node.getType());
         append('(');
-        visitArguments(asMethodCallArguments(node), hasNamedArgs(node), false);
+        visitArguments(asMethodCallArguments(node), false);
         append(')');
     }
 
-    public void visitArguments(List<Expression> args, boolean hasNamedArgs, boolean wrap) {
+    public void visitArguments(List<Expression> args, boolean wrap) {
+        var hasNamedArgs = args.size() > 0 && args.get(0) instanceof NamedArgumentListExpression;
         var positionalArgs = hasNamedArgs
             ? DefaultGroovyMethods.tail(args)
             : args;

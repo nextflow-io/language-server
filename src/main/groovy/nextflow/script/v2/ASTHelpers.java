@@ -31,6 +31,7 @@ import org.codehaus.groovy.ast.expr.MapExpression;
 import org.codehaus.groovy.ast.expr.MapEntryExpression;
 import org.codehaus.groovy.ast.expr.MethodCall;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
+import org.codehaus.groovy.ast.expr.NamedArgumentListExpression;
 import org.codehaus.groovy.ast.expr.TupleExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
@@ -110,15 +111,10 @@ public class ASTHelpers {
         return ((TupleExpression) call.getArguments()).getExpressions();
     }
 
-    public static boolean hasNamedArgs(MethodCall call) {
-        var args = (TupleExpression) call.getArguments();
-        return args.getNodeMetaData(NAMED_ARGS) != null;
-    }
-
     public static List<MapEntryExpression> asNamedArgs(MethodCall call) {
         var args = asMethodCallArguments(call);
-        return args.size() > 0 && args.get(0) instanceof MapExpression me
-            ? me.getMapEntryExpressions()
+        return args.size() > 0 && args.get(0) instanceof NamedArgumentListExpression nale
+            ? nale.getMapEntryExpressions()
             : Collections.emptyList();
     }
 
@@ -142,6 +138,4 @@ public class ASTHelpers {
             .filter(an -> an.getClassNode().getName().equals(type.getName()))
             .findFirst();
     }
-
-    private static final String NAMED_ARGS = "_NAMED_ARGS";
 }

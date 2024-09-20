@@ -68,6 +68,7 @@ import org.codehaus.groovy.ast.expr.GStringExpression;
 import org.codehaus.groovy.ast.expr.MapExpression;
 import org.codehaus.groovy.ast.expr.MapEntryExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
+import org.codehaus.groovy.ast.expr.NamedArgumentListExpression;
 import org.codehaus.groovy.ast.expr.NotExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.RangeExpression;
@@ -1055,16 +1056,6 @@ public class ScriptAstBuilder {
             var arguments = (ArgumentListExpression) mce.getArguments();
             arguments.addExpression(closure);
             return mce;
-
-            // TODO: only needed if namedArgs uses TupleExpression
-            // named arguments, e.g. x: 1, y: 2
-            // if ( arguments instanceof TupleExpression te ) {
-            //     if( !te.expressions )
-            //         throw new IllegalStateException()
-            //     var namedArguments = (NamedArgumentListExpression) te.getExpression(0)
-            //     mce.getArguments() = args( mapX(namedArguments.mapEntryExpressions), closure )
-            //     return mce
-            // }
         }
 
         var arguments = ast( args(closure), closure );
@@ -1444,31 +1435,34 @@ public class ScriptAstBuilder {
         var namedArgs = new ArrayList<MapEntryExpression>();
 
         for( var el : ctx.argumentListElement() ) {
-            if( el.expression() != null )
+            if( el.expression() != null ) {
                 arguments.add(expression(el.expression()));
-
-            else if( el.namedArg() != null )
-                namedArgs.add(namedArg(el.namedArg()));
-
-            else
-                throw createParsingFailedException("Invalid method argument: " + ctx.getText(), ctx);
+            }
+            else if( el.namedArg() != null ) {
+                var namedArg = namedArg(el.namedArg());
+                checkDuplicateNamedArg(namedArgs, namedArg);
+                namedArgs.add(namedArg);
+            }
         }
 
-        // TODO: validate duplicate named arguments ?
-        // TODO: only named arguments -> TupleExpression ?
         if( !namedArgs.isEmpty() )
-            arguments.add(0, mapX(namedArgs));
+            arguments.add(0, new NamedArgumentListExpression(namedArgs));
 
-        var result = ast( args(arguments), ctx );
-        if( !namedArgs.isEmpty() )
-            result.putNodeMetaData(NAMED_ARGS, true);
-        return result;
+        return ast( args(arguments), ctx );
     }
 
     private MapEntryExpression namedArg(NamedArgContext ctx) {
         var key = ast( constX(namedProperty(ctx.namedProperty())), ctx.namedProperty() );
         var value = expression(ctx.expression());
         return ast( new MapEntryExpression(key, value), ctx );
+    }
+
+    private void checkDuplicateNamedArg(List<MapEntryExpression> namedArgs, MapEntryExpression namedArg) {
+        var name = namedArg.getKeyExpression().getText();
+        for( var arg : namedArgs ) {
+            if( arg.getKeyExpression().getText().equals(name) )
+                throw createParsingFailedException("Duplicated named argument '" + name + "' found", namedArg);
+        }
     }
 
     private Expression incompleteExpression(IncompleteExpressionContext ctx) {
@@ -1782,7 +1776,6 @@ public class ScriptAstBuilder {
 
     private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
-    private static final String NAMED_ARGS = "_NAMED_ARGS";
     private static final String PREPEND_COMMENTS = "_PREPEND_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
 

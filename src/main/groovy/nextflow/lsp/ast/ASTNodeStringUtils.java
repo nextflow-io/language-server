@@ -130,7 +130,7 @@ public class ASTNodeStringUtils {
                 fmt.appendIndent();
                 fmt.append(call.getMethodAsString());
                 fmt.append(' ');
-                fmt.visitArguments(asMethodCallArguments(call), hasNamedArgs(call), false);
+                fmt.visitArguments(asMethodCallArguments(call), false);
                 fmt.appendNewLine();
             });
             fmt.decIndent();
@@ -140,7 +140,7 @@ public class ASTNodeStringUtils {
                 fmt.appendIndent();
                 fmt.append(call.getMethodAsString());
                 fmt.append(' ');
-                fmt.visitArguments(asMethodCallArguments(call), hasNamedArgs(call), false);
+                fmt.visitArguments(asMethodCallArguments(call), false);
                 fmt.appendNewLine();
             });
             fmt.decIndent();
