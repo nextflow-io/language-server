@@ -594,7 +594,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( currentClosure != null )
                 addError("Local variables in a closure should be declared with `def`", ve);
             else if( !inWorkflowEmit )
-                sourceUnit.addWarning("Local variables should be declared with `def`", ve);
+                addFutureWarning("Local variables should be declared with `def`", ve);
             var scope = currentScope;
             currentScope = currentDefinition.getVariableScope();
             declare(ve);
