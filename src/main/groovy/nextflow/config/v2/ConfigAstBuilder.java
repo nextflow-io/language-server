@@ -233,7 +233,7 @@ public class ConfigAstBuilder {
         else
             throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
 
-        prependComments(result, ctx);
+        saveLeadingComments(result, ctx);
         return result;
     }
 
@@ -284,7 +284,7 @@ public class ConfigAstBuilder {
         else
             throw createParsingFailedException("Invalid statement in config block: " + ctx.getText(), ctx);
 
-        prependComments(result, ctx);
+        saveLeadingComments(result, ctx);
         return result;
     }
 
@@ -364,7 +364,7 @@ public class ConfigAstBuilder {
         else
             throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
 
-        prependComments(result, ctx);
+        saveLeadingComments(result, ctx);
         return result;
     }
 
@@ -1217,19 +1217,19 @@ public class ConfigAstBuilder {
         return ast( new GenericsType(type(ctx)), ctx );
     }
 
-    /// HELPERS
+    /// COMMENTS
 
-    private void prependComments(ASTNode node, ParserRuleContext ctx) {
+    private void saveLeadingComments(ASTNode node, ParserRuleContext ctx) {
         var comments = new ArrayList<String>();
         var child = ctx;
-        while( prependComments0(child, comments) )
+        while( saveLeadingComments0(child, comments) )
             child = child.getParent();
 
         if( !comments.isEmpty() )
-            node.putNodeMetaData(PREPEND_COMMENTS, comments);
+            node.putNodeMetaData(LEADING_COMMENTS, comments);
     }
 
-    private boolean prependComments0(ParserRuleContext ctx, List<String> comments) {
+    private boolean saveLeadingComments0(ParserRuleContext ctx, List<String> comments) {
         var parent = ctx.getParent();
         if( parent == null )
             return false;
@@ -1272,6 +1272,8 @@ public class ConfigAstBuilder {
 
         return false;
     }
+
+    /// HELPERS
 
     private boolean isInsideParentheses(NodeMetaDataHandler nodeMetaDataHandler) {
         Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
@@ -1384,7 +1386,7 @@ public class ConfigAstBuilder {
 
     private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
-    private static final String PREPEND_COMMENTS = "_PREPEND_COMMENTS";
+    private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
 
     private static final List<String> GROOVY_KEYWORDS = List.of(

@@ -174,7 +174,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitFeatureFlag(FeatureFlagNode node) {
-            fmt.appendComments(node);
+            fmt.appendLeadingComments(node);
             fmt.append(node.name);
             fmt.append(" = ");
             fmt.visit(node.value);
@@ -184,7 +184,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
         @Override
         public void visitInclude(IncludeNode node) {
             var wrap = node.modules.size() > 1;
-            fmt.appendComments(node);
+            fmt.appendLeadingComments(node);
             fmt.append("include {");
             if( wrap )
                 fmt.incIndent();
@@ -223,7 +223,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitEnum(ClassNode node) {
-            fmt.appendComments(node);
+            fmt.appendLeadingComments(node);
             fmt.append("enum ");
             fmt.append(node.getName());
             fmt.append(" {\n");
@@ -240,7 +240,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitFunction(FunctionNode node) {
-            fmt.appendComments(node);
+            fmt.appendLeadingComments(node);
             fmt.append("def ");
             fmt.append(node.getName());
             fmt.append('(');
@@ -254,7 +254,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitProcess(ProcessNode node) {
-            fmt.appendComments(node);
+            fmt.appendLeadingComments(node);
             fmt.append("process ");
             fmt.append(node.getName());
             fmt.append(" {\n");
@@ -298,7 +298,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitWorkflow(WorkflowNode node) {
-            fmt.appendComments(node);
+            fmt.appendLeadingComments(node);
             fmt.append("workflow");
             if( !node.isEntry() ) {
                 fmt.append(' ');
@@ -309,7 +309,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
             if( node.takes instanceof BlockStatement ) {
                 fmt.appendIndent();
                 fmt.append("take:\n");
-                fmt.visit(node.takes);
+                visitWorkflowTakes(asBlockStatements(node.takes));
                 fmt.appendNewLine();
             }
             if( node.main instanceof BlockStatement ) {
@@ -335,9 +335,29 @@ public class ScriptFormattingProvider implements FormattingProvider {
             fmt.append("}\n");
         }
 
+        protected void visitWorkflowTakes(List<Statement> takes) {
+            var alignmentWidth = options.harshilAlignment()
+                ? getMaxParameterWidth(takes)
+                : 0;
+
+            for( var stmt : takes ) {
+                var stmtX = (ExpressionStatement)stmt;
+                var emit = stmtX.getExpression();
+                var ve = (VariableExpression) emit;
+                fmt.appendIndent();
+                fmt.visit(ve);
+                if( alignmentWidth > 0 ) {
+                    var padding = alignmentWidth - ve.getName().length();
+                    fmt.append(" ".repeat(padding));
+                }
+                fmt.appendTrailingComment(stmt);
+                fmt.appendNewLine();
+            }
+        }
+
         protected void visitWorkflowEmits(List<Statement> emits) {
             var alignmentWidth = options.harshilAlignment()
-                ? getWorkflowEmitWidth(emits)
+                ? getMaxParameterWidth(emits)
                 : 0;
 
             for( var stmt : emits ) {
@@ -353,6 +373,17 @@ public class ScriptFormattingProvider implements FormattingProvider {
                     }
                     fmt.append(" = ");
                     fmt.visit(assign.getRightExpression());
+                    fmt.appendTrailingComment(stmt);
+                    fmt.appendNewLine();
+                }
+                else if( emit instanceof VariableExpression ve ) {
+                    fmt.appendIndent();
+                    fmt.visit(ve);
+                    if( alignmentWidth > 0 ) {
+                        var padding = alignmentWidth - ve.getName().length();
+                        fmt.append(" ".repeat(padding));
+                    }
+                    fmt.appendTrailingComment(stmt);
                     fmt.appendNewLine();
                 }
                 else {
@@ -361,12 +392,12 @@ public class ScriptFormattingProvider implements FormattingProvider {
             }
         }
 
-        protected int getWorkflowEmitWidth(List<Statement> emits) {
-            if( emits.size() == 1 )
+        protected int getMaxParameterWidth(List<Statement> statements) {
+            if( statements.size() == 1 )
                 return 0;
 
             int maxWidth = 0;
-            for( var stmt : emits ) {
+            for( var stmt : statements ) {
                 var stmtX = (ExpressionStatement)stmt;
                 var emit = stmtX.getExpression();
                 int width = 0;
@@ -386,7 +417,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitOutput(OutputNode node) {
-            fmt.appendComments(node);
+            fmt.appendLeadingComments(node);
             fmt.append("output {\n");
             fmt.incIndent();
             visitOutputBody(node.body);

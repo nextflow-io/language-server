@@ -95,8 +95,8 @@ public class Formatter extends CodeVisitorSupport {
         builder.append('\n');
     }
 
-    public void appendComments(ASTNode node) {
-        var comments = (List<String>) node.getNodeMetaData(PREPEND_COMMENTS);
+    public void appendLeadingComments(ASTNode node) {
+        var comments = (List<String>) node.getNodeMetaData(LEADING_COMMENTS);
         if( comments == null || comments.isEmpty() )
             return;
 
@@ -108,6 +108,14 @@ public class Formatter extends CodeVisitorSupport {
                 appendIndent();
                 append(line.stripLeading());
             }
+        }
+    }
+
+    public void appendTrailingComment(ASTNode node) {
+        var comment = (String) node.getNodeMetaData(TRAILING_COMMENT);
+        if( comment != null ) {
+            append(' ');
+            append(comment);
         }
     }
 
@@ -131,7 +139,7 @@ public class Formatter extends CodeVisitorSupport {
     }
 
     protected void visitIfElse(IfStatement node, boolean preIndent) {
-        appendComments(node);
+        appendLeadingComments(node);
         if( preIndent )
             appendIndent();
         append("if (");
@@ -164,7 +172,7 @@ public class Formatter extends CodeVisitorSupport {
     public void visitExpressionStatement(ExpressionStatement node) {
         var cse = currentStmtExpr;
         currentStmtExpr = node.getExpression();
-        appendComments(node);
+        appendLeadingComments(node);
         appendIndent();
         if( node.getStatementLabels() != null ) {
             for( var label : node.getStatementLabels() ) {
@@ -179,7 +187,7 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitReturnStatement(ReturnStatement node) {
-        appendComments(node);
+        appendLeadingComments(node);
         appendIndent();
         append("return ");
         visit(node.getExpression());
@@ -188,7 +196,7 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitAssertStatement(AssertStatement node) {
-        appendComments(node);
+        appendLeadingComments(node);
         appendIndent();
         append("assert ");
         visit(node.getBooleanExpression());
@@ -201,7 +209,7 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitTryCatchFinally(TryCatchStatement node) {
-        appendComments(node);
+        appendLeadingComments(node);
         appendIndent();
         append("try {\n");
         incIndent();
@@ -216,7 +224,7 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitCatchStatement(CatchStatement node) {
-        appendComments(node);
+        appendLeadingComments(node);
         appendIndent();
         append("catch (");
 
@@ -711,7 +719,8 @@ public class Formatter extends CodeVisitorSupport {
 
     private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
-    private static final String PREPEND_COMMENTS = "_PREPEND_COMMENTS";
+    private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
+    private static final String TRAILING_COMMENT = "_TRAILING_COMMENT";
 
 }

@@ -113,7 +113,7 @@ public class ConfigFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitConfigAssign(ConfigAssignNode node) {
-            fmt.appendComments(node);
+            fmt.appendLeadingComments(node);
             fmt.appendIndent();
             var name = String.join(".", node.names);
             fmt.append(name);
@@ -132,7 +132,7 @@ public class ConfigFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitConfigBlock(ConfigBlockNode node) {
-            fmt.appendComments(node);
+            fmt.appendLeadingComments(node);
             fmt.appendIndent();
             if( node.kind != null ) {
                 fmt.append(node.kind);
@@ -177,7 +177,7 @@ public class ConfigFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitConfigInclude(ConfigIncludeNode node) {
-            fmt.appendComments(node);
+            fmt.appendLeadingComments(node);
             fmt.appendIndent();
             fmt.append("includeConfig ");
             fmt.visit(node.source);

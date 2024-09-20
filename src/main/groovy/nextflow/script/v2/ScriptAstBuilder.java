@@ -243,7 +243,7 @@ public class ScriptAstBuilder {
     private void scriptStatement(ScriptStatementContext ctx, List<Statement> extraStatements) {
         if( ctx instanceof TopAssignmentStmtAltContext taac ) {
             var node = topAssignmentStatement(taac.topAssignmentStatement());
-            prependComments(node, ctx);
+            saveLeadingComments(node, ctx);
             if( node instanceof FeatureFlagNode ffn )
                 moduleNode.addFeatureFlag(ffn);
             else if( node instanceof ExpressionStatement es )
@@ -252,13 +252,13 @@ public class ScriptAstBuilder {
 
         else if( ctx instanceof EnumDefAltContext edac ) {
             var node = enumDef(edac.enumDef());
-            prependComments(node, ctx);
+            saveLeadingComments(node, ctx);
             moduleNode.addClass(node);
         }
 
         else if( ctx instanceof FunctionDefAltContext fdac ) {
             var node = functionDef(fdac.functionDef());
-            prependComments(node, ctx);
+            saveLeadingComments(node, ctx);
             moduleNode.addFunction(node);
         }
 
@@ -269,13 +269,13 @@ public class ScriptAstBuilder {
 
         else if( ctx instanceof IncludeStmtAltContext iac ) {
             var node = includeStatement(iac.includeStatement());
-            prependComments(node, ctx);
+            saveLeadingComments(node, ctx);
             moduleNode.addInclude(node);
         }
 
         else if( ctx instanceof OutputDefAltContext odac ) {
             var node = outputDef(odac.outputDef());
-            prependComments(node, ctx);
+            saveLeadingComments(node, ctx);
             if( moduleNode.getOutput() != null )
                 collectSyntaxError(new SyntaxException("Output block defined more than once", node));
             moduleNode.setOutput(node);
@@ -283,13 +283,13 @@ public class ScriptAstBuilder {
 
         else if( ctx instanceof ProcessDefAltContext pdac ) {
             var node = processDef(pdac.processDef());
-            prependComments(node, ctx);
+            saveLeadingComments(node, ctx);
             moduleNode.addProcess(node);
         }
 
         else if( ctx instanceof WorkflowDefAltContext wdac ) {
             var node = workflowDef(wdac.workflowDef());
-            prependComments(node, ctx);
+            saveLeadingComments(node, ctx);
             if( node.getName() == null ) {
                 if( moduleNode.getEntry() != null )
                     collectSyntaxError(new SyntaxException("Entry workflow defined more than once", node));
@@ -573,7 +573,9 @@ public class ScriptAstBuilder {
     }
 
     private Statement workflowTake(IdentifierContext ctx) {
-        return ast( stmt(variableName(ctx)), ctx );
+        var result = ast( stmt(variableName(ctx)), ctx );
+        saveTrailingComment(result, ctx);
+        return result;
     }
 
     private Statement workflowEmits(WorkflowEmitsContext ctx) {
@@ -591,7 +593,9 @@ public class ScriptAstBuilder {
         var emit = ctx.expression() != null
             ? ast( new AssignmentExpression(varX, expression(ctx.expression())), ctx )
             : varX;
-        return ast( stmt(emit), ctx );
+        var result = ast( stmt(emit), ctx );
+        saveTrailingComment(result, ctx);
+        return result;
     }
 
     private Statement workflowPublishers(WorkflowPublishersContext ctx) {
@@ -686,7 +690,7 @@ public class ScriptAstBuilder {
         else
             throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
 
-        prependComments(result, ctx);
+        saveLeadingComments(result, ctx);
         return result;
     }
 
@@ -1593,19 +1597,19 @@ public class ScriptAstBuilder {
         return ast( new GenericsType(type(ctx)), ctx );
     }
 
-    /// HELPERS
+    /// COMMENTS
 
-    private void prependComments(ASTNode node, ParserRuleContext ctx) {
+    private void saveLeadingComments(ASTNode node, ParserRuleContext ctx) {
         var comments = new ArrayList<String>();
         var child = ctx;
-        while( prependComments0(child, comments) )
+        while( saveLeadingComments0(child, comments) )
             child = child.getParent();
 
         if( !comments.isEmpty() )
-            node.putNodeMetaData(PREPEND_COMMENTS, comments);
+            node.putNodeMetaData(LEADING_COMMENTS, comments);
     }
 
-    private boolean prependComments0(ParserRuleContext ctx, List<String> comments) {
+    private boolean saveLeadingComments0(ParserRuleContext ctx, List<String> comments) {
         var parent = ctx.getParent();
         if( parent == null )
             return false;
@@ -1653,6 +1657,41 @@ public class ScriptAstBuilder {
 
         return false;
     }
+
+    private void saveTrailingComment(ASTNode node, ParserRuleContext ctx) {
+        var child = ctx;
+        while( saveTrailingComment0(child, node) )
+            child = child.getParent();
+    }
+
+    private boolean saveTrailingComment0(ParserRuleContext ctx, ASTNode node) {
+        var parent = ctx.getParent();
+        if( parent == null )
+            return false;
+
+        // find index of token among siblings
+        var siblings = parent.children;
+        int i = 0;
+        while( i < siblings.size() && siblings.get(i) != ctx ) {
+            i++;
+        }
+
+        // check parent context for additional comments
+        if( i == siblings.size() - 1 )
+            return true;
+
+        // save trailing inline comment
+        var next = siblings.get(i + 1);
+        if( next instanceof SepContext sep ) {
+            var text = sep.children.get(0).getText();
+            if( !";".equals(text) && !"\n".equals(text) )
+                node.putNodeMetaData(TRAILING_COMMENT, text);
+        }
+
+        return false;
+    }
+
+    /// HELPERS
 
     private boolean isInsideParentheses(NodeMetaDataHandler nodeMetaDataHandler) {
         Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
@@ -1776,8 +1815,9 @@ public class ScriptAstBuilder {
 
     private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
-    private static final String PREPEND_COMMENTS = "_PREPEND_COMMENTS";
+    private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
+    private static final String TRAILING_COMMENT = "_TRAILING_COMMENT";
 
     private static final List<String> GROOVY_KEYWORDS = List.of(
         Types.getText(Types.KEYWORD_ABSTRACT),
