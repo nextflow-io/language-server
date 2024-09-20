@@ -513,9 +513,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     // statements
 
     private static final List<String> KEYWORDS = List.of(
-        "breaK",
         "case",
-        "continue",
         "for",
         "switch",
         "while"
