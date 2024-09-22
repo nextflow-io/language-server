@@ -439,7 +439,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
             """
             Include statement:
 
-            ```groovy
+            ```nextflow
             include { HELLO } from './hello.nf'
             ```
 
@@ -452,7 +452,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
             """
             Function definition:
 
-            ```groovy
+            ```nextflow
             def hello(name) {
                 println "Hello $name!"
             }
@@ -471,7 +471,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
             """
             Process definition:
 
-            ```groovy
+            ```nextflow
             process HELLO {
                 input: 
                 val message
@@ -513,7 +513,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
             """
             Workflow definition:
 
-            ```groovy
+            ```nextflow
             workflow MY_FLOW {
                 take:
                 input
@@ -546,7 +546,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
             """
             Entry workflow definition:
 
-            ```groovy
+            ```nextflow
             workflow {
                 Channel.of('Bonjour', 'Ciao', 'Hello', 'Hola') | view { it -> '$it world!' }
             }

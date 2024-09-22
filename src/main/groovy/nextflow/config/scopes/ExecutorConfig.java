@@ -68,7 +68,7 @@ public class ExecutorConfig implements ConfigScope {
         *Used only by grid executors and Google Batch.*
 
         Determines the name of jobs submitted to the underlying cluster executor:
-        ```groovy
+        ```nextflow
         executor.jobName = { "$task.name - $task.hash" }
         ```
     """)
