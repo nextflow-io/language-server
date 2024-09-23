@@ -130,14 +130,17 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
-        for( var workspaceFolder : params.getWorkspaceFolders() ) {
-            var name = workspaceFolder.getName();
-            var uri = workspaceFolder.getUri();
-            addWorkspaceFolder(name, uri);
+        var workspaceFolders = params.getWorkspaceFolders();
+        if( workspaceFolders != null && !workspaceFolders.isEmpty() ) {
+            for( var workspaceFolder : workspaceFolders ) {
+                var name = workspaceFolder.getName();
+                var uri = workspaceFolder.getUri();
+                addWorkspaceFolder(name, uri);
+            }
         }
-
-        if( params.getWorkspaceFolders().isEmpty() )
+        else {
             addWorkspaceFolder(DEFAULT_WORKSPACE_FOLDER_NAME, null);
+        }
 
         var serverCapabilities = new ServerCapabilities();
         serverCapabilities.setTextDocumentSync(TextDocumentSyncKind.Incremental);
@@ -567,7 +570,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     private String relativePath(String uri) {
         return workspaceRoots.entrySet().stream()
-            .filter((entry) -> uri.startsWith(entry.getValue()))
+            .filter((entry) -> entry.getValue() != null && uri.startsWith(entry.getValue()))
             .findFirst()
             .map((entry) -> {
                 var name = entry.getKey();
@@ -592,7 +595,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     private LanguageService getLanguageService0(String uri, Map<String, LanguageService> services) {
         var service = workspaceRoots.entrySet().stream()
-            .filter((entry) -> uri.startsWith(entry.getValue()))
+            .filter((entry) -> entry.getValue() != null && uri.startsWith(entry.getValue()))
             .findFirst()
             .map((entry) -> services.get(entry.getKey()))
             .orElse(services.get(DEFAULT_WORKSPACE_FOLDER_NAME));
