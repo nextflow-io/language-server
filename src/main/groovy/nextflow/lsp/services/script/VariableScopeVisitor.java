@@ -632,8 +632,9 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( variable instanceof FieldNode fn && findAnnotation(fn, Constant.class).isPresent() ) {
             if( "params".equals(variable.getName()) )
                 addFutureWarning("Assigning params in the script will not be supported in a future version", target);
-            else
-                addError("Built-in variable cannot be mutated", target);
+            // TODO: re-enable after workflow.onComplete bug is fixed
+            // else
+            //     addError("Built-in variable cannot be mutated", target);
         }
         else if( variable != null ) {
             checkExternalWriteInClosure(target, variable);
