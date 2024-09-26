@@ -11,6 +11,10 @@ The following language features are currently supported:
 - hover hints
 - rename
 
+## Requirements
+
+The language server requires Java 17 or later.
+
 ## Development
 
 To build from the command line:
