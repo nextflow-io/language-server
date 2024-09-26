@@ -103,12 +103,18 @@ configAssignment
     ;
 
 configAssignmentPath
-    :   identifier (DOT identifier)*
+    :   configPrimary (DOT configPrimary)*
+    ;
+
+configPrimary
+    :   identifier
+    |   stringLiteral
+    |   builtInType
     ;
 
 // -- config block
 configBlock
-    :   (identifier | stringLiteral) nls LBRACE (nls configBlockStatement)* nls RBRACE
+    :   configPrimary nls LBRACE (nls configBlockStatement)* nls RBRACE
     ;
 
 configBlockStatement
@@ -121,17 +127,12 @@ configBlockStatement
     ;
 
 configSelector
-    :   kind=Identifier COLON target=configSelectorTarget nls LBRACE nls (configAssignment nls)* RBRACE
-    ;
-
-configSelectorTarget
-    :   identifier
-    |   stringLiteral
+    :   kind=Identifier COLON target=configPrimary nls LBRACE nls (configAssignment nls)* RBRACE
     ;
 
 // -- config append block
 configAppendBlock
-    :   identifier nls LBRACE (nls configAppendBlockStatement)* nls RBRACE
+    :   configPrimary nls LBRACE (nls configAppendBlockStatement)* nls RBRACE
     ;
 
 configAppendBlockStatement
@@ -140,7 +141,7 @@ configAppendBlockStatement
 
 // -- incomplete config statement
 configIncomplete
-    :   identifier (DOT identifier)* DOT?
+    :   configPrimary (DOT configPrimary)* DOT?
     ;
 
 
@@ -243,7 +244,7 @@ expressionStatement
 // expressions
 //
 expression
-    // identifiers, literals, list/map element, method invocation
+    // identifiers, literals, closures, lists, maps, method calls, index/property expressions
     :   primary pathElement*                                                                #pathExprAlt
 
     // bitwise not (~) / logical not (!) (level 1)

@@ -344,7 +344,7 @@ expressionStatement
 // expressions
 //
 expression
-    // identifiers, literals, list/map element, method invocation
+    // identifiers, literals, closures, lists, maps, method calls, index/property expressions
     :   primary pathElement*                                                                #pathExprAlt
 
     // bitwise not (~) / logical not (!) (level 1)

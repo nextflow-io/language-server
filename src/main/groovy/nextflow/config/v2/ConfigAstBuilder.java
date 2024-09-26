@@ -244,17 +244,28 @@ public class ConfigAstBuilder {
     }
 
     private ConfigStatement configAssignment(ConfigAssignmentContext ctx) {
-        var names = ctx.configAssignmentPath().identifier().stream()
-            .map(this::identifier)
+        var names = ctx.configAssignmentPath().configPrimary().stream()
+            .map(this::configPrimary)
             .collect(Collectors.toList());
         var value = expression(ctx.expression());
         return ast( new ConfigAssignNode(names, value), ctx );
     }
 
+    private String configPrimary(ConfigPrimaryContext ctx) {
+        if( ctx.identifier() != null )
+            return identifier(ctx.identifier());
+
+        if( ctx.stringLiteral() != null )
+            return stringLiteral(ctx.stringLiteral());
+
+        if( ctx.builtInType() != null )
+            return ctx.builtInType().getText();
+
+        throw new IllegalStateException();
+    }
+
     private ConfigStatement configBlock(ConfigBlockContext ctx) {
-        var name = ctx.identifier() != null
-            ? identifier(ctx.identifier())
-            : stringLiteral(ctx.stringLiteral());
+        var name = configPrimary(ctx.configPrimary());
         var statements = ctx.configBlockStatement().stream()
             .map(this::configBlockStatement)
             .collect(Collectors.toList());
@@ -291,21 +302,15 @@ public class ConfigAstBuilder {
 
     private ConfigStatement configSelector(ConfigSelectorContext ctx) {
         var kind = ctx.kind.getText();
-        var target = configSelectorTarget(ctx.target);
+        var target = configPrimary(ctx.target);
         var statements = ctx.configAssignment().stream()
             .map(this::configAssignment)
             .collect(Collectors.toList());
         return new ConfigBlockNode(kind, target, statements);
     }
 
-    private String configSelectorTarget(ConfigSelectorTargetContext ctx) {
-        return ctx.identifier() != null
-            ? identifier(ctx.identifier())
-            : stringLiteral(ctx.stringLiteral());
-    }
-
     private ConfigStatement configAppendBlock(ConfigAppendBlockContext ctx) {
-        var name = identifier(ctx.identifier());
+        var name = configPrimary(ctx.configPrimary());
         var statements = ctx.configAppendBlockStatement().stream()
             .map(this::configAppendBlockStatement)
             .collect(Collectors.toList());
