@@ -31,7 +31,7 @@ public class ProcessConfig implements ConfigScope {
         return """
             The `process` scope allows you to specify default directives for processes in your pipeline.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-process)
+            [Read more](https://nextflow.io/docs/latest/config.html#process-configuration)
             """;
     }
 

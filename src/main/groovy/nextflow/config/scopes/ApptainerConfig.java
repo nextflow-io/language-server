@@ -34,7 +34,7 @@ public class ApptainerConfig implements ConfigScope {
         return """
             The `apptainer` scope controls how [Apptainer](https://apptainer.org) containers are executed by Nextflow.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-apptainer)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#apptainer)
             """;
     }
 

@@ -32,7 +32,7 @@ public class UnscopedConfig implements ConfigScope {
         return """
             Miscellaneous settings that do not have a dedicated scope.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#miscellaneous)
+            [Read more](https://nextflow.io/docs/latest/config.html#unscoped-options)
             """;
     }
 

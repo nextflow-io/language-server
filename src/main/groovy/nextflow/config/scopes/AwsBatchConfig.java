@@ -35,7 +35,7 @@ public class AwsBatchConfig implements ConfigScope {
         return """
             The `aws` scope controls the interactions with AWS, including AWS Batch and S3.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-aws)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#aws)
             """;
     }
 

@@ -46,7 +46,7 @@ class FeatureFlagDsl {
     @FeatureFlag(
         name='nextflow.enable.strict',
         description='''
-            When `true`, the pipeline is executed in [strict mode](https://nextflow.io/docs/latest/config.html#feature-flags).
+            When `true`, the pipeline is executed in [strict mode](https://nextflow.io/docs/latest/reference/feature-flags.html).
         ''')
     boolean strict
 
@@ -67,7 +67,7 @@ class FeatureFlagDsl {
     @FeatureFlag(
         name='nextflow.preview.topic',
         description='''
-            When `true`, enables the use of [topic channels](https://nextflow.io/docs/latest/channel.html#channel-topic).
+            When `true`, enables the use of [topic channels](https://nextflow.io/docs/latest/reference/channel.html#topic).
         ''')
     boolean previewTopic
 

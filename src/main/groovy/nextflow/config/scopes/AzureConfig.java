@@ -31,7 +31,7 @@ public class AzureConfig implements ConfigScope {
         return """
             The `azure` scope allows you to configure the interactions with Azure, including Azure Batch and Azure Blob Storage.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-azure)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#azure)
             """;
     }
 

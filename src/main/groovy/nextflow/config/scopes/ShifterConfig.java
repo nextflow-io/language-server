@@ -32,7 +32,7 @@ public class ShifterConfig implements ConfigScope {
         return """
             The `shifter` scope controls how [Shifter](https://docs.nersc.gov/programming/shifter/overview/) containers are executed by Nextflow.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-shifter)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#shifter)
             """;
     }
 

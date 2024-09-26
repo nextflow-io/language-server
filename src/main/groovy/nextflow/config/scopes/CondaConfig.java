@@ -33,7 +33,7 @@ public class CondaConfig implements ConfigScope {
         return """
             The `conda` scope controls the creation of Conda environments by the Conda package manager.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-conda)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#conda)
             """;
     }
 

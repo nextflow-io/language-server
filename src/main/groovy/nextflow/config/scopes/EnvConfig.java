@@ -31,7 +31,7 @@ public class EnvConfig implements ConfigScope {
         return """
             The `env` scope allows you to define environment variables that will be exported into the environment where workflow tasks are executed.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-env)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#env)
             """;
     }
 

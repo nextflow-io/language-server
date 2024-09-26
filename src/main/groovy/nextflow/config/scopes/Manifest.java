@@ -32,7 +32,7 @@ public class Manifest implements ConfigScope {
         return """
             The `manifest` scope allows you to define some metadata that is useful when publishing or running your pipeline.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-manifest)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#manifest)
             """;
     }
 

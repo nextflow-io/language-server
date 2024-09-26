@@ -25,14 +25,14 @@ import nextflow.script.dsl.Function
 @DslType('''
     The `Channel` type provides the channel factory methods.
 
-    [Read more](https://nextflow.io/docs/latest/channel.html)
+    [Read more](https://nextflow.io/docs/latest/reference/channel.html)
 ''')
 class Channel {
 
     @Function('''
         Create a channel that emits nothing.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#empty)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#empty)
     ''')
     static DataflowWriteChannel empty() {
     }
@@ -41,7 +41,7 @@ class Channel {
     @Function('''
         Create a channel that emits each argument.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#from)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
     ''')
     static DataflowWriteChannel from(Object... values) {
     }
@@ -50,7 +50,7 @@ class Channel {
     @Function('''
         Create a channel that emits each element in a collection.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#from)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
     ''')
     static DataflowWriteChannel from(Collection values) {
     }
@@ -60,7 +60,7 @@ class Channel {
 
         An optional closure can be used to customize the grouping strategy.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#fromfilepairs)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromfilepairs)
     ''')
     static DataflowWriteChannel fromFilePairs(Map opts = null, pattern, Closure grouping = null) {
     }
@@ -68,7 +68,7 @@ class Channel {
     @Function('''
         Create a channel that emits each element in a collection.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#fromlist)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromlist)
     ''')
     static DataflowWriteChannel fromList(Collection values) {
     }
@@ -76,7 +76,7 @@ class Channel {
     @Function('''
         Create a channel that emits all paths matching a name or glob pattern.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#frompath)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#frompath)
     ''')
     static DataflowWriteChannel fromPath(Map opts = null, pattern) {
     }
@@ -84,7 +84,7 @@ class Channel {
     @Function('''
         Create a channel that queries the [NCBI SRA](https://www.ncbi.nlm.nih.gov/sra) database and emits all FASTQ files matching the given project or accession ids.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#fromsra)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromsra)
     ''')
     static DataflowWriteChannel fromSRA(Map opts = null, query) {
     }
@@ -92,7 +92,7 @@ class Channel {
     @Function('''
         Create a channel that emits each argument.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#of)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#of)
     ''')
     static DataflowWriteChannel of(Object... values) {
     }
@@ -100,7 +100,7 @@ class Channel {
     @Function('''
         Create a channel that emits all values in the given topic.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#topic)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#topic)
     ''')
     static DataflowWriteChannel topic(String name) {
     }
@@ -108,7 +108,7 @@ class Channel {
     @Function('''
         Create a value channel.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#value)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#value)
     ''')
     static DataflowVariable value(obj = null) {
     }
@@ -116,7 +116,7 @@ class Channel {
     @Function('''
         Create a channel that watches for filesystem events for all files matching the given pattern.
 
-        [Read more](https://nextflow.io/docs/latest/channel.html#watchpath)
+        [Read more](https://nextflow.io/docs/latest/reference/channel.html#watchpath)
     ''')
     static DataflowWriteChannel watchPath(filePattern, String events = 'create') {
     }

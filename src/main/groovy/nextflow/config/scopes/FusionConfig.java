@@ -33,7 +33,7 @@ public class FusionConfig implements ConfigScope {
         return """
             The `fusion` scope provides advanced configuration for the use of the [Fusion file system](https://docs.seqera.io/fusion).
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-fusion)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#fusion)
             """;
     }
 

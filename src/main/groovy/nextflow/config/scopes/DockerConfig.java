@@ -32,7 +32,7 @@ public class DockerConfig implements ConfigScope {
         return """
             The `docker` scope controls how [Docker](https://www.docker.com) containers are executed by Nextflow.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-docker)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#docker)
             """;
     }
 

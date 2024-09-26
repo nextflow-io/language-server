@@ -33,7 +33,7 @@ public class SingularityConfig implements ConfigScope {
         return """
             The `singularity` scope controls how [Singularity](https://sylabs.io/singularity/) containers are executed by Nextflow.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-singularity)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#singularity)
             """;
     }
 

@@ -15,46 +15,41 @@
  */
 package nextflow.config.scopes;
 
+import groovy.lang.Closure;
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
-import nextflow.util.Duration;
 
-public class WaveRetryConfig implements ConfigScope {
+public class WorkflowConfig implements ConfigScope {
 
-    public WaveRetryConfig() {}
+    public WorkflowConfig() {}
 
     @Override
     public String name() {
-        return "wave.retryPolicy";
+        return "workflow";
     }
 
     @Override
     public String description() {
         return """
-            The `wave` scope provides advanced configuration for the use of [Wave containers](https://docs.seqera.io/wave).
+            The `workflow` scope provides workflow execution options.
 
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#wave)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#workflow)
             """;
     }
 
     @ConfigOption("""
-        The initial delay when a failing HTTP request is retried (default: `150ms`).
+        When `true`, the pipeline will exit with a non-zero exit code if any failed tasks are ignored using the `ignore` error strategy.
     """)
-    public Duration delay;
+    public boolean failOnIgnore;
 
     @ConfigOption("""
-        The jitter factor used to randomly vary retry delays (default: `0.25`).
+        Specify a closure that will be invoked at the end of a workflow run (including failed runs).
     """)
-    public double jitter;
+    public Closure onComplete;
 
     @ConfigOption("""
-        The max number of attempts a failing HTTP request is retried (default: `5`).
+        Specify a closure that will be invoked if a workflow run is terminated.
     """)
-    public int maxAttempts;
-
-    @ConfigOption("""
-        The max delay when a failing HTTP request is retried (default: `90 seconds`).
-    """)
-    public Duration maxDelay;
+    public Closure onError;
 
 }

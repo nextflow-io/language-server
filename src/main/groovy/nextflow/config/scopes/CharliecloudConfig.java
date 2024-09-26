@@ -33,7 +33,7 @@ public class CharliecloudConfig implements ConfigScope {
         return """
             The `charliecloud` scope controls how [Charliecloud](https://hpc.github.io/charliecloud/) containers are executed by Nextflow.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-charliecloud)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#charliecloud)
             """;
     }
 

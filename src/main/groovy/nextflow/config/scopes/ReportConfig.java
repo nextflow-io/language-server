@@ -32,7 +32,7 @@ public class ReportConfig implements ConfigScope {
         return """
             The `report` scope allows you to configure the workflow [execution report](https://nextflow.io/docs/latest/tracing.html#execution-report).
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-report)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#report)
             """;
     }
 

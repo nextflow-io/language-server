@@ -36,7 +36,7 @@ public class K8sConfig implements ConfigScope {
         return """
             The `k8s` scope controls the deployment and execution of workflow applications in a Kubernetes cluster.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-k8s)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#k8s)
             """;
     }
 

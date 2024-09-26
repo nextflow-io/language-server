@@ -32,7 +32,7 @@ public class WaveBuildConfig implements ConfigScope {
         return """
             The `wave` scope provides advanced configuration for the use of [Wave containers](https://docs.seqera.io/wave).
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-wave)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#wave)
             """;
     }
 

@@ -34,7 +34,7 @@ public class ExecutorConfig implements ConfigScope {
         return """
             The `executor` scope controls various executor behaviors.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-executor)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#executor)
             """;
     }
 

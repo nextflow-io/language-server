@@ -31,7 +31,7 @@ public class ParamsConfig implements ConfigScope {
         return """
             The `params` scope allows you to define parameters that will be accessible in the pipeline script.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-params)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#params)
             """;
     }
 

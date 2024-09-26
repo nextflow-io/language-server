@@ -33,7 +33,7 @@ public class GoogleConfig implements ConfigScope {
         return """
             The `google` scope allows you to configure the interactions with Google Cloud, including Google Cloud Batch and Google Cloud Storage.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-google)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#google)
             """;
     }
 

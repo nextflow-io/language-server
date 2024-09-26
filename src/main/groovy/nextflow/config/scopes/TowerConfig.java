@@ -32,7 +32,7 @@ public class TowerConfig implements ConfigScope {
         return """
             The `tower` scope controls the settings for the [Seqera Platform](https://seqera.io) (formerly Tower Cloud).
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-tower)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#tower)
             """;
     }
 

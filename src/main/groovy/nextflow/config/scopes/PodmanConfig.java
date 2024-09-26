@@ -32,7 +32,7 @@ public class PodmanConfig implements ConfigScope {
         return """
             The `podman` scope controls how [Podman](https://podman.io/) containers are executed by Nextflow.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-podman)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#podman)
             """;
     }
 

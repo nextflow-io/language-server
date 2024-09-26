@@ -33,7 +33,7 @@ public class SpackConfig implements ConfigScope {
         return """
             The `spack` scope controls the creation of a Spack environment by the Spack package manager.
 
-            [Read more](https://nextflow.io/docs/latest/config.html#scope-spack)
+            [Read more](https://nextflow.io/docs/latest/reference/config.html#spack)
             """;
     }
 

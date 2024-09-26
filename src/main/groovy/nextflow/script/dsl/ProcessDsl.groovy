@@ -44,7 +44,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `accelerator` directive allows you to request hardware accelerators (e.g. GPUs) for the task execution.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#accelerator)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#accelerator)
     ''')
     void accelerator(Map value) {
     }
@@ -52,7 +52,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `afterScript` directive allows you to execute a custom (Bash) snippet *after* the task script.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#afterscript)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#afterscript)
     ''')
     void afterScript(String value) {
     }
@@ -60,7 +60,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `arch` directive allows you to define the CPU architecture to build the software used by the task.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#arch)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#arch)
     ''')
     void arch(String value) {
     }
@@ -68,7 +68,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `array` directive allows you to submit tasks as *job arrays* for executors that support it.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#array)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#array)
     ''')
     void array(Integer value) {
     }
@@ -76,7 +76,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `beforeScript` directive allows you to execute a custom (Bash) snippet *before* the task script.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#beforescript)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#beforescript)
     ''')
     void beforeScript(String value) {
     }
@@ -84,7 +84,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `cache` directive allows you to store the process results to a local cache. When the cache is enabled *and* the pipeline is launched with the `-resume` option, any task executions that are already cached will be re-used.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#cache)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#cache)
     ''')
     void cache(String value) {
     }
@@ -92,7 +92,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `clusterOptions` directive allows the usage of any native configuration option accepted by your cluster submit command. You can use it to request non-standard resources or use settings that are specific to your cluster and not supported out of the box by Nextflow.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#clusteroptions)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#clusteroptions)
     ''')
     void clusterOptions(String value) {
     }
@@ -100,7 +100,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `conda` directive allows for the definition of the process dependencies using the [Conda](https://conda.io) package manager.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#conda)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#conda)
     ''')
     void conda(String value) {
     }
@@ -108,7 +108,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `container` directive allows you to execute the process script in a container.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#container)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#container)
     ''')
     void container(String value) {
     }
@@ -116,7 +116,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `containerOptions` directive allows you to specify any container execution option supported by the underlying container engine (ie. Docker, Singularity, etc). This can be useful to provide container settings only for a specific process.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#containeroptions)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#containeroptions)
     ''')
     void containerOptions(String value) {
     }
@@ -124,7 +124,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `cpus` directive allows you to define the number of (logical) CPUs required by each task.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#cpus)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#cpus)
     ''')
     void cpus(Integer value) {
     }
@@ -132,7 +132,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `debug` directive allows you to print the process standard output to Nextflow\'s standard output, i.e. the console. By default this directive is disabled.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#debug)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#debug)
     ''')
     void debug(boolean value) {
     }
@@ -140,7 +140,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `disk` directive allows you to define how much local disk storage the process is allowed to use.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#disk)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#disk)
     ''')
     void disk(MemoryUnit value) {
     }
@@ -148,7 +148,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `errorStrategy` directive allows you to define what to do when a task fails.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#errorstrategy)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#errorstrategy)
     ''')
     void errorStrategy(String value) {
     }
@@ -156,7 +156,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `executor` defines the underlying system where tasks are executed.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#executor)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#executor)
     ''')
     void executor(String value) {
     }
@@ -164,7 +164,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `ext` is a special directive used for custom settings by some executors.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#ext)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#ext)
     ''')
     void ext(Map value) {
     }
@@ -172,7 +172,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `fair` directive, when enabled, guarantees that process outputs will be emitted in the order in which they were received.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#fair)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#fair)
     ''')
     void fair(boolean value) {
     }
@@ -180,7 +180,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `label` directive allows you to annotate a process with a mnemonic identifier of your choice.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#label)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#label)
     ''')
     void label(String value) {
     }
@@ -188,7 +188,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `machineType` directive can be used to specify a predefined Google Compute Platform [machine type](https://cloud.google.com/compute/docs/machine-types) when using the [Google Batch](https://nextflow.io/docs/latest/google.html#cloud-batch) executor.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#machinetype)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#machinetype)
     ''')
     void machineType(String value) {
     }
@@ -196,7 +196,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `maxErrors` directive allows you to specify the maximum number of times a process can fail when using the `retry` or `ignore` error strategy. By default this directive is disabled.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#maxerrors)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#maxerrors)
     ''')
     void maxErrors(int value) {
     }
@@ -204,7 +204,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `maxForks` directive allows you to define the maximum number of tasks (per process) that can be executed in parallel.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#maxforks)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#maxforks)
     ''')
     void maxForks(Integer value) {
     }
@@ -212,7 +212,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `maxRetries` directive allows you to define the maximum number of times a task can be retried when using the `retry` error strategy. By default only one retry is allowed.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#maxretries)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#maxretries)
     ''')
     void maxRetries(int value) {
     }
@@ -220,7 +220,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `maxSubmitAwait` directives allows you to specify how long a task can remain in the submission queue. If a task remains in the queue beyond this time limit, it will fail.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#maxsubmitawait)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#maxsubmitawait)
     ''')
     void maxSubmitAwait(Duration value) {
     }
@@ -228,7 +228,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `memory` directive allows you to define how much memory is required by each task. Can be a string (e.g. `\'8 GB\'`) or a memory unit (e.g. `8.GB`).
 
-        [Read more](https://nextflow.io/docs/latest/process.html#memory)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#memory)
     ''')
     void memory(MemoryUnit value) {
     }
@@ -236,7 +236,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `module` directive allows you to provide software dependencies to a process using [Environment Modules](http://modules.sourceforge.net/).
 
-        [Read more](https://nextflow.io/docs/latest/process.html#module)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#module)
     ''')
     void module(String value) {
     }
@@ -244,7 +244,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `penv` directive allows you to define the parallel environment to be used when submitting a parallel task to the [SGE](https://nextflow.io/docs/latest/executor.html#sge) resource manager.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#penv)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#penv)
     ''')
     void penv(String value) {
     }
@@ -252,7 +252,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `pod` directive allows you to define pod specific settings, such as environment variables, secrets, and config maps, when using the [Kubernetes](https://nextflow.io/docs/latest/kubernetes.html) executor.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#pod)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#pod)
     ''')
     void pod(List value) {
     }
@@ -260,7 +260,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `publishDir` directive allows you to publish the process output files to a directory.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#publishdir)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#publishdir)
     ''')
     void publishDir(List value) {
     }
@@ -268,7 +268,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `queue` directive allows you to specify the queue to which jobs are submitted when using a grid executor.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#queue)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#queue)
     ''')
     void queue(String value) {
     }
@@ -276,7 +276,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `resourceLabels` directive allows you to specify custom name-value pairs which are applied to the compute resources used for the process execution.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#resourcelabels)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#resourcelabels)
     ''')
     void resourceLabels(Map value) {
     }
@@ -284,7 +284,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `resourceLimits` directive allows you to specify environment-specific limits for task resource requests.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#resourcelimits)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#resourcelimits)
     ''')
     void resourceLimits(Map value) {
     }
@@ -292,7 +292,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `scratch` directive allows you to execute each task in a temporary directory that is local to the compute node.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#scratch)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#scratch)
     ''')
     void scratch(String value) {
     }
@@ -308,7 +308,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `shell` directive allows you to define a custom shell command for process scripts. By default, script blocks are executed with `/bin/bash -ue`.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#shell)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#shell)
     ''')
     void shell(String value) {
     }
@@ -316,7 +316,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `spack` directive allows you to provide software dependencies using the [Spack](https://spack.io) package manager.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#spack)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#spack)
     ''')
     void spack(String value) {
     }
@@ -324,7 +324,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `stageInMode` directive defines how input files are staged into the task work directory.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#stageinmode)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#stageinmode)
     ''')
     void stageInMode(String value) {
     }
@@ -332,7 +332,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `stageOutMode` directive defines how output files are staged out from the scratch directory to the task work directory when using the `scratch` directive.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#stageoutmode)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#stageoutmode)
     ''')
     void stageOutMode(String value) {
     }
@@ -340,7 +340,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `storeDir` directive allows you to use an external directory as a *permanent* cache for process outputs.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#storedir)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#storedir)
     ''')
     void storeDir(String value) {
     }
@@ -348,7 +348,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `tag` directive allows you to associate each process execution with a custom label, so that it will be easier to identify in the log file or in a report.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#tag)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#tag)
     ''')
     void tag(String value) {
     }
@@ -356,7 +356,7 @@ class ProcessDirectiveDsl implements DslScope {
     @Function('''
         The `time` directive allows you to define how long a task is allowed to run.
 
-        [Read more](https://nextflow.io/docs/latest/process.html#time)
+        [Read more](https://nextflow.io/docs/latest/reference/process.html#time)
     ''')
     void time(Duration value) {
     }
