@@ -20,7 +20,7 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
-import nextflow.lsp.services.util.CustomFormattingOptions;
+import nextflow.lsp.services.util.FormattingOptions;
 import nextflow.lsp.services.util.Formatter;
 import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.util.Logger;
@@ -67,7 +67,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
     }
 
     @Override
-    public List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options) {
+    public List<? extends TextEdit> formatting(URI uri, FormattingOptions options) {
         if( ast == null ) {
             log.error("ast cache is empty while providing formatting");
             return Collections.emptyList();
@@ -97,7 +97,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         private SourceUnit sourceUnit;
 
-        private CustomFormattingOptions options;
+        private FormattingOptions options;
 
         private ScriptAstCache ast;
 
@@ -105,7 +105,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         private int maxIncludeWidth = 0;
 
-        public Visitor(SourceUnit sourceUnit, CustomFormattingOptions options, ScriptAstCache ast) {
+        public Visitor(SourceUnit sourceUnit, FormattingOptions options, ScriptAstCache ast) {
             this.sourceUnit = sourceUnit;
             this.options = options;
             this.ast = ast;

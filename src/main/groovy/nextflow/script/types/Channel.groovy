@@ -15,6 +15,8 @@
  */
 package nextflow.script.types
 
+import java.nio.file.Path
+
 import groovy.transform.CompileStatic
 import groovyx.gpars.dataflow.DataflowVariable
 import groovyx.gpars.dataflow.DataflowWriteChannel
@@ -43,7 +45,7 @@ class Channel {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
     ''')
-    static DataflowWriteChannel from(Object... values) {
+    static <T> DataflowWriteChannel<T> from(T... values) {
     }
 
     @Deprecated
@@ -52,7 +54,7 @@ class Channel {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
     ''')
-    static DataflowWriteChannel from(Collection values) {
+    static <T> DataflowWriteChannel<T> from(Collection<T> values) {
     }
 
     @Function('''
@@ -70,7 +72,7 @@ class Channel {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromlist)
     ''')
-    static DataflowWriteChannel fromList(Collection values) {
+    static <T> DataflowWriteChannel<T> fromList(Collection<T> values) {
     }
 
     @Function('''
@@ -78,7 +80,7 @@ class Channel {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#frompath)
     ''')
-    static DataflowWriteChannel fromPath(Map opts = null, pattern) {
+    static DataflowWriteChannel<Path> fromPath(Map opts = null, pattern) {
     }
 
     @Function('''
@@ -94,7 +96,7 @@ class Channel {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#of)
     ''')
-    static DataflowWriteChannel of(Object... values) {
+    static <T> DataflowWriteChannel<T> of(T... values) {
     }
 
     @Function('''
@@ -110,7 +112,7 @@ class Channel {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#value)
     ''')
-    static DataflowVariable value(obj = null) {
+    static <T> DataflowVariable<T> value(T obj = null) {
     }
 
     @Function('''
@@ -118,7 +120,7 @@ class Channel {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#watchpath)
     ''')
-    static DataflowWriteChannel watchPath(filePattern, String events = 'create') {
+    static DataflowWriteChannel<Path> watchPath(filePattern, String events = 'create') {
     }
 
 }

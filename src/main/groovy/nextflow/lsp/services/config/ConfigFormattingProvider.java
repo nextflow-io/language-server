@@ -27,7 +27,7 @@ import nextflow.config.v2.ConfigBlockNode;
 import nextflow.config.v2.ConfigIncludeNode;
 import nextflow.config.v2.ConfigNode;
 import nextflow.config.v2.ConfigVisitorSupport;
-import nextflow.lsp.services.util.CustomFormattingOptions;
+import nextflow.lsp.services.util.FormattingOptions;
 import nextflow.lsp.services.util.Formatter;
 import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.util.Logger;
@@ -54,7 +54,7 @@ public class ConfigFormattingProvider implements FormattingProvider {
     }
 
     @Override
-    public List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options) {
+    public List<? extends TextEdit> formatting(URI uri, FormattingOptions options) {
         if( ast == null ) {
             log.error("ast cache is empty while providing formatting");
             return Collections.emptyList();
@@ -84,11 +84,11 @@ public class ConfigFormattingProvider implements FormattingProvider {
 
         private SourceUnit sourceUnit;
 
-        private CustomFormattingOptions options;
+        private FormattingOptions options;
 
         private Formatter fmt;
 
-        public Visitor(SourceUnit sourceUnit, CustomFormattingOptions options) {
+        public Visitor(SourceUnit sourceUnit, FormattingOptions options) {
             this.sourceUnit = sourceUnit;
             this.options = options;
             this.fmt = new Formatter(options);

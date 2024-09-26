@@ -30,7 +30,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.Logger;
-import nextflow.lsp.services.util.CustomFormattingOptions;
+import nextflow.lsp.services.util.FormattingOptions;
 import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.config.ConfigService;
 import nextflow.lsp.services.script.ScriptService;
@@ -356,7 +356,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled();
             var uri = params.getTextDocument().getUri();
-            var options = new CustomFormattingOptions(
+            var options = new FormattingOptions(
                 params.getOptions().getTabSize(),
                 params.getOptions().isInsertSpaces(),
                 harshilAlignment

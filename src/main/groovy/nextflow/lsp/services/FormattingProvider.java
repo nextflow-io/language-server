@@ -18,11 +18,11 @@ package nextflow.lsp.services;
 import java.net.URI;
 import java.util.List;
 
-import nextflow.lsp.services.util.CustomFormattingOptions;
+import nextflow.lsp.services.util.FormattingOptions;
 import org.eclipse.lsp4j.TextEdit;
 
 public interface FormattingProvider {
 
-    List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options);
+    List<? extends TextEdit> formatting(URI uri, FormattingOptions options);
 
 }

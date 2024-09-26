@@ -39,7 +39,7 @@ import nextflow.lsp.compiler.FutureWarning;
 import nextflow.lsp.compiler.RelatedInformationAware;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.file.PathUtils;
-import nextflow.lsp.services.util.CustomFormattingOptions;
+import nextflow.lsp.services.util.FormattingOptions;
 import nextflow.lsp.util.DebouncingExecutor;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
@@ -262,7 +262,7 @@ public abstract class LanguageService {
         return null;
     }
 
-    public List<? extends TextEdit> formatting(URI uri, CustomFormattingOptions options) {
+    public List<? extends TextEdit> formatting(URI uri, FormattingOptions options) {
         var provider = getFormattingProvider();
         if( provider == null )
             return Collections.emptyList();

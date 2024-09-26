@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 import groovy.lang.groovydoc.Groovydoc;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTUtils;
-import nextflow.lsp.services.util.CustomFormattingOptions;
+import nextflow.lsp.services.util.FormattingOptions;
 import nextflow.lsp.services.util.Formatter;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.DslType;
@@ -81,7 +81,7 @@ public class ASTNodeStringUtils {
             builder.append("enum ");
         else
             builder.append("class ");
-        builder.append(node.toString(false));
+        builder.append(node.getNameWithoutPackage());
         return builder.toString();
     }
 
@@ -94,7 +94,7 @@ public class ASTNodeStringUtils {
 
     public static String toString(MethodNode node, ASTNodeCache ast) {
         if( node instanceof WorkflowNode wn ) {
-            var fmt = new Formatter(new CustomFormattingOptions(2, true, false));
+            var fmt = new Formatter(new FormattingOptions(2, true, false));
             fmt.append("workflow ");
             fmt.append(wn.isEntry() ? "<entry>" : wn.getName());
             fmt.append("\n\ntake:\n");
@@ -121,7 +121,7 @@ public class ASTNodeStringUtils {
         }
 
         if( node instanceof ProcessNode pn ) {
-            var fmt = new Formatter(new CustomFormattingOptions(2, true, false));
+            var fmt = new Formatter(new FormattingOptions(2, true, false));
             fmt.append("process ");
             fmt.append(pn.getName());
             fmt.append("\n\ninput:\n");
@@ -158,7 +158,10 @@ public class ASTNodeStringUtils {
         }
 
         var builder = new StringBuilder();
-        builder.append("def ");
+        if( node.isStatic() ) {
+            builder.append(Formatter.prettyPrintTypeName(node.getDeclaringClass()));
+            builder.append('.');
+        }
         builder.append(node.getName());
         builder.append("(");
         builder.append(toString(node.getParameters(), ast));
@@ -166,7 +169,7 @@ public class ASTNodeStringUtils {
         var returnType = node.getReturnType();
         if( !ClassHelper.OBJECT_TYPE.equals(returnType) ) {
             builder.append(" -> ");
-            builder.append(returnType.toString(false));
+            builder.append(Formatter.prettyPrintTypeName(returnType));
         }
         return builder.toString();
     }
@@ -202,7 +205,7 @@ public class ASTNodeStringUtils {
             : variable.getType();
         if( !ClassHelper.OBJECT_TYPE.equals(type) ) {
             builder.append(": ");
-            builder.append(type.getNameWithoutPackage());
+            builder.append(Formatter.prettyPrintTypeName(type));
         }
         return builder.toString();
     }

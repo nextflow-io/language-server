@@ -66,13 +66,19 @@ import static nextflow.script.v2.ASTHelpers.*;
  */
 public class Formatter extends CodeVisitorSupport {
 
-    private CustomFormattingOptions options;
+    public static String prettyPrintTypeName(ClassNode type) {
+        var fmt = new Formatter(new FormattingOptions(0, false, false));
+        fmt.visitTypeName(type);
+        return fmt.toString();
+    }
+
+    private FormattingOptions options;
 
     private StringBuilder builder = new StringBuilder();
 
     private int indentCount = 0;
 
-    public Formatter(CustomFormattingOptions options) {
+    public Formatter(FormattingOptions options) {
         this.options = options;
     }
 
@@ -596,11 +602,21 @@ public class Formatter extends CodeVisitorSupport {
     }
 
     protected void visitTypeName(ClassNode type) {
-        var isFullyQualified = type.getNodeMetaData(FULLY_QUALIFIED) != null;
-        append(isFullyQualified ? type.getName() : type.getNameWithoutPackage());
+        if( type.isArray() ) {
+            visitTypeName(type.getComponentType());
+            append("...");
+            return;
+        }
+
+        var fullyQualified = type.getNodeMetaData(FULLY_QUALIFIED) != null;
+        var placeholder = type.isGenericsPlaceHolder();
+        var name = fullyQualified
+            ? type.getName()
+            : placeholder ? type.getUnresolvedName() : type.getNameWithoutPackage();
+        append(name);
 
         var genericsTypes = type.getGenericsTypes();
-        if( genericsTypes != null ) {
+        if( !placeholder && genericsTypes != null ) {
             append('<');
             for( int i = 0; i < genericsTypes.length; i++ ) {
                 if( i > 0 )

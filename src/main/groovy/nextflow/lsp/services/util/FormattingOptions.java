@@ -15,7 +15,7 @@
  */
 package nextflow.lsp.services.util;
 
-public record CustomFormattingOptions(
+public record FormattingOptions(
     int tabSize,
     boolean insertSpaces,
     boolean harshilAlignment
