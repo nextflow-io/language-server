@@ -13,10 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.dsl
+package nextflow.script.dsl;
 
-import groovy.transform.CompileStatic
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-@CompileStatic
-class ParamsMap implements DslScope {
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.FIELD)
+public @interface FeatureFlag {
+    String name();
+    String description();
 }
