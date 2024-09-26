@@ -52,6 +52,7 @@ public class ConfigSchema {
         new PluginsConfig(),
         new PodmanConfig(),
         new ProcessConfig(),
+        new ProfilesConfig(),
         new ReportConfig(),
         new ShifterConfig(),
         new SingularityConfig(),

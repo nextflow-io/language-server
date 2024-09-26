@@ -118,7 +118,8 @@ public class ConfigCompletionProvider implements CompletionProvider {
         ConfigSchema.SCOPES.forEach((name, scope) -> {
             if( name.isEmpty() )
                 return;
-            result.add(getConfigScopeDot(name, scope));
+            if( !"profiles".equals(name) )
+                result.add(getConfigScopeDot(name, scope));
             if( !name.contains(".") )
                 result.add(getConfigScopeBlock(name, scope));
         });
