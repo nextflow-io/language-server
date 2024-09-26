@@ -25,7 +25,7 @@ import java.util.Set;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.ast.ASTNodeCache;
-import nextflow.lsp.ast.ASTNodeLookup;
+import nextflow.lsp.ast.ASTParentVisitor;
 import nextflow.lsp.compiler.Compiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
 import nextflow.lsp.compiler.PhaseAware;
@@ -45,40 +45,6 @@ import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.ast.expr.BinaryExpression;
-import org.codehaus.groovy.ast.expr.BitwiseNegationExpression;
-import org.codehaus.groovy.ast.expr.BooleanExpression;
-import org.codehaus.groovy.ast.expr.CastExpression;
-import org.codehaus.groovy.ast.expr.ClassExpression;
-import org.codehaus.groovy.ast.expr.ClosureExpression;
-import org.codehaus.groovy.ast.expr.ConstantExpression;
-import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
-import org.codehaus.groovy.ast.expr.ElvisOperatorExpression;
-import org.codehaus.groovy.ast.expr.FieldExpression;
-import org.codehaus.groovy.ast.expr.GStringExpression;
-import org.codehaus.groovy.ast.expr.ListExpression;
-import org.codehaus.groovy.ast.expr.MapEntryExpression;
-import org.codehaus.groovy.ast.expr.MapExpression;
-import org.codehaus.groovy.ast.expr.MethodCallExpression;
-import org.codehaus.groovy.ast.expr.NotExpression;
-import org.codehaus.groovy.ast.expr.PropertyExpression;
-import org.codehaus.groovy.ast.expr.RangeExpression;
-import org.codehaus.groovy.ast.expr.StaticMethodCallExpression;
-import org.codehaus.groovy.ast.expr.TernaryExpression;
-import org.codehaus.groovy.ast.expr.TupleExpression;
-import org.codehaus.groovy.ast.expr.UnaryMinusExpression;
-import org.codehaus.groovy.ast.expr.UnaryPlusExpression;
-import org.codehaus.groovy.ast.expr.VariableExpression;
-import org.codehaus.groovy.ast.stmt.AssertStatement;
-import org.codehaus.groovy.ast.stmt.BlockStatement;
-import org.codehaus.groovy.ast.stmt.CatchStatement;
-import org.codehaus.groovy.ast.stmt.EmptyStatement;
-import org.codehaus.groovy.ast.stmt.ExpressionStatement;
-import org.codehaus.groovy.ast.stmt.IfStatement;
-import org.codehaus.groovy.ast.stmt.ReturnStatement;
-import org.codehaus.groovy.ast.stmt.ThrowStatement;
-import org.codehaus.groovy.ast.stmt.TryCatchStatement;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
@@ -128,7 +94,7 @@ public class ScriptAstCache extends ASTNodeCache {
     protected Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit) {
         var visitor = new Visitor(sourceUnit);
         visitor.visit();
-        return visitor.getLookup().getParents();
+        return visitor.getParents();
     }
 
     @Override
@@ -273,7 +239,7 @@ public class ScriptAstCache extends ASTNodeCache {
 
         private SourceUnit sourceUnit;
 
-        private ASTNodeLookup lookup = new ASTNodeLookup();
+        private ASTParentVisitor lookup = new ASTParentVisitor();
 
         public Visitor(SourceUnit sourceUnit) {
             this.sourceUnit = sourceUnit;
@@ -290,15 +256,15 @@ public class ScriptAstCache extends ASTNodeCache {
                 super.visit(sn);
         }
 
-        public ASTNodeLookup getLookup() {
-            return lookup;
+        public Map<ASTNode, ASTNode> getParents() {
+            return lookup.getParents();
         }
 
         @Override
         public void visitFeatureFlag(FeatureFlagNode node) {
             lookup.push(node);
             try {
-                visit(node.value);
+                lookup.visit(node.value);
             }
             finally {
                 lookup.pop();
@@ -309,7 +275,7 @@ public class ScriptAstCache extends ASTNodeCache {
         public void visitInclude(IncludeNode node) {
             lookup.push(node);
             try {
-                visit(node.source);
+                lookup.visit(node.source);
                 for( var module : node.modules )
                     visitIncludeVariable(module);
             }
@@ -353,7 +319,10 @@ public class ScriptAstCache extends ASTNodeCache {
         public void visitWorkflow(WorkflowNode node) {
             lookup.push(node);
             try {
-                super.visitWorkflow(node);
+                lookup.visit(node.takes);
+                lookup.visit(node.main);
+                lookup.visit(node.emits);
+                lookup.visit(node.publishers);
             }
             finally {
                 lookup.pop();
@@ -364,7 +333,12 @@ public class ScriptAstCache extends ASTNodeCache {
         public void visitProcess(ProcessNode node) {
             lookup.push(node);
             try {
-                super.visitProcess(node);
+                lookup.visit(node.directives);
+                lookup.visit(node.inputs);
+                lookup.visit(node.outputs);
+                lookup.visit(node.when);
+                lookup.visit(node.exec);
+                lookup.visit(node.stub);
             }
             finally {
                 lookup.pop();
@@ -376,8 +350,8 @@ public class ScriptAstCache extends ASTNodeCache {
             lookup.push(node);
             try {
                 for( var parameter : node.getParameters() )
-                    visitParameter(parameter);
-                visit(node.getCode());
+                    lookup.visitParameter(parameter);
+                lookup.visit(node.getCode());
             }
             finally {
                 lookup.pop();
@@ -388,389 +362,7 @@ public class ScriptAstCache extends ASTNodeCache {
         public void visitOutput(OutputNode node) {
             lookup.push(node);
             try {
-                super.visitOutput(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        // statements
-
-        @Override
-        public void visitBlockStatement(BlockStatement node) {
-            lookup.push(node);
-            try {
-                super.visitBlockStatement(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitIfElse(IfStatement node) {
-            lookup.push(node);
-            try {
-                super.visitIfElse(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitExpressionStatement(ExpressionStatement node) {
-            lookup.push(node);
-            try {
-                super.visitExpressionStatement(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitReturnStatement(ReturnStatement node) {
-            lookup.push(node);
-            try {
-                super.visitReturnStatement(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitAssertStatement(AssertStatement node) {
-            lookup.push(node);
-            try {
-                super.visitAssertStatement(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitTryCatchFinally(TryCatchStatement node) {
-            lookup.push(node);
-            try {
-                super.visitTryCatchFinally(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitThrowStatement(ThrowStatement node) {
-            lookup.push(node);
-            try {
-                super.visitThrowStatement(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitCatchStatement(CatchStatement node) {
-            lookup.push(node);
-            try {
-                super.visitCatchStatement(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitEmptyStatement(EmptyStatement node) {
-            lookup.push(node);
-            try {
-                super.visitEmptyStatement(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        // expressions
-
-        @Override
-        public void visitMethodCallExpression(MethodCallExpression node) {
-            lookup.push(node);
-            try {
-                super.visitMethodCallExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitStaticMethodCallExpression(StaticMethodCallExpression node) {
-            lookup.push(node);
-            try {
-                super.visitStaticMethodCallExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitConstructorCallExpression(ConstructorCallExpression node) {
-            lookup.push(node);
-            try {
-                super.visitConstructorCallExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitTernaryExpression(TernaryExpression node) {
-            lookup.push(node);
-            try {
-                super.visitTernaryExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitShortTernaryExpression(ElvisOperatorExpression node) {
-            lookup.push(node);
-            try {
-                // see CodeVisitorSupport::visitShortTernaryExpression()
-                super.visitTernaryExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitBinaryExpression(BinaryExpression node) {
-            lookup.push(node);
-            try {
-                super.visitBinaryExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitBooleanExpression(BooleanExpression node) {
-            lookup.push(node);
-            try {
-                super.visitBooleanExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitClosureExpression(ClosureExpression node) {
-            lookup.push(node);
-            try {
-                var parameters = node.getParameters();
-                if( parameters != null ) {
-                    for( var parameter : parameters )
-                        visitParameter(parameter);
-                }
-                super.visitClosureExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        protected void visitParameter(Parameter node) {
-            lookup.push(node);
-            try {
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitTupleExpression(TupleExpression node) {
-            lookup.push(node);
-            try {
-                super.visitTupleExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitMapExpression(MapExpression node) {
-            lookup.push(node);
-            try {
-                super.visitMapExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitMapEntryExpression(MapEntryExpression node) {
-            lookup.push(node);
-            try {
-                super.visitMapEntryExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitListExpression(ListExpression node) {
-            lookup.push(node);
-            try {
-                super.visitListExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitRangeExpression(RangeExpression node) {
-            lookup.push(node);
-            try {
-                super.visitRangeExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitPropertyExpression(PropertyExpression node) {
-            lookup.push(node);
-            try {
-                super.visitPropertyExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitFieldExpression(FieldExpression node) {
-            lookup.push(node);
-            try {
-                super.visitFieldExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitConstantExpression(ConstantExpression node) {
-            lookup.push(node);
-            try {
-                super.visitConstantExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitClassExpression(ClassExpression node) {
-            lookup.push(node);
-            try {
-                super.visitClassExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitVariableExpression(VariableExpression node) {
-            lookup.push(node);
-            try {
-                super.visitVariableExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitGStringExpression(GStringExpression node) {
-            lookup.push(node);
-            try {
-                super.visitGStringExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitNotExpression(NotExpression node) {
-            lookup.push(node);
-            try {
-                super.visitNotExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitUnaryMinusExpression(UnaryMinusExpression node) {
-            lookup.push(node);
-            try {
-                super.visitUnaryMinusExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitUnaryPlusExpression(UnaryPlusExpression node) {
-            lookup.push(node);
-            try {
-                super.visitUnaryPlusExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitBitwiseNegationExpression(BitwiseNegationExpression node) {
-            lookup.push(node);
-            try {
-                super.visitBitwiseNegationExpression(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitCastExpression(CastExpression node) {
-            lookup.push(node);
-            try {
-                super.visitCastExpression(node);
+                lookup.visit(node.body);
             }
             finally {
                 lookup.pop();
