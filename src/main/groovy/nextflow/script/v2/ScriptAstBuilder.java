@@ -95,6 +95,7 @@ import org.codehaus.groovy.syntax.Types;
 
 import static nextflow.antlr.ScriptParser.*;
 import static nextflow.antlr.PositionConfigureUtils.ast;
+import static org.codehaus.groovy.ast.expr.VariableExpression.THIS_EXPRESSION;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
 /**
@@ -433,7 +434,7 @@ public class ScriptAstBuilder {
         var expression = stmtX.getExpression();
         if( expression instanceof VariableExpression ve ) {
             var method = ast( constX(ve.getName()), ve );
-            var call = ast( callX(varX("this"), method, new ArgumentListExpression()), stmtX );
+            var call = ast( callX(THIS_EXPRESSION, method, new ArgumentListExpression()), stmtX );
             stmtX.setExpression(call);
             return stmtX;
         }
@@ -443,7 +444,7 @@ public class ScriptAstBuilder {
             var method = ast( constX(left.getName()), left );
             var value = (Expression) ast( new UnaryMinusExpression(binary.getRightExpression()), binary.getRightExpression() );
             var arguments = ast( args(value), value );
-            var call = ast( callX(varX("this"), method, arguments), stmtX );
+            var call = ast( callX(THIS_EXPRESSION, method, arguments), stmtX );
             stmtX.setExpression(call);
             return stmtX;
         }
@@ -1422,7 +1423,7 @@ public class ScriptAstBuilder {
     }
 
     private Expression thisMethodCall(Expression caller, Expression arguments) {
-        var object = varX("this");
+        var object = THIS_EXPRESSION;
         object.setColumnNumber(caller.getColumnNumber());
         object.setLineNumber(caller.getLineNumber());
 

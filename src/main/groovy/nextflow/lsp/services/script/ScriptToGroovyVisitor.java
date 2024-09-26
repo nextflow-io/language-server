@@ -109,8 +109,70 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
     }
 
     @Override
-    public void visitFunction(FunctionNode node) {
-        moduleNode.addMethod(node);
+    public void visitWorkflow(WorkflowNode node) {
+        visitWorkflowTakes(node.takes);
+        visitWorkflowEmits(node.emits, node.main);
+        visitWorkflowPublishers(node.publishers, node.main);
+
+        var bodyDef = stmt(createX(
+            BodyDef.class,
+            args(
+                closureX(node.main),
+                constX(""), // TODO: source code formatting
+                constX("workflow"),
+                new ListExpression() // TODO: variable references (see VariableVisitor)
+            )
+        ));
+        var closure = closureX(block(new VariableScope(), List.of(
+            node.takes,
+            node.emits,
+            bodyDef
+        )));
+        var arguments = node.isEntry()
+            ? args(closure)
+            : args(constX(node.getName()), closure);
+        var result = stmt(callThisX("workflow", arguments));
+        moduleNode.addStatement(result);
+    }
+
+    private void visitWorkflowTakes(Statement takes) {
+        for( var stmt : asBlockStatements(takes) ) {
+            var stmtX = (ExpressionStatement)stmt;
+            var take = (VariableExpression)stmtX.getExpression();
+            stmtX.setExpression(callThisX("_take_", args(constX(take.getName()))));
+        }
+    }
+
+    private void visitWorkflowEmits(Statement emits, Statement main) {
+        var code = (BlockStatement)main;
+        for( var stmt : asBlockStatements(emits) ) {
+            var stmtX = (ExpressionStatement)stmt;
+            var emit = stmtX.getExpression();
+            if( emit instanceof VariableExpression ve ) {
+                stmtX.setExpression(callThisX("_emit_", args(constX(ve.getName()))));
+            }
+            else if( emit instanceof AssignmentExpression assign ) {
+                var left = (VariableExpression)assign.getLeftExpression();
+                stmtX.setExpression(callThisX("_emit_", args(constX(left.getName()))));
+                code.addStatement(stmtX);
+            }
+            else {
+                var target = varX("$out");
+                code.addStatement(assignS(target, emit));
+                stmtX.setExpression(callThisX("_emit_", args(constX(target.getName()))));
+                code.addStatement(stmtX);
+            }
+        }
+    }
+
+    private void visitWorkflowPublishers(Statement publishers, Statement main) {
+        var code = (BlockStatement)main;
+        for( var stmt : asBlockStatements(publishers) ) {
+            var stmtX = (ExpressionStatement)stmt;
+            var publish = (BinaryExpression)stmtX.getExpression();
+            stmtX.setExpression(callThisX("_publish_target", args(publish.getLeftExpression(), publish.getRightExpression())));
+            code.addStatement(stmtX);
+        }
     }
 
     @Override
@@ -241,70 +303,8 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
     }
 
     @Override
-    public void visitWorkflow(WorkflowNode node) {
-        visitWorkflowTakes(node.takes);
-        visitWorkflowEmits(node.emits, node.main);
-        visitWorkflowPublishers(node.publishers, node.main);
-
-        var bodyDef = stmt(createX(
-            BodyDef.class,
-            args(
-                closureX(node.main),
-                constX(""), // TODO: source code formatting
-                constX("workflow"),
-                new ListExpression() // TODO: variable references (see VariableVisitor)
-            )
-        ));
-        var closure = closureX(block(new VariableScope(), List.of(
-            node.takes,
-            node.emits,
-            bodyDef
-        )));
-        var arguments = node.isEntry()
-            ? args(closure)
-            : args(constX(node.getName()), closure);
-        var result = stmt(callThisX("workflow", arguments));
-        moduleNode.addStatement(result);
-    }
-
-    private void visitWorkflowTakes(Statement takes) {
-        for( var stmt : asBlockStatements(takes) ) {
-            var stmtX = (ExpressionStatement)stmt;
-            var take = (VariableExpression)stmtX.getExpression();
-            stmtX.setExpression(callThisX("_take_", args(constX(take.getName()))));
-        }
-    }
-
-    private void visitWorkflowEmits(Statement emits, Statement main) {
-        var code = (BlockStatement)main;
-        for( var stmt : asBlockStatements(emits) ) {
-            var stmtX = (ExpressionStatement)stmt;
-            var emit = stmtX.getExpression();
-            if( emit instanceof VariableExpression ve ) {
-                stmtX.setExpression(callThisX("_emit_", args(constX(ve.getName()))));
-            }
-            else if( emit instanceof AssignmentExpression assign ) {
-                var left = (VariableExpression)assign.getLeftExpression();
-                stmtX.setExpression(callThisX("_emit_", args(constX(left.getName()))));
-                code.addStatement(stmtX);
-            }
-            else {
-                var target = varX("$out");
-                code.addStatement(assignS(target, emit));
-                stmtX.setExpression(callThisX("_emit_", args(constX(target.getName()))));
-                code.addStatement(stmtX);
-            }
-        }
-    }
-
-    private void visitWorkflowPublishers(Statement publishers, Statement main) {
-        var code = (BlockStatement)main;
-        for( var stmt : asBlockStatements(publishers) ) {
-            var stmtX = (ExpressionStatement)stmt;
-            var publish = (BinaryExpression)stmtX.getExpression();
-            stmtX.setExpression(callThisX("_publish_target", args(publish.getLeftExpression(), publish.getRightExpression())));
-            code.addStatement(stmtX);
-        }
+    public void visitFunction(FunctionNode node) {
+        moduleNode.addMethod(node);
     }
 
     @Override

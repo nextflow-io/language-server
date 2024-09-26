@@ -90,6 +90,7 @@ import org.codehaus.groovy.syntax.Types;
 
 import static nextflow.antlr.ConfigParser.*;
 import static nextflow.antlr.PositionConfigureUtils.ast;
+import static org.codehaus.groovy.ast.expr.VariableExpression.THIS_EXPRESSION;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
 /**
@@ -1043,7 +1044,7 @@ public class ConfigAstBuilder {
     }
 
     private Expression thisMethodCall(Expression caller, Expression arguments) {
-        var object = varX("this");
+        var object = THIS_EXPRESSION;
         object.setColumnNumber(caller.getColumnNumber());
         object.setLineNumber(caller.getLineNumber());
 
