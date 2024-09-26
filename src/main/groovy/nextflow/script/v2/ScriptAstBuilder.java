@@ -396,40 +396,31 @@ public class ScriptAstBuilder {
     private Statement processDirectives(ProcessDirectivesContext ctx) {
         if( ctx == null )
             return EmptyStatement.INSTANCE;
-        var statements = ctx.processDirective().stream()
-            .map(this::processDirective)
+        var statements = ctx.statement().stream()
+            .map(this::statement)
+            .map(stmt -> checkDirective(stmt, "Invalid process directive"))
             .collect(Collectors.toList());
         return ast( block(null, statements), ctx );
-    }
-
-    private Statement processDirective(ProcessDirectiveContext ctx) {
-        return checkDirective(statement(ctx.statement()), "Invalid process directive");
     }
 
     private Statement processInputs(ProcessInputsContext ctx) {
         if( ctx == null )
             return EmptyStatement.INSTANCE;
-        var statements = ctx.processDirective().stream()
-            .map(this::processInput)
+        var statements = ctx.statement().stream()
+            .map(this::statement)
+            .map(stmt -> checkDirective(stmt, "Invalid process input"))
             .collect(Collectors.toList());
         return ast( block(null, statements), ctx );
-    }
-
-    private Statement processInput(ProcessDirectiveContext ctx) {
-        return checkDirective(statement(ctx.statement()), "Invalid process input");
     }
 
     private Statement processOutputs(ProcessOutputsContext ctx) {
         if( ctx == null )
             return EmptyStatement.INSTANCE;
-        var statements = ctx.processDirective().stream()
-            .map(this::processOutput)
+        var statements = ctx.statement().stream()
+            .map(this::statement)
+            .map(stmt -> checkDirective(stmt, "Invalid process output"))
             .collect(Collectors.toList());
         return ast( block(null, statements), ctx );
-    }
-
-    private Statement processOutput(ProcessDirectiveContext ctx) {
-        return checkDirective(statement(ctx.statement()), "Invalid process output");
     }
 
     private Statement checkDirective(Statement stmt, String errorMessage) {
@@ -507,17 +498,18 @@ public class ScriptAstBuilder {
 
     private WorkflowNode workflowDef(WorkflowDefContext ctx) {
         var name = ctx.name != null ? ctx.name.getText() : null;
-        var takes = workflowTakes(
-            ctx.body != null ? ctx.body.workflowTakes() : null
-        );
-        var emits = workflowEmits(
-            ctx.body != null ? ctx.body.workflowEmits() : null
-        );
-        var publishers = workflowPublishers(
-            ctx.body != null ? ctx.body.workflowPublishers() : null
-        );
+
+        if( ctx.body == null ) {
+            var result = ast( new WorkflowNode(name, null, null, null, null), ctx );
+            groovydocManager.handle(result, ctx);
+            return result;
+        }
+
+        var takes = workflowTakes(ctx.body.workflowTakes());
+        var emits = workflowEmits(ctx.body.workflowEmits());
+        var publishers = workflowPublishers(ctx.body.workflowPublishers());
         var main = blockStatements(
-            ctx.body != null && ctx.body.workflowMain() != null
+            ctx.body.workflowMain() != null
                 ? ctx.body.workflowMain().blockStatements()
                 : null
         );
@@ -582,37 +574,56 @@ public class ScriptAstBuilder {
         if( ctx == null )
             return EmptyStatement.INSTANCE;
 
-        var statements = ctx.workflowEmit().size() > 0
-            ? ctx.workflowEmit().stream().map(this::workflowEmit).collect(Collectors.toList())
-            : List.of(ast( stmt(expression(ctx.expression())), ctx ));
-        return ast( block(null, statements), ctx );
+        var statements = ctx.statement().stream()
+            .map(this::workflowEmit)
+            .filter(stmt -> stmt != null)
+            .collect(Collectors.toList());
+        var result = ast( block(null, statements), ctx );
+        var hasEmitExpression = statements.stream().anyMatch(this::isEmitExpression);
+        if( hasEmitExpression && statements.size() > 1 )
+            collectSyntaxError(new SyntaxException("Only one emit is allowed with anonymous emit expression", result));
+        return result;
     }
 
-    private Statement workflowEmit(WorkflowEmitContext ctx) {
-        var varX = variableName(ctx.identifier());
-        var emit = ctx.expression() != null
-            ? ast( new AssignmentExpression(varX, expression(ctx.expression())), ctx )
-            : varX;
-        var result = ast( stmt(emit), ctx );
+    private Statement workflowEmit(StatementContext ctx) {
+        var result = statement(ctx);
+        if( !(result instanceof ExpressionStatement) ) {
+            collectSyntaxError(new SyntaxException("Invalid workflow emit", result));
+            return null;
+        }
         saveTrailingComment(result, ctx);
         return result;
+    }
+
+    private boolean isEmitExpression(Statement stmt) {
+        if( stmt instanceof ExpressionStatement es ) {
+            var exp = es.getExpression();
+            return !(exp instanceof VariableExpression || exp instanceof AssignmentExpression);
+        }
+        return false;
     }
 
     private Statement workflowPublishers(WorkflowPublishersContext ctx) {
         if( ctx == null )
             return EmptyStatement.INSTANCE;
 
-        var statements = ctx.workflowPublish().stream()
-            .map(this::workflowPublish)
+        var statements = ctx.statement().stream()
+            .map(this::statement)
+            .map(this::checkWorkflowPublisher)
+            .filter(stmt -> stmt != null)
             .collect(Collectors.toList());
         return ast( block(null, statements), ctx );
     }
 
-    private Statement workflowPublish(WorkflowPublishContext ctx) {
-        var source = expression(ctx.source);
-        var op = token(ctx.op, 2);
-        var target = expression(ctx.target);
-        return ast( stmt(ast( binX(source, op, target), ctx )), ctx );
+    private Statement checkWorkflowPublisher(Statement stmt) {
+        var valid = stmt instanceof ExpressionStatement es
+            && es.getExpression() instanceof BinaryExpression be
+            && be.getOperation().getType() == Types.RIGHT_SHIFT;
+        if( !valid ) {
+            collectSyntaxError(new SyntaxException("Invalid workflow publisher", stmt));
+            return null;
+        }
+        return stmt;
     }
 
     private OutputNode outputDef(OutputDefContext ctx) {
@@ -623,14 +634,11 @@ public class ScriptAstBuilder {
     private Statement outputBody(OutputBodyContext ctx) {
         if( ctx == null )
             return EmptyStatement.INSTANCE;
-        var statements = ctx.outputDirective().stream()
-            .map(this::outputDirective)
+        var statements = ctx.statement().stream()
+            .map(this::statement)
+            .map(stmt -> checkDirective(stmt, "Invalid output directive"))
             .collect(Collectors.toList());
         return ast( block(null, statements), ctx );
-    }
-
-    private Statement outputDirective(OutputDirectiveContext ctx) {
-        return checkDirective(statement(ctx.statement()), "Invalid output directive");
     }
 
     private FunctionNode functionDef(FunctionDefContext ctx) {

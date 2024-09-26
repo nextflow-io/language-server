@@ -165,19 +165,15 @@ processBody
     ;
 
 processDirectives
-    :   processDirective (sep processDirective)*
+    :   statement (sep statement)*
     ;
 
 processInputs
-    :   INPUT COLON nls processDirective (sep processDirective)*
+    :   INPUT COLON nls statement (sep statement)*
     ;
 
 processOutputs
-    :   OUTPUT COLON nls processDirective (sep processDirective)*
-    ;
-
-processDirective
-    :   statement
+    :   OUTPUT COLON nls statement (sep statement)*
     ;
 
 processWhen
@@ -219,20 +215,11 @@ workflowMain
     ;
 
 workflowEmits
-    :   workflowEmit (sep workflowEmit)*
-    |   expression
-    ;
-
-workflowEmit
-    :   identifier (ASSIGN expression)?
+    :   statement (sep statement)*
     ;
 
 workflowPublishers
-    :   workflowPublish (sep workflowPublish)*
-    ;
-
-workflowPublish
-    :   source=expression (op=GT GT) target=expression
+    :   statement (sep statement)*
     ;
 
 // -- output definition
@@ -243,11 +230,7 @@ outputDef
     ;
 
 outputBody
-    :   sep? outputDirective (sep outputDirective)*
-    ;
-
-outputDirective
-    :   statement
+    :   sep? statement (sep statement)*
     ;
 
 // -- function definition
