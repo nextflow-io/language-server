@@ -61,21 +61,27 @@ public class ASTNodeStringUtils {
 
     public static String getLabel(ASTNode node, ASTNodeCache ast) {
         if( node instanceof ClassNode cn )
-            return toString(cn, ast);
+            return classToLabel(cn, ast);
 
         if( node instanceof FeatureFlagNode ffn )
-            return toString(ffn);
+            return featureFlagToLabel(ffn);
+
+        if( node instanceof WorkflowNode wn )
+            return workflowToLabel(wn);
+
+        if( node instanceof ProcessNode pn )
+            return processToLabel(pn);
 
         if( node instanceof MethodNode mn )
-            return toString(mn, ast);
+            return methodToLabel(mn, ast);
 
         if( node instanceof Variable var )
-            return toString(var, ast);
+            return variableToLabel(var, ast);
 
         return null;
     }
 
-    public static String toString(ClassNode node, ASTNodeCache ast) {
+    private static String classToLabel(ClassNode node, ASTNodeCache ast) {
         var builder = new StringBuilder();
         if( node.isEnum() )
             builder.append("enum ");
@@ -85,72 +91,98 @@ public class ASTNodeStringUtils {
         return builder.toString();
     }
 
-    public static String toString(FeatureFlagNode node) {
+    private static String featureFlagToLabel(FeatureFlagNode node) {
         var builder = new StringBuilder();
         builder.append("(feature flag) ");
         builder.append(node.name);
         return builder.toString();
     }
 
-    public static String toString(MethodNode node, ASTNodeCache ast) {
-        if( node instanceof WorkflowNode wn ) {
-            var fmt = new Formatter(new FormattingOptions(2, true, false));
-            fmt.append("workflow ");
-            fmt.append(wn.isEntry() ? "<entry>" : wn.getName());
-            fmt.append("\n\ntake:\n");
-            fmt.incIndent();
-            asBlockStatements(wn.takes).stream().forEach((take) -> {
-                fmt.appendIndent();
-                fmt.append(asVarX(take).getName());
-                fmt.appendNewLine();
-            });
-            fmt.decIndent();
-            fmt.append("\nemit:\n");
-            fmt.incIndent();
-            asBlockStatements(wn.emits).stream().forEach((stmt) -> {
-                var emit = ((ExpressionStatement) stmt).getExpression();
-                fmt.appendIndent();
-                if( emit instanceof AssignmentExpression assign )
-                    fmt.visit(assign.getLeftExpression());
-                else
-                    fmt.visit(emit);
-                fmt.appendNewLine();
-            });
-            fmt.decIndent();
-            return fmt.toString();
+    private static String workflowToLabel(WorkflowNode wn) {
+        if( wn.isEntry() )
+            return "workflow <entry>";
+        var fmt = new Formatter(new FormattingOptions(2, true, false));
+        fmt.append("workflow ");
+        fmt.append(wn.getName());
+        fmt.append(" {\n");
+        fmt.incIndent();
+        fmt.appendIndent();
+        fmt.append("take:\n");
+        var takes = asBlockStatements(wn.takes);
+        if( takes.isEmpty() ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
         }
-
-        if( node instanceof ProcessNode pn ) {
-            var fmt = new Formatter(new FormattingOptions(2, true, false));
-            fmt.append("process ");
-            fmt.append(pn.getName());
-            fmt.append("\n\ninput:\n");
-            fmt.incIndent();
-            asDirectives(pn.inputs).forEach((call) -> {
-                fmt.appendIndent();
-                fmt.append(call.getMethodAsString());
-                fmt.append(' ');
-                fmt.visitArguments(asMethodCallArguments(call), false);
-                fmt.appendNewLine();
-            });
-            fmt.decIndent();
-            fmt.append("\noutput:\n");
-            fmt.incIndent();
-            asDirectives(pn.outputs).forEach((call) -> {
-                fmt.appendIndent();
-                fmt.append(call.getMethodAsString());
-                fmt.append(' ');
-                fmt.visitArguments(asMethodCallArguments(call), false);
-                fmt.appendNewLine();
-            });
-            fmt.decIndent();
-            return fmt.toString();
+        takes.stream().forEach((take) -> {
+            fmt.appendIndent();
+            fmt.append(asVarX(take).getName());
+            fmt.appendNewLine();
+        });
+        fmt.appendNewLine();
+        fmt.appendIndent();
+        fmt.append("emit:\n");
+        var emits = asBlockStatements(wn.emits);
+        if( emits.isEmpty() ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
         }
+        emits.stream().forEach((stmt) -> {
+            var emit = ((ExpressionStatement) stmt).getExpression();
+            fmt.appendIndent();
+            if( emit instanceof AssignmentExpression assign )
+                fmt.visit(assign.getLeftExpression());
+            else
+                fmt.visit(emit);
+            fmt.appendNewLine();
+        });
+        fmt.decIndent();
+        fmt.append('}');
+        return fmt.toString();
+    }
 
+    private static String processToLabel(ProcessNode pn) {
+        var fmt = new Formatter(new FormattingOptions(2, true, false));
+        fmt.append("process ");
+        fmt.append(pn.getName());
+        fmt.append(" {\n");
+        fmt.incIndent();
+        fmt.appendIndent();
+        fmt.append("input:\n");
+        if( asDirectives(pn.inputs).count() == 0 ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+        }
+        asDirectives(pn.inputs).forEach((call) -> {
+            fmt.appendIndent();
+            fmt.append(call.getMethodAsString());
+            fmt.append(' ');
+            fmt.visitArguments(asMethodCallArguments(call), false);
+            fmt.appendNewLine();
+        });
+        fmt.appendNewLine();
+        fmt.appendIndent();
+        fmt.append("output:\n");
+        if( asDirectives(pn.outputs).count() == 0 ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+        }
+        asDirectives(pn.outputs).forEach((call) -> {
+            fmt.appendIndent();
+            fmt.append(call.getMethodAsString());
+            fmt.append(' ');
+            fmt.visitArguments(asMethodCallArguments(call), false);
+            fmt.appendNewLine();
+        });
+        fmt.decIndent();
+        fmt.append('}');
+        return fmt.toString();
+    }
+
+    private static String methodToLabel(MethodNode node, ASTNodeCache ast) {
         var label = getMethodTypeLabel(node);
         if( label != null ) {
             var builder = new StringBuilder();
-            builder.append("(");
+            builder.append('(');
             builder.append(label);
             builder.append(") ");
             builder.append(node.getName());
@@ -163,9 +195,9 @@ public class ASTNodeStringUtils {
             builder.append('.');
         }
         builder.append(node.getName());
-        builder.append("(");
-        builder.append(toString(node.getParameters(), ast));
-        builder.append(")");
+        builder.append('(');
+        builder.append(parametersToLabel(node.getParameters(), ast));
+        builder.append(')');
         var returnType = node.getReturnType();
         if( !ClassHelper.OBJECT_TYPE.equals(returnType) ) {
             builder.append(" -> ");
@@ -191,13 +223,13 @@ public class ASTNodeStringUtils {
         return null;
     }
 
-    public static String toString(Parameter[] params, ASTNodeCache ast) {
+    private static String parametersToLabel(Parameter[] params, ASTNodeCache ast) {
         return Stream.of(params)
-            .map(param -> toString(param, ast))
+            .map(param -> variableToLabel(param, ast))
             .collect(Collectors.joining(", "));
     }
 
-    public static String toString(Variable variable, ASTNodeCache ast) {
+    private static String variableToLabel(Variable variable, ASTNodeCache ast) {
         var builder = new StringBuilder();
         builder.append(variable.getName());
         var type = variable instanceof ASTNode node
@@ -291,7 +323,7 @@ public class ASTNodeStringUtils {
         if( line.length() == 0 )
             return;
         builder.append(line);
-        builder.append("\n");
+        builder.append('\n');
     }
 
     private static String reformatLine(String line) {
