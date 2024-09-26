@@ -560,6 +560,30 @@ public class ScriptCompletionProvider implements CompletionProvider {
             }
             """
         ));
+        snippets.add(new Snippet(
+            "output",
+            """
+            Output block for configuring publish targets:
+
+            ```nextflow
+            output {
+                'fastq' {
+                    path 'samples'
+                    index {
+                        path 'index.csv'
+                    }
+                }
+            }
+            ```
+
+            [Read more](https://nextflow.io/docs/latest/workflow.html#workflow-output-def)
+            """,
+            """
+            output {
+                $1
+            }
+            """
+        ));
 
         for( var field : FeatureFlagDsl.class.getDeclaredFields() ) {
             var annot = field.getAnnotation(FeatureFlag.class);
