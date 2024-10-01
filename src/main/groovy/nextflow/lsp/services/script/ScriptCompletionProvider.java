@@ -437,7 +437,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         snippets.add(new Snippet(
             "include",
             """
-            Include statement:
+            Include declaration:
 
             ```nextflow
             include { HELLO } from './hello.nf'
@@ -453,8 +453,8 @@ public class ScriptCompletionProvider implements CompletionProvider {
             Function definition:
 
             ```nextflow
-            def hello(name) {
-                println "Hello $name!"
+            def greet(greeting, name) {
+                println "${greeting}, ${name}!"
             }
             ```
 
@@ -519,7 +519,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 input
 
                 main:
-                input | view | output
+                input | view | set { output }
 
                 emit:
                 output
@@ -548,7 +548,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
             ```nextflow
             workflow {
-                Channel.of('Bonjour', 'Ciao', 'Hello', 'Hola') | view { it -> '$it world!' }
+                Channel.of('Bonjour', 'Ciao', 'Hello', 'Hola') | view { v -> "$v world!" }
             }
             ```
 
