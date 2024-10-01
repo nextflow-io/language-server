@@ -29,6 +29,7 @@ import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.Logger;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 import org.eclipse.lsp4j.CompletionItem;
@@ -74,6 +75,9 @@ public class ConfigCompletionProvider implements CompletionProvider {
             return Either.forLeft(TOPLEVEL_ITEMS);
 
         var scope = getCurrentScope(nodeStack);
+        if( scope == null )
+            return Either.forLeft(Collections.emptyList());
+
         var items = scope.isEmpty()
             ? TOPLEVEL_ITEMS
             : getConfigOptions(scope + ".");
@@ -83,6 +87,8 @@ public class ConfigCompletionProvider implements CompletionProvider {
     private String getCurrentScope(List<ASTNode> nodeStack) {
         var names = new ArrayList<String>();
         for( var node : DefaultGroovyMethods.asReversed(nodeStack) ) {
+            if( node instanceof Expression )
+                return null;
             if( node instanceof ConfigBlockNode block && block.kind == null )
                 names.add(block.name);
         }
