@@ -161,7 +161,10 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         }
         var otherMethods = cn.getDeclaredMethods(name);
         if( otherMethods.size() > 0 ) {
-            addError("`" + name + "` is already declared", mn, "First declared here", otherMethods.get(0));
+            var other = otherMethods.get(0);
+            var first = mn.getLineNumber() < other.getLineNumber() ? mn : other;
+            var second = mn.getLineNumber() < other.getLineNumber() ? other : mn;
+            addError("`" + name + "` is already declared", second, "First declared here", first);
             return;
         }
         cn.addMethod(mn);
