@@ -405,8 +405,8 @@ public class ScriptFormattingProvider implements FormattingProvider {
                     width = ve.getName().length();
                 }
                 else if( emit instanceof AssignmentExpression assign ) {
-                    var ve = (VariableExpression)assign.getLeftExpression();
-                    width = ve.getName().length();
+                    var target = (VariableExpression)assign.getLeftExpression();
+                    width = target.getName().length();
                 }
 
                 if( maxWidth < width )

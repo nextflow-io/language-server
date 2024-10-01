@@ -121,9 +121,9 @@ public class DataflowVisitor extends ScriptVisitorSupport {
                 result.add(ve.getName());
             }
             else if( emit instanceof AssignmentExpression assign ) {
-                var left = (VariableExpression) assign.getLeftExpression();
+                var target = (VariableExpression) assign.getLeftExpression();
                 visit(emit);
-                result.add(left.getName());
+                result.add(target.getName());
             }
             else {
                 var name = "$out";
@@ -335,8 +335,8 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             return ve.getName();
         }
         else if( emit instanceof AssignmentExpression assign ) {
-            var left = (VariableExpression) assign.getLeftExpression();
-            return left.getName();
+            var target = (VariableExpression) assign.getLeftExpression();
+            return target.getName();
         }
         return null;
     }

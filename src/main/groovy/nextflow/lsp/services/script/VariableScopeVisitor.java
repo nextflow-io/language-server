@@ -21,9 +21,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -109,6 +111,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     private ClassNode paramsType;
 
+    private Set<Variable> declaredVariables = Collections.newSetFromMap(new IdentityHashMap<>());
+
     public VariableScopeVisitor(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
         this.currentScope = new VariableScope();
@@ -140,6 +144,12 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
         // visit top-level definitions
         super.visit(scriptNode);
+
+        // warn about any unused local variables
+        for( var variable : declaredVariables ) {
+            if( variable instanceof ASTNode node )
+                sourceUnit.addWarning("Variable was declared but not used", node);
+        }
     }
 
     private void declareInclude(IncludeNode node) {
@@ -205,10 +215,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( node.main instanceof BlockStatement block )
             copyVariableScope(block.getVariableScope());
 
-        inWorkflowEmit = true;
-        visit(node.emits);
-        inWorkflowEmit = false;
-
+        visitWorkflowEmits(node.emits);
         visit(node.publishers);
 
         currentDefinition = null;
@@ -305,6 +312,28 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( varX == null )
                 continue;
             declare(varX);
+        }
+    }
+
+    private void visitWorkflowEmits(Statement emits) {
+        var declaredEmits = new HashMap<String,ASTNode>();
+        for( var stmt : asBlockStatements(emits) ) {
+            var stmtX = (ExpressionStatement)stmt;
+            var emit = stmtX.getExpression();
+            if( emit instanceof AssignmentExpression assign ) {
+                visit(assign.getRightExpression());
+
+                var target = (VariableExpression)assign.getLeftExpression();
+                var name = target.getName();
+                var other = declaredEmits.get(name);
+                if( other != null )
+                    addError("Workflow emit `" + name + "` is already declared", target, "First declared here", other);
+                else
+                    declaredEmits.put(name, target);
+            }
+            else {
+                visit(emit);
+            }
         }
     }
 
@@ -600,7 +629,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         else if( currentDefinition instanceof ProcessNode || currentDefinition instanceof WorkflowNode ) {
             if( currentClosure != null )
                 addError("Variables in a closure should be declared with `def`", ve);
-            else if( !inWorkflowEmit )
+            else
                 addFutureWarning("Variables should be declared with `def`", ve);
             var scope = currentScope;
             currentScope = currentDefinition.getVariableScope();
@@ -786,6 +815,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             }
         }
         currentScope.putDeclaredVariable(variable);
+        declaredVariables.add(variable);
     }
 
     /**
@@ -835,6 +865,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                 break;
             scope = scope.getParent();
         }
+        declaredVariables.remove(variable);
         return variable;
     }
 

@@ -152,8 +152,8 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
                 stmtX.setExpression(callThisX("_emit_", args(constX(ve.getName()))));
             }
             else if( emit instanceof AssignmentExpression assign ) {
-                var left = (VariableExpression)assign.getLeftExpression();
-                stmtX.setExpression(callThisX("_emit_", args(constX(left.getName()))));
+                var target = (VariableExpression)assign.getLeftExpression();
+                stmtX.setExpression(callThisX("_emit_", args(constX(target.getName()))));
                 code.addStatement(stmtX);
             }
             else {
