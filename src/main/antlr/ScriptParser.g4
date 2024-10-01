@@ -78,33 +78,32 @@ import org.apache.groovy.parser.antlr4.GroovySyntaxError;
 
 
 compilationUnit
-    :   nls (scriptStatement (sep scriptStatement)* sep?)? EOF
+    :   nls (scriptDeclaration (sep scriptDeclaration)* sep?)? EOF
     |   nls workflowMain EOF
     ;
 
 //
-// top-level statements
+// script declarations
 //
-scriptStatement
-    :   topAssignmentStatement      #topAssignmentStmtAlt
-    |   includeStatement            #includeStmtAlt
-    |   importStatement             #importStmtAlt
+scriptDeclaration
+    :   featureFlagOrParam          #featureFlagOrParamAlt
+    |   includeDeclaration          #includeDeclAlt
+    |   importDeclaration           #importDeclAlt
     |   enumDef                     #enumDefAlt
     |   processDef                  #processDefAlt
     |   workflowDef                 #workflowDefAlt
     |   outputDef                   #outputDefAlt
     |   functionDef                 #functionDefAlt
-    |   incompleteScriptStatement   #incompleteScriptStmtAlt
+    |   incompleteScriptDeclaration #incompleteScriptDeclAlt
     ;
 
-// -- top-level assignment (feature flag, param)
-topAssignmentStatement
+// -- feature flag or param declaration
+featureFlagOrParam
     :   identifier (DOT identifier)* nls ASSIGN nls expression
-    |   (DEF | legacyType | DEF legacyType) identifier nls ASSIGN nls expression
     ;
 
-// -- include statement
-includeStatement
+// -- include declaration
+includeDeclaration
     :   INCLUDE includeNames FROM stringLiteral
     ;
 
@@ -117,8 +116,8 @@ includeName
     |   name=identifier AS alias=identifier
     ;
 
-// -- import statement (legacy)
-importStatement
+// -- import declaration (legacy)
+importDeclaration
     :   IMPORT qualifiedClassName
     ;
 
@@ -239,8 +238,8 @@ functionDef
         nls blockStatements? RBRACE
     ;
 
-// -- incomplete script statement
-incompleteScriptStatement
+// -- incomplete script declaration
+incompleteScriptDeclaration
     :   identifier (DOT identifier)* DOT?
     ;
 

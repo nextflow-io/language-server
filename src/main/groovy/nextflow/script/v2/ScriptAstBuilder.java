@@ -189,8 +189,8 @@ public class ScriptAstBuilder {
 
     private ModuleNode compilationUnit(CompilationUnitContext ctx) {
         var extraStatements = new ArrayList<Statement>();
-        for( var stmt : ctx.scriptStatement() )
-            scriptStatement(stmt, extraStatements);
+        for( var stmt : ctx.scriptDeclaration() )
+            scriptDeclaration(stmt, extraStatements);
 
         if( ctx.workflowMain() != null ) {
             var main = blockStatements(ctx.workflowMain().blockStatements());
@@ -241,9 +241,9 @@ public class ScriptAstBuilder {
         }
     }
 
-    private void scriptStatement(ScriptStatementContext ctx, List<Statement> extraStatements) {
-        if( ctx instanceof TopAssignmentStmtAltContext taac ) {
-            var node = topAssignmentStatement(taac.topAssignmentStatement());
+    private void scriptDeclaration(ScriptDeclarationContext ctx, List<Statement> extraStatements) {
+        if( ctx instanceof FeatureFlagOrParamAltContext taac ) {
+            var node = featureFlagOrParam(taac.featureFlagOrParam());
             saveLeadingComments(node, ctx);
             if( node instanceof FeatureFlagNode ffn )
                 moduleNode.addFeatureFlag(ffn);
@@ -263,13 +263,13 @@ public class ScriptAstBuilder {
             moduleNode.addFunction(node);
         }
 
-        else if( ctx instanceof ImportStmtAltContext iac ) {
+        else if( ctx instanceof ImportDeclAltContext iac ) {
             var node = ast( new EmptyStatement(), iac );
-            collectSyntaxError(new SyntaxException("Groovy `import` statements are not supported -- use fully-qualified name inline instead", node));
+            collectSyntaxError(new SyntaxException("Groovy `import` declarations are not supported -- use fully-qualified name inline instead", node));
         }
 
-        else if( ctx instanceof IncludeStmtAltContext iac ) {
-            var node = includeStatement(iac.includeStatement());
+        else if( ctx instanceof IncludeDeclAltContext iac ) {
+            var node = includeDeclaration(iac.includeDeclaration());
             saveLeadingComments(node, ctx);
             moduleNode.addInclude(node);
         }
@@ -299,17 +299,15 @@ public class ScriptAstBuilder {
             moduleNode.addWorkflow(node);
         }
 
-        else if( ctx instanceof IncompleteScriptStmtAltContext iac ) {
-            incompleteScriptStatement(iac.incompleteScriptStatement());
+        else if( ctx instanceof IncompleteScriptDeclAltContext iac ) {
+            incompleteScriptDeclaration(iac.incompleteScriptDeclaration());
         }
 
         else
-            throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
+            throw createParsingFailedException("Invalid script declaration: " + ctx.getText(), ctx);
     }
 
-    private ASTNode topAssignmentStatement(TopAssignmentStatementContext ctx) {
-        checkLegacyType(ctx.legacyType());
-
+    private ASTNode featureFlagOrParam(FeatureFlagOrParamContext ctx) {
         var names = ctx.identifier().stream()
             .map(this::identifier)
             .collect(Collectors.toList());
@@ -328,7 +326,7 @@ public class ScriptAstBuilder {
         }
         else {
             var result = ast( new EmptyStatement(), ctx );
-            collectSyntaxError(new SyntaxException("Invalid top-level statement (hint: move into entry workflow)", result));
+            collectSyntaxError(new SyntaxException("Invalid script declaration (hint: move into entry workflow)", result));
             return result;
         }
     }
@@ -344,7 +342,7 @@ public class ScriptAstBuilder {
         return result;
     }
 
-    private IncludeNode includeStatement(IncludeStatementContext ctx) {
+    private IncludeNode includeDeclaration(IncludeDeclarationContext ctx) {
         var source = ast( constX(stringLiteral(ctx.stringLiteral())), ctx.stringLiteral() );
         var modules = ctx.includeNames().includeName().stream()
             .map(it -> {
@@ -660,9 +658,9 @@ public class ScriptAstBuilder {
         return result;
     }
 
-    private Statement incompleteScriptStatement(IncompleteScriptStatementContext ctx) {
+    private Statement incompleteScriptDeclaration(IncompleteScriptDeclarationContext ctx) {
         var result = ast( new IncompleteNode(ctx.getText()), ctx );
-        collectSyntaxError(new SyntaxException("Incomplete statement", result));
+        collectSyntaxError(new SyntaxException("Incomplete declaration", result));
         return result;
     }
 
