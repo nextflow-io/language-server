@@ -829,6 +829,8 @@ public class ScriptAstBuilder {
     private static final String KEYWORD_WHILE = Types.getText(Types.KEYWORD_WHILE);
 
     private void checkInvalidVarName(String name, ASTNode node) {
+        if( "_".equals(name) )
+            collectSyntaxError(new SyntaxException("`_` is not allowed as an identifier because it is reserved for future use", node));
         if( !GROOVY_KEYWORDS.contains(name) )
             return;
         if( KEYWORD_FOR.equals(name) || KEYWORD_WHILE.equals(name) )
