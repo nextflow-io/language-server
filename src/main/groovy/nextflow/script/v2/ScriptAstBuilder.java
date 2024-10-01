@@ -389,6 +389,11 @@ public class ScriptAstBuilder {
             : blockStatements(ctx.body.processExec().blockStatements());
         var stub = processStub(ctx.body.processStub());
 
+        if( ctx.body.blockStatements() != null ) {
+            if( !(directives instanceof EmptyStatement) || !(inputs instanceof EmptyStatement) || !(outputs instanceof EmptyStatement) )
+                collectSyntaxError(new SyntaxException("The `script:`, `shell:`, or `exec:` label is required when other sections are present", exec));
+        }
+
         var result = ast( new ProcessNode(name, directives, inputs, outputs, when, type, exec, stub), ctx );
         groovydocManager.handle(result, ctx);
         return result;
@@ -582,14 +587,14 @@ public class ScriptAstBuilder {
         var result = ast( block(null, statements), ctx );
         var hasEmitExpression = statements.stream().anyMatch(this::isEmitExpression);
         if( hasEmitExpression && statements.size() > 1 )
-            collectSyntaxError(new SyntaxException("Only one emit is allowed with anonymous emit expression", result));
+            collectSyntaxError(new SyntaxException("Every emit must be assigned to a name when there are multiple emits", result));
         return result;
     }
 
     private Statement workflowEmit(StatementContext ctx) {
         var result = statement(ctx);
         if( !(result instanceof ExpressionStatement) ) {
-            collectSyntaxError(new SyntaxException("Invalid workflow emit", result));
+            collectSyntaxError(new SyntaxException("Invalid workflow emit -- should be a name, assignment, or expression", result));
             return null;
         }
         saveTrailingComment(result, ctx);

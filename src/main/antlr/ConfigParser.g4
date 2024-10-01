@@ -114,7 +114,7 @@ configPrimary
 
 // -- config block
 configBlock
-    :   configPrimary nls LBRACE (nls configBlockStatement)* nls RBRACE
+    :   configPrimary nls LBRACE nls (configBlockStatement (sep configBlockStatement)* sep?)? RBRACE
     ;
 
 configBlockStatement
@@ -127,12 +127,12 @@ configBlockStatement
     ;
 
 configSelector
-    :   kind=Identifier COLON target=configPrimary nls LBRACE nls (configAssignment nls)* RBRACE
+    :   kind=Identifier COLON target=configPrimary nls LBRACE nls (configAssignment (sep configAssignment)* sep?)? RBRACE
     ;
 
 // -- config append block
 configAppendBlock
-    :   configPrimary nls LBRACE (nls configAppendBlockStatement)* nls RBRACE
+    :   configPrimary nls LBRACE nls (configAppendBlockStatement (sep configAppendBlockStatement)* sep?)? RBRACE
     ;
 
 configAppendBlockStatement

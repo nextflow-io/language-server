@@ -151,7 +151,7 @@ processBody
 
     // explicit "Mahesh" form
     |   (sep processDirectives)?
-        sep processInputs
+        (sep processInputs)?
         sep processExec
         (sep processStub)?
         sep processOutputs
@@ -291,7 +291,7 @@ catchTypes
 
 // -- assert statement
 assertStatement
-    :   ASSERT condition=expression (nls (COLON | COMMA) nls message=expression)?
+    :   ASSERT condition=expression (nls COLON nls message=expression)?
     ;
 
 // -- variable declaration
