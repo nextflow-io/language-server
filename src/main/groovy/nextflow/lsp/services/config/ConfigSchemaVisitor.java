@@ -97,7 +97,16 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
 
     @Override
     public void visitConfigInclude(ConfigIncludeNode node) {
-        // TODO: validate embedded config settings in this context?
+        checkConfigInclude(node);
+        super.visitConfigInclude(node);
+    }
+
+    private void checkConfigInclude(ConfigIncludeNode node) {
+        if( scopes.isEmpty() )
+            return;
+        if( scopes.size() == 2 && "profiles".equals(scopes.get(0)) )
+            return;
+        addError("Config includes are only allowed at the top-level or in a profile.", node);
     }
 
     @Override
