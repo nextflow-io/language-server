@@ -733,8 +733,26 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                 variable = new DynamicVariable(name, false);
             }
         }
-        if( variable != null )
+        if( variable != null ) {
+            checkGlobalVariableInProcess(variable, node);
             node.setAccessedVariable(variable);
+        }
+    }
+
+    private static final List<String> WARN_GLOBALS = List.of(
+        "baseDir",
+        "launchDir",
+        "projectDir",
+        "workDir"
+    );
+
+    private void checkGlobalVariableInProcess(Variable variable, ASTNode context) {
+        if( !(currentDefinition instanceof ProcessNode) )
+            return;
+        if( variable instanceof FieldNode fn && fn.getDeclaringClass().getTypeClass() == ScriptDsl.class ) {
+            if( WARN_GLOBALS.contains(variable.getName()) )
+                sourceUnit.addWarning("The use of `" + variable.getName() + "` in a process is discouraged -- input files should be provided as process inputs", context);
+        }
     }
 
     // helpers
