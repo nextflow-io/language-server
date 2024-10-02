@@ -50,7 +50,7 @@ public class ConfigLinkProvider implements LinkProvider {
     @Override
     public List<DocumentLink> documentLink(TextDocumentIdentifier textDocument) {
         if( ast == null ) {
-            log.error("ast cache is empty while peoviding document links");
+            log.error("ast cache is empty while providing document links");
             return Collections.emptyList();
         }
 

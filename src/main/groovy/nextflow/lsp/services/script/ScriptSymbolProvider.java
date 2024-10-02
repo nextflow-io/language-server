@@ -55,7 +55,7 @@ public class ScriptSymbolProvider implements SymbolProvider {
     @Override
     public List<Either<SymbolInformation, DocumentSymbol>> documentSymbol(TextDocumentIdentifier textDocument) {
         if( ast == null ) {
-            log.error("ast cache is empty while peoviding document symbols");
+            log.error("ast cache is empty while providing document symbols");
             return Collections.emptyList();
         }
 
@@ -83,7 +83,7 @@ public class ScriptSymbolProvider implements SymbolProvider {
     @Override
     public List<? extends WorkspaceSymbol> symbol(String query) {
         if( ast == null ) {
-            log.error("ast cache is empty while peoviding workspace symbols");
+            log.error("ast cache is empty while providing workspace symbols");
             return Collections.emptyList();
         }
 

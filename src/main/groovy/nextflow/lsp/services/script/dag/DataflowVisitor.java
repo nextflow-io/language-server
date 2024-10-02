@@ -86,7 +86,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return graphs.get(name);
     }
 
-    // script statements
+    // script declarations
 
     private Graph current;
 

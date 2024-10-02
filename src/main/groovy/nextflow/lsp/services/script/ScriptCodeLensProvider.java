@@ -48,7 +48,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
     @Override
     public List<CodeLens> codeLens(TextDocumentIdentifier textDocument) {
         if( ast == null ) {
-            log.error("ast cache is empty while peoviding code lens");
+            log.error("ast cache is empty while providing code lens");
             return Collections.emptyList();
         }
 

@@ -22,7 +22,7 @@ import org.codehaus.groovy.ast.expr.MethodCallExpression;
 public abstract class ScriptVisitorSupport extends ClassCodeVisitorSupport implements ScriptVisitor {
 
     //--------------------------------------------------------------------------
-    // script statements
+    // script declarations
 
     @Override
     public void visit(ScriptNode script) {

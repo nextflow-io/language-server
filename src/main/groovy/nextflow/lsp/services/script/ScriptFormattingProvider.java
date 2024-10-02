@@ -170,7 +170,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
             return fmt.toString();
         }
 
-        // script statements
+        // script declarations
 
         @Override
         public void visitFeatureFlag(FeatureFlagNode node) {
