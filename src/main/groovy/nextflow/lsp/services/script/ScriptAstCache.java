@@ -15,13 +15,20 @@
  */
 package nextflow.lsp.services.script;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.ast.ASTNodeCache;
@@ -41,13 +48,16 @@ import nextflow.script.v2.ScriptNode;
 import nextflow.script.v2.ScriptParserPluginFactory;
 import nextflow.script.v2.ScriptVisitorSupport;
 import nextflow.script.v2.WorkflowNode;
+import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
 
 /**
@@ -59,6 +69,8 @@ public class ScriptAstCache extends ASTNodeCache {
     private Compiler compiler;
 
     private CompilationUnit compilationUnit;
+
+    private String rootUri;
 
     public ScriptAstCache() {
         var config = createConfiguration();
@@ -78,16 +90,129 @@ public class ScriptAstCache extends ASTNodeCache {
         return config;
     }
 
+    public void initialize(String rootUri) {
+        this.rootUri = rootUri;
+    }
+
     @Override
     protected SourceUnit buildAST(URI uri, FileCache fileCache) {
+        // compile Groovy classes in lib directory
+        var libClasses = getLibClasses();
+
         // phase 1: syntax resolution
         var sourceUnit = compiler.compile(uri, fileCache);
 
         // phase 2: name resolution
         // NOTE: must be done before visiting parents because it transforms nodes
         if( sourceUnit != null )
-            new ResolveVisitor(sourceUnit, compilationUnit).visit();
+            new ResolveVisitor(sourceUnit, compilationUnit, libClasses).visit();
         return sourceUnit;
+    }
+
+    private static class Entry {
+        FileTime lastModified;
+        List<ClassNode> classes;
+
+        Entry(FileTime lastModified) {
+            this.lastModified = lastModified;
+        }
+    }
+
+    private Map<URI,Entry> libCache = new HashMap<>();
+
+    private List<ClassNode> getLibClasses() {
+        // collect Groovy files in lib directory
+        var libDir = Path.of(URI.create(rootUri)).resolve("lib");
+        if( !Files.isDirectory(libDir) )
+            return Collections.emptyList();
+
+        Set<URI> uris;
+        try {
+            uris = Files.walk(libDir)
+                .filter(path -> path.toString().endsWith(".groovy"))
+                .map(path -> path.toUri())
+                .collect(Collectors.toSet());
+        }
+        catch( IOException e ) {
+            System.err.println("Failed to read Groovy source files in lib directory: " + e.toString());
+            return Collections.emptyList();
+        }
+
+        if( uris.isEmpty() )
+            return Collections.emptyList();
+
+        // compile source files
+        var cachedClasses = new ArrayList<ClassNode>();
+        var config = new CompilerConfiguration();
+        config.getOptimizationOptions().put(CompilerConfiguration.GROOVYDOC, true);
+        var classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true);
+        var compilationUnit = new CompilationUnit(config, null, classLoader);
+        for( var uri : uris ) {
+            var lastModified = getLastModified(uri);
+            if( libCache.containsKey(uri) ) {
+                var entry = libCache.get(uri);
+                if( lastModified != null && lastModified.equals(entry.lastModified) ) {
+                    if( entry.classes != null )
+                        cachedClasses.addAll(entry.classes);
+                    continue;
+                }
+            }
+
+            System.err.println("compile " + uri.toString());
+            var sourceUnit = new SourceUnit(
+                    new File(uri),
+                    config,
+                    classLoader,
+                    new LanguageServerErrorCollector(config));
+            compilationUnit.addSource(sourceUnit);
+            libCache.put(uri, new Entry(lastModified));
+        }
+
+        try {
+            compilationUnit.compile(org.codehaus.groovy.control.Phases.CANONICALIZATION);
+        }
+        catch( CompilationFailedException e ) {
+            // ignore
+        }
+        catch( GroovyBugError | Exception e ) {
+            System.err.println("Failed to compile Groovy source files in lib directory -- " + e.toString());
+        }
+
+        // collect class nodes and report errors
+        var result = new ArrayList<ClassNode>();
+        result.addAll(cachedClasses);
+        compilationUnit.iterator().forEachRemaining((sourceUnit) -> {
+            var uri = sourceUnit.getSource().getURI();
+            var errors = sourceUnit.getErrorCollector().getErrors();
+            if( errors != null ) {
+                for( var error : errors ) {
+                    if( !(error instanceof SyntaxErrorMessage) )
+                        continue;
+                    var sem = (SyntaxErrorMessage) error;
+                    var cause = sem.getCause();
+                    System.err.println(String.format("Groovy syntax error in %s -- %s: %s", uri, cause, cause.getMessage()));
+                }
+            }
+
+            var moduleNode = sourceUnit.getAST();
+            if( moduleNode == null )
+                return;
+            result.addAll(moduleNode.getClasses());
+
+            var entry = libCache.get(uri);
+            entry.classes = moduleNode.getClasses();
+        });
+        return result;
+    }
+
+    private FileTime getLastModified(URI uri) {
+        try {
+            return Files.getLastModifiedTime(Path.of(uri));
+        }
+        catch( IOException e ) {
+            System.err.println(String.format("Failed to get last modified time for %s -- %s", uri, e));
+            return null;
+        }
     }
 
     @Override

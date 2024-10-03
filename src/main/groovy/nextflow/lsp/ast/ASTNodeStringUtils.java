@@ -199,7 +199,7 @@ public class ASTNodeStringUtils {
         builder.append(parametersToLabel(node.getParameters(), ast));
         builder.append(')');
         var returnType = node.getReturnType();
-        if( !ClassHelper.OBJECT_TYPE.equals(returnType) ) {
+        if( !ClassHelper.OBJECT_TYPE.equals(returnType) && !ClassHelper.VOID_TYPE.equals(returnType) ) {
             builder.append(" -> ");
             builder.append(Formatter.prettyPrintTypeName(returnType));
         }
@@ -211,7 +211,10 @@ public class ASTNodeStringUtils {
             return null;
         if( findAnnotation(mn, Operator.class).isPresent() )
             return "operator";
-        var type = mn.getDeclaringClass().getTypeClass();
+        var cn = mn.getDeclaringClass();
+        if( cn.isPrimaryClassNode() )
+            return null;
+        var type = cn.getTypeClass();
         if( type == ProcessDirectiveDsl.class )
             return "process directive";
         if( type == ProcessInputDsl.class )
@@ -271,8 +274,12 @@ public class ASTNodeStringUtils {
             return result;
         }
 
-        if( node instanceof MethodNode mn )
-            return annotationValueToMarkdown(mn, Function.class);
+        if( node instanceof MethodNode mn ) {
+            var result = groovydocToMarkdown(mn.getGroovydoc());
+            if( result == null )
+                result = annotationValueToMarkdown(mn, Function.class);
+            return result;
+        }
 
         return null;
     }

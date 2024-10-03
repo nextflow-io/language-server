@@ -46,6 +46,14 @@ public class ScriptService extends LanguageService {
     }
 
     @Override
+    public void initialize(String rootUri, List<String> excludes, boolean suppressFutureWarnings) {
+        synchronized (this) {
+            astCache.initialize(rootUri);
+        }
+        super.initialize(rootUri, excludes, suppressFutureWarnings);
+    }
+
+    @Override
     protected ASTNodeCache getAstCache() {
         return astCache;
     }

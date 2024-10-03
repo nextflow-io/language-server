@@ -16,6 +16,7 @@
 package nextflow.lsp.services.script;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -67,9 +68,12 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
 
     private ClassNodeResolver classNodeResolver = new ClassNodeResolver();
 
-    public ResolveVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
+    private List<ClassNode> libClasses;
+
+    public ResolveVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<ClassNode> libClasses) {
         this.sourceUnit = sourceUnit;
         this.compilationUnit = compilationUnit;
+        this.libClasses = libClasses;
     }
 
     @Override
@@ -176,6 +180,13 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         // resolve from script imports
         var typeName = type.getName();
         for( var cn : ScriptDsl.TYPES ) {
+            if( typeName.equals(cn.getNameWithoutPackage()) || typeName.equals(cn.getName()) ) {
+                type.setRedirect(cn);
+                return true;
+            }
+        }
+        // resolve from lib directory
+        for( var cn : libClasses ) {
             if( typeName.equals(cn.getNameWithoutPackage()) || typeName.equals(cn.getName()) ) {
                 type.setRedirect(cn);
                 return true;
