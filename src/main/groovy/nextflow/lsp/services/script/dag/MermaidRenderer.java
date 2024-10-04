@@ -27,33 +27,19 @@ import java.util.stream.Stream;
 public class MermaidRenderer {
 
     public String render(String name, Graph graph) {
+        var isEntry = name == null;
         var lines = new ArrayList<String>();
         lines.add("flowchart TB");
-
-        if( name != null )
-            lines.add("    subgraph " + name);
+        lines.add(String.format("    subgraph %s", isEntry ? "\" \"" : name));
 
         // prepare inputs and outputs
         var inputs = graph.inputs.values();
         var nodes = graph.nodes.values();
-        var outputs = graph.outputs.stream()
-            .map(v -> graph.getSymbol(v))
-            .collect(Collectors.toList());
-
-        graph.inputs.forEach((input, dn) -> {
-            if( dn == null )
-                System.err.println("missing input: " + input);
-        });
-
-        graph.outputs.forEach((output) -> {
-            var dn = graph.getSymbol(output);
-            if( dn == null )
-                System.err.println("missing output: " + output);
-        });
+        var outputs = graph.outputs.values();
 
         // render inputs
         if( inputs.size() > 0 ) {
-            lines.add("    subgraph \" \"");
+            lines.add(String.format("    subgraph %s", isEntry ? "params" : "take"));
             for( var dn : inputs ) {
                 if( dn == null )
                     continue;
@@ -76,7 +62,7 @@ public class MermaidRenderer {
 
         // render outputs
         if( outputs.size() > 0 ) {
-            lines.add("    subgraph \" \"");
+            lines.add(String.format("    subgraph %s", isEntry ? "publish" : "emit"));
             for( var dn : outputs )
                 lines.add("    " + renderNode(dn.id, dn.label, dn.type));
             lines.add("    end");
@@ -105,8 +91,7 @@ public class MermaidRenderer {
                 lines.add(String.format("    v%d --> v%d", dnPred.id, dn.id));
         }
 
-        if( name != null )
-            lines.add("    end");
+        lines.add("    end");
 
         return String.join("\n", lines);
     }

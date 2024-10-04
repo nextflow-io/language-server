@@ -97,15 +97,18 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         current = new Graph();
         inEntry = node.isEntry();
         var name = node.isEntry() ? "<entry>" : node.getName();
-        visitWorkflowInputs(node, current.inputs);
+        visitWorkflowTakes(node, current.inputs);
         visit(node.main);
-        visitWorkflowOutputs(node, current.outputs);
+        if( node.isEntry() )
+            visitWorkflowPublishers(node, current.outputs);
+        else
+            visitWorkflowEmits(node, current.outputs);
         graphs.put(name, current);
         inEntry = false;
         current = null;
     }
 
-    private void visitWorkflowInputs(WorkflowNode node, Map<String,Node> result) {
+    private void visitWorkflowTakes(WorkflowNode node, Map<String,Node> result) {
         for( var stmt : asBlockStatements(node.takes) ) {
             var name = asVarX(stmt).getName();
             var dn = addNode(name, Node.Type.NAME);
@@ -114,21 +117,38 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         }
     }
 
-    private void visitWorkflowOutputs(WorkflowNode node, Set<String> result) {
+    private void visitWorkflowEmits(WorkflowNode node, Map<String,Node> result) {
         for( var stmt : asBlockStatements(node.emits) ) {
             var emit = ((ExpressionStatement) stmt).getExpression();
+            String name;
             if( emit instanceof VariableExpression ve ) {
-                result.add(ve.getName());
+                name = ve.getName();
             }
             else if( emit instanceof AssignmentExpression assign ) {
                 var target = (VariableExpression) assign.getLeftExpression();
+                name = target.getName();
                 visit(emit);
-                result.add(target.getName());
             }
             else {
-                var name = "$out";
-                visit(assignX(varX(name), emit));
-                result.add(name);
+                name = "$out";
+                visit(new AssignmentExpression(varX(name), emit));
+            }
+            var dn = current.getSymbol(name);
+            if( dn == null )
+                System.err.println("missing emit: " + name);
+            result.put(name, dn);
+        }
+    }
+
+    private void visitWorkflowPublishers(WorkflowNode node, Map<String,Node> result) {
+        for( var stmt : asBlockStatements(node.publishers) ) {
+            var publisher = (BinaryExpression) ((ExpressionStatement) stmt).getExpression();
+            var target = publisher.getRightExpression();
+            if( target instanceof ConstantExpression ce ) {
+                var name = ce.getText();
+                var source = publisher.getLeftExpression();
+                visit(new AssignmentExpression(varX(name), source));
+                result.put(name, current.getSymbol(name));
             }
         }
     }
@@ -143,7 +163,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             if( code != null && !code.getStatements().isEmpty() ) {
                 var target = asVarX(code.getStatements().get(0));
                 if( target != null ) {
-                    visit(assignX(target, node.getObjectExpression()));
+                    visit(new AssignmentExpression(target, node.getObjectExpression()));
                     return;
                 }
             }
@@ -237,12 +257,10 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     @Override
     public void visitPropertyExpression(PropertyExpression node) {
         if( isEntryParam(node) ) {
-            var name = "params." + node.getPropertyAsString();
-            if( !current.inputs.containsKey(name) ) {
-                current.inputs.put(name, null);
-                current.putSymbol(name, addNode(name, Node.Type.NAME));
-            }
-            var dn = current.getSymbol(name);
+            var name = node.getPropertyAsString();
+            if( !current.inputs.containsKey(name) )
+                current.inputs.put(name, addNode(name, Node.Type.NAME));
+            var dn = current.inputs.get(name);
             currentPreds().add(dn);
             return;
         }
@@ -263,6 +281,10 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         }
 
         super.visitPropertyExpression(node);
+    }
+
+    private boolean isEntryParam(PropertyExpression node) {
+        return inEntry && node.getObjectExpression() instanceof VariableExpression ve && "params".equals(ve.getName());
     }
 
     private Tuple3<MethodNode,String,String> asMethodOutput(PropertyExpression node) {
@@ -341,10 +363,6 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return null;
     }
 
-    private boolean isEntryParam(PropertyExpression node) {
-        return inEntry && node.getObjectExpression() instanceof VariableExpression ve && "params".equals(ve.getName());
-    }
-
     @Override
     public void visitVariableExpression(VariableExpression node) {
         var name = node.getName();
@@ -398,7 +416,7 @@ class Graph {
 
     public final Map<Integer,Node> nodes = new HashMap<>();
 
-    public final Set<String> outputs = new HashSet<>();
+    public final Map<String,Node> outputs = new HashMap<>();
 
     private List<Map<String,Node>> scopes = new ArrayList<>();
 
