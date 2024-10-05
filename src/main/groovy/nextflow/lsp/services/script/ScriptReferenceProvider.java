@@ -33,7 +33,6 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.expr.ClassExpression;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
-import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -143,7 +142,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
         if( node instanceof Variable v )
             return v.getName();
 
-        if( node instanceof ClassExpression || node instanceof ConstantExpression || node instanceof VariableExpression )
+        if( node instanceof ClassExpression || node instanceof ConstantExpression )
             return node.getText();
 
         return null;
@@ -224,7 +223,12 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
             return new TextEdit(range, newText);
         }
 
-        if( node instanceof ClassExpression || node instanceof ConstantExpression || node instanceof VariableExpression ) {
+        if( node instanceof Variable v ) {
+            if( oldName.equals(v.getName()) )
+                return new TextEdit(range, newName);
+        }
+
+        if( node instanceof ClassExpression || node instanceof ConstantExpression ) {
             if( oldName.equals(node.getText()) )
                 return new TextEdit(range, newName);
         }
