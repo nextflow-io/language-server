@@ -238,6 +238,8 @@ public class ASTNodeStringUtils {
         var type = variable instanceof ASTNode node
             ? ASTUtils.getTypeOfNode(node, ast)
             : variable.getType();
+        if( type.isArray() )
+            builder.append("...");
         if( !ClassHelper.OBJECT_TYPE.equals(type) ) {
             builder.append(": ");
             builder.append(Formatter.prettyPrintTypeName(type));

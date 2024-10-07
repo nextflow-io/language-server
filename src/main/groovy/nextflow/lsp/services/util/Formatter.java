@@ -604,7 +604,6 @@ public class Formatter extends CodeVisitorSupport {
     protected void visitTypeName(ClassNode type) {
         if( type.isArray() ) {
             visitTypeName(type.getComponentType());
-            append("...");
             return;
         }
 
@@ -613,7 +612,7 @@ public class Formatter extends CodeVisitorSupport {
         var name = fullyQualified
             ? type.getName()
             : placeholder ? type.getUnresolvedName() : type.getNameWithoutPackage();
-        append(name);
+        append(nextflow.script.dsl.Types.normalize(name));
 
         var genericsTypes = type.getGenericsTypes();
         if( !placeholder && genericsTypes != null ) {
