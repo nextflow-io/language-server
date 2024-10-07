@@ -147,7 +147,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
         // warn about any unused local variables
         for( var variable : declaredVariables ) {
-            if( variable instanceof ASTNode node )
+            if( variable instanceof ASTNode node && !variable.getName().startsWith("_") )
                 sourceUnit.addWarning("Variable was declared but not used", node);
         }
     }
