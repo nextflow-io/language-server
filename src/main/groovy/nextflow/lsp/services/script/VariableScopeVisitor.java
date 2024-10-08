@@ -665,7 +665,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var variable = findVariableDeclaration(target.getName(), target);
         if( variable instanceof FieldNode fn && findAnnotation(fn, Constant.class).isPresent() ) {
             if( "params".equals(variable.getName()) )
-                addFutureWarning("Assigning params in the script will not be supported in a future version", target);
+                sourceUnit.addWarning("Params should be declared at the top-level (i.e. outside the workflow)", target);
             // TODO: re-enable after workflow.onComplete bug is fixed
             // else
             //     addError("Built-in variable cannot be mutated", target);

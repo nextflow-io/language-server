@@ -29,11 +29,12 @@ public class ScriptNode extends ModuleNode {
     private String shebang;
     private List<FeatureFlagNode> featureFlags = new ArrayList<>();
     private List<IncludeNode> includes = new ArrayList<>();
-    private List<FunctionNode> functions = new ArrayList<>();
-    private List<ProcessNode> processes = new ArrayList<>();
-    private List<WorkflowNode> workflows = new ArrayList<>();
+    private List<ParamNode> params = new ArrayList<>();
     private WorkflowNode entry;
     private OutputNode output;
+    private List<WorkflowNode> workflows = new ArrayList<>();
+    private List<ProcessNode> processes = new ArrayList<>();
+    private List<FunctionNode> functions = new ArrayList<>();
 
     public ScriptNode(SourceUnit sourceUnit) {
         super(sourceUnit);
@@ -51,16 +52,8 @@ public class ScriptNode extends ModuleNode {
         return includes;
     }
 
-    public List<FunctionNode> getFunctions() {
-        return functions;
-    }
-
-    public List<ProcessNode> getProcesses() {
-        return processes;
-    }
-
-    public List<WorkflowNode> getWorkflows() {
-        return workflows;
+    public List<ParamNode> getParams() {
+        return params;
     }
 
     public WorkflowNode getEntry() {
@@ -69,6 +62,18 @@ public class ScriptNode extends ModuleNode {
 
     public OutputNode getOutput() {
         return output;
+    }
+
+    public List<WorkflowNode> getWorkflows() {
+        return workflows;
+    }
+
+    public List<ProcessNode> getProcesses() {
+        return processes;
+    }
+
+    public List<FunctionNode> getFunctions() {
+        return functions;
     }
 
     public void setShebang(String shebang) {
@@ -83,16 +88,8 @@ public class ScriptNode extends ModuleNode {
         includes.add(includeNode);
     }
 
-    public void addFunction(FunctionNode functionNode) {
-        functions.add(functionNode);
-    }
-
-    public void addProcess(ProcessNode processNode) {
-        processes.add(processNode);
-    }
-
-    public void addWorkflow(WorkflowNode workflowNode) {
-        workflows.add(workflowNode);
+    public void addParam(ParamNode paramNode) {
+        params.add(paramNode);
     }
 
     public void setEntry(WorkflowNode entry) {
@@ -101,5 +98,17 @@ public class ScriptNode extends ModuleNode {
 
     public void setOutput(OutputNode output) {
         this.output = output;
+    }
+
+    public void addWorkflow(WorkflowNode workflowNode) {
+        workflows.add(workflowNode);
+    }
+
+    public void addProcess(ProcessNode processNode) {
+        processes.add(processNode);
+    }
+
+    public void addFunction(FunctionNode functionNode) {
+        functions.add(functionNode);
     }
 }

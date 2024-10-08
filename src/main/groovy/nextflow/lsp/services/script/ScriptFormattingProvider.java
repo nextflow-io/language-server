@@ -31,6 +31,7 @@ import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.IncludeNode;
 import nextflow.script.v2.IncludeVariable;
 import nextflow.script.v2.OutputNode;
+import nextflow.script.v2.ParamNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.ScriptNode;
 import nextflow.script.v2.ScriptVisitorSupport;
@@ -38,6 +39,7 @@ import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.expr.EmptyExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
+import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.EmptyStatement;
@@ -130,6 +132,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
                 visitFeatureFlag(featureFlag);
             for( var includeNode : scriptNode.getIncludes() )
                 visitInclude(includeNode);
+            visitParams(scriptNode.getParams());
             if( scriptNode.getEntry() != null )
                 visitWorkflow(scriptNode.getEntry());
             if( scriptNode.getOutput() != null )
@@ -221,79 +224,29 @@ public class ScriptFormattingProvider implements FormattingProvider {
             fmt.appendNewLine();
         }
 
-        @Override
-        public void visitEnum(ClassNode node) {
-            fmt.appendLeadingComments(node);
-            fmt.append("enum ");
-            fmt.append(node.getName());
-            fmt.append(" {\n");
-            fmt.incIndent();
-            for( var fn : node.getFields() ) {
+        protected void visitParams(List<ParamNode> nodes) {
+            var alignmentWidth = options.harshilAlignment()
+                ? nodes.stream().map(this::getParamWidth).max(Integer::compare).orElse(0)
+                : 0;
+
+            for( var node : nodes ) {
+                fmt.appendLeadingComments(node);
                 fmt.appendIndent();
-                fmt.append(fn.getName());
-                fmt.append(',');
+                fmt.visit(node.target);
+                if( alignmentWidth > 0 ) {
+                    var padding = alignmentWidth - getParamWidth(node);
+                    fmt.append(" ".repeat(padding));
+                }
+                fmt.append(" = ");
+                fmt.visit(node.value);
                 fmt.appendNewLine();
             }
-            fmt.decIndent();
-            fmt.append("}\n");
         }
 
-        @Override
-        public void visitFunction(FunctionNode node) {
-            fmt.appendLeadingComments(node);
-            fmt.append("def ");
-            fmt.append(node.getName());
-            fmt.append('(');
-            fmt.visitParameters(node.getParameters());
-            fmt.append(") {\n");
-            fmt.incIndent();
-            fmt.visit(node.getCode());
-            fmt.decIndent();
-            fmt.append("}\n");
-        }
-
-        @Override
-        public void visitProcess(ProcessNode node) {
-            fmt.appendLeadingComments(node);
-            fmt.append("process ");
-            fmt.append(node.getName());
-            fmt.append(" {\n");
-            fmt.incIndent();
-            if( node.directives instanceof BlockStatement ) {
-                visitDirectives(node.directives);
-                fmt.appendNewLine();
-            }
-            if( node.inputs instanceof BlockStatement ) {
-                fmt.appendIndent();
-                fmt.append("input:\n");
-                visitDirectives(node.inputs);
-                fmt.appendNewLine();
-            }
-            if( node.outputs instanceof BlockStatement ) {
-                fmt.appendIndent();
-                fmt.append("output:\n");
-                visitDirectives(node.outputs);
-                fmt.appendNewLine();
-            }
-            if( !(node.when instanceof EmptyExpression) ) {
-                fmt.appendIndent();
-                fmt.append("when:\n");
-                fmt.appendIndent();
-                fmt.visit(node.when);
-                fmt.append("\n\n");
-            }
-            fmt.appendIndent();
-            fmt.append(node.type);
-            fmt.append(":\n");
-            fmt.visit(node.exec);
-            if( !(node.stub instanceof EmptyStatement) ) {
-                fmt.appendNewLine();
-                fmt.appendIndent();
-                fmt.append("stub:\n");
-                fmt.visit(node.stub);
-            }
-            fmt.decIndent();
-            fmt.append("}\n");
+        protected int getParamWidth(ParamNode node) {
+            var target = (PropertyExpression) node.target;
+            var name = target.getPropertyAsString();
+            return name != null ? name.length() : 0;
         }
 
         @Override
@@ -413,6 +366,81 @@ public class ScriptFormattingProvider implements FormattingProvider {
                     maxWidth = width;
             }
             return maxWidth;
+        }
+
+        @Override
+        public void visitProcess(ProcessNode node) {
+            fmt.appendLeadingComments(node);
+            fmt.append("process ");
+            fmt.append(node.getName());
+            fmt.append(" {\n");
+            fmt.incIndent();
+            if( node.directives instanceof BlockStatement ) {
+                visitDirectives(node.directives);
+                fmt.appendNewLine();
+            }
+            if( node.inputs instanceof BlockStatement ) {
+                fmt.appendIndent();
+                fmt.append("input:\n");
+                visitDirectives(node.inputs);
+                fmt.appendNewLine();
+            }
+            if( node.outputs instanceof BlockStatement ) {
+                fmt.appendIndent();
+                fmt.append("output:\n");
+                visitDirectives(node.outputs);
+                fmt.appendNewLine();
+            }
+            if( !(node.when instanceof EmptyExpression) ) {
+                fmt.appendIndent();
+                fmt.append("when:\n");
+                fmt.appendIndent();
+                fmt.visit(node.when);
+                fmt.append("\n\n");
+            }
+            fmt.appendIndent();
+            fmt.append(node.type);
+            fmt.append(":\n");
+            fmt.visit(node.exec);
+            if( !(node.stub instanceof EmptyStatement) ) {
+                fmt.appendNewLine();
+                fmt.appendIndent();
+                fmt.append("stub:\n");
+                fmt.visit(node.stub);
+            }
+            fmt.decIndent();
+            fmt.append("}\n");
+        }
+
+        @Override
+        public void visitFunction(FunctionNode node) {
+            fmt.appendLeadingComments(node);
+            fmt.append("def ");
+            fmt.append(node.getName());
+            fmt.append('(');
+            fmt.visitParameters(node.getParameters());
+            fmt.append(") {\n");
+            fmt.incIndent();
+            fmt.visit(node.getCode());
+            fmt.decIndent();
+            fmt.append("}\n");
+        }
+
+        @Override
+        public void visitEnum(ClassNode node) {
+            fmt.appendLeadingComments(node);
+            fmt.append("enum ");
+            fmt.append(node.getName());
+            fmt.append(" {\n");
+            fmt.incIndent();
+            for( var fn : node.getFields() ) {
+                fmt.appendIndent();
+                fmt.append(fn.getName());
+                fmt.append(',');
+                fmt.appendNewLine();
+            }
+            fmt.decIndent();
+            fmt.append("}\n");
         }
 
         @Override

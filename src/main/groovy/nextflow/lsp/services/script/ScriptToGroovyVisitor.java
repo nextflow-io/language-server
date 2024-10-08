@@ -33,6 +33,7 @@ import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.IncludeNode;
 import nextflow.script.v2.OutputNode;
+import nextflow.script.v2.ParamNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.ScriptNode;
 import nextflow.script.v2.ScriptVisitorSupport;
@@ -105,6 +106,12 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
         var include = callThisX("include", args(createX(IncludeDef.class, args(moduleArgs))));
         var from = callX(include, "from", args(node.source));
         node.setExpression(callX(from, "load0", args(varX("params"))));
+        moduleNode.addStatement(node);
+    }
+
+    @Override
+    public void visitParam(ParamNode node) {
+        node.setExpression(assignX(node.target, node.value));
         moduleNode.addStatement(node);
     }
 

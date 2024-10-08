@@ -188,27 +188,14 @@ public class ScriptAstBuilder {
     /// SCRIPT STATEMENTS
 
     private ModuleNode compilationUnit(CompilationUnitContext ctx) {
-        var extraStatements = new ArrayList<Statement>();
         for( var stmt : ctx.scriptDeclaration() )
-            scriptDeclaration(stmt, extraStatements);
+            scriptDeclaration(stmt);
 
         if( ctx.workflowMain() != null ) {
             var main = blockStatements(ctx.workflowMain().blockStatements());
             var workflowNode = workflowDef(main);
             moduleNode.addWorkflow(workflowNode);
             moduleNode.setEntry(workflowNode);
-        }
-
-        if( !extraStatements.isEmpty() ) {
-            if( moduleNode.getEntry() == null ) {
-                var main = block(new VariableScope(), Collections.emptyList());
-                moduleNode.setEntry(workflowDef(main));
-            }
-            var entry = moduleNode.getEntry();
-            var main = (BlockStatement) entry.main;
-            var statements = main.getStatements();
-            for( var extra : DefaultGroovyMethods.asReversed(extraStatements) )
-                statements.add(0, extra);
         }
 
         var scriptClassNode = moduleNode.getScriptClassDummy();
@@ -241,14 +228,14 @@ public class ScriptAstBuilder {
         }
     }
 
-    private void scriptDeclaration(ScriptDeclarationContext ctx, List<Statement> extraStatements) {
-        if( ctx instanceof FeatureFlagOrParamAltContext taac ) {
-            var node = featureFlagOrParam(taac.featureFlagOrParam());
+    private void scriptDeclaration(ScriptDeclarationContext ctx) {
+        if( ctx instanceof FeatureFlagOrParamAltContext ffpac ) {
+            var node = featureFlagOrParam(ffpac.featureFlagOrParam());
             saveLeadingComments(node, ctx);
             if( node instanceof FeatureFlagNode ffn )
                 moduleNode.addFeatureFlag(ffn);
-            else if( node instanceof ExpressionStatement es )
-                extraStatements.add(es);
+            else if( node instanceof ParamNode pn )
+                moduleNode.addParam(pn);
         }
 
         else if( ctx instanceof EnumDefAltContext edac ) {
@@ -321,12 +308,12 @@ public class ScriptAstBuilder {
             return result;
         }
         else if( "params".equals(firstName) ) {
-            var left = propertyExpression(ctx.identifier());
-            return stmt(ast( new AssignmentExpression(left, value), ctx ));
+            var target = propertyExpression(ctx.identifier());
+            return ast( new ParamNode(target, value), ctx );
         }
         else {
             var result = ast( new EmptyStatement(), ctx );
-            collectSyntaxError(new SyntaxException("Invalid script declaration (hint: move into entry workflow)", result));
+            collectSyntaxError(new SyntaxException("Statements cannot be mixed with top-level declarations (hint: move into a process or workflow)", result));
             return result;
         }
     }

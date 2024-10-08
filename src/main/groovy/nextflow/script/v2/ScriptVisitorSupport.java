@@ -30,16 +30,18 @@ public abstract class ScriptVisitorSupport extends ClassCodeVisitorSupport imple
             visitFeatureFlag(featureFlag);
         for( var includeNode : script.getIncludes() )
             visitInclude(includeNode);
-        for( var classNode : script.getClasses() ) {
-            if( classNode.isEnum() )
-                visitEnum(classNode);
-        }
+        for( var paramNode : script.getParams() )
+            visitParam(paramNode);
         for( var workflowNode : script.getWorkflows() )
             visitWorkflow(workflowNode);
         for( var processNode : script.getProcesses() )
             visitProcess(processNode);
         for( var functionNode : script.getFunctions() )
             visitFunction(functionNode);
+        for( var classNode : script.getClasses() ) {
+            if( classNode.isEnum() )
+                visitEnum(classNode);
+        }
         if( script.getOutput() != null )
             visitOutput(script.getOutput());
     }
@@ -54,9 +56,8 @@ public abstract class ScriptVisitorSupport extends ClassCodeVisitorSupport imple
     }
 
     @Override
-    public void visitEnum(ClassNode node) {
-        for( var fn : node.getFields() )
-            visitField(fn);
+    public void visitParam(ParamNode node) {
+        visit(node.value);
     }
 
     @Override
@@ -80,6 +81,12 @@ public abstract class ScriptVisitorSupport extends ClassCodeVisitorSupport imple
     @Override
     public void visitFunction(FunctionNode node) {
         visit(node.getCode());
+    }
+
+    @Override
+    public void visitEnum(ClassNode node) {
+        for( var fn : node.getFields() )
+            visitField(fn);
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024, Seqera Labs
+ * Copyright 2013-2024, Seqera Labs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,27 +15,21 @@
  */
 package nextflow.script.v2;
 
-import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.GroovyCodeVisitor;
+import org.codehaus.groovy.ast.expr.EmptyExpression;
+import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 
-public interface ScriptVisitor extends GroovyCodeVisitor {
+/**
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public class ParamNode extends ExpressionStatement {
+    public final Expression target;
+    public final Expression value;
 
-    void visit(ScriptNode node);
-
-    void visitFeatureFlag(FeatureFlagNode node);
-
-    void visitInclude(IncludeNode node);
-
-    void visitParam(ParamNode node);
-
-    void visitWorkflow(WorkflowNode node);
-
-    void visitProcess(ProcessNode node);
-
-    void visitFunction(FunctionNode node);
-
-    void visitEnum(ClassNode node);
-
-    void visitOutput(OutputNode node);
-
+    public ParamNode(Expression target, Expression value) {
+        super(EmptyExpression.INSTANCE);
+        this.target = target;
+        this.value = value;
+    }
 }

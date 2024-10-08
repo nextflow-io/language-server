@@ -43,6 +43,7 @@ import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.IncludeNode;
 import nextflow.script.v2.IncludeVariable;
 import nextflow.script.v2.OutputNode;
+import nextflow.script.v2.ParamNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.ScriptNode;
 import nextflow.script.v2.ScriptParserPluginFactory;
@@ -263,11 +264,82 @@ public class ScriptAstCache extends ASTNodeCache {
             .isPresent();
     }
 
+    private List<ScriptNode> getScriptNodes() {
+        var result = new ArrayList<ScriptNode>();
+        for( var sourceUnit : getSourceUnits() ) {
+            if( sourceUnit.getAST() instanceof ScriptNode sn )
+                result.add(sn);
+        }
+        return result;
+    }
+
+    private ScriptNode getScriptNode(URI uri) {
+        return (ScriptNode) getSourceUnit(uri).getAST();
+    }
+
     public List<IncludeNode> getIncludeNodes(URI uri) {
         var scriptNode = getScriptNode(uri);
         if( scriptNode == null )
             return Collections.emptyList();
         return scriptNode.getIncludes();
+    }
+
+    public List<MethodNode> getDefinitions() {
+        var result = new ArrayList<MethodNode>();
+        result.addAll(getFunctionNodes());
+        result.addAll(getProcessNodes());
+        result.addAll(getWorkflowNodes());
+        return result;
+    }
+
+    public List<MethodNode> getDefinitions(URI uri) {
+        var result = new ArrayList<MethodNode>();
+        result.addAll(getFunctionNodes(uri));
+        result.addAll(getProcessNodes(uri));
+        result.addAll(getWorkflowNodes(uri));
+        return result;
+    }
+
+    public List<WorkflowNode> getWorkflowNodes() {
+        var result = new ArrayList<WorkflowNode>();
+        for( var script : getScriptNodes() )
+            result.addAll(script.getWorkflows());
+        return result;
+    }
+
+    public List<WorkflowNode> getWorkflowNodes(URI uri) {
+        var scriptNode = getScriptNode(uri);
+        if( scriptNode == null )
+            return Collections.emptyList();
+        return scriptNode.getWorkflows();
+    }
+
+    public List<ProcessNode> getProcessNodes() {
+        var result = new ArrayList<ProcessNode>();
+        for( var script : getScriptNodes() )
+            result.addAll(script.getProcesses());
+        return result;
+    }
+
+    public List<ProcessNode> getProcessNodes(URI uri) {
+        var scriptNode = getScriptNode(uri);
+        if( scriptNode == null )
+            return Collections.emptyList();
+        return scriptNode.getProcesses();
+    }
+
+    public List<FunctionNode> getFunctionNodes() {
+        var result = new ArrayList<FunctionNode>();
+        for( var script : getScriptNodes() )
+            result.addAll(script.getFunctions());
+        return result;
+    }
+
+    public List<FunctionNode> getFunctionNodes(URI uri) {
+        var scriptNode = getScriptNode(uri);
+        if( scriptNode == null )
+            return Collections.emptyList();
+        return scriptNode.getFunctions();
     }
 
     public List<ClassNode> getEnumNodes() {
@@ -287,77 +359,6 @@ public class ScriptAstCache extends ASTNodeCache {
                 result.add(cn);
         }
         return result;
-    }
-
-    public List<MethodNode> getDefinitions() {
-        var result = new ArrayList<MethodNode>();
-        result.addAll(getFunctionNodes());
-        result.addAll(getProcessNodes());
-        result.addAll(getWorkflowNodes());
-        return result;
-    }
-
-    public List<MethodNode> getDefinitions(URI uri) {
-        var result = new ArrayList<MethodNode>();
-        result.addAll(getFunctionNodes(uri));
-        result.addAll(getProcessNodes(uri));
-        result.addAll(getWorkflowNodes(uri));
-        return result;
-    }
-
-    public List<FunctionNode> getFunctionNodes() {
-        var result = new ArrayList<FunctionNode>();
-        for( var script : getScriptNodes() )
-            result.addAll(script.getFunctions());
-        return result;
-    }
-
-    public List<FunctionNode> getFunctionNodes(URI uri) {
-        var scriptNode = getScriptNode(uri);
-        if( scriptNode == null )
-            return Collections.emptyList();
-        return scriptNode.getFunctions();
-    }
-
-    public List<ProcessNode> getProcessNodes() {
-        var result = new ArrayList<ProcessNode>();
-        for( var script : getScriptNodes() )
-            result.addAll(script.getProcesses());
-        return result;
-    }
-
-    public List<ProcessNode> getProcessNodes(URI uri) {
-        var scriptNode = getScriptNode(uri);
-        if( scriptNode == null )
-            return Collections.emptyList();
-        return scriptNode.getProcesses();
-    }
-
-    public List<WorkflowNode> getWorkflowNodes() {
-        var result = new ArrayList<WorkflowNode>();
-        for( var script : getScriptNodes() )
-            result.addAll(script.getWorkflows());
-        return result;
-    }
-
-    public List<WorkflowNode> getWorkflowNodes(URI uri) {
-        var scriptNode = getScriptNode(uri);
-        if( scriptNode == null )
-            return Collections.emptyList();
-        return scriptNode.getWorkflows();
-    }
-
-    private List<ScriptNode> getScriptNodes() {
-        var result = new ArrayList<ScriptNode>();
-        for( var sourceUnit : getSourceUnits() ) {
-            if( sourceUnit.getAST() instanceof ScriptNode sn )
-                result.add(sn);
-        }
-        return result;
-    }
-
-    private ScriptNode getScriptNode(URI uri) {
-        return (ScriptNode) getSourceUnit(uri).getAST();
     }
 
     private static class Visitor extends ScriptVisitorSupport {
@@ -419,21 +420,10 @@ public class ScriptAstCache extends ASTNodeCache {
         }
 
         @Override
-        public void visitEnum(ClassNode node) {
+        public void visitParam(ParamNode node) {
             lookup.push(node);
             try {
-                super.visitEnum(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitField(FieldNode node) {
-            lookup.push(node);
-            try {
-                super.visitField(node);
+                lookup.visit(node.value);
             }
             finally {
                 lookup.pop();
@@ -477,6 +467,28 @@ public class ScriptAstCache extends ASTNodeCache {
                 for( var parameter : node.getParameters() )
                     lookup.visitParameter(parameter);
                 lookup.visit(node.getCode());
+            }
+            finally {
+                lookup.pop();
+            }
+        }
+
+        @Override
+        public void visitEnum(ClassNode node) {
+            lookup.push(node);
+            try {
+                super.visitEnum(node);
+            }
+            finally {
+                lookup.pop();
+            }
+        }
+
+        @Override
+        public void visitField(FieldNode node) {
+            lookup.push(node);
+            try {
+                super.visitField(node);
             }
             finally {
                 lookup.pop();
