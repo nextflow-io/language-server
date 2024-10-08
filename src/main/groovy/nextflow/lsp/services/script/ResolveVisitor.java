@@ -88,9 +88,13 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         var scriptNode = (ScriptNode) moduleNode;
 
         // initialize variable scopes
-        new VariableScopeVisitor(sourceUnit).visit();
+        var variableScopeVisitor = new VariableScopeVisitor(sourceUnit);
+        variableScopeVisitor.declare();
+        variableScopeVisitor.visit();
 
         // resolve type names
+        for( var paramNode : scriptNode.getParams() )
+            visitParam(paramNode);
         for( var workflowNode : scriptNode.getWorkflows() )
             visitWorkflow(workflowNode);
         for( var processNode : scriptNode.getProcesses() )

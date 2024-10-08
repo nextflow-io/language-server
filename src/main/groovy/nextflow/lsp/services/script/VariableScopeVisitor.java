@@ -124,31 +124,19 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         return sourceUnit;
     }
 
-    public void visit() {
+    public void declare() {
         var moduleNode = sourceUnit.getAST();
-        if( !(moduleNode instanceof ScriptNode) )
-            return;
-        var scriptNode = (ScriptNode) moduleNode;
-
-        // declare top-level names
-        for( var includeNode : scriptNode.getIncludes() )
-            declareInclude(includeNode);
-        for( var workflowNode : scriptNode.getWorkflows() ) {
-            if( !workflowNode.isEntry() )
-                declareMethod(workflowNode);
-        }
-        for( var processNode : scriptNode.getProcesses() )
-            declareMethod(processNode);
-        for( var functionNode : scriptNode.getFunctions() )
-            declareMethod(functionNode);
-
-        // visit top-level definitions
-        super.visit(scriptNode);
-
-        // warn about any unused local variables
-        for( var variable : declaredVariables ) {
-            if( variable instanceof ASTNode node && !variable.getName().startsWith("_") )
-                sourceUnit.addWarning("Variable was declared but not used", node);
+        if( moduleNode instanceof ScriptNode sn ) {
+            for( var includeNode : sn.getIncludes() )
+                declareInclude(includeNode);
+            for( var workflowNode : sn.getWorkflows() ) {
+                if( !workflowNode.isEntry() )
+                    declareMethod(workflowNode);
+            }
+            for( var processNode : sn.getProcesses() )
+                declareMethod(processNode);
+            for( var functionNode : sn.getFunctions() )
+                declareMethod(functionNode);
         }
     }
 
@@ -178,6 +166,20 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             return;
         }
         cn.addMethod(mn);
+    }
+
+    public void visit() {
+        var moduleNode = sourceUnit.getAST();
+        if( moduleNode instanceof ScriptNode sn ) {
+            // visit top-level definitions
+            super.visit(sn);
+
+            // warn about any unused local variables
+            for( var variable : declaredVariables ) {
+                if( variable instanceof ASTNode node && !variable.getName().startsWith("_") )
+                    sourceUnit.addWarning("Variable was declared but not used", node);
+            }
+        }
     }
 
     @Override
