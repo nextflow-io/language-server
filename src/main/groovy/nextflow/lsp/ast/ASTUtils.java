@@ -77,7 +77,7 @@ public class ASTUtils {
             return cce.getType().redirect();
 
         if( node instanceof FeatureFlagNode ffn )
-            return ffn.accessedVariable != null ? ffn : null;
+            return ffn.target != null ? ffn : null;
 
         if( node instanceof IncludeVariable iv )
             return iv.getMethod();

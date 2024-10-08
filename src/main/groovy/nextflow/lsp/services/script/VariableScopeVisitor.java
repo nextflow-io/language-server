@@ -193,7 +193,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             .findFirst();
 
         if( result.isPresent() )
-            node.accessedVariable = result.get();
+            node.target = result.get();
         else
             addError("Unrecognized feature flag '" + node.name + "'", node);
     }

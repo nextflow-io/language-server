@@ -249,7 +249,7 @@ public class ASTNodeStringUtils {
 
     public static String getDocumentation(ASTNode node) {
         if( node instanceof FeatureFlagNode ffn ) {
-            if( ffn.accessedVariable instanceof AnnotatedNode an )
+            if( ffn.target instanceof AnnotatedNode an )
                 return annotationValueToMarkdown(an, FeatureFlag.class, "description");
         }
 

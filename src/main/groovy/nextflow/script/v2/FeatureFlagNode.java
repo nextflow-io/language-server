@@ -27,7 +27,7 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 public class FeatureFlagNode extends ExpressionStatement {
     public final String name;
     public final Expression value;
-    public Variable accessedVariable;
+    public Variable target;
 
     public FeatureFlagNode(String name, Expression value) {
         super(EmptyExpression.INSTANCE);
