@@ -68,7 +68,7 @@ public class ScriptHoverProvider implements HoverProvider {
 
         var builder = new StringBuilder();
 
-        var label = ASTNodeStringUtils.getLabel(defNode, ast);
+        var label = ASTNodeStringUtils.getLabel(defNode);
         if( label != null ) {
             builder.append("```nextflow\n");
             builder.append(label);

@@ -15,13 +15,10 @@
  */
 package nextflow.lsp.ast;
 
-import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import groovy.lang.groovydoc.Groovydoc;
-import nextflow.lsp.ast.ASTNodeCache;
-import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.util.FormattingOptions;
 import nextflow.lsp.services.util.Formatter;
 import nextflow.script.dsl.Constant;
@@ -39,7 +36,6 @@ import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
-import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -59,9 +55,9 @@ import static nextflow.script.v2.ASTHelpers.*;
  */
 public class ASTNodeStringUtils {
 
-    public static String getLabel(ASTNode node, ASTNodeCache ast) {
+    public static String getLabel(ASTNode node) {
         if( node instanceof ClassNode cn )
-            return classToLabel(cn, ast);
+            return classToLabel(cn);
 
         if( node instanceof FeatureFlagNode ffn )
             return featureFlagToLabel(ffn);
@@ -73,20 +69,20 @@ public class ASTNodeStringUtils {
             return processToLabel(pn);
 
         if( node instanceof MethodNode mn )
-            return methodToLabel(mn, ast);
+            return methodToLabel(mn);
 
         if( node instanceof Variable var )
-            return variableToLabel(var, ast);
+            return variableToLabel(var);
 
         return null;
     }
 
-    private static String classToLabel(ClassNode node, ASTNodeCache ast) {
+    private static String classToLabel(ClassNode node) {
         var builder = new StringBuilder();
         if( node.isEnum() )
             builder.append("enum ");
         else
-            builder.append("class ");
+            builder.append("type ");
         builder.append(node.getNameWithoutPackage());
         return builder.toString();
     }
@@ -98,17 +94,17 @@ public class ASTNodeStringUtils {
         return builder.toString();
     }
 
-    private static String workflowToLabel(WorkflowNode wn) {
-        if( wn.isEntry() )
+    private static String workflowToLabel(WorkflowNode node) {
+        if( node.isEntry() )
             return "workflow <entry>";
         var fmt = new Formatter(new FormattingOptions(2, true, false));
         fmt.append("workflow ");
-        fmt.append(wn.getName());
+        fmt.append(node.getName());
         fmt.append(" {\n");
         fmt.incIndent();
         fmt.appendIndent();
         fmt.append("take:\n");
-        var takes = asBlockStatements(wn.takes);
+        var takes = asBlockStatements(node.takes);
         if( takes.isEmpty() ) {
             fmt.appendIndent();
             fmt.append("<none>\n");
@@ -121,7 +117,7 @@ public class ASTNodeStringUtils {
         fmt.appendNewLine();
         fmt.appendIndent();
         fmt.append("emit:\n");
-        var emits = asBlockStatements(wn.emits);
+        var emits = asBlockStatements(node.emits);
         if( emits.isEmpty() ) {
             fmt.appendIndent();
             fmt.append("<none>\n");
@@ -140,19 +136,19 @@ public class ASTNodeStringUtils {
         return fmt.toString();
     }
 
-    private static String processToLabel(ProcessNode pn) {
+    private static String processToLabel(ProcessNode node) {
         var fmt = new Formatter(new FormattingOptions(2, true, false));
         fmt.append("process ");
-        fmt.append(pn.getName());
+        fmt.append(node.getName());
         fmt.append(" {\n");
         fmt.incIndent();
         fmt.appendIndent();
         fmt.append("input:\n");
-        if( asDirectives(pn.inputs).count() == 0 ) {
+        if( asDirectives(node.inputs).count() == 0 ) {
             fmt.appendIndent();
             fmt.append("<none>\n");
         }
-        asDirectives(pn.inputs).forEach((call) -> {
+        asDirectives(node.inputs).forEach((call) -> {
             fmt.appendIndent();
             fmt.append(call.getMethodAsString());
             fmt.append(' ');
@@ -162,11 +158,11 @@ public class ASTNodeStringUtils {
         fmt.appendNewLine();
         fmt.appendIndent();
         fmt.append("output:\n");
-        if( asDirectives(pn.outputs).count() == 0 ) {
+        if( asDirectives(node.outputs).count() == 0 ) {
             fmt.appendIndent();
             fmt.append("<none>\n");
         }
-        asDirectives(pn.outputs).forEach((call) -> {
+        asDirectives(node.outputs).forEach((call) -> {
             fmt.appendIndent();
             fmt.append(call.getMethodAsString());
             fmt.append(' ');
@@ -178,7 +174,7 @@ public class ASTNodeStringUtils {
         return fmt.toString();
     }
 
-    private static String methodToLabel(MethodNode node, ASTNodeCache ast) {
+    private static String methodToLabel(MethodNode node) {
         var label = getMethodTypeLabel(node);
         if( label != null ) {
             var builder = new StringBuilder();
@@ -196,7 +192,7 @@ public class ASTNodeStringUtils {
         }
         builder.append(node.getName());
         builder.append('(');
-        builder.append(parametersToLabel(node.getParameters(), ast));
+        builder.append(parametersToLabel(node.getParameters()));
         builder.append(')');
         var returnType = node.getReturnType();
         if( !ClassHelper.OBJECT_TYPE.equals(returnType) && !ClassHelper.VOID_TYPE.equals(returnType) ) {
@@ -226,17 +222,17 @@ public class ASTNodeStringUtils {
         return null;
     }
 
-    private static String parametersToLabel(Parameter[] params, ASTNodeCache ast) {
+    private static String parametersToLabel(Parameter[] params) {
         return Stream.of(params)
-            .map(param -> variableToLabel(param, ast))
+            .map(param -> variableToLabel(param))
             .collect(Collectors.joining(", "));
     }
 
-    private static String variableToLabel(Variable variable, ASTNodeCache ast) {
+    private static String variableToLabel(Variable variable) {
         var builder = new StringBuilder();
         builder.append(variable.getName());
-        var type = variable instanceof ASTNode node
-            ? ASTUtils.getTypeOfNode(node, ast)
+        var type = variable.getOriginType() != null
+            ? variable.getOriginType()
             : variable.getType();
         if( type.isArray() )
             builder.append("...");
@@ -253,14 +249,14 @@ public class ASTNodeStringUtils {
                 return annotationValueToMarkdown(an, FeatureFlag.class, "description");
         }
 
+        if( node instanceof WorkflowNode wn )
+            return groovydocToMarkdown(wn.getGroovydoc());
+
         if( node instanceof FunctionNode fn )
             return groovydocToMarkdown(fn.getGroovydoc());
 
         if( node instanceof ProcessNode pn )
             return groovydocToMarkdown(pn.getGroovydoc());
-
-        if( node instanceof WorkflowNode wn )
-            return groovydocToMarkdown(wn.getGroovydoc());
 
         if( node instanceof ClassNode cn ) {
             var result = groovydocToMarkdown(cn.getGroovydoc());
