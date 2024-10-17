@@ -122,6 +122,9 @@ public class ScriptAstCache extends ASTNodeCache {
     private Map<URI,Entry> libCache = new HashMap<>();
 
     private List<ClassNode> getLibClasses() {
+        if( rootUri == null )
+            return Collections.emptyList();
+
         // collect Groovy files in lib directory
         var libDir = Path.of(URI.create(rootUri)).resolve("lib");
         if( !Files.isDirectory(libDir) )

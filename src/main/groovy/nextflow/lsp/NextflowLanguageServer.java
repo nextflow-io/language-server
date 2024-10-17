@@ -130,6 +130,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+        addWorkspaceFolder(DEFAULT_WORKSPACE_FOLDER_NAME, null);
+
         var workspaceFolders = params.getWorkspaceFolders();
         if( workspaceFolders != null && !workspaceFolders.isEmpty() ) {
             for( var workspaceFolder : workspaceFolders ) {
@@ -137,9 +139,6 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 var uri = workspaceFolder.getUri();
                 addWorkspaceFolder(name, uri);
             }
-        }
-        else {
-            addWorkspaceFolder(DEFAULT_WORKSPACE_FOLDER_NAME, null);
         }
 
         var serverCapabilities = new ServerCapabilities();
