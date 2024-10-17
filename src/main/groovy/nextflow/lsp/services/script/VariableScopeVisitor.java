@@ -238,6 +238,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var defs = Optional.ofNullable(schemaJson)
             .flatMap(json -> asMap(json))
             .flatMap(json ->
+                json.containsKey("$defs")
+                    ? asMap(json.get("$defs")) :
                 json.containsKey("defs")
                     ? asMap(json.get("defs")) :
                 json.containsKey("definitions")
