@@ -350,8 +350,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         declareProcessInputs(node.inputs);
 
         pushState(ProcessInputDsl.class);
-        checkDirectives(node.inputs, "process input qualifier");
-        visit(node.inputs);
+        visitDirectives(node.inputs, null, "process input qualifier", false);
         popState();
 
         if( !(node.when instanceof EmptyExpression) )
@@ -361,16 +360,12 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         visit(node.exec);
         visit(node.stub);
 
-        pushState(ProcessDirectiveDsl.class);
-        checkDirectives(node.directives, "process directive");
-        visit(node.directives);
-        popState();
+        visitDirectives(node.directives, ProcessDirectiveDsl.class, "process directive", false);
 
         pushState(ProcessOutputDsl.class);
         if( node.exec instanceof BlockStatement block )
             copyVariableScope(block.getVariableScope());
-        checkDirectives(node.outputs, "process output qualifier");
-        visit(node.outputs);
+        visitDirectives(node.outputs, null, "process output qualifier", false);
         popState();
 
         currentDefinition = null;
@@ -416,23 +411,29 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             declare(ve);
     }
 
-    private void checkDirectives(Statement node, String typeLabel, boolean checkSyntaxErrors) {
+    private void visitDirectives(Statement node, Class classScope, String typeLabel, boolean checkSyntaxErrors) {
+        var cn = classScope != null
+            ? ClassHelper.makeCached(classScope)
+            : currentScope.getClassScope();
         for( var stmt : asBlockStatements(node) ) {
-            var call = asMethodCallX(stmt);
-            if( call == null ) {
-                if( checkSyntaxErrors )
-                    addSyntaxError("Invalid " + typeLabel, stmt);
-                continue;
-            }
-            var name = call.getMethodAsString();
-            var variable = findClassMember(currentScope.getClassScope(), name, call.getMethod());
-            if( variable == null )
-                addError("Invalid " + typeLabel + " `" + name + "`", stmt);
+            var call = checkDirective(stmt, cn, typeLabel, checkSyntaxErrors);
+            if( call != null )
+                super.visitMethodCallExpression(call);
         }
     }
 
-    private void checkDirectives(Statement node, String typeLabel) {
-        checkDirectives(node, typeLabel, false);
+    private MethodCallExpression checkDirective(Statement node, ClassNode cn, String typeLabel, boolean checkSyntaxErrors) {
+        var call = asMethodCallX(node);
+        if( call == null ) {
+            if( checkSyntaxErrors )
+                addSyntaxError("Invalid " + typeLabel, node);
+            return null;
+        }
+        var name = call.getMethodAsString();
+        var variable = findClassMember(cn, name, call.getMethod());
+        if( variable == null )
+            addError("Invalid " + typeLabel + " `" + name + "`", node);
+        return call;
     }
 
     private void copyVariableScope(VariableScope source) {
@@ -497,10 +498,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             // treat as target definition
             var code = asDslBlock(call, 1);
             if( code != null ) {
-                pushState(OutputDsl.TargetDsl.class);
-                checkDirectives(code, "output target directive", true);
+                checkDirectives(code, OutputDsl.TargetDsl.class, "output target directive");
                 visitTargetBody(code);
-                popState();
                 return;
             }
 
@@ -517,18 +516,21 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( "index".equals(name) ) {
                 var code = asDslBlock(call, 1);
                 if( code != null ) {
-                    pushState(OutputDsl.IndexDsl.class);
                     code.setVariableScope(null);
-                    checkDirectives(code, "output index directive", true);
-                    visit(code);
-                    popState();
+                    visitDirectives(code, OutputDsl.IndexDsl.class, "output index directive", true);
                     return;
                 }
             }
 
             // treat as regular directive
-            visit(call);
+            super.visitMethodCallExpression(call);
         });
+    }
+
+    private void checkDirectives(Statement node, Class classScope, String typeLabel) {
+        var cn = ClassHelper.makeCached(classScope);
+        for( var stmt : asBlockStatements(node) )
+            checkDirective(stmt, cn, typeLabel, true);
     }
 
     // statements
