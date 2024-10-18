@@ -47,6 +47,11 @@ public class UnscopedConfig implements ConfigScope {
     public boolean dumpHashes;
 
     @ConfigOption("""
+        Defines the pipeline output directory. Equivalent to the `-output-dir` option of the `run` command.
+    """)
+    public String outputDir;
+
+    @ConfigOption("""
         If `true`, enable the use of previously cached task executions. Equivalent to the `-resume` option of the `run` command.
     """)
     public boolean resume;

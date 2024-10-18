@@ -487,23 +487,13 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         block.setVariableScope(currentScope);
 
         asDirectives(block).forEach((call) -> {
-            // treat as regular directive
-            var name = call.getMethodAsString();
-            var variable = findClassMember(currentScope.getClassScope(), name, call.getMethod());
-            if( variable != null ) {
-                visit(call);
-                return;
-            }
-
-            // treat as target definition
             var code = asDslBlock(call, 1);
-            if( code != null ) {
-                checkDirectives(code, OutputDsl.TargetDsl.class, "output target directive");
-                visitTargetBody(code);
+            if( code == null ) {
+                addError("Invalid output directive", call);
                 return;
             }
-
-            addError("Invalid output directive `" + name + "`", call);
+            checkDirectives(code, OutputDsl.TargetDsl.class, "output target directive");
+            visitTargetBody(code);
         });
     }
 

@@ -67,7 +67,8 @@ public class ConfigSchema {
         new WaveHttpConfig(),
         new WaveRetryConfig(),
         new WaveSpackConfig(),
-        new WorkflowConfig()
+        new WorkflowConfig(),
+        new WorkflowOutputsConfig()
     );
 
     public static final Map<String, ConfigScope> SCOPES = getConfigScopes();
