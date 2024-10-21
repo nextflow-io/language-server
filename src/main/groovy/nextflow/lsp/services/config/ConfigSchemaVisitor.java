@@ -29,8 +29,10 @@ import nextflow.lsp.compiler.Phases;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
+import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.syntax.SyntaxException;
+import org.codehaus.groovy.syntax.Token;
 
 /**
  *
@@ -82,7 +84,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
             return;
         var option = ConfigSchema.OPTIONS.get(fqName);
         if( option == null )
-            sourceUnit.addWarning("Unrecognized config option '" + fqName + "'", node);
+            addWarning("Unrecognized config option '" + fqName + "'", String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
     }
 
     @Override
@@ -114,6 +116,11 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
         var cause = new ConfigSchemaError(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
+    }
+
+    private void addWarning(String message, String tokenText, int startLine, int startColumn) {
+        var token = new Token(0, tokenText, startLine, startColumn);
+        sourceUnit.getErrorCollector().addWarning(WarningMessage.POSSIBLE_ERRORS, message, token, sourceUnit);
     }
 
     private class ConfigSchemaError extends SyntaxException implements PhaseAware {
