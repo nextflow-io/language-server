@@ -442,8 +442,10 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             progressBegin(progressToken, "Initializing workspace...");
 
             var count = 0;
-            var total = workspaceRoots.keySet().size();
+            var total = workspaceRoots.keySet().size() - 1;
             for( var name : workspaceRoots.keySet() ) {
+                if( DEFAULT_WORKSPACE_FOLDER_NAME.equals(name) )
+                    continue;
                 var progressMessage = String.format("Initializing workspace: %s (%d / %d)", name, count + 1, total);
                 progressUpdate(progressToken, progressMessage, count * 100 / total);
                 count++;
