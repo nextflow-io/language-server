@@ -98,6 +98,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
         }
 
         this.uri = URI.create(textDocument.getUri());
+        if( !ast.hasAST(uri) )
+            return Either.forLeft(Collections.emptyList());
+
         var nodeStack = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter());
         if( nodeStack.isEmpty() )
             return Either.forLeft(TOPLEVEL_ITEMS);
