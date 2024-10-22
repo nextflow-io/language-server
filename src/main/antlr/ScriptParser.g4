@@ -79,7 +79,11 @@ import org.apache.groovy.parser.antlr4.GroovySyntaxError;
 
 compilationUnit
     :   nls (scriptDeclaration (sep scriptDeclaration)* sep?)? EOF
-    |   nls workflowMain EOF
+    |   nls codeSnippet EOF
+    ;
+
+codeSnippet
+    :   blockStatements
     ;
 
 //
@@ -258,6 +262,11 @@ statement
     |   assignmentStatement             #assignmentStmtAlt
     |   expressionStatement             #expressionStmtAlt
     |   SEMI                            #emptyStmtAlt
+
+    // error cases
+    |   functionDef                     #functionDefStmtAlt
+    |   importDeclaration               #importDeclStmtAlt
+    |   includeDeclaration              #includeDeclStmtAlt
     ;
 
 // -- if/else statement

@@ -187,12 +187,15 @@ public class ScriptAstBuilder {
 
     /// SCRIPT STATEMENTS
 
+    private boolean isCodeSnippet;
+
     private ModuleNode compilationUnit(CompilationUnitContext ctx) {
         for( var stmt : ctx.scriptDeclaration() )
             scriptDeclaration(stmt);
 
-        if( ctx.workflowMain() != null ) {
-            var main = blockStatements(ctx.workflowMain().blockStatements());
+        if( ctx.codeSnippet() != null ) {
+            isCodeSnippet = true;
+            var main = blockStatements(ctx.codeSnippet().blockStatements());
             var workflowNode = workflowDef(main);
             moduleNode.addWorkflow(workflowNode);
             moduleNode.setEntry(workflowNode);
@@ -313,7 +316,7 @@ public class ScriptAstBuilder {
         }
         else {
             var result = ast( new EmptyStatement(), ctx );
-            collectSyntaxError(new SyntaxException("Statements cannot be mixed with top-level declarations (hint: move into a process or workflow)", result));
+            collectSyntaxError(new SyntaxException("Statements cannot be mixed with script declarations -- move statements into a process or workflow", result));
             return result;
         }
     }
@@ -521,28 +524,49 @@ public class ScriptAstBuilder {
         var takes = EmptyStatement.INSTANCE;
         var emits = EmptyStatement.INSTANCE;
         var publishers = EmptyStatement.INSTANCE;
-        for( var statement : main.getStatements() ) {
-            if( !(statement instanceof ExpressionStatement) )
-                continue;
-            var stmtX = (ExpressionStatement) statement;
-            if( !(stmtX.getExpression() instanceof MethodCallExpression) )
-                continue;
-            var call = (MethodCallExpression) stmtX.getExpression();
-            var name = call.getMethodAsString();
-            if( "process".equals(name) ) {
-                collectSyntaxError(new SyntaxException("Process definition is not allowed with implicit workflow", statement));
-                stmtX.setExpression(EmptyExpression.INSTANCE);
-            }
-            else if( "workflow".equals(name) ) {
-                collectSyntaxError(new SyntaxException("Workflow definition is not allowed with implicit workflow", statement));
-                stmtX.setExpression(EmptyExpression.INSTANCE);
-            }
-            else if( "output".equals(name) ) {
-                collectSyntaxError(new SyntaxException("Output definition is not allowed with implicit workflow", statement));
-                stmtX.setExpression(EmptyExpression.INSTANCE);
+        var hasScriptDeclarations = main.getStatements().stream().anyMatch(this::isScriptDeclaration);
+        if( hasScriptDeclarations ) {
+            for( int i = 0; i < main.getStatements().size(); i++ ) {
+                var stmt = main.getStatements().get(i);
+                if( !isScriptDeclaration(stmt) )
+                    collectSyntaxError(new SyntaxException("Statements cannot be mixed with script declarations -- move statements into a process or workflow", stmt));
+                else if( !(stmt instanceof InvalidDeclaration) )
+                    main.getStatements().set(i, ast(new InvalidDeclaration(), stmt));
             }
         }
         return new WorkflowNode(null, takes, main, emits, publishers);
+    }
+
+    private boolean isScriptDeclaration(Statement stmt) {
+        return stmt instanceof InvalidDeclaration || isFeatureFlagOrParam(stmt) || isScriptDefinition(stmt);
+    }
+
+    private boolean isFeatureFlagOrParam(Statement stmt) {
+        if( stmt instanceof ExpressionStatement es && es.getExpression() instanceof AssignmentExpression ae && ae.getLeftExpression() instanceof PropertyExpression pe ) {
+            var root = getPropertyRootName(pe);
+            return "nextflow".equals(root) || "params".equals(root);
+        }
+        return false;
+    }
+
+    private String getPropertyRootName(PropertyExpression node) {
+        Expression current = node;
+        while( current != null ) {
+            if( current instanceof VariableExpression ve )
+                return ve.getName();
+            current = current instanceof PropertyExpression pe
+                ? pe.getObjectExpression()
+                : null;
+        }
+        return null;        
+    }
+
+    private static final List<String> SCRIPT_DEF_NAMES = List.of("process", "workflow", "output");
+
+    private boolean isScriptDefinition(Statement stmt) {
+        return stmt instanceof ExpressionStatement es
+            && es.getExpression() instanceof MethodCallExpression mce
+            && SCRIPT_DEF_NAMES.contains(mce.getMethodAsString());
     }
 
     private Statement workflowTakes(WorkflowTakesContext ctx) {
@@ -685,6 +709,26 @@ public class ScriptAstBuilder {
 
         else if( ctx instanceof EmptyStmtAltContext )
             return EmptyStatement.INSTANCE;
+
+        else if( ctx instanceof FunctionDefStmtAltContext fdac ) {
+            var node = ast( new InvalidDeclaration(), fdac );
+            if( !isCodeSnippet )
+                collectSyntaxError(new SyntaxException("Functions must be defined in the script top-level", node));
+            return node;
+        }
+
+        else if( ctx instanceof ImportDeclStmtAltContext idac ) {
+            var node = ast( new InvalidDeclaration(), idac );
+            collectSyntaxError(new SyntaxException("Groovy `import` declarations are not supported -- use fully-qualified name inline instead", node));
+            return node;
+        }
+
+        else if( ctx instanceof IncludeDeclStmtAltContext idac ) {
+            var node = ast( new InvalidDeclaration(), idac );
+            if( !isCodeSnippet )
+                collectSyntaxError(new SyntaxException("Include declarations must be specified in the script top-level", node));
+            return node;
+        }
 
         else
             throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
