@@ -319,6 +319,13 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         }
     }
 
+    private void copyVariableScope(VariableScope source) {
+        for( var it = source.getDeclaredVariablesIterator(); it.hasNext(); ) {
+            var variable = it.next();
+            currentScope.putDeclaredVariable(variable);
+        }
+    }
+
     private void visitWorkflowEmits(Statement emits) {
         var declaredEmits = new HashMap<String,ASTNode>();
         for( var stmt : asBlockStatements(emits) ) {
@@ -363,8 +370,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         visitDirectives(node.directives, ProcessDirectiveDsl.class, "process directive", false);
 
         pushState(ProcessOutputDsl.class);
-        if( node.exec instanceof BlockStatement block )
-            copyVariableScope(block.getVariableScope());
         visitDirectives(node.outputs, null, "process output qualifier", false);
         popState();
 
@@ -434,13 +439,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( variable == null )
             addError("Invalid " + typeLabel + " `" + name + "`", node);
         return call;
-    }
-
-    private void copyVariableScope(VariableScope source) {
-        for( var it = source.getDeclaredVariablesIterator(); it.hasNext(); ) {
-            var variable = it.next();
-            currentScope.putDeclaredVariable(variable);
-        }
     }
 
     private static final List<String> EMIT_AND_TOPIC = List.of("emit", "topic");
@@ -635,7 +633,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         else if( currentDefinition instanceof ProcessNode || currentDefinition instanceof WorkflowNode ) {
             if( currentClosure != null )
                 addError("Variables in a closure should be declared with `def`", ve);
-            else
+            else if( !(currentDefinition instanceof ProcessNode) )
                 addFutureWarning("Variables should be declared with `def`", ve);
             var scope = currentScope;
             currentScope = currentDefinition.getVariableScope();
