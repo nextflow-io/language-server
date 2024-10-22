@@ -103,7 +103,7 @@ public class ConfigCompletionProvider implements CompletionProvider {
         if( offsetNode instanceof ConfigIncompleteNode cin ) {
             names.addAll(StringGroovyMethods.tokenize(cin.text, "."));
             if( !cin.text.endsWith(".") )
-                names.remove(0);
+                names.remove(names.size() - 1);
         }
         return String.join(".", names);
     }
