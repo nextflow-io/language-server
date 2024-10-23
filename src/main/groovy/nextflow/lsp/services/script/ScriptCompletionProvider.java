@@ -34,6 +34,7 @@ import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
 import nextflow.script.dsl.ScriptDsl;
 import nextflow.script.v2.FunctionNode;
+import nextflow.script.v2.InvalidDeclaration;
 import nextflow.script.v2.OutputNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.WorkflowNode;
@@ -154,6 +155,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
             //               ^
             log.debug("completion property -- ''");
             populateItemsFromObjectScope(pe.getObjectExpression(), "", items);
+        }
+        else if( offsetNode instanceof InvalidDeclaration ) {
+            return Either.forLeft(Collections.emptyList());
         }
         else {
             log.debug("completion " + offsetNode.getClass().getSimpleName() + " -- '" + offsetNode.getText() + "'");
