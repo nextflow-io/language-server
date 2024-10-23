@@ -109,7 +109,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
         if( defNode == null || ast.getURI(defNode) == null )
             return null;
 
-        var isAlias = oldName.equals(getSymbolName(defNode, null));
+        var isAlias = !oldName.equals(getSymbolName(defNode, null));
         var references = ASTUtils.getReferences(defNode, ast, true);
         var changes = new HashMap<String,List<TextEdit>>();
         references.forEachRemaining((refNode) -> {
