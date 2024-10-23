@@ -318,7 +318,11 @@ TRY           : 'try';
 // VOLATILE      : 'volatile';
 // WHILE         : 'while';
 
-// -- include statement
+// -- feature flag, param declarations
+NEXTFLOW        : 'nextflow';
+PARAMS          : 'params';
+
+// -- include declaration
 INCLUDE         : 'include';
 FROM            : 'from';
 

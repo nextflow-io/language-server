@@ -187,31 +187,48 @@ public class ScriptAstBuilder {
 
     /// SCRIPT STATEMENTS
 
-    private boolean isCodeSnippet;
+    private static final List<String> SCRIPT_DEF_NAMES = List.of("process", "workflow", "output");
 
     private ModuleNode compilationUnit(CompilationUnitContext ctx) {
-        for( var stmt : ctx.scriptDeclaration() )
-            scriptDeclaration(stmt);
+        var statements = new ArrayList<Statement>();
+        boolean hasDeclarations = false;
 
-        if( ctx.codeSnippet() != null ) {
-            isCodeSnippet = true;
-            var main = blockStatements(ctx.codeSnippet().blockStatements());
+        for( var declOrStmt : ctx.scriptDeclarationOrStatement() ) {
+            if( declOrStmt.scriptDeclaration() != null )
+                hasDeclarations |= scriptDeclaration(declOrStmt.scriptDeclaration());
+            if( declOrStmt.statement() != null )
+                statements.add(statement(declOrStmt.statement()));
+        }
+
+        for( int i = 0; i < statements.size(); i++ ) {
+            var stmt = statements.get(i);
+            var defName = stmt instanceof ExpressionStatement es && es.getExpression() instanceof MethodCallExpression mce
+                ? mce.getMethodAsString()
+                : null;
+            if( defName != null && SCRIPT_DEF_NAMES.contains(defName) ) {
+                collectSyntaxError(new SyntaxException("Invalid " + defName + " definition -- check for syntax errors", stmt));
+                statements.set(i, ast(new InvalidDeclaration(), stmt));
+                hasDeclarations = true;
+            }
+        }
+
+        if( hasDeclarations ) {
+            for( var stmt : statements ) {
+                if( !(stmt instanceof InvalidDeclaration) )
+                    collectSyntaxError(new SyntaxException("Statements cannot be mixed with script declarations -- move statements into a process or workflow", stmt));
+            }
+        }
+
+        if( !statements.isEmpty() ) {
+            var main = block(new VariableScope(), statements);
             var workflowNode = workflowDef(main);
             moduleNode.addWorkflow(workflowNode);
-            moduleNode.setEntry(workflowNode);
+            if( !hasDeclarations )
+                moduleNode.setEntry(workflowNode);
         }
 
         var scriptClassNode = moduleNode.getScriptClassDummy();
         scriptClassNode.setName(getMainClassName());
-
-        var statements = moduleNode.getStatementBlock().getStatements();
-        if( scriptClassNode != null && !statements.isEmpty() ) {
-            var first = statements.get(0);
-            var last = statements.get(statements.size() - 1);
-            scriptClassNode.setSourcePosition(first);
-            scriptClassNode.setLastColumnNumber(last.getLastColumnNumber());
-            scriptClassNode.setLastLineNumber(last.getLastLineNumber());
-        }
 
         if( numberFormatError != null )
             throw createParsingFailedException(numberFormatError.getV2().getMessage(), numberFormatError.getV1());
@@ -231,14 +248,11 @@ public class ScriptAstBuilder {
         }
     }
 
-    private void scriptDeclaration(ScriptDeclarationContext ctx) {
-        if( ctx instanceof FeatureFlagOrParamAltContext ffpac ) {
-            var node = featureFlagOrParam(ffpac.featureFlagOrParam());
+    private boolean scriptDeclaration(ScriptDeclarationContext ctx) {
+        if( ctx instanceof FeatureFlagDeclAltContext ffac ) {
+            var node = featureFlagDeclaration(ffac.featureFlagDeclaration());
             saveLeadingComments(node, ctx);
-            if( node instanceof FeatureFlagNode ffn )
-                moduleNode.addFeatureFlag(ffn);
-            else if( node instanceof ParamNode pn )
-                moduleNode.addParam(pn);
+            moduleNode.addFeatureFlag(node);
         }
 
         else if( ctx instanceof EnumDefAltContext edac ) {
@@ -256,6 +270,7 @@ public class ScriptAstBuilder {
         else if( ctx instanceof ImportDeclAltContext iac ) {
             var node = ast( new EmptyStatement(), iac );
             collectSyntaxError(new SyntaxException("Groovy `import` declarations are not supported -- use fully-qualified name inline instead", node));
+            return false;
         }
 
         else if( ctx instanceof IncludeDeclAltContext iac ) {
@@ -270,6 +285,12 @@ public class ScriptAstBuilder {
             if( moduleNode.getOutput() != null )
                 collectSyntaxError(new SyntaxException("Output block defined more than once", node));
             moduleNode.setOutput(node);
+        }
+
+        if( ctx instanceof ParamDeclAltContext pac ) {
+            var node = paramDeclaration(pac.paramDeclaration());
+            saveLeadingComments(node, ctx);
+            moduleNode.addParam(node);
         }
 
         else if( ctx instanceof ProcessDefAltContext pdac ) {
@@ -291,34 +312,31 @@ public class ScriptAstBuilder {
 
         else if( ctx instanceof IncompleteScriptDeclAltContext iac ) {
             incompleteScriptDeclaration(iac.incompleteScriptDeclaration());
+            return false;
         }
 
         else
             throw createParsingFailedException("Invalid script declaration: " + ctx.getText(), ctx);
+
+        return true;
     }
 
-    private ASTNode featureFlagOrParam(FeatureFlagOrParamContext ctx) {
+    private FeatureFlagNode featureFlagDeclaration(FeatureFlagDeclarationContext ctx) {
         var names = ctx.identifier().stream()
             .map(this::identifier)
             .collect(Collectors.toList());
         var value = expression(ctx.expression());
-        var firstName = names.get(0);
-        if( "nextflow".equals(firstName) ) {
-            var fullName = String.join(".", names);
-            var result = ast( new FeatureFlagNode(fullName, value), ctx );
-            if( !(value instanceof ConstantExpression) )
-                collectSyntaxError(new SyntaxException("Feature flag value should be a literal value (number, string, true/false)", result));
-            return result;
-        }
-        else if( "params".equals(firstName) ) {
-            var target = propertyExpression(ctx.identifier());
-            return ast( new ParamNode(target, value), ctx );
-        }
-        else {
-            var result = ast( new EmptyStatement(), ctx );
-            collectSyntaxError(new SyntaxException("Statements cannot be mixed with script declarations -- move statements into a process or workflow", result));
-            return result;
-        }
+        var fullName = String.join(".", names);
+        var result = ast( new FeatureFlagNode(fullName, value), ctx );
+        if( !(value instanceof ConstantExpression) )
+            collectSyntaxError(new SyntaxException("Feature flag value should be a literal value (number, string, true/false)", result));
+        return result;
+    }
+
+    private ParamNode paramDeclaration(ParamDeclarationContext ctx) {
+        var target = propertyExpression(ctx.identifier());
+        var value = expression(ctx.expression());
+        return ast( new ParamNode(target, value), ctx );
     }
 
     private Expression propertyExpression(List<IdentifierContext> idents) {
@@ -524,49 +542,7 @@ public class ScriptAstBuilder {
         var takes = EmptyStatement.INSTANCE;
         var emits = EmptyStatement.INSTANCE;
         var publishers = EmptyStatement.INSTANCE;
-        var hasScriptDeclarations = main.getStatements().stream().anyMatch(this::isScriptDeclaration);
-        if( hasScriptDeclarations ) {
-            for( int i = 0; i < main.getStatements().size(); i++ ) {
-                var stmt = main.getStatements().get(i);
-                if( !isScriptDeclaration(stmt) )
-                    collectSyntaxError(new SyntaxException("Statements cannot be mixed with script declarations -- move statements into a process or workflow", stmt));
-                else if( !(stmt instanceof InvalidDeclaration) )
-                    main.getStatements().set(i, ast(new InvalidDeclaration(), stmt));
-            }
-        }
         return new WorkflowNode(null, takes, main, emits, publishers);
-    }
-
-    private boolean isScriptDeclaration(Statement stmt) {
-        return stmt instanceof InvalidDeclaration || isFeatureFlagOrParam(stmt) || isScriptDefinition(stmt);
-    }
-
-    private boolean isFeatureFlagOrParam(Statement stmt) {
-        if( stmt instanceof ExpressionStatement es && es.getExpression() instanceof AssignmentExpression ae && ae.getLeftExpression() instanceof PropertyExpression pe ) {
-            var root = getPropertyRootName(pe);
-            return "nextflow".equals(root) || "params".equals(root);
-        }
-        return false;
-    }
-
-    private String getPropertyRootName(PropertyExpression node) {
-        Expression current = node;
-        while( current != null ) {
-            if( current instanceof VariableExpression ve )
-                return ve.getName();
-            current = current instanceof PropertyExpression pe
-                ? pe.getObjectExpression()
-                : null;
-        }
-        return null;        
-    }
-
-    private static final List<String> SCRIPT_DEF_NAMES = List.of("process", "workflow", "output");
-
-    private boolean isScriptDefinition(Statement stmt) {
-        return stmt instanceof ExpressionStatement es
-            && es.getExpression() instanceof MethodCallExpression mce
-            && SCRIPT_DEF_NAMES.contains(mce.getMethodAsString());
     }
 
     private Statement workflowTakes(WorkflowTakesContext ctx) {
@@ -709,26 +685,6 @@ public class ScriptAstBuilder {
 
         else if( ctx instanceof EmptyStmtAltContext )
             return EmptyStatement.INSTANCE;
-
-        else if( ctx instanceof FunctionDefStmtAltContext fdac ) {
-            var node = ast( new InvalidDeclaration(), fdac );
-            if( !isCodeSnippet )
-                collectSyntaxError(new SyntaxException("Functions must be defined in the script top-level", node));
-            return node;
-        }
-
-        else if( ctx instanceof ImportDeclStmtAltContext idac ) {
-            var node = ast( new InvalidDeclaration(), idac );
-            collectSyntaxError(new SyntaxException("Groovy `import` declarations are not supported -- use fully-qualified name inline instead", node));
-            return node;
-        }
-
-        else if( ctx instanceof IncludeDeclStmtAltContext idac ) {
-            var node = ast( new InvalidDeclaration(), idac );
-            if( !isCodeSnippet )
-                collectSyntaxError(new SyntaxException("Include declarations must be specified in the script top-level", node));
-            return node;
-        }
 
         else
             throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);

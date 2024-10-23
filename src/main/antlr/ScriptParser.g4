@@ -78,21 +78,22 @@ import org.apache.groovy.parser.antlr4.GroovySyntaxError;
 
 
 compilationUnit
-    :   nls (scriptDeclaration (sep scriptDeclaration)* sep?)? EOF
-    |   nls codeSnippet EOF
+    :   nls (scriptDeclarationOrStatement (sep scriptDeclarationOrStatement)* sep?)? EOF
     ;
 
-codeSnippet
-    :   blockStatements
+scriptDeclarationOrStatement
+    :   scriptDeclaration
+    |   statement
     ;
 
 //
 // script declarations
 //
 scriptDeclaration
-    :   featureFlagOrParam          #featureFlagOrParamAlt
+    :   featureFlagDeclaration      #featureFlagDeclAlt
     |   includeDeclaration          #includeDeclAlt
     |   importDeclaration           #importDeclAlt
+    |   paramDeclaration            #paramDeclAlt
     |   enumDef                     #enumDefAlt
     |   processDef                  #processDefAlt
     |   workflowDef                 #workflowDefAlt
@@ -101,9 +102,9 @@ scriptDeclaration
     |   incompleteScriptDeclaration #incompleteScriptDeclAlt
     ;
 
-// -- feature flag or param declaration
-featureFlagOrParam
-    :   identifier (DOT identifier)* nls ASSIGN nls expression
+// -- feature flag declaration
+featureFlagDeclaration
+    :   NEXTFLOW (DOT identifier)* nls ASSIGN nls expression
     ;
 
 // -- include declaration
@@ -123,6 +124,11 @@ includeName
 // -- import declaration (legacy)
 importDeclaration
     :   IMPORT qualifiedClassName
+    ;
+
+// -- param declaration
+paramDeclaration
+    :   PARAMS (DOT identifier)* nls ASSIGN nls expression
     ;
 
 // -- enum definition
@@ -262,11 +268,6 @@ statement
     |   assignmentStatement             #assignmentStmtAlt
     |   expressionStatement             #expressionStmtAlt
     |   SEMI                            #emptyStmtAlt
-
-    // error cases
-    |   functionDef                     #functionDefStmtAlt
-    |   importDeclaration               #importDeclStmtAlt
-    |   includeDeclaration              #includeDeclStmtAlt
     ;
 
 // -- if/else statement
@@ -471,6 +472,8 @@ identifier
     :   Identifier
     |   CapitalizedIdentifier
     |   IN
+    |   NEXTFLOW
+    |   PARAMS
     |   FROM
     |   PROCESS
     |   EXEC
@@ -665,6 +668,8 @@ keywords
     |   IN
     |   INSTANCEOF
     |   RETURN
+    |   NEXTFLOW
+    |   PARAMS
     |   INCLUDE
     |   FROM
     |   PROCESS
