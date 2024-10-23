@@ -48,6 +48,11 @@ public class CondaConfig implements ConfigScope {
     public String cacheDir;
 
     @ConfigOption("""
+        The Conda channels that can be used to resolve Conda packages.
+    """)
+    public String channels;
+
+    @ConfigOption("""
         Extra command line options to append to the `conda create` command.
     """)
     public String createOptions;
