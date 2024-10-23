@@ -287,7 +287,7 @@ public class ScriptAstBuilder {
             moduleNode.setOutput(node);
         }
 
-        if( ctx instanceof ParamDeclAltContext pac ) {
+        else if( ctx instanceof ParamDeclAltContext pac ) {
             var node = paramDeclaration(pac.paramDeclaration());
             saveLeadingComments(node, ctx);
             moduleNode.addParam(node);
