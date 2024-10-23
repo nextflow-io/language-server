@@ -86,9 +86,7 @@ import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
-import org.codehaus.groovy.runtime.StringGroovyMethods;
 import org.codehaus.groovy.syntax.Numbers;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Types;
@@ -322,32 +320,22 @@ public class ScriptAstBuilder {
     }
 
     private FeatureFlagNode featureFlagDeclaration(FeatureFlagDeclarationContext ctx) {
-        var names = ctx.identifier().stream()
-            .map(this::identifier)
-            .collect(Collectors.toList());
+        var name = ctx.featureFlagName().getText();
         var value = expression(ctx.expression());
-        var fullName = String.join(".", names);
-        var result = ast( new FeatureFlagNode(fullName, value), ctx );
+        var result = ast( new FeatureFlagNode(name, value), ctx );
         if( !(value instanceof ConstantExpression) )
             collectSyntaxError(new SyntaxException("Feature flag value should be a literal value (number, string, true/false)", result));
         return result;
     }
 
     private ParamNode paramDeclaration(ParamDeclarationContext ctx) {
-        var target = propertyExpression(ctx.identifier());
+        Expression target = ast( varX("params"), ctx.PARAMS() );
+        for( var ident : ctx.identifier() ) {
+            var name = ast( constX(identifier(ident)), ident );
+            target = ast( propX(target, name), target, name );
+        }
         var value = expression(ctx.expression());
         return ast( new ParamNode(target, value), ctx );
-    }
-
-    private Expression propertyExpression(List<IdentifierContext> idents) {
-        var head = idents.get(0);
-        Expression result = variableName(head);
-        for( int i = 1; i < idents.size(); i++ ) {
-            var ident = idents.get(i);
-            var name = ast( constX(identifier(ident)), ident );
-            result = ast( propX(result, name), result, name );
-        }
-        return result;
     }
 
     private IncludeNode includeDeclaration(IncludeDeclarationContext ctx) {
@@ -1477,6 +1465,17 @@ public class ScriptAstBuilder {
         return result;
     }
 
+    private Expression propertyExpression(List<IdentifierContext> idents) {
+        var head = idents.get(0);
+        Expression result = variableName(head);
+        for( int i = 1; i < idents.size(); i++ ) {
+            var ident = idents.get(i);
+            var name = ast( constX(identifier(ident)), ident );
+            result = ast( propX(result, name), result, name );
+        }
+        return result;
+    }
+
     /// MISCELLANEOUS
 
     private Parameter[] formalParameterList(FormalParameterListContext ctx) {
@@ -1522,7 +1521,7 @@ public class ScriptAstBuilder {
         var tokenType = token.getType();
         var text = cardinality == 1
             ? tokenText
-            : StringGroovyMethods.multiply(tokenText, cardinality);
+            : tokenText.repeat(cardinality);
         var type = tokenType == RANGE_EXCLUSIVE_RIGHT || tokenType == RANGE_INCLUSIVE
             ? Types.RANGE_OPERATOR
             : Types.lookup(text, Types.ANY);

@@ -83,7 +83,6 @@ import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
-import org.codehaus.groovy.runtime.StringGroovyMethods;
 import org.codehaus.groovy.syntax.Numbers;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Types;
@@ -1147,7 +1146,7 @@ public class ConfigAstBuilder {
         var tokenType = token.getType();
         var text = cardinality == 1
             ? tokenText
-            : StringGroovyMethods.multiply(tokenText, cardinality);
+            : tokenText.repeat(cardinality);
         var type = tokenType == RANGE_EXCLUSIVE_RIGHT || tokenType == RANGE_INCLUSIVE
             ? Types.RANGE_OPERATOR
             : Types.lookup(text, Types.ANY);

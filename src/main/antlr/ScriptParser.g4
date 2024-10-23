@@ -104,7 +104,11 @@ scriptDeclaration
 
 // -- feature flag declaration
 featureFlagDeclaration
-    :   NEXTFLOW (DOT identifier)* nls ASSIGN nls expression
+    :   featureFlagName nls ASSIGN nls expression
+    ;
+
+featureFlagName
+    :   NEXTFLOW (DOT identifier)+
     ;
 
 // -- include declaration
@@ -128,7 +132,7 @@ importDeclaration
 
 // -- param declaration
 paramDeclaration
-    :   PARAMS (DOT identifier)* nls ASSIGN nls expression
+    :   PARAMS (DOT identifier)+ nls ASSIGN nls expression
     ;
 
 // -- enum definition
