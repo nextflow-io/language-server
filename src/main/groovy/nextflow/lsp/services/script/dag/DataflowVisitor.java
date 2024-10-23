@@ -306,6 +306,10 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     }
 
     private void visitProcessOut(ProcessNode process, String label, String propName) {
+        if( propName == null ) {
+            addOperatorPred(label);
+            return;
+        }
         asDirectives(process.outputs)
             .filter((call) -> {
                 var emitName = getProcessEmitName(call);
@@ -313,11 +317,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             })
             .findFirst()
             .ifPresent((call) -> {
-                var dn = current.getSymbol(label);
-                if( dn != null )
-                    currentPreds().add(dn);
-                else
-                    current.putSymbol(label, addNode(label, Node.Type.OPERATOR));
+                addOperatorPred(label);
             });
     }
 
@@ -336,6 +336,10 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     }
 
     private void visitWorkflowOut(WorkflowNode workflow, String label, String propName) {
+        if( propName == null ) {
+            addOperatorPred(label);
+            return;
+        }
         asBlockStatements(workflow.emits).stream()
             .map(stmt -> ((ExpressionStatement) stmt).getExpression())
             .filter((emit) -> {
@@ -344,11 +348,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             })
             .findFirst()
             .ifPresent((call) -> {
-                var dn = current.getSymbol(label);
-                if( dn != null )
-                    currentPreds().add(dn);
-                else
-                    current.putSymbol(label, addNode(label, Node.Type.OPERATOR));
+                addOperatorPred(label);
             });
     }
 
@@ -361,6 +361,14 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             return target.getName();
         }
         return null;
+    }
+
+    private void addOperatorPred(String label) {
+        var dn = current.getSymbol(label);
+        if( dn != null )
+            currentPreds().add(dn);
+        else
+            current.putSymbol(label, addNode(label, Node.Type.OPERATOR));
     }
 
     @Override
