@@ -20,28 +20,23 @@ import java.util.Map;
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
 
-public class WorkflowOutputsConfig implements ConfigScope {
+public class WorkflowOutputConfig implements ConfigScope {
 
-    public WorkflowOutputsConfig() {}
+    public WorkflowOutputConfig() {}
 
     @Override
     public String name() {
-        return "workflow.outputs";
+        return "workflow.output";
     }
 
     @Override
     public String description() {
         return """
-            The `workflow.outputs` scope provides options for workflow publishing.
+            The `workflow.output` scope provides options for publishing workflow outputs.
 
             [Read more](https://nextflow.io/docs/latest/reference/config.html#workflow)
             """;
     }
-
-    @ConfigOption("""
-        Set the top-level output directory of the workflow. Defaults to the launch directory (`workflow.launchDir`).
-    """)
-    public String directory;
 
     @ConfigOption("""
         *Currently only supported for S3.*
