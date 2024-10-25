@@ -15,20 +15,18 @@
  */
 package nextflow.script.v2;
 
-import org.codehaus.groovy.ast.expr.EmptyExpression;
+import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.expr.Expression;
-import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class ParamNode extends ExpressionStatement {
+public class ParamNode extends ASTNode {
     public final Expression target;
     public final Expression value;
 
     public ParamNode(Expression target, Expression value) {
-        super(EmptyExpression.INSTANCE);
         this.target = target;
         this.value = value;
     }

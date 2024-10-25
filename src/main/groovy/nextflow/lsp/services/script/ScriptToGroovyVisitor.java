@@ -88,8 +88,8 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
     @Override
     public void visitFeatureFlag(FeatureFlagNode node) {
         var left = constX(node.name);
-        node.setExpression(callThisX("feature", args(left, node.value)));
-        moduleNode.addStatement(node);
+        var result = stmt(callThisX("feature", args(left, node.value)));
+        moduleNode.addStatement(result);
     }
 
     @Override
@@ -105,14 +105,14 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
 
         var include = callThisX("include", args(createX(IncludeDef.class, args(moduleArgs))));
         var from = callX(include, "from", args(node.source));
-        node.setExpression(callX(from, "load0", args(varX("params"))));
-        moduleNode.addStatement(node);
+        var result = stmt(callX(from, "load0", args(varX("params"))));
+        moduleNode.addStatement(result);
     }
 
     @Override
     public void visitParam(ParamNode node) {
-        node.setExpression(assignX(node.target, node.value));
-        moduleNode.addStatement(node);
+        var result = stmt(assignX(node.target, node.value));
+        moduleNode.addStatement(result);
     }
 
     @Override
@@ -317,8 +317,8 @@ public class ScriptToGroovyVisitor extends ScriptVisitorSupport {
     @Override
     public void visitOutput(OutputNode node) {
         var closure = closureX(node.body);
-        node.setExpression(callThisX("output", args(closure)));
-        moduleNode.addStatement(node);
+        var result = stmt(callThisX("output", args(closure)));
+        moduleNode.addStatement(result);
     }
 
 }

@@ -15,22 +15,20 @@
  */
 package nextflow.script.v2;
 
+import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.Variable;
-import org.codehaus.groovy.ast.expr.EmptyExpression;
 import org.codehaus.groovy.ast.expr.Expression;
-import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class FeatureFlagNode extends ExpressionStatement {
+public class FeatureFlagNode extends ASTNode {
     public final String name;
     public final Expression value;
     public Variable target;
 
     public FeatureFlagNode(String name, Expression value) {
-        super(EmptyExpression.INSTANCE);
         this.name = name;
         this.value = value;
     }

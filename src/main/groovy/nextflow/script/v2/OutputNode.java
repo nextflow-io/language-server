@@ -15,19 +15,17 @@
  */
 package nextflow.script.v2;
 
-import org.codehaus.groovy.ast.expr.EmptyExpression;
-import org.codehaus.groovy.ast.stmt.ExpressionStatement;
+import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.stmt.Statement;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class OutputNode extends ExpressionStatement {
+public class OutputNode extends ASTNode {
     public final Statement body;
 
     public OutputNode(Statement body) {
-        super(EmptyExpression.INSTANCE);
         this.body = body;
     }
 }
