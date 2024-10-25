@@ -30,8 +30,10 @@ import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
+import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
+import nextflow.script.dsl.Function;
 import nextflow.script.dsl.ScriptDsl;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.InvalidDeclaration;
@@ -67,6 +69,8 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+
+import static nextflow.script.v2.ASTHelpers.*;
 
 /**
  * Provide suggestions for an incomplete expression or statement
@@ -246,7 +250,8 @@ public class ScriptCompletionProvider implements CompletionProvider {
         var existingNames = new HashSet<String>();
         VariableScope scope = ASTUtils.getVariableScope(node, ast);
         while( scope != null ) {
-            populateItemsFromScope0(scope, namePrefix, existingNames, items);
+            populateLocalVariables(scope, namePrefix, existingNames, items);
+            populateItemsFromDslScope(scope.getClassScope(), namePrefix, existingNames, items);
             scope = scope.getParent();
         }
 
@@ -262,7 +267,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         populateTypes(namePrefix, items);
     }
 
-    private void populateItemsFromScope0(VariableScope scope, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
+    private void populateLocalVariables(VariableScope scope, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
         for( var it = scope.getDeclaredVariablesIterator(); it.hasNext(); ) {
             var variable = it.next();
             var name = variable.getName();
@@ -278,11 +283,20 @@ public class ScriptCompletionProvider implements CompletionProvider {
             if( !addItem(item, items) )
                 break;
         }
+    }
 
-        ClassNode cn = scope.getClassScope();
+    private void populateItemsFromDslScope(ClassNode cn, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
-            populateItemsFromFields(cn.getFields().iterator(), namePrefix, existingNames, items);
-            populateItemsFromMethods(cn.getMethods().iterator(), namePrefix, existingNames, items);
+            var constants = cn.getFields().stream()
+                .filter(fn -> findAnnotation(fn, Constant.class).isPresent())
+                .iterator();
+            populateItemsFromFields(constants, namePrefix, existingNames, items);
+
+            var functions = cn.getMethods().stream()
+                .filter(mn -> findAnnotation(mn, Function.class).isPresent())
+                .iterator();
+            populateItemsFromMethods(functions, namePrefix, existingNames, items);
+
             cn = cn.getSuperClass();
         }
     }
