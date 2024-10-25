@@ -473,32 +473,32 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitOutput(OutputNode node) {
-        pushState(OutputDsl.class);
-
         if( node.body instanceof BlockStatement block )
             visitOutputBody(block);
-
-        popState();
     }
 
     private void visitOutputBody(BlockStatement block) {
+        pushState(OutputDsl.class);
         block.setVariableScope(currentScope);
 
         asDirectives(block).forEach((call) -> {
             var code = asDslBlock(call, 1);
-            if( code == null ) {
-                addError("Invalid output directive", call);
-                return;
-            }
-            checkDirectives(code, OutputDsl.TargetDsl.class, "output target directive");
-            visitTargetBody(code);
+            if( code != null )
+                visitTargetBody(code);
         });
+        popState();
     }
 
     private void visitTargetBody(BlockStatement block) {
+        pushState(OutputDsl.TargetDsl.class);
         block.setVariableScope(currentScope);
 
-        asDirectives(block).forEach((call) -> {
+        asBlockStatements(block).forEach((stmt) -> {
+            // validate target directive
+            var call = checkDirective(stmt, currentScope.getClassScope(), "output target directive", true);
+            if( call == null )
+                return;
+
             // treat as index definition
             var name = call.getMethodAsString();
             if( "index".equals(name) ) {
@@ -513,12 +513,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             // treat as regular directive
             super.visitMethodCallExpression(call);
         });
-    }
-
-    private void checkDirectives(Statement node, Class classScope, String typeLabel) {
-        var cn = ClassHelper.makeCached(classScope);
-        for( var stmt : asBlockStatements(node) )
-            checkDirective(stmt, cn, typeLabel, true);
+        popState();
     }
 
     // statements

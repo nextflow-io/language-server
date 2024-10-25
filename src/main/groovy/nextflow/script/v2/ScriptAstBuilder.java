@@ -93,6 +93,7 @@ import org.codehaus.groovy.syntax.Types;
 
 import static nextflow.antlr.ScriptParser.*;
 import static nextflow.antlr.PositionConfigureUtils.ast;
+import static nextflow.script.v2.ASTHelpers.*;
 import static org.codehaus.groovy.ast.expr.VariableExpression.THIS_EXPRESSION;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
@@ -613,11 +614,22 @@ public class ScriptAstBuilder {
     private Statement outputBody(OutputBodyContext ctx) {
         if( ctx == null )
             return EmptyStatement.INSTANCE;
-        var statements = ctx.statement().stream()
-            .map(this::statement)
-            .map(stmt -> checkDirective(stmt, "Invalid output directive"))
+        var statements = ctx.outputTargetBlock().stream()
+            .map(this::outputTargetBlock)
             .collect(Collectors.toList());
         return ast( block(null, statements), ctx );
+    }
+
+    private Statement outputTargetBlock(OutputTargetBlockContext ctx) {
+        var stmt = statement(ctx.statement());
+        var call = asMethodCallX(stmt);
+        if( call != null ) {
+            var block = asDslBlock(call, 1);
+            if( block != null )
+                return stmt;
+        }
+        collectSyntaxError(new SyntaxException("Invalid output target block", stmt));
+        return ast( new EmptyStatement(), stmt );
     }
 
     private FunctionNode functionDef(FunctionDefContext ctx) {

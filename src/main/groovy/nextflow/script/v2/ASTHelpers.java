@@ -74,8 +74,7 @@ public class ASTHelpers {
     public static Stream<MethodCallExpression> asDirectives(Statement statement) {
         return asBlockStatements(statement)
             .stream()
-            .map(stmt -> stmt instanceof ExpressionStatement es ? es.getExpression() : null)
-            .map(expr -> expr instanceof MethodCallExpression mce ? mce : null)
+            .map(stmt -> asMethodCallX(stmt))
             .filter(mce -> mce != null);
     }
 

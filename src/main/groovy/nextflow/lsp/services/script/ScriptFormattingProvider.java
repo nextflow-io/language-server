@@ -446,7 +446,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
         @Override
         public void visitOutput(OutputNode node) {
             fmt.appendLeadingComments(node);
-            fmt.append("output {\n");
+            fmt.append("output {");
             fmt.incIndent();
             visitOutputBody(node.body);
             fmt.decIndent();
@@ -455,7 +455,6 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         protected void visitOutputBody(Statement body) {
             asDirectives(body).forEach((call) -> {
-                // treat as target definition
                 var code = asDslBlock(call, 1);
                 if( code != null ) {
                     fmt.appendNewLine();
@@ -467,11 +466,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
                     fmt.decIndent();
                     fmt.appendIndent();
                     fmt.append("}\n");
-                    return;
                 }
-
-                // treat as regular directive
-                visitDirective(call);
             });
         }
 

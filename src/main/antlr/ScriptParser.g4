@@ -243,7 +243,11 @@ outputDef
     ;
 
 outputBody
-    :   sep? statement (sep statement)*
+    :   sep? outputTargetBlock (sep outputTargetBlock)*
+    ;
+
+outputTargetBlock
+    : statement
     ;
 
 // -- function definition
