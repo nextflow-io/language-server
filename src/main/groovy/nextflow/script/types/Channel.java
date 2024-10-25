@@ -13,114 +13,126 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.types
+package nextflow.script.types;
 
-import java.nio.file.Path
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.Map;
 
-import groovy.transform.CompileStatic
-import groovyx.gpars.dataflow.DataflowVariable
-import groovyx.gpars.dataflow.DataflowWriteChannel
-import nextflow.script.dsl.DslType
-import nextflow.script.dsl.Function
+import groovy.lang.Closure;
+import groovyx.gpars.dataflow.DataflowVariable;
+import groovyx.gpars.dataflow.DataflowWriteChannel;
+import nextflow.script.dsl.DslType;
+import nextflow.script.dsl.Function;
 
-@CompileStatic
-@DslType('''
+@DslType("""
     The `Channel` type provides the channel factory methods.
 
     [Read more](https://nextflow.io/docs/latest/reference/channel.html)
-''')
-class Channel {
+""")
+public class Channel {
 
-    @Function('''
+    @Function("""
         Create a channel that emits nothing.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#empty)
-    ''')
-    static DataflowWriteChannel empty() {
+    """)
+    public static DataflowWriteChannel empty() {
+        return null;
     }
 
     @Deprecated
-    @Function('''
+    @Function("""
         Create a channel that emits each argument.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
-    ''')
-    static <T> DataflowWriteChannel<T> from(T... values) {
+    """)
+    public static <T> DataflowWriteChannel<T> from(T... values) {
+        return null;
     }
 
     @Deprecated
-    @Function('''
+    @Function("""
         Create a channel that emits each element in a collection.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
-    ''')
-    static <T> DataflowWriteChannel<T> from(Collection<T> values) {
+    """)
+    public static <T> DataflowWriteChannel<T> from(Collection<T> values) {
+        return null;
     }
 
-    @Function('''
+    @Function("""
         Create a channel that emits all file pairs matching a glob pattern.
 
         An optional closure can be used to customize the grouping strategy.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromfilepairs)
-    ''')
-    static DataflowWriteChannel fromFilePairs(Map opts = null, pattern, Closure grouping = null) {
+    """)
+    public static DataflowWriteChannel fromFilePairs(Map opts, String pattern, Closure grouping) {
+        return null;
     }
 
-    @Function('''
+    @Function("""
         Create a channel that emits each element in a collection.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromlist)
-    ''')
-    static <T> DataflowWriteChannel<T> fromList(Collection<T> values) {
+    """)
+    public static <T> DataflowWriteChannel<T> fromList(Collection<T> values) {
+        return null;
     }
 
-    @Function('''
+    @Function("""
         Create a channel that emits all paths matching a name or glob pattern.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#frompath)
-    ''')
-    static DataflowWriteChannel<Path> fromPath(Map opts = null, pattern) {
+    """)
+    public static DataflowWriteChannel<Path> fromPath(Map opts, String pattern) {
+        return null;
     }
 
-    @Function('''
+    @Function("""
         Create a channel that queries the [NCBI SRA](https://www.ncbi.nlm.nih.gov/sra) database and emits all FASTQ files matching the given project or accession ids.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromsra)
-    ''')
-    static DataflowWriteChannel fromSRA(Map opts = null, query) {
+    """)
+    public static DataflowWriteChannel fromSRA(Map opts, String query) {
+        return null;
     }
 
-    @Function('''
+    @Function("""
         Create a channel that emits each argument.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#of)
-    ''')
-    static <T> DataflowWriteChannel<T> of(T... values) {
+    """)
+    public static <T> DataflowWriteChannel<T> of(T... values) {
+        return null;
     }
 
-    @Function('''
+    @Function("""
         Create a channel that emits all values in the given topic.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#topic)
-    ''')
-    static DataflowWriteChannel topic(String name) {
+    """)
+    public static DataflowWriteChannel topic(String name) {
+        return null;
     }
 
-    @Function('''
+    @Function("""
         Create a value channel.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#value)
-    ''')
-    static <T> DataflowVariable<T> value(T obj = null) {
+    """)
+    public static <T> DataflowVariable<T> value(T value) {
+        return null;
     }
 
-    @Function('''
+    @Function("""
         Create a channel that watches for filesystem events for all files matching the given pattern.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#watchpath)
-    ''')
-    static DataflowWriteChannel<Path> watchPath(filePattern, String events = 'create') {
+    """)
+    public static DataflowWriteChannel<Path> watchPath(String filePattern, String events) {
+        return null;
     }
 
 }
