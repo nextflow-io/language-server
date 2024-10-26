@@ -211,6 +211,15 @@ class WorkflowDsl implements DslScope {
     DataflowWriteChannel map(DataflowReadChannel source, Closure closure) {
     }
 
+    @Operator
+    @Function('''
+        The `max` operator emits the item with the greatest value from a source channel.
+
+        [Read more](https://nextflow.io/docs/latest/reference/operator.html#max)
+    ''')
+    DataflowWriteChannel max(DataflowReadChannel source, Closure comparator) {
+    }
+
     @Deprecated
     @Operator
     @Function('''
@@ -219,6 +228,15 @@ class WorkflowDsl implements DslScope {
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#merge)
     ''')
     DataflowWriteChannel merge(DataflowReadChannel source, DataflowReadChannel... others) {
+    }
+
+    @Operator
+    @Function('''
+        The `min` operator emits the item with the lowest value from a source channel.
+
+        [Read more](https://nextflow.io/docs/latest/reference/operator.html#min)
+    ''')
+    DataflowWriteChannel min(DataflowReadChannel source, Closure comparator) {
     }
 
     @Operator
@@ -309,6 +327,15 @@ class WorkflowDsl implements DslScope {
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#subscribe)
     ''')
     DataflowReadChannel subscribe(DataflowReadChannel source, Closure closure) {
+    }
+
+    @Operator
+    @Function('''
+        The `sum` operator emits the sum of all values in a source channel.
+
+        [Read more](https://nextflow.io/docs/latest/reference/operator.html#sum)
+    ''')
+    DataflowWriteChannel sum(DataflowReadChannel source, Closure closure) {
     }
 
     @Operator
