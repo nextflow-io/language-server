@@ -205,7 +205,7 @@ public class ScriptAstBuilder {
                 ? mce.getMethodAsString()
                 : null;
             if( defName != null && SCRIPT_DEF_NAMES.contains(defName) ) {
-                collectSyntaxError(new SyntaxException("Invalid " + defName + " definition -- check for syntax errors", stmt));
+                collectSyntaxError(new SyntaxException("Invalid " + defName + " definition -- check for missing or out-of-order section labels", stmt));
                 statements.set(i, ast(new InvalidDeclaration(), stmt));
                 hasDeclarations = true;
             }
