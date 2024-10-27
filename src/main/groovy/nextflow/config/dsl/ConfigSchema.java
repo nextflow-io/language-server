@@ -66,6 +66,7 @@ public class ConfigSchema {
         new WaveCondaConfig(),
         new WaveHttpConfig(),
         new WaveRetryConfig(),
+        new WaveScanConfig(),
         new WaveSpackConfig(),
         new WorkflowConfig(),
         new WorkflowOutputConfig()

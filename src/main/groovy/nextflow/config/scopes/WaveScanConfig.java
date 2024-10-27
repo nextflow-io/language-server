@@ -18,13 +18,13 @@ package nextflow.config.scopes;
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
 
-public class WaveConfig implements ConfigScope {
+public class WaveScanConfig implements ConfigScope {
 
-    public WaveConfig() {}
+    public WaveScanConfig() {}
 
     @Override
     public String name() {
-        return "wave";
+        return "wave.scan";
     }
 
     @Override
@@ -37,30 +37,13 @@ public class WaveConfig implements ConfigScope {
     }
 
     @ConfigOption("""
-        Enable the use of Wave containers.
+        Determines the allowed security levels when scanning containers for security vulnerabilities.
     """)
-    public boolean enabled;
+    public String allowedLevels;
 
     @ConfigOption("""
-        The Wave service endpoint (default: `https://wave.seqera.io`).
+        Determines the container security scanning execution modality.
     """)
-    public String endpoint;
-
-    @ConfigOption("""
-        Enables Wave container freezing. Wave will provision a non-ephemeral container image that will be pushed to a container repository of your choice.
-
-        See also: `wave.build.repository` and `wave.build.cacheRepository`
-    """)
-    public boolean freeze;
-
-    @ConfigOption("""
-        Enables Wave container mirroring.
-    """)
-    public boolean mirror;
-
-    @ConfigOption("""
-        The strategy to be used when resolving multiple Wave container requirements (default: `'container,dockerfile,conda,spack'`).
-    """)
-    public String strategy;
+    public String mode;
 
 }
