@@ -133,8 +133,13 @@ public class ScriptFormattingProvider implements FormattingProvider {
             for( var includeNode : scriptNode.getIncludes() )
                 visitInclude(includeNode);
             visitParams(scriptNode.getParams());
-            if( scriptNode.getEntry() != null )
-                visitWorkflow(scriptNode.getEntry());
+            var entry = scriptNode.getEntry();
+            if( entry != null ) {
+                if( entry.getLineNumber() != -1 )
+                    visitWorkflow(entry);
+                else
+                    fmt.visit(entry.main);
+            }
             if( scriptNode.getOutput() != null )
                 visitOutput(scriptNode.getOutput());
             for( var workflowNode : scriptNode.getWorkflows() ) {
