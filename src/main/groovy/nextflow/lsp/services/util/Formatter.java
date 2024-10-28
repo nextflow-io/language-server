@@ -687,6 +687,7 @@ public class Formatter extends CodeVisitorSupport {
     // helpers
 
     private String replaceEscapes(String value, String quoteChar) {
+        value = value.replace("\\", "\\\\");
         if( quoteChar == SQ_STR || quoteChar == DQ_STR ) {
             value = value.replace("\n", "\\n");
             value = value.replace("\t", "\\t");
