@@ -51,6 +51,7 @@ import nextflow.script.v2.AssignmentExpression;
 import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.IncludeNode;
+import nextflow.script.v2.IncludeVariable;
 import nextflow.script.v2.OutputNode;
 import nextflow.script.v2.ProcessNode;
 import nextflow.script.v2.ScriptNode;
@@ -147,6 +148,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( otherInclude != null )
                 addError("`" + name + "` is already included", node, "First included here", (ASTNode) otherInclude);
             includes.put(name, module);
+            declaredVariables.add(module);
         }
     }
 
@@ -176,8 +178,12 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
             // warn about any unused local variables
             for( var variable : declaredVariables ) {
-                if( variable instanceof ASTNode node && !variable.getName().startsWith("_") )
-                    sourceUnit.addWarning("Variable was declared but not used", node);
+                if( variable instanceof ASTNode node && !variable.getName().startsWith("_") ) {
+                    var message = variable instanceof IncludeVariable
+                        ? "Include was not used"
+                        : "Variable was declared but not used";
+                    sourceUnit.addWarning(message, node);
+                }
             }
         }
     }
