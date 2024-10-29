@@ -54,6 +54,7 @@ import org.codehaus.groovy.ast.stmt.EmptyStatement;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.IfStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
+import org.codehaus.groovy.ast.stmt.ThrowStatement;
 import org.codehaus.groovy.ast.stmt.TryCatchStatement;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.syntax.Types;
@@ -226,6 +227,15 @@ public class Formatter extends CodeVisitorSupport {
         for( var catchStatement : node.getCatchStatements() ) {
             visit(catchStatement);
         }
+    }
+
+    @Override
+    public void visitThrowStatement(ThrowStatement node) {
+        appendLeadingComments(node);
+        appendIndent();
+        append("throw ");
+        visit(node.getExpression());
+        appendNewLine();
     }
 
     @Override
