@@ -340,7 +340,7 @@ public class ScriptAstBuilder {
     }
 
     private IncludeNode includeDeclaration(IncludeDeclarationContext ctx) {
-        var source = ast( constX(stringLiteral(ctx.stringLiteral())), ctx.stringLiteral() );
+        var source = ast( string(ctx.stringLiteral()), ctx.stringLiteral() );
         var modules = ctx.includeNames().includeName().stream()
             .map(it -> {
                 var name = it.name.getText();
@@ -1031,7 +1031,7 @@ public class ScriptAstBuilder {
     }
 
     private Expression pathPropertyElement(Expression expression, PropertyPathExprAltContext ctx) {
-        var property = ast( constX(namedProperty(ctx.namedProperty())), ctx.namedProperty() );
+        var property = namedProperty(ctx.namedProperty());
         var safe = ctx.SAFE_DOT() != null || ctx.SPREAD_DOT() != null;
         var result = new PropertyExpression(expression, property, safe);
         if( ctx.SPREAD_DOT() != null )
@@ -1039,15 +1039,15 @@ public class ScriptAstBuilder {
         return result;
     }
 
-    private String namedProperty(NamedPropertyContext ctx) {
+    private Expression namedProperty(NamedPropertyContext ctx) {
         if( ctx.keywords() != null )
-            return keywords(ctx.keywords());
+            return ast( constX(keywords(ctx.keywords())), ctx );
 
         if( ctx.identifier() != null )
-            return identifier(ctx.identifier());
+            return ast( constX(identifier(ctx.identifier())), ctx );
 
         if( ctx.stringLiteral() != null )
-            return stringLiteral(ctx.stringLiteral());
+            return ast( string(ctx.stringLiteral()), ctx );
 
         throw new IllegalStateException();
     }
@@ -1188,14 +1188,10 @@ public class ScriptAstBuilder {
         return constX(num, true);
     }
 
-    private Expression string(StringLiteralContext ctx) {
+    private ConstantExpression string(ParserRuleContext ctx) {
         var text = ctx.getText();
         var result = constX(stringLiteral(text));
-        if( text.startsWith(SQ_STR)    ) result.putNodeMetaData(QUOTE_CHAR, SQ_STR);
-        if( text.startsWith(DQ_STR)    ) result.putNodeMetaData(QUOTE_CHAR, DQ_STR);
-        if( text.startsWith(TSQ_STR)   ) result.putNodeMetaData(QUOTE_CHAR, TSQ_STR);
-        if( text.startsWith(TDQ_STR)   ) result.putNodeMetaData(QUOTE_CHAR, TDQ_STR);
-        if( text.startsWith(SLASH_STR) ) result.putNodeMetaData(QUOTE_CHAR, SLASH_STR);
+        result.putNodeMetaData(VERBATIM_TEXT, text);
         return result;
     }
 
@@ -1226,13 +1222,14 @@ public class ScriptAstBuilder {
 
     private Expression gstring(GstringContext ctx) {
         var text = ctx.getText();
+        var beginQuotation = beginQuotation(text);
         var verbatimText = stringLiteral(text);
         var strings = new ArrayList<ConstantExpression>();
         var values = new ArrayList<Expression>();
 
         for( var part : ctx.gstringDqPart() ) {
             if( part instanceof GstringDqTextAltContext tac )
-                strings.add(ast( constX(tac.getText()), tac ));
+                strings.add(ast( gstringText(tac, beginQuotation), tac ));
 
             if( part instanceof GstringDqPathAltContext pac )
                 values.add(ast( gstringPath(pac), pac ));
@@ -1243,7 +1240,7 @@ public class ScriptAstBuilder {
 
         for( var part : ctx.gstringTdqPart() ) {
             if( part instanceof GstringTdqTextAltContext tac )
-                strings.add(ast( constX(tac.getText()), tac ));
+                strings.add(ast( gstringText(tac, beginQuotation), tac ));
 
             if( part instanceof GstringTdqPathAltContext pac )
                 values.add(ast( gstringPath(pac), pac ));
@@ -1253,8 +1250,27 @@ public class ScriptAstBuilder {
         }
 
         var result = new GStringExpression(verbatimText, strings, values);
-        if( text.startsWith(DQ_STR)  ) result.putNodeMetaData(QUOTE_CHAR, DQ_STR);
-        if( text.startsWith(TDQ_STR) ) result.putNodeMetaData(QUOTE_CHAR, TDQ_STR);
+        result.putNodeMetaData(QUOTE_CHAR, beginQuotation);
+        return result;
+    }
+
+    private String beginQuotation(String text) {
+        if( text.startsWith(TDQ_STR) )
+            return TDQ_STR;
+        if( text.startsWith(DQ_STR) )
+            return DQ_STR;
+
+        throw new IllegalStateException();
+    }
+
+    private ConstantExpression gstringText(ParserRuleContext ctx, String beginQuotation) {
+        var text = ctx.getText();
+        var quotedText = new StringBuilder(text)
+            .insert(0, beginQuotation)
+            .append(beginQuotation)
+            .toString();
+        var result = constX(stringLiteral(quotedText));
+        result.putNodeMetaData(VERBATIM_TEXT, text);
         return result;
     }
 
@@ -1457,7 +1473,7 @@ public class ScriptAstBuilder {
     }
 
     private MapEntryExpression namedArg(NamedArgContext ctx) {
-        var key = ast( constX(namedProperty(ctx.namedProperty())), ctx.namedProperty() );
+        var key = namedProperty(ctx.namedProperty());
         var value = expression(ctx.expression());
         return ast( new MapEntryExpression(key, value), ctx );
     }
@@ -1830,6 +1846,7 @@ public class ScriptAstBuilder {
     private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
     private static final String TRAILING_COMMENT = "_TRAILING_COMMENT";
+    private static final String VERBATIM_TEXT = "_VERBATIM_TEXT";
 
     private static final List<String> GROOVY_KEYWORDS = List.of(
         Types.getText(Types.KEYWORD_ABSTRACT),

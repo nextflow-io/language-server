@@ -280,7 +280,7 @@ public class Formatter extends CodeVisitorSupport {
             append('.');
         }
 
-        visit(node.getMethod(), false);
+        visit(node.getMethod());
 
         var iwmc = inWrappedMethodChain;
         inWrappedMethodChain = false;
@@ -543,7 +543,7 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitMapEntryExpression(MapEntryExpression node) {
-        visit(node.getKeyExpression(), false);
+        visit(node.getKeyExpression());
         append(": ");
         visit(node.getValueExpression());
     }
@@ -586,24 +586,11 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitConstantExpression(ConstantExpression node) {
-        visitConstantExpression(node, true);
-    }
-
-    protected void visitConstantExpression(ConstantExpression node, boolean quote) {
-        if( node.getValue() instanceof String str ) {
-            if( quote ) {
-                var quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> SQ_STR);
-                append(quoteChar);
-                append(replaceEscapes(str, quoteChar));
-                append(quoteChar);
-            }
-            else {
-                append(str);
-            }
-        }
-        else {
+        var text = (String) node.getNodeMetaData(VERBATIM_TEXT);
+        if( text != null )
+            append(text);
+        else
             append(node.getText());
-        }
     }
 
     @Override
@@ -645,26 +632,26 @@ public class Formatter extends CodeVisitorSupport {
     public void visitPropertyExpression(PropertyExpression node) {
         visit(node.getObjectExpression());
         append('.');
-        visit(node.getProperty(), false);
+        visit(node.getProperty());
     }
 
     @Override
     public void visitGStringExpression(GStringExpression node) {
         var quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> DQ_STR);
         append(quoteChar);
-        var stream = Stream.concat(
-            node.getStrings().stream().map(v -> (Expression) v),
-            node.getValues().stream()
-        );
-        stream
+        Stream
+            .concat(
+                node.getStrings().stream().map(v -> (Expression) v),
+                node.getValues().stream()
+            )
             .sorted((a, b) ->
                 a.getLineNumber() != b.getLineNumber()
                     ? a.getLineNumber() - b.getLineNumber()
                     : a.getColumnNumber() - b.getColumnNumber()
             )
             .forEach((part) -> {
-                if( part instanceof ConstantExpression ce && ce.getValue() instanceof String str ) {
-                    append(replaceEscapes(str, quoteChar));
+                if( part.getNodeMetaData(VERBATIM_TEXT) != null ) {
+                    visit(part);
                 }
                 else {
                     append("${");
@@ -677,33 +664,15 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visit(Expression node) {
-        visit(node, true);
-    }
-
-    protected void visit(Expression node, boolean quote) {
         var number = (Number) node.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
         if( number != null && number.intValue() > 0 )
             append('(');
-        if( node instanceof ConstantExpression ce ) {
-            visitConstantExpression(ce, quote);
-        }
-        else {
-            super.visit(node);
-        }
+        super.visit(node);
         if( number != null && number.intValue() > 0 )
             append(')');
     }
 
     // helpers
-
-    private String replaceEscapes(String value, String quoteChar) {
-        value = value.replace("\\", "\\\\");
-        if( quoteChar == SQ_STR || quoteChar == DQ_STR ) {
-            value = value.replace("\n", "\\n");
-            value = value.replace("\t", "\\t");
-        }
-        return value;
-    }
 
     private boolean shouldWrapExpression(Expression node) {
         return node.getLineNumber() < node.getLastLineNumber();
@@ -748,5 +717,6 @@ public class Formatter extends CodeVisitorSupport {
     private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
     private static final String TRAILING_COMMENT = "_TRAILING_COMMENT";
+    private static final String VERBATIM_TEXT = "_VERBATIM_TEXT";
 
 }
