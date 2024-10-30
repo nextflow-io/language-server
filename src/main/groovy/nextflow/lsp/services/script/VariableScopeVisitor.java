@@ -63,6 +63,7 @@ import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.DynamicVariable;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.VariableScope;
@@ -176,8 +177,12 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
             // warn about any unused local variables
             for( var variable : declaredVariables ) {
-                if( variable instanceof ASTNode node && !variable.getName().startsWith("_") )
-                    sourceUnit.addWarning("Variable was declared but not used", node);
+                if( variable instanceof ASTNode node && !variable.getName().startsWith("_") ) {
+                    var message = variable instanceof Parameter
+                        ? "Parameter was not used -- prefix with `_` to suppress warning"
+                        : "Variable was declared but not used";
+                    sourceUnit.addWarning(message, node);
+                }
             }
         }
     }
