@@ -27,6 +27,7 @@ import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.expr.BinaryExpression;
+import org.codehaus.groovy.ast.expr.ClassExpression;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
@@ -81,10 +82,13 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
         super.visitMethodCallExpression(node);
     }
 
-    protected void checkMethodCall(MethodCallExpression node) {
+    private void checkMethodCall(MethodCallExpression node) {
         var defNode = ASTUtils.getMethodFromCallExpression(node, astCache);
-        if( defNode == null )
+        if( defNode == null ) {
+            if( node.getObjectExpression() instanceof ClassExpression ce )
+                addError(String.format("`%s.%s()` is not defined", ce.getType().getNameWithoutPackage(), node.getMethodAsString()), node);
             return;
+        }
         if( !(defNode instanceof ProcessNode) && !(defNode instanceof WorkflowNode) )
             return;
         if( !inWorkflow ) {
@@ -103,7 +107,7 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
             addError(String.format("Incorrect number of call arguments, expected %d but received %d", paramsCount, argsCount), node);
     }
 
-    protected static int getNumberOfParameters(MethodNode node) {
+    private static int getNumberOfParameters(MethodNode node) {
         if( node instanceof ProcessNode pn ) {
             return (int) asBlockStatements(pn.inputs).size();
         }
