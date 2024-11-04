@@ -18,7 +18,6 @@ package nextflow.config.scopes;
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
 import nextflow.util.Duration;
-import nextflow.util.MemoryUnit;
 
 public class ExecutorRetryConfig implements ConfigScope {
 
@@ -43,28 +42,28 @@ public class ExecutorRetryConfig implements ConfigScope {
 
         Delay when retrying failed job submissions (default: `500ms`).
         """)
-    public String delay;
+    public Duration delay;
 
     @ConfigOption("""
         *Used only by grid executors.*
 
         Jitter value when retrying failed job submissions (default: `0.25`).
         """)
-    public String jitter;
+    public double jitter;
 
     @ConfigOption("""
         *Used only by grid executors.*
 
         Max attempts when retrying failed job submissions (default: `3`).
         """)
-    public String maxAttempt;
+    public int maxAttempts;
 
     @ConfigOption("""
         *Used only by grid executors.*
 
         Max delay when retrying failed job submissions (default: `30s`).
         """)
-    public String maxDelay;
+    public Duration maxDelay;
 
     @ConfigOption("""
         *Used only by grid executors.*

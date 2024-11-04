@@ -15,6 +15,8 @@
  */
 package nextflow.config.scopes;
 
+import java.nio.file.Path;
+
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
 import nextflow.util.Duration;
@@ -40,7 +42,7 @@ public class SpackConfig implements ConfigScope {
     @ConfigOption("""
         The path where Spack environments are stored.
     """)
-    public String cacheDir;
+    public Path cacheDir;
 
     @ConfigOption("""
         Enables checksum verification for source tarballs (default: `true`).

@@ -15,6 +15,9 @@
  */
 package nextflow.config.scopes;
 
+import java.nio.file.Path;
+import java.util.List;
+
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
 import nextflow.util.Duration;
@@ -45,12 +48,12 @@ public class CondaConfig implements ConfigScope {
     @ConfigOption("""
         The path where Conda environments are stored.
     """)
-    public String cacheDir;
+    public Path cacheDir;
 
     @ConfigOption("""
         The Conda channels that can be used to resolve Conda packages.
     """)
-    public String channels;
+    public List<String> channels;
 
     @ConfigOption("""
         Extra command line options to append to the `conda create` command.

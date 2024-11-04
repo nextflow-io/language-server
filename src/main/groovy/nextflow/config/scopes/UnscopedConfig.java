@@ -15,6 +15,8 @@
  */
 package nextflow.config.scopes;
 
+import java.nio.file.Path;
+
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
 
@@ -49,7 +51,7 @@ public class UnscopedConfig implements ConfigScope {
     @ConfigOption("""
         Defines the pipeline output directory. Equivalent to the `-output-dir` option of the `run` command.
     """)
-    public String outputDir;
+    public Path outputDir;
 
     @ConfigOption("""
         If `true`, enable the use of previously cached task executions. Equivalent to the `-resume` option of the `run` command.
@@ -59,6 +61,6 @@ public class UnscopedConfig implements ConfigScope {
     @ConfigOption("""
         The pipeline work directory. Equivalent to the `-work-dir` option of the `run` command.
     """)
-    public String workDir;
+    public Path workDir;
 
 }
