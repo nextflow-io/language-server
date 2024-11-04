@@ -517,9 +517,9 @@ public class ScriptAstBuilder {
 
         if( name == null ) {
             if( takes instanceof BlockStatement )
-                collectSyntaxError(new SyntaxException("Entry workflow cannot have inputs", takes));
+                collectSyntaxError(new SyntaxException("Entry workflow cannot have a take section", takes));
             if( emits instanceof BlockStatement )
-                collectSyntaxError(new SyntaxException("Entry workflow cannot have outputs", emits));
+                collectSyntaxError(new SyntaxException("Entry workflow cannot have an emit section", emits));
         }
 
         var result = ast( new WorkflowNode(name, takes, main, emits, publishers), ctx );

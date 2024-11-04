@@ -211,8 +211,14 @@ workflowDef
 workflowBody
     // explicit main block with optional take/emit blocks
     :   (sep TAKE COLON nls workflowTakes)?
-        (sep MAIN COLON nls workflowMain)?
+        sep MAIN COLON nls workflowMain
         (sep EMIT COLON nls workflowEmits)?
+        (sep PUBLISH COLON nls workflowPublishers)?
+
+    // explicit emit block with optional take/main blocks
+    |   (sep TAKE COLON nls workflowTakes)?
+        (sep MAIN COLON nls workflowMain)?
+        sep EMIT COLON nls workflowEmits
         (sep PUBLISH COLON nls workflowPublishers)?
 
     // implicit main block
