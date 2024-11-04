@@ -48,6 +48,8 @@ public class ConfigSchema {
         new GoogleConfig(),
         new GoogleBatchConfig(),
         new K8sConfig(),
+        new MailConfig(),
+        new MailSmtpConfig(),
         new Manifest(),
         new ParamsConfig(),
         new PluginsConfig(),
