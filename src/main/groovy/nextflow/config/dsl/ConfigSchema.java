@@ -43,6 +43,7 @@ public class ConfigSchema {
         new DockerConfig(),
         new EnvConfig(),
         new ExecutorConfig(),
+        new ExecutorRetryConfig(),
         new FusionConfig(),
         new GoogleConfig(),
         new GoogleBatchConfig(),
