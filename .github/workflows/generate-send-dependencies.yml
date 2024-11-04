@@ -22,4 +22,4 @@ jobs:
         dependency-resolution-task: "dependencies"
         additional-arguments: "--configuration runtimeClasspath"
         dependency-graph: generate-and-submit
-        gradle-version: 8
+        gradle-version: 8.10.2
