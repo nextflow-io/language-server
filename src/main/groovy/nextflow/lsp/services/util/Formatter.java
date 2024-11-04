@@ -32,6 +32,7 @@ import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
 import org.codehaus.groovy.ast.expr.DeclarationExpression;
 import org.codehaus.groovy.ast.expr.ElvisOperatorExpression;
+import org.codehaus.groovy.ast.expr.EmptyExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.GStringExpression;
 import org.codehaus.groovy.ast.expr.ListExpression;
@@ -341,6 +342,16 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitBinaryExpression(BinaryExpression node) {
+        if( node instanceof DeclarationExpression ) {
+            append("def ");
+            visit(node.getLeftExpression());
+            if( !(node.getRightExpression() instanceof EmptyExpression) ) {
+                append(" = ");
+                visit(node.getRightExpression());
+            }
+            return;
+        }
+
         if( node.getOperation().isA(Types.LEFT_SQUARE_BRACKET) ) {
             visit(node.getLeftExpression());
             append('[');
@@ -359,8 +370,6 @@ public class Formatter extends CodeVisitorSupport {
             currentStmtExpr = node.getRightExpression();
         }
 
-        if( node instanceof DeclarationExpression )
-            append("def ");
         visit(node.getLeftExpression());
 
         if( inWrappedPipeChain ) {
