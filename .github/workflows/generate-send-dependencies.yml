@@ -16,9 +16,10 @@ jobs:
         distribution: temurin
         java-version: 21
 
-    - name: Generate and submit dependency graph for nextflow
+    - name: Generate and submit dependency graph for language-server
       uses: gradle/actions/dependency-submission@v4
       with:
         dependency-resolution-task: "dependencies"
         additional-arguments: "--configuration runtimeClasspath"
         dependency-graph: generate-and-submit
+        gradle-version: 8
