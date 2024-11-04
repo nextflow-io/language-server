@@ -1,6 +1,7 @@
 name: Generate and submit dependency graph for language-server
 on:
-    pull_request:
+  push:
+    branches: ['main']
 
 permissions:
   contents: write
