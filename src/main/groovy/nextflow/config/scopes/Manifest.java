@@ -15,6 +15,9 @@
  */
 package nextflow.config.scopes;
 
+import java.util.List;
+import java.util.Map;
+
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
 
@@ -42,6 +45,11 @@ public class Manifest implements ConfigScope {
     public String author;
 
     @ConfigOption("""
+        List of project contributors. Should be a list of maps.
+    """)
+    public List<Map> contributors;
+
+    @ConfigOption("""
         Git repository default branch (default: `master`).
     """)
     public String defaultBranch;
@@ -52,6 +60,11 @@ public class Manifest implements ConfigScope {
     public String description;
 
     @ConfigOption("""
+        Project documentation URL.
+    """)
+    public String docsUrl;
+
+    @ConfigOption("""
         Project related publication DOI identifier.
     """)
     public String doi;
@@ -60,6 +73,16 @@ public class Manifest implements ConfigScope {
         Project home page URL.
     """)
     public String homePage;
+
+    @ConfigOption("""
+        Project related icon location (Relative path or URL).
+    """)
+    public String icon;
+
+    @ConfigOption("""
+        Project license.
+    """)
+    public String license;
 
     @ConfigOption("""
         Project main script (default: `main.nf`).
@@ -75,6 +98,11 @@ public class Manifest implements ConfigScope {
         Minimum required Nextflow version.
     """)
     public String nextflowVersion;
+
+    @ConfigOption("""
+        Project organization.
+    """)
+    public String organization;
 
     @ConfigOption("""
         Pull submodules recursively from the Git repository.
