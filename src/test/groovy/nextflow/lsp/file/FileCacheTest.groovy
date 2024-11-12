@@ -67,7 +67,7 @@ class FileCacheTest extends Specification {
             )
         ))
         then:
-		'hello there, friend' == fileCache.getContents(URI.create('file.txt'))
+        'hello there, friend' == fileCache.getContents(URI.create('file.txt'))
     }
 
 }
