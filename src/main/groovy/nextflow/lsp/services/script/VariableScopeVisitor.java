@@ -198,10 +198,15 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             )
             .findFirst();
 
-        if( result.isPresent() )
-            node.target = result.get();
-        else
+        if( result.isPresent() ) {
+            var ffn = result.get();
+            if( findAnnotation(ffn, Deprecated.class).isPresent() )
+                addFutureWarning("`" + node.name + "` is deprecated and will be removed in a future version", node.name, node);
+            node.target = ffn;
+        }
+        else {
             addError("Unrecognized feature flag '" + node.name + "'", node);
+        }
     }
 
     private boolean inWorkflowEmit;
@@ -918,16 +923,24 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    protected void addFutureWarning(String message, ASTNode node, String otherMessage, ASTNode otherNode) {
-        var token = new Token(0, "", node.getLineNumber(), node.getColumnNumber()); // ASTNode to CSTNode
+    protected void addFutureWarning(String message, String tokenText, ASTNode node, String otherMessage, ASTNode otherNode) {
+        var token = new Token(0, tokenText, node.getLineNumber(), node.getColumnNumber()); // ASTNode to CSTNode
         var warning = new FutureWarning(WarningMessage.POSSIBLE_ERRORS, message, token, sourceUnit);
         if( otherNode != null )
             warning.setRelatedInformation(otherMessage, otherNode);
         sourceUnit.getErrorCollector().addWarning(warning);
     }
 
+    protected void addFutureWarning(String message, ASTNode node, String otherMessage, ASTNode otherNode) {
+        addFutureWarning(message, "", node, otherMessage, otherNode);
+    }
+
+    protected void addFutureWarning(String message, String tokenText, ASTNode node) {
+        addFutureWarning(message, tokenText, node, null, null);
+    }
+
     protected void addFutureWarning(String message, ASTNode node) {
-        addFutureWarning(message, node, null, null);
+        addFutureWarning(message, "", node, null, null);
     }
 
     @Override
