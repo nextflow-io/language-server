@@ -304,11 +304,13 @@ public class ScriptFormattingProvider implements FormattingProvider {
                 var ve = (VariableExpression) emit;
                 fmt.appendIndent();
                 fmt.visit(ve);
-                if( alignmentWidth > 0 ) {
-                    var padding = alignmentWidth - ve.getName().length();
-                    fmt.append(" ".repeat(padding));
+                if( fmt.hasTrailingComment(stmt) ) {
+                    if( alignmentWidth > 0 ) {
+                        var padding = alignmentWidth - ve.getName().length();
+                        fmt.append(" ".repeat(padding));
+                    }
+                    fmt.appendTrailingComment(stmt);
                 }
-                fmt.appendTrailingComment(stmt);
                 fmt.appendNewLine();
             }
         }
@@ -337,11 +339,13 @@ public class ScriptFormattingProvider implements FormattingProvider {
                 else if( emit instanceof VariableExpression ve ) {
                     fmt.appendIndent();
                     fmt.visit(ve);
-                    if( alignmentWidth > 0 ) {
-                        var padding = alignmentWidth - ve.getName().length();
-                        fmt.append(" ".repeat(padding));
+                    if( fmt.hasTrailingComment(stmt) ) {
+                        if( alignmentWidth > 0 ) {
+                            var padding = alignmentWidth - ve.getName().length();
+                            fmt.append(" ".repeat(padding));
+                        }
+                        fmt.appendTrailingComment(stmt);
                     }
-                    fmt.appendTrailingComment(stmt);
                     fmt.appendNewLine();
                 }
                 else {
@@ -507,8 +511,11 @@ public class ScriptFormattingProvider implements FormattingProvider {
         protected void visitDirective(MethodCallExpression call) {
             fmt.appendIndent();
             fmt.append(call.getMethodAsString());
-            fmt.append(' ');
-            fmt.visitArguments(asMethodCallArguments(call), false);
+            var arguments = asMethodCallArguments(call);
+            if( !arguments.isEmpty() ) {
+                fmt.append(' ');
+                fmt.visitArguments(arguments, false);
+            }
             fmt.appendNewLine();
         }
 

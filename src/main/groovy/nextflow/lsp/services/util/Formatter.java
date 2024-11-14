@@ -119,6 +119,11 @@ public class Formatter extends CodeVisitorSupport {
         }
     }
 
+    public boolean hasTrailingComment(ASTNode node) {
+        var comment = (String) node.getNodeMetaData(TRAILING_COMMENT);
+        return comment != null;
+    }
+
     public void appendTrailingComment(ASTNode node) {
         var comment = (String) node.getNodeMetaData(TRAILING_COMMENT);
         if( comment != null ) {
