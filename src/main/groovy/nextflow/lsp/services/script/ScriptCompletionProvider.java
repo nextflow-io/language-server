@@ -210,14 +210,10 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 continue;
             existingNames.add(name);
 
-            var item = new CompletionItem();
-            item.setLabel(field.getName());
+            var item = new CompletionItem(field.getName());
             item.setKind(astNodeToCompletionItemKind(field));
             item.setDetail(astNodeToCompletionItemDetail(field));
-
-            var documentation = ASTNodeStringUtils.getDocumentation(field);
-            if( documentation != null )
-                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation));
+            item.setDocumentation(astNodeToCompletionItemDocumentation(field));
 
             if( !addItem(item, items) )
                 break;
@@ -232,14 +228,10 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 continue;
             existingNames.add(name);
 
-            var item = new CompletionItem();
-            item.setLabel(method.getName());
+            var item = new CompletionItem(method.getName());
             item.setKind(astNodeToCompletionItemKind(method));
             item.setDetail(astNodeToCompletionItemDetail(method));
-
-            var documentation = ASTNodeStringUtils.getDocumentation(method);
-            if( documentation != null )
-                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation));
+            item.setDocumentation(astNodeToCompletionItemDocumentation(method));
 
             if( !addItem(item, items) )
                 break;
@@ -277,8 +269,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 continue;
             existingNames.add(name);
 
-            var item = new CompletionItem();
-            item.setLabel(name);
+            var item = new CompletionItem(name);
             item.setKind(astNodeToCompletionItemKind((ASTNode) variable));
             if( !addItem(item, items) )
                 break;
@@ -332,10 +323,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
             var item = new CompletionItem(name);
             item.setKind(astNodeToCompletionItemKind(node));
             item.setDetail(astNodeToCompletionItemDetail(node));
-
-            var documentation = ASTNodeStringUtils.getDocumentation(node);
-            if( documentation != null )
-                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation));
+            item.setDocumentation(astNodeToCompletionItemDocumentation(node));
 
             if( !isIncluded(uri, node) ) {
                 var textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, node);
@@ -390,13 +378,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
     private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, List<CompletionItem> items) {
         for( var cn : classNodes ) {
-            var item = new CompletionItem();
-            item.setLabel(cn.getNameWithoutPackage());
+            var item = new CompletionItem(cn.getNameWithoutPackage());
             item.setKind(astNodeToCompletionItemKind(cn));
-
-            var documentation = ASTNodeStringUtils.getDocumentation(cn);
-            if( documentation != null )
-                item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation));
+            item.setDocumentation(astNodeToCompletionItemDocumentation(cn));
 
             if( !addItem(item, items) )
                 break;
@@ -404,15 +388,14 @@ public class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private static String astNodeToCompletionItemDetail(ASTNode node) {
-        if( node instanceof FunctionNode )
-            return "function";
-        if( node instanceof ProcessNode )
-            return "process";
-        if( node instanceof WorkflowNode )
-            return "workflow";
-        if( Logger.isDebugEnabled() && node instanceof AnnotatedNode an )
-            return an.getDeclaringClass().getNameWithoutPackage();
-        return null;
+        return ASTNodeStringUtils.getLabel(node);
+    }
+
+    private static MarkupContent astNodeToCompletionItemDocumentation(ASTNode node) {
+        var documentation = ASTNodeStringUtils.getDocumentation(node);
+        return documentation != null
+            ? new MarkupContent(MarkupKind.MARKDOWN, documentation)
+            : null;
     }
 
     private static CompletionItemKind astNodeToCompletionItemKind(ASTNode node) {
