@@ -209,8 +209,15 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitWorkflow(WorkflowNode node) {
-        if( node.isEntry() )
-            declareParameters();
+        if( node.isEntry() ) {
+            try {
+                declareParameters();
+            }
+            catch( Exception e ) {
+                System.err.println("Failed to parse parameter schema (nextflow_schema.json): " + e.toString());
+                addError("Failed to parse parameter schema -- check nextflow_schema.json for possible errors", node);
+            }
+        }
 
         pushState(node.isEntry() ? EntryWorkflowDsl.class : WorkflowDsl.class);
         currentDefinition = node;
