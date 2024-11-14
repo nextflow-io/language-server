@@ -386,7 +386,7 @@ public class ScriptAstBuilder {
 
         if( ctx.body.blockStatements() != null ) {
             if( !(directives instanceof EmptyStatement) || !(inputs instanceof EmptyStatement) || !(outputs instanceof EmptyStatement) )
-                collectSyntaxError(new SyntaxException("The `script:`, `shell:`, or `exec:` label is required when other sections are present", exec));
+                collectSyntaxError(new SyntaxException("The `script:` or `exec:` label is required when other sections are present", exec));
         }
 
         var result = ast( new ProcessNode(name, directives, inputs, outputs, when, type, exec, stub), ctx );
@@ -483,12 +483,14 @@ public class ScriptAstBuilder {
         if( ctx == null )
             return "script";
 
-        if( ctx.EXEC() != null )
+        if( ctx.EXEC() != null ) {
             return "exec";
-        else if( ctx.SHELL() != null )
+        }
+        if( ctx.SHELL() != null ) {
+            collectWarning("The `shell` block is deprecated, use `script` instead", ast( new EmptyExpression(), ctx.SHELL() ));
             return "shell";
-        else
-            return "script";
+        }
+        return "script";
     }
 
     private Statement processStub(ProcessStubContext ctx) {
