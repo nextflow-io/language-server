@@ -21,10 +21,8 @@ import java.util.stream.Stream;
 import groovy.lang.groovydoc.Groovydoc;
 import nextflow.lsp.services.util.FormattingOptions;
 import nextflow.lsp.services.util.Formatter;
-import nextflow.script.dsl.Constant;
-import nextflow.script.dsl.DslType;
+import nextflow.script.dsl.Description;
 import nextflow.script.dsl.FeatureFlag;
-import nextflow.script.dsl.Function;
 import nextflow.script.dsl.Operator;
 import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDirectiveDsl;
@@ -246,7 +244,7 @@ public class ASTNodeStringUtils {
     public static String getDocumentation(ASTNode node) {
         if( node instanceof FeatureFlagNode ffn ) {
             if( ffn.target instanceof AnnotatedNode an )
-                return annotationValueToMarkdown(an, FeatureFlag.class, "description");
+                return annotationValueToMarkdown(an);
         }
 
         if( node instanceof WorkflowNode wn )
@@ -261,38 +259,34 @@ public class ASTNodeStringUtils {
         if( node instanceof ClassNode cn ) {
             var result = groovydocToMarkdown(cn.getGroovydoc());
             if( result == null )
-                result = annotationValueToMarkdown(cn, DslType.class);
+                result = annotationValueToMarkdown(cn);
             return result;
         }
 
         if( node instanceof FieldNode fn ) {
             var result = groovydocToMarkdown(fn.getGroovydoc());
             if( result == null )
-                result = annotationValueToMarkdown(fn, Constant.class);
+                result = annotationValueToMarkdown(fn);
             return result;
         }
 
         if( node instanceof MethodNode mn ) {
             var result = groovydocToMarkdown(mn.getGroovydoc());
             if( result == null )
-                result = annotationValueToMarkdown(mn, Function.class);
+                result = annotationValueToMarkdown(mn);
             return result;
         }
 
         return null;
     }
 
-    private static String annotationValueToMarkdown(AnnotatedNode node, Class type, String member) {
-        return findAnnotation(node, type)
+    private static String annotationValueToMarkdown(AnnotatedNode node) {
+        return findAnnotation(node, Description.class)
             .map((an) -> {
-                var description = an.getMember(member).getText();
+                var description = an.getMember("value").getText();
                 return StringGroovyMethods.stripIndent(description, true).trim();
             })
             .orElse(null);
-    }
-
-    private static String annotationValueToMarkdown(AnnotatedNode node, Class type) {
-        return annotationValueToMarkdown(node, type, "value");
     }
 
     private static String groovydocToMarkdown(Groovydoc groovydoc) {

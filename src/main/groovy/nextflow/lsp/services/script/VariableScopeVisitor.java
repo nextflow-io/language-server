@@ -34,11 +34,10 @@ import nextflow.lsp.compiler.FutureWarning;
 import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
 import nextflow.lsp.compiler.RelatedInformationAware;
-import nextflow.script.dsl.Constant;
+import nextflow.script.dsl.Description;
 import nextflow.script.dsl.EntryWorkflowDsl;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
-import nextflow.script.dsl.Function;
 import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ParamsMap;
 import nextflow.script.dsl.ProcessDsl;
@@ -193,7 +192,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var result = cn.getFields().stream()
             .filter(fn ->
                 findAnnotation(fn, FeatureFlag.class)
-                    .map(an -> an.getMember("name").getText())
+                    .map(an -> an.getMember("value").getText())
                     .map(name -> name.equals(node.name))
                     .orElse(false)
             )
@@ -284,7 +283,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             fn.setHasNoRealSourcePosition(true);
             fn.setDeclaringClass(cn);
             fn.setSynthetic(true);
-            var an = new AnnotationNode(ClassHelper.makeCached(Constant.class));
+            var an = new AnnotationNode(ClassHelper.makeCached(Description.class));
             an.addMember("value", new ConstantExpression(description));
             fn.addAnnotation(an);
             cn.addField(fn);
@@ -626,7 +625,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void declareAssignedVariable(VariableExpression ve) {
         var variable = findVariableDeclaration(ve.getName(), ve);
         if( variable != null ) {
-            if( variable instanceof FieldNode fn && findAnnotation(fn, Constant.class).isPresent() )
+            if( variable instanceof FieldNode fn && findAnnotation(fn, Description.class).isPresent() )
                 addError("Built-in variable cannot be re-assigned", ve);
             else
                 checkExternalWriteInClosure(ve, variable);
@@ -666,7 +665,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( target == null )
             return;
         var variable = findVariableDeclaration(target.getName(), target);
-        if( variable instanceof FieldNode fn && findAnnotation(fn, Constant.class).isPresent() ) {
+        if( variable instanceof FieldNode fn && findAnnotation(fn, Description.class).isPresent() ) {
             if( "params".equals(variable.getName()) )
                 sourceUnit.addWarning("Params should be declared at the top-level (i.e. outside the workflow)", target);
             // TODO: re-enable after workflow.onComplete bug is fixed
@@ -877,7 +876,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private Variable findClassMember(ClassNode cn, String name, ASTNode node) {
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var fn = cn.getDeclaredField(name);
-            if( fn != null && findAnnotation(fn, Constant.class).isPresent() ) {
+            if( fn != null && findAnnotation(fn, Description.class).isPresent() ) {
                 if( findAnnotation(fn, Deprecated.class).isPresent() )
                     addFutureWarning("`" + name + "` is deprecated and will be removed in a future version", node);
                 return fn;
@@ -889,7 +888,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                 if( mn instanceof FunctionNode || mn instanceof ProcessNode || mn instanceof WorkflowNode ) {
                     return wrapMethodAsVariable(mn, cn);
                 }
-                if( findAnnotation(mn, Function.class).isPresent() ) {
+                if( findAnnotation(mn, Description.class).isPresent() ) {
                     if( findAnnotation(mn, Deprecated.class).isPresent() )
                         addFutureWarning("`" + name + "` is deprecated and will be removed in a future version", node);
                     return wrapMethodAsVariable(mn, cn);

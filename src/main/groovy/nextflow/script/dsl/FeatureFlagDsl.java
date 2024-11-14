@@ -18,54 +18,47 @@ package nextflow.script.dsl;
 public class FeatureFlagDsl {
 
     @Deprecated
-    @FeatureFlag(
-        name="nextflow.enable.configProcessNamesValidation",
-        description="""
-            When `true`, prints a warning for every `withName:` process selector that doesn't match a process in the pipeline (default: `true`).
-        """)
+    @FeatureFlag("nextflow.enable.configProcessNamesValidation")
+    @Description("""
+        When `true`, prints a warning for every `withName:` process selector that doesn't match a process in the pipeline (default: `true`).
+    """)
     public boolean configProcessNamesValidation;
 
     @Deprecated
-    @FeatureFlag(
-        name="nextflow.enable.dsl",
-        description="""
-            Defines the DSL version (`1` or `2`).
-        """)
+    @FeatureFlag("nextflow.enable.dsl")
+    @Description("""
+        Defines the DSL version (`1` or `2`).
+    """)
     public float dsl;
 
-    @FeatureFlag(
-        name="nextflow.enable.moduleBinaries",
-        description="""
-            When `true`, enables the use of modules with executable scripts i.e. [module binaries](https://nextflow.io/docs/latest/module.html#module-binaries).
-        """)
+    @FeatureFlag("nextflow.enable.moduleBinaries")
+    @Description("""
+        When `true`, enables the use of modules with executable scripts i.e. [module binaries](https://nextflow.io/docs/latest/module.html#module-binaries).
+    """)
     public boolean moduleBinaries;
 
-    @FeatureFlag(
-        name="nextflow.enable.strict",
-        description="""
-            When `true`, the pipeline is executed in [strict mode](https://nextflow.io/docs/latest/reference/feature-flags.html).
-        """)
+    @FeatureFlag("nextflow.enable.strict")
+    @Description("""
+        When `true`, the pipeline is executed in [strict mode](https://nextflow.io/docs/latest/reference/feature-flags.html).
+    """)
     public boolean strict;
 
-    @FeatureFlag(
-        name="nextflow.preview.output",
-        description="""
-            When `true`, enables the use of the [workflow output definition](https://nextflow.io/docs/latest/workflow.html#workflow-output-def).
-        """)
+    @FeatureFlag("nextflow.preview.output")
+    @Description("""
+        When `true`, enables the use of the [workflow output definition](https://nextflow.io/docs/latest/workflow.html#workflow-output-def).
+    """)
     public boolean previewOutput;
 
-    @FeatureFlag(
-        name="nextflow.preview.recursion",
-        description="""
-            When `true`, enables the use of [process and workflow recursion](https://github.com/nextflow-io/nextflow/discussions/2521).
-        """)
+    @FeatureFlag("nextflow.preview.recursion")
+    @Description("""
+        When `true`, enables the use of [process and workflow recursion](https://github.com/nextflow-io/nextflow/discussions/2521).
+    """)
     public boolean previewRecursion;
 
-    @FeatureFlag(
-        name="nextflow.preview.topic",
-        description="""
-            When `true`, enables the use of [topic channels](https://nextflow.io/docs/latest/reference/channel.html#topic).
-        """)
+    @FeatureFlag("nextflow.preview.topic")
+    @Description("""
+        When `true`, enables the use of [topic channels](https://nextflow.io/docs/latest/reference/channel.html#topic).
+    """)
     public boolean previewTopic;
 
 }

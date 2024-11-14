@@ -36,120 +36,120 @@ class ScriptDsl implements DslScope {
     ]
 
     @Deprecated
-    @Constant('''
+    @Description('''
         Alias of `workflow.projectDir`.
     ''')
     Path baseDir
 
-    @Constant('''
+    @Description('''
         Alias of `workflow.launchDir`.
     ''')
     Path launchDir
 
-    @Constant('''
+    @Description('''
         Logger which can be used to log messages to the console.
     ''')
     Logger log
 
-    @Constant('''
+    @Description('''
         The directory where a module script is located (equivalent to `projectDir` if used in the main script).
     ''')
     Path moduleDir
 
-    @Constant('''
+    @Description('''
         Map of Nextflow runtime information.
     ''')
     NextflowMeta nextflow
 
-    @Constant('''
+    @Description('''
         Alias of `workflow.projectDir`.
     ''')
     Path projectDir
 
-    @Constant('''
+    @Description('''
         Map of user-defined pipeline secrets.
     ''')
     Map secrets
 
-    @Constant('''
+    @Description('''
         Alias of `workflow.workDir`.
     ''')
     Path workDir
 
-    @Constant('''
+    @Description('''
         Map of workflow runtime information.
     ''')
     WorkflowMetadata workflow
 
-    @Function('''
+    @Description('''
         Create a branch criteria to use with the `branch` operator.
     ''')
     void branchCriteria(Closure closure) {
     }
 
-    @Function('''
+    @Description('''
         Throw a script runtime error with an optional error message.
     ''')
     void error(String message=null) {
     }
 
     @Deprecated
-    @Function('''
+    @Description('''
         Stop the pipeline execution and return an exit code and optional error message.
     ''')
     void exit(int exitCode=0, String message=null) {
     }
 
-    @Function('''
+    @Description('''
         Get one or more files from a path or glob pattern. Returns a Path or list of Paths if there are multiple files.
     ''')
     /* Path | List<Path> */
     Object file(Map opts=null, String filePattern) {
     }
 
-    @Function('''
+    @Description('''
         Convenience method for `file()` that always returns a list.
     ''')
     List<Path> files(Map opts=null, String filePattern) {
     }
 
-    @Function('''
+    @Description('''
         Create a grouping key to use with the [groupTuple](https://nextflow.io/docs/latest/operator.html#grouptuple) operator.
     ''')
     GroupKey groupKey(Object key, int size) {
     }
 
-    @Function('''
+    @Description('''
         Create a multi-map criteria to use with the `multiMap` operator.
     ''')
     void multiMapCriteria(Closure closure) {
     }
 
-    @Function('''
+    @Description('''
         Print a value to standard output.
     ''')
     void print(Object object) {
     }
 
-    @Function('''
+    @Description('''
         Print a newline to standard output.
     ''')
     void println() {
     }
 
-    @Function('''
+    @Description('''
         Print a value to standard output with a newline.
     ''')
     void println(Object object) {
     }
 
-    @Function('''
+    @Description('''
         Send an email.
     ''')
     void sendMail(Map params) {
     }
 
-    @Function('''
+    @Description('''
         Create a tuple object from the given arguments.
     ''')
     ArrayTuple tuple(Object... args) {

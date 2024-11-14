@@ -22,17 +22,16 @@ import java.util.Map;
 import groovy.lang.Closure;
 import groovyx.gpars.dataflow.DataflowVariable;
 import groovyx.gpars.dataflow.DataflowWriteChannel;
-import nextflow.script.dsl.DslType;
-import nextflow.script.dsl.Function;
+import nextflow.script.dsl.Description;
 
-@DslType("""
+@Description("""
     The `Channel` type provides the channel factory methods.
 
     [Read more](https://nextflow.io/docs/latest/reference/channel.html)
 """)
 public class Channel {
 
-    @Function("""
+    @Description("""
         Create a channel that emits nothing.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#empty)
@@ -42,7 +41,7 @@ public class Channel {
     }
 
     @Deprecated
-    @Function("""
+    @Description("""
         Create a channel that emits each argument.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
@@ -52,7 +51,7 @@ public class Channel {
     }
 
     @Deprecated
-    @Function("""
+    @Description("""
         Create a channel that emits each element in a collection.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
@@ -61,7 +60,7 @@ public class Channel {
         return null;
     }
 
-    @Function("""
+    @Description("""
         Create a channel that emits all file pairs matching a glob pattern.
 
         An optional closure can be used to customize the grouping strategy.
@@ -72,7 +71,7 @@ public class Channel {
         return null;
     }
 
-    @Function("""
+    @Description("""
         Create a channel that emits each element in a collection.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromlist)
@@ -81,7 +80,7 @@ public class Channel {
         return null;
     }
 
-    @Function("""
+    @Description("""
         Create a channel that emits all paths matching a name or glob pattern.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#frompath)
@@ -90,7 +89,7 @@ public class Channel {
         return null;
     }
 
-    @Function("""
+    @Description("""
         Create a channel that queries the [NCBI SRA](https://www.ncbi.nlm.nih.gov/sra) database and emits all FASTQ files matching the given project or accession ids.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromsra)
@@ -99,7 +98,7 @@ public class Channel {
         return null;
     }
 
-    @Function("""
+    @Description("""
         Create a channel that emits each argument.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#of)
@@ -108,7 +107,7 @@ public class Channel {
         return null;
     }
 
-    @Function("""
+    @Description("""
         Create a channel that emits all values in the given topic.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#topic)
@@ -117,7 +116,7 @@ public class Channel {
         return null;
     }
 
-    @Function("""
+    @Description("""
         Create a value channel.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#value)
@@ -126,7 +125,7 @@ public class Channel {
         return null;
     }
 
-    @Function("""
+    @Description("""
         Create a channel that watches for filesystem events for all files matching the given pattern.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#watchpath)

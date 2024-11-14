@@ -20,19 +20,19 @@ import groovy.transform.CompileStatic
 @CompileStatic
 class OutputDsl implements DslScope {
 
-    @Constant('''
+    @Description('''
         List of positional arguments specified on the command line.
     ''')
     List<String> args
 
-    @Constant('''
+    @Description('''
         Map of workflow parameters specified in the config file or as command line options.
     ''')
     Map<String,Object> params
 
     static class TargetDsl implements DslScope {
 
-        @Function('''
+        @Description('''
             *Currently only supported for S3.*
 
             Specify the media type a.k.a. [MIME type](https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_Types) of published files (default: `false`). Can be a string (e.g. `'text/html'`), or `true` to infer the content type from the file extension.
@@ -40,43 +40,43 @@ class OutputDsl implements DslScope {
         void contentType(value) {
         }
 
-        @Function('''
+        @Description('''
             Enable or disable publishing (default: `true`).
         ''')
         void enabled(boolean value) {
         }
 
-        @Function('''
+        @Description('''
             When `true`, the workflow will not fail if a file can't be published for some reason (default: `false`).
         ''')
         void ignoreErrors(boolean value) {
         }
 
-        @Function('''
+        @Description('''
             Create an index file of the values that were published.
         ''')
         void index(Closure closure) {
         }
 
-        @Function('''
+        @Description('''
             The file publishing method (default: `'symlink'`).
         ''')
         void mode(String value) {
         }
 
-        @Function('''
+        @Description('''
             When `true` any existing file in the specified folder will be overwritten (default: `'standard'`).
         ''')
         void overwrite(value) {
         }
 
-        @Function('''
+        @Description('''
             Specify the publish path relative to the output directory (default: the target name).
         ''')
         void path(String value) {
         }
 
-        @Function('''
+        @Description('''
             *Currently only supported for S3.*
 
             Specify the storage class for published files.
@@ -84,7 +84,7 @@ class OutputDsl implements DslScope {
         void storageClass(String value) {
         }
 
-        @Function('''
+        @Description('''
             *Currently only supported for S3.*
 
             Specify arbitrary tags for published files.
@@ -96,25 +96,25 @@ class OutputDsl implements DslScope {
 
     static class IndexDsl implements DslScope {
 
-        @Function('''
+        @Description('''
             When `true`, the keys of the first record are used as the column names (default: `false`). Can also be a list of column names.
         ''')
         void header(value) {
         }
 
-        @Function('''
+        @Description('''
             Closure which defines how to transform each published value into a CSV record. The closure should return a list or map. By default, no transformation is applied.
         ''')
         void mapper(Closure value) {
         }
 
-        @Function('''
+        @Description('''
             The name of the index file relative to the target path (required).
         ''')
         void path(String value) {
         }
 
-        @Function('''
+        @Description('''
             The character used to separate values (default: `','`).
         ''')
         void sep(String value) {

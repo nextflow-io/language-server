@@ -30,10 +30,10 @@ import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
-import nextflow.script.dsl.Constant;
+import nextflow.script.dsl.Description;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
-import nextflow.script.dsl.Function;
+import nextflow.script.dsl.Description;
 import nextflow.script.dsl.ScriptDsl;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.InvalidDeclaration;
@@ -288,12 +288,12 @@ public class ScriptCompletionProvider implements CompletionProvider {
     private void populateItemsFromDslScope(ClassNode cn, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var constants = cn.getFields().stream()
-                .filter(fn -> findAnnotation(fn, Constant.class).isPresent())
+                .filter(fn -> findAnnotation(fn, Description.class).isPresent())
                 .iterator();
             populateItemsFromFields(constants, namePrefix, existingNames, items);
 
             var functions = cn.getMethods().stream()
-                .filter(mn -> findAnnotation(mn, Function.class).isPresent())
+                .filter(mn -> findAnnotation(mn, Description.class).isPresent())
                 .iterator();
             populateItemsFromMethods(functions, namePrefix, existingNames, items);
 
@@ -607,13 +607,14 @@ public class ScriptCompletionProvider implements CompletionProvider {
         ));
 
         for( var field : FeatureFlagDsl.class.getDeclaredFields() ) {
-            var annot = field.getAnnotation(FeatureFlag.class);
-            if( annot == null )
+            var name = field.getAnnotation(FeatureFlag.class);
+            var description = field.getAnnotation(Description.class);
+            if( name == null || description == null )
                 continue;
             snippets.add(new Snippet(
-                annot.name(),
-                annot.description(),
-                annot.name() + " = "
+                name.value(),
+                description.value(),
+                name.value() + " = "
             ));
         }
 

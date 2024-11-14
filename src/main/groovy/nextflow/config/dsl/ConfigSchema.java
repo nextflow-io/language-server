@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import nextflow.config.scopes.*;
-import nextflow.script.dsl.Function;
+import nextflow.script.dsl.Description;
 import nextflow.script.dsl.ProcessDirectiveDsl;
 
 public class ConfigSchema {
@@ -110,7 +110,7 @@ public class ConfigSchema {
         }
         // derive process config from process directives
         for( var method : ProcessDirectiveDsl.class.getDeclaredMethods() ) {
-            var annot = method.getAnnotation(Function.class);
+            var annot = method.getAnnotation(Description.class);
             if( annot == null )
                 continue;
             var name = "process." + method.getName();
