@@ -21,7 +21,7 @@ import java.util.Map;
 
 import nextflow.config.scopes.*;
 import nextflow.script.dsl.Description;
-import nextflow.script.dsl.ProcessDirectiveDsl;
+import nextflow.script.dsl.ProcessDsl;
 
 public class ConfigSchema {
 
@@ -109,7 +109,7 @@ public class ConfigSchema {
             }
         }
         // derive process config from process directives
-        for( var method : ProcessDirectiveDsl.class.getDeclaredMethods() ) {
+        for( var method : ProcessDsl.DirectiveDsl.class.getDeclaredMethods() ) {
             var annot = method.getAnnotation(Description.class);
             if( annot == null )
                 continue;

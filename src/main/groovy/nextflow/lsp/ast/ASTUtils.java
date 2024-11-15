@@ -169,38 +169,6 @@ public class ASTUtils {
             : null;
     }
 
-    /**
-     * Get the set of available fields for a type.
-     *
-     * @param classNode
-     * @param ast
-     */
-    public static Iterator<FieldNode> getFieldsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
-        return classNode.getFields().stream()
-            .filter((fieldNode) -> {
-                if( !fieldNode.isPublic() )
-                    return false;
-                return isStatic ? fieldNode.isStatic() : !fieldNode.isStatic();
-            })
-            .iterator();
-    }
-
-    /**
-     * Get the set of available methods for a type.
-     *
-     * @param classNode
-     * @param ast
-     */
-    public static Iterator<MethodNode> getMethodsForType(ClassNode classNode, boolean isStatic, ASTNodeCache ast) {
-        return classNode.getMethods().stream()
-            .filter((methodNode) -> {
-                if( !methodNode.isPublic() )
-                    return false;
-                return isStatic ? methodNode.isStatic() : !methodNode.isStatic();
-            })
-            .iterator();
-    }
-
     private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
         var classNode = getTypeOfNode(node.getObjectExpression(), ast);
         if( classNode == null )

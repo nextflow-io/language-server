@@ -15,14 +15,22 @@
  */
 package nextflow.script.dsl;
 
-public class Types {
-    public static String normalize(String name) {
-        if( "DataflowReadChannel".equals(name) )
-            return "Channel";
-        if( "DataflowWriteChannel".equals(name) )
-            return "Channel";
-        if( "DataflowVariable".equals(name) )
-            return "Channel";
-        return name;
-    }
+import java.util.List;
+import java.util.Map;
+
+import nextflow.script.types.ParamsMap;
+
+public interface EntryWorkflowDsl extends WorkflowDsl {
+
+    @Constant("args")
+    @Description("""
+        List of positional arguments specified on the command line.
+    """)
+    List<String> getArgs();
+
+    @Constant("params")
+    @Description("""
+        Map of workflow parameters specified in the config file or as command line options.
+    """)
+    ParamsMap getParams();
 }

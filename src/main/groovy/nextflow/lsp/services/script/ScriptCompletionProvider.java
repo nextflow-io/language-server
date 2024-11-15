@@ -30,11 +30,11 @@ import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
+import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
-import nextflow.script.dsl.Description;
-import nextflow.script.dsl.ScriptDsl;
+import nextflow.script.types.Types;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.InvalidDeclaration;
 import nextflow.script.v2.OutputNode;
@@ -177,13 +177,29 @@ public class ScriptCompletionProvider implements CompletionProvider {
         ClassNode cn = ASTUtils.getTypeOfNode(object, ast);
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var isStatic = object instanceof ClassExpression;
-            var existingNames = new HashSet<String>();
 
-            var fields = ASTUtils.getFieldsForType(cn, isStatic, ast);
-            populateItemsFromFields(fields, namePrefix, existingNames, items);
+            for( var fn : cn.getFields() ) {
+                if( !fn.isPublic() || isStatic != fn.isStatic() )
+                    continue;
+                if( !addItemForField(fn, namePrefix, items) )
+                    break;
+            }
 
-            var methods = ASTUtils.getMethodsForType(cn, isStatic, ast);
-            populateItemsFromMethods(methods, namePrefix, existingNames, items);
+            for( var mn : cn.getMethods() ) {
+                if( !mn.isPublic() || isStatic != mn.isStatic() )
+                    continue;
+                var an = findAnnotation(mn, Constant.class);
+                boolean result;
+                if( an.isPresent() ) {
+                    var name = an.get().getMember("value").getText();
+                    result = addItemForConstant(name, mn, namePrefix, items);
+                }
+                else {
+                    result = addItemForMethod(mn, namePrefix, items);
+                }
+                if( !result )
+                    break;
+            }
 
             cn = cn.getSuperClass();
         }
@@ -193,57 +209,58 @@ public class ScriptCompletionProvider implements CompletionProvider {
         ClassNode cn = ASTUtils.getTypeOfNode(object, ast);
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var isStatic = object instanceof ClassExpression;
-            var existingNames = new HashSet<String>();
 
-            var methods = ASTUtils.getMethodsForType(cn, isStatic, ast);
-            populateItemsFromMethods(methods, namePrefix, existingNames, items);
+            for( var mn : cn.getMethods() ) {
+                if( !mn.isPublic() || isStatic != mn.isStatic() )
+                    continue;
+                if( findAnnotation(mn, Constant.class).isPresent() )
+                    continue;
+                if( !addItemForMethod(mn, namePrefix, items) )
+                    break;
+            }
 
             cn = cn.getSuperClass();
         }
     }
 
-    private void populateItemsFromFields(Iterator<FieldNode> fields, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
-        while( fields.hasNext() ) {
-            var field = fields.next();
-            var name = field.getName();
-            if( !name.startsWith(namePrefix) || existingNames.contains(name) )
-                continue;
-            existingNames.add(name);
-
-            var item = new CompletionItem(field.getName());
-            item.setKind(astNodeToCompletionItemKind(field));
-            item.setDetail(astNodeToCompletionItemDetail(field));
-            item.setDocumentation(astNodeToCompletionItemDocumentation(field));
-
-            if( !addItem(item, items) )
-                break;
-        }
+    private boolean addItemForField(FieldNode fn, String namePrefix, List<CompletionItem> items) {
+        var name = fn.getName();
+        if( !name.startsWith(namePrefix) )
+            return true;
+        var item = new CompletionItem(name);
+        item.setKind(CompletionItemKind.Field);
+        item.setDetail(astNodeToCompletionItemDetail(fn));
+        item.setDocumentation(astNodeToCompletionItemDocumentation(fn));
+        return addItem(item, items);
     }
 
-    private void populateItemsFromMethods(Iterator<MethodNode> methods, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
-        while( methods.hasNext() ) {
-            var method = methods.next();
-            var name = method.getName();
-            if( !name.startsWith(namePrefix) || existingNames.contains(name) )
-                continue;
-            existingNames.add(name);
+    private boolean addItemForConstant(String name, MethodNode mn, String namePrefix, List<CompletionItem> items) {
+        if( !name.startsWith(namePrefix) )
+            return true;
+        var fn = new FieldNode(name, 0xF, mn.getReturnType(), mn.getDeclaringClass(), null);
+        var item = new CompletionItem(name);
+        item.setKind(CompletionItemKind.Constant);
+        item.setDetail(astNodeToCompletionItemDetail(fn));
+        item.setDocumentation(astNodeToCompletionItemDocumentation(mn));
+        return addItem(item, items);
+    }
 
-            var item = new CompletionItem(method.getName());
-            item.setKind(astNodeToCompletionItemKind(method));
-            item.setDetail(astNodeToCompletionItemDetail(method));
-            item.setDocumentation(astNodeToCompletionItemDocumentation(method));
-
-            if( !addItem(item, items) )
-                break;
-        }
+    private boolean addItemForMethod(MethodNode mn, String namePrefix, List<CompletionItem> items) {
+        var name = mn.getName();
+        if( !name.startsWith(namePrefix) )
+            return true;
+        var item = new CompletionItem(mn.getName());
+        item.setKind(CompletionItemKind.Function);
+        item.setDetail(astNodeToCompletionItemDetail(mn));
+        item.setDocumentation(astNodeToCompletionItemDocumentation(mn));
+        return addItem(item, items);
     }
 
     private void populateItemsFromScope(ASTNode node, String namePrefix, ASTNode topNode, List<CompletionItem> items) {
-        var existingNames = new HashSet<String>();
         VariableScope scope = ASTUtils.getVariableScope(node, ast);
         while( scope != null ) {
-            populateLocalVariables(scope, namePrefix, existingNames, items);
-            populateItemsFromDslScope(scope.getClassScope(), namePrefix, existingNames, items);
+            populateLocalVariables(scope, namePrefix, items);
+            populateItemsFromDslScope(scope.getClassScope(), namePrefix, items);
             scope = scope.getParent();
         }
 
@@ -259,35 +276,34 @@ public class ScriptCompletionProvider implements CompletionProvider {
         populateTypes(namePrefix, items);
     }
 
-    private void populateLocalVariables(VariableScope scope, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
+    private void populateLocalVariables(VariableScope scope, String namePrefix, List<CompletionItem> items) {
         for( var it = scope.getDeclaredVariablesIterator(); it.hasNext(); ) {
             var variable = it.next();
             var name = variable.getName();
             if( !name.startsWith(namePrefix) )
                 continue;
-            if( existingNames.contains(name) )
-                continue;
-            existingNames.add(name);
-
             var item = new CompletionItem(name);
-            item.setKind(astNodeToCompletionItemKind((ASTNode) variable));
+            item.setKind(CompletionItemKind.Variable);
             if( !addItem(item, items) )
                 break;
         }
     }
 
-    private void populateItemsFromDslScope(ClassNode cn, String namePrefix, Set<String> existingNames, List<CompletionItem> items) {
+    private void populateItemsFromDslScope(ClassNode cn, String namePrefix, List<CompletionItem> items) {
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
-            var constants = cn.getFields().stream()
-                .filter(fn -> findAnnotation(fn, Description.class).isPresent())
-                .iterator();
-            populateItemsFromFields(constants, namePrefix, existingNames, items);
-
-            var functions = cn.getMethods().stream()
-                .filter(mn -> findAnnotation(mn, Description.class).isPresent())
-                .iterator();
-            populateItemsFromMethods(functions, namePrefix, existingNames, items);
-
+            for( var mn : cn.getMethods() ) {
+                var an = findAnnotation(mn, Constant.class);
+                boolean result;
+                if( an.isPresent() ) {
+                    var name = an.get().getMember("value").getText();
+                    result = addItemForConstant(name, mn, namePrefix, items);
+                }
+                else {
+                    result = addItemForMethod(mn, namePrefix, items);
+                }
+                if( !result )
+                    break;
+            }
             cn = cn.getSuperClass();
         }
     }
@@ -321,7 +337,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 continue;
 
             var item = new CompletionItem(name);
-            item.setKind(astNodeToCompletionItemKind(node));
+            item.setKind(CompletionItemKind.Function);
             item.setDetail(astNodeToCompletionItemDetail(node));
             item.setDocumentation(astNodeToCompletionItemDocumentation(node));
 
@@ -373,7 +389,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         populateTypes0(ast.getEnumNodes(uri), namePrefix, items);
 
         // add built-in types
-        populateTypes0(ScriptDsl.TYPES, namePrefix, items);
+        populateTypes0(Types.TYPES, namePrefix, items);
     }
 
     private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, List<CompletionItem> items) {

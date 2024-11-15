@@ -31,13 +31,15 @@ import nextflow.script.dsl.Description;
 """)
 public class Channel {
 
+    protected static Channel instance;
+
     @Description("""
         Create a channel that emits nothing.
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#empty)
     """)
     public static DataflowWriteChannel empty() {
-        return null;
+        return instance.empty();
     }
 
     @Deprecated
@@ -47,7 +49,7 @@ public class Channel {
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
     """)
     public static <T> DataflowWriteChannel<T> from(T... values) {
-        return null;
+        return instance.from(values);
     }
 
     @Deprecated
@@ -57,7 +59,7 @@ public class Channel {
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
     """)
     public static <T> DataflowWriteChannel<T> from(Collection<T> values) {
-        return null;
+        return instance.from(values);
     }
 
     @Description("""
@@ -68,7 +70,7 @@ public class Channel {
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromfilepairs)
     """)
     public static DataflowWriteChannel fromFilePairs(Map opts, String pattern, Closure grouping) {
-        return null;
+        return instance.fromFilePairs(opts, pattern, grouping);
     }
 
     @Description("""
@@ -77,7 +79,7 @@ public class Channel {
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromlist)
     """)
     public static <T> DataflowWriteChannel<T> fromList(Collection<T> values) {
-        return null;
+        return instance.fromList(values);
     }
 
     @Description("""
@@ -86,7 +88,7 @@ public class Channel {
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#frompath)
     """)
     public static DataflowWriteChannel<Path> fromPath(Map opts, String pattern) {
-        return null;
+        return instance.fromPath(opts, pattern);
     }
 
     @Description("""
@@ -95,7 +97,7 @@ public class Channel {
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromsra)
     """)
     public static DataflowWriteChannel fromSRA(Map opts, String query) {
-        return null;
+        return instance.fromSRA(opts, query);
     }
 
     @Description("""
@@ -104,7 +106,7 @@ public class Channel {
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#of)
     """)
     public static <T> DataflowWriteChannel<T> of(T... values) {
-        return null;
+        return instance.of(values);
     }
 
     @Description("""
@@ -113,7 +115,7 @@ public class Channel {
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#topic)
     """)
     public static DataflowWriteChannel topic(String name) {
-        return null;
+        return instance.topic(name);
     }
 
     @Description("""
@@ -122,7 +124,7 @@ public class Channel {
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#value)
     """)
     public static <T> DataflowVariable<T> value(T value) {
-        return null;
+        return instance.value(value);
     }
 
     @Description("""
@@ -131,7 +133,7 @@ public class Channel {
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#watchpath)
     """)
     public static DataflowWriteChannel<Path> watchPath(String filePattern, String events) {
-        return null;
+        return instance.watchPath(filePattern, events);
     }
 
 }

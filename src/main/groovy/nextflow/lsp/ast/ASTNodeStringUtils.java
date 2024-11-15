@@ -21,13 +21,12 @@ import java.util.stream.Stream;
 import groovy.lang.groovydoc.Groovydoc;
 import nextflow.lsp.services.util.FormattingOptions;
 import nextflow.lsp.services.util.Formatter;
+import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.Operator;
 import nextflow.script.dsl.OutputDsl;
-import nextflow.script.dsl.ProcessDirectiveDsl;
-import nextflow.script.dsl.ProcessInputDsl;
-import nextflow.script.dsl.ProcessOutputDsl;
+import nextflow.script.dsl.ProcessDsl;
 import nextflow.script.v2.AssignmentExpression;
 import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
@@ -173,6 +172,13 @@ public class ASTNodeStringUtils {
     }
 
     private static String methodToLabel(MethodNode node) {
+        var an = findAnnotation(node, Constant.class);
+        if( an.isPresent() ) {
+            var name = an.get().getMember("value").getText();
+            var fn = new FieldNode(name, 0xF, node.getReturnType(), node.getDeclaringClass(), null);
+            return variableToLabel(fn);
+        }
+
         var label = getMethodTypeLabel(node);
         if( label != null ) {
             var builder = new StringBuilder();
@@ -209,11 +215,11 @@ public class ASTNodeStringUtils {
         if( cn.isPrimaryClassNode() )
             return null;
         var type = cn.getTypeClass();
-        if( type == ProcessDirectiveDsl.class )
+        if( type == ProcessDsl.DirectiveDsl.class )
             return "process directive";
-        if( type == ProcessInputDsl.class )
+        if( type == ProcessDsl.InputDsl.class )
             return "process input";
-        if( type == ProcessOutputDsl.class )
+        if( type == ProcessDsl.OutputDsl.class )
             return "process output";
         if( type == OutputDsl.class )
             return "output directive";
