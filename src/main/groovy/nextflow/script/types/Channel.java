@@ -31,7 +31,7 @@ import nextflow.script.dsl.Description;
 """)
 public class Channel {
 
-    protected static Channel instance;
+    protected static ChannelFactory instance;
 
     @Description("""
         Create a channel that emits nothing.
@@ -69,7 +69,7 @@ public class Channel {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromfilepairs)
     """)
-    public static DataflowWriteChannel fromFilePairs(Map opts, String pattern, Closure grouping) {
+    public static DataflowWriteChannel fromFilePairs(Map<String,?> opts, String pattern, Closure grouping) {
         return instance.fromFilePairs(opts, pattern, grouping);
     }
 
@@ -87,7 +87,7 @@ public class Channel {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#frompath)
     """)
-    public static DataflowWriteChannel<Path> fromPath(Map opts, String pattern) {
+    public static DataflowWriteChannel<Path> fromPath(Map<String,?> opts, String pattern) {
         return instance.fromPath(opts, pattern);
     }
 
@@ -96,7 +96,7 @@ public class Channel {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromsra)
     """)
-    public static DataflowWriteChannel fromSRA(Map opts, String query) {
+    public static DataflowWriteChannel fromSRA(Map<String,?> opts, String query) {
         return instance.fromSRA(opts, query);
     }
 
