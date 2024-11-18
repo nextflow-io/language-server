@@ -23,7 +23,7 @@ import java.util.Set;
 import groovy.lang.Tuple2;
 import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
-import nextflow.script.dsl.ScriptDsl;
+import nextflow.script.types.Types;
 import nextflow.script.v2.AssignmentExpression;
 import nextflow.script.v2.FunctionNode;
 import nextflow.script.v2.ScriptExpressionTransformer;
@@ -183,7 +183,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
     protected boolean resolveFromDefaultImports(ClassNode type) {
         // resolve from script imports
         var typeName = type.getName();
-        for( var cn : ScriptDsl.TYPES ) {
+        for( var cn : Types.TYPES ) {
             if( typeName.equals(cn.getNameWithoutPackage()) || typeName.equals(cn.getName()) ) {
                 type.setRedirect(cn);
                 return true;

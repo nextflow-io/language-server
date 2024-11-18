@@ -18,7 +18,7 @@ package nextflow.lsp.ast
 
 import groovy.lang.groovydoc.Groovydoc
 import nextflow.script.dsl.FeatureFlagDsl
-import nextflow.script.dsl.ProcessDirectiveDsl
+import nextflow.script.dsl.ProcessDsl
 import nextflow.script.types.Channel
 import nextflow.script.v2.FeatureFlagNode
 import nextflow.script.v2.FunctionNode
@@ -172,7 +172,7 @@ class ASTNodeStringUtilsTest extends Specification {
 
     def 'should get the label and docs for a process directive' () {
         when:
-        def node = new ClassNode(ProcessDirectiveDsl.class).getDeclaredMethods('executor').first()
+        def node = new ClassNode(ProcessDsl.DirectiveDsl.class).getDeclaredMethods('executor').first()
         then:
         ASTNodeStringUtils.getLabel(node) == '(process directive) executor'
         ASTNodeStringUtils.getDocumentation(node) == '''
