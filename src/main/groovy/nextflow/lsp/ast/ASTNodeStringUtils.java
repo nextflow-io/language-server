@@ -223,6 +223,8 @@ public class ASTNodeStringUtils {
             return "process output";
         if( type == OutputDsl.class )
             return "output directive";
+        if( type == OutputDsl.IndexDsl.class )
+            return "output index directive";
         return null;
     }
 
