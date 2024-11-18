@@ -623,7 +623,7 @@ public class Formatter extends CodeVisitorSupport {
         var name = fullyQualified
             ? type.getName()
             : placeholder ? type.getUnresolvedName() : type.getNameWithoutPackage();
-        append(nextflow.script.dsl.Types.normalize(name));
+        append(nextflow.script.types.Types.normalize(name));
 
         var genericsTypes = type.getGenericsTypes();
         if( !placeholder && genericsTypes != null ) {

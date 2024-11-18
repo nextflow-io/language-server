@@ -34,18 +34,16 @@ import nextflow.lsp.compiler.FutureWarning;
 import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
 import nextflow.lsp.compiler.RelatedInformationAware;
+import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.dsl.EntryWorkflowDsl;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
 import nextflow.script.dsl.OutputDsl;
-import nextflow.script.dsl.ParamsMap;
 import nextflow.script.dsl.ProcessDsl;
-import nextflow.script.dsl.ProcessDirectiveDsl;
-import nextflow.script.dsl.ProcessInputDsl;
-import nextflow.script.dsl.ProcessOutputDsl;
 import nextflow.script.dsl.ScriptDsl;
 import nextflow.script.dsl.WorkflowDsl;
+import nextflow.script.types.ParamsMap;
 import nextflow.script.v2.AssignmentExpression;
 import nextflow.script.v2.FeatureFlagNode;
 import nextflow.script.v2.FunctionNode;
@@ -372,7 +370,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
         declareProcessInputs(node.inputs);
 
-        pushState(ProcessInputDsl.class);
+        pushState(ProcessDsl.InputDsl.class);
         visitDirectives(node.inputs, "process input qualifier", false);
         popState();
 
@@ -383,11 +381,11 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         visit(node.exec);
         visit(node.stub);
 
-        pushState(ProcessDirectiveDsl.class);
+        pushState(ProcessDsl.DirectiveDsl.class);
         visitDirectives(node.directives, "process directive", false);
         popState();
 
-        pushState(ProcessOutputDsl.class);
+        pushState(ProcessDsl.OutputDsl.class);
         visitDirectives(node.outputs, "process output qualifier", false);
         popState();
 
@@ -452,7 +450,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             return null;
         }
         var name = call.getMethodAsString();
-        var variable = findClassMember(currentScope.getClassScope(), name, call.getMethod());
+        var variable = findDslMember(currentScope.getClassScope(), name, call.getMethod());
         if( variable != null )
             currentScope.putReferencedClassVariable(variable);
         else
@@ -465,7 +463,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     @Override
     public void visitMapEntryExpression(MapEntryExpression node) {
         var classScope = currentScope.getClassScope();
-        if( classScope != null && classScope.getTypeClass() == ProcessOutputDsl.class ) {
+        if( classScope != null && classScope.getTypeClass() == ProcessDsl.OutputDsl.class ) {
             var key = node.getKeyExpression();
             if( key instanceof ConstantExpression && EMIT_AND_TOPIC.contains(key.getText()) )
                 return;
@@ -497,7 +495,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     }
 
     private void visitOutputBody(BlockStatement block) {
-        pushState(OutputDsl.class);
         block.setVariableScope(currentScope);
 
         asDirectives(block).forEach((call) -> {
@@ -505,11 +502,10 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( code != null )
                 visitTargetBody(code);
         });
-        popState();
     }
 
     private void visitTargetBody(BlockStatement block) {
-        pushState(OutputDsl.TargetDsl.class);
+        pushState(OutputDsl.class);
         block.setVariableScope(currentScope);
 
         asBlockStatements(block).forEach((stmt) -> {
@@ -744,13 +740,15 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( !"params".equals(varX.getName()) )
             return;
         var property = node.getPropertyAsString();
-        if( findClassMember(paramsType, property, node) == null ) {
+        if( paramsType.getDeclaredField(property) == null ) {
             addError("Unrecognized parameter `" + property + "`", node);
             return;
         }
         var variable = varX.getAccessedVariable();
-        if( variable instanceof FieldNode fn )
-            fn.setType(paramsType);
+        if( variable instanceof PropertyNode pn ) {
+            var mn = (MethodNode) pn.getNodeMetaData("access.method");
+            mn.setReturnType(paramsType);
+        }
     }
 
     @Override
@@ -849,7 +847,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                 isClassVariable = true;
                 break;
             }
-            variable = findClassMember(scope.getClassScope(), name, node);
+            variable = findDslMember(scope.getClassScope(), name, node);
             if( variable != null ) {
                 isClassVariable = true;
                 break;
@@ -878,36 +876,31 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         return variable;
     }
 
-    private Variable findClassMember(ClassNode cn, String name, ASTNode node) {
-        while( cn != null && !ClassHelper.isObjectType(cn) ) {
-            var fn = cn.getDeclaredField(name);
-            if( fn != null && findAnnotation(fn, Description.class).isPresent() ) {
-                if( findAnnotation(fn, Deprecated.class).isPresent() )
+    private Variable findDslMember(ClassNode cn, String name, ASTNode node) {
+        while( cn != null ) {
+            for( var mn : cn.getMethods() ) {
+                var an = findAnnotation(mn, Constant.class);
+                var memberName = an.isPresent()
+                    ? an.get().getMember("value").getText()
+                    : mn.getName();
+                if( !name.equals(memberName) )
+                    continue;
+                if( findAnnotation(mn, Deprecated.class).isPresent() )
                     addFutureWarning("`" + name + "` is deprecated and will be removed in a future version", node);
-                return fn;
+                return wrapMethodAsVariable(mn, memberName);
             }
 
-            var methods = cn.getDeclaredMethods(name);
-            var mn = methods.size() > 0 ? methods.get(0) : null;
-            if( mn != null ) {
-                if( mn instanceof FunctionNode || mn instanceof ProcessNode || mn instanceof WorkflowNode ) {
-                    return wrapMethodAsVariable(mn, cn);
-                }
-                if( findAnnotation(mn, Description.class).isPresent() ) {
-                    if( findAnnotation(mn, Deprecated.class).isPresent() )
-                        addFutureWarning("`" + name + "` is deprecated and will be removed in a future version", node);
-                    return wrapMethodAsVariable(mn, cn);
-                }
-            }
-
-            cn = cn.getSuperClass();
+            cn = cn.getInterfaces().length > 0
+                ? cn.getInterfaces()[0]
+                : null;
         }
 
         return null;
     }
 
-    private Variable wrapMethodAsVariable(MethodNode mn, ClassNode cn) {
-        var fn = new FieldNode(mn.getName(), mn.getModifiers() & 0xF, ClassHelper.dynamicType(), cn, null);
+    private Variable wrapMethodAsVariable(MethodNode mn, String name) {
+        var cn = mn.getDeclaringClass();
+        var fn = new FieldNode(name, mn.getModifiers() & 0xF, mn.getReturnType(), cn, null);
         fn.setHasNoRealSourcePosition(true);
         fn.setDeclaringClass(cn);
         fn.setSynthetic(true);
