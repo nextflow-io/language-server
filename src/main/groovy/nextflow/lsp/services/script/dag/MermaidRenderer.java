@@ -58,6 +58,9 @@ public class MermaidRenderer {
                 .replaceAll("\"", "\\\\\"");
 
             lines.add("    " + renderNode(dn.id, label, dn.type));
+
+            if( dn.uri != null )
+                lines.add(String.format("    click v%d href \"%s\" _blank", dn.id, dn.uri.toString()));
         }
 
         // render outputs
