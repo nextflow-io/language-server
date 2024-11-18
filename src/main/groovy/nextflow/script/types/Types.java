@@ -25,13 +25,8 @@ public class Types {
     public static final List<ClassNode> TYPES = List.of(
         new ClassNode(Channel.class),
         new ClassNode(Duration.class),
-        new ClassNode(Manifest.class),
         new ClassNode(MemoryUnit.class),
-        new ClassNode(NextflowMetadata.class),
-        new ClassNode(Path.class),
-        new ClassNode(TaskConfig.class),
-        new ClassNode(VersionNumber.class),
-        new ClassNode(WorkflowMetadata.class)
+        new ClassNode(Path.class)
     );
 
     public static String normalize(String name) {
