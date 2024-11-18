@@ -290,7 +290,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateItemsFromDslScope(ClassNode cn, String namePrefix, List<CompletionItem> items) {
-        while( cn != null && !ClassHelper.isObjectType(cn) ) {
+        while( cn != null ) {
             for( var mn : cn.getMethods() ) {
                 var an = findAnnotation(mn, Constant.class);
                 boolean result;
@@ -304,7 +304,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 if( !result )
                     break;
             }
-            cn = cn.getSuperClass();
+            cn = cn.getInterfaces().length > 0
+                ? cn.getInterfaces()[0]
+                : null;
         }
     }
 

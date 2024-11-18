@@ -740,7 +740,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( !"params".equals(varX.getName()) )
             return;
         var property = node.getPropertyAsString();
-        if( findDslMember(paramsType, property, node) == null ) {
+        if( paramsType.getDeclaredField(property) == null ) {
             addError("Unrecognized parameter `" + property + "`", node);
             return;
         }
@@ -877,13 +877,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     }
 
     private Variable findDslMember(ClassNode cn, String name, ASTNode node) {
-        for( ; cn != null && !ClassHelper.isObjectType(cn); cn = cn.getSuperClass() ) {
-            // NOTE: hack for params, DSL scopes should only declare methods
-            for( var fn : cn.getFields() ) {
-                if( name.equals(fn.getName()) )
-                    return fn;
-            }
-
+        while( cn != null ) {
             for( var mn : cn.getMethods() ) {
                 var an = findAnnotation(mn, Constant.class);
                 var memberName = an.isPresent()
@@ -891,12 +885,14 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                     : mn.getName();
                 if( !name.equals(memberName) )
                     continue;
-                if( mn instanceof FunctionNode || mn instanceof ProcessNode || mn instanceof WorkflowNode )
-                    return wrapMethodAsVariable(mn, memberName);
                 if( findAnnotation(mn, Deprecated.class).isPresent() )
                     addFutureWarning("`" + name + "` is deprecated and will be removed in a future version", node);
                 return wrapMethodAsVariable(mn, memberName);
             }
+
+            cn = cn.getInterfaces().length > 0
+                ? cn.getInterfaces()[0]
+                : null;
         }
 
         return null;
