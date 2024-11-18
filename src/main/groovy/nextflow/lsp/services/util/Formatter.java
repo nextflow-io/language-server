@@ -283,6 +283,10 @@ public class Formatter extends CodeVisitorSupport {
                 incIndent();
                 appendIndent();
             }
+            if( node.isSpreadSafe() )
+                append('*');
+            else if( node.isSafe() )
+                append('?');
             append('.');
         }
 
@@ -645,6 +649,10 @@ public class Formatter extends CodeVisitorSupport {
     @Override
     public void visitPropertyExpression(PropertyExpression node) {
         visit(node.getObjectExpression());
+        if( node.isSpreadSafe() )
+            append('*');
+        else if( node.isSafe() )
+            append('?');
         append('.');
         visit(node.getProperty());
     }

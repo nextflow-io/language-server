@@ -454,9 +454,9 @@ primary
 pathElement
     // property expression
     :   nls
-        (   DOT                 // dot operator
-        |   SPREAD_DOT          // spread operator:         x*.y === x?.collect { it.y }
-        |   SAFE_DOT            // optional-null operator:  x?.y === (x!=null) ? x.y : null
+        (   DOT
+        |   SPREAD_DOT  // spread dot:  xs*.y == xs?.collect { x -> x.y }
+        |   SAFE_DOT    // safe dot:    x?.y == (x != null) ? x.y : null
         )
         namedProperty                                   #propertyPathExprAlt
 

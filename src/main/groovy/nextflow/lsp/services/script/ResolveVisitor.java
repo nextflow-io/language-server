@@ -315,6 +315,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         objectExpression = transform(pe.getObjectExpression());
         property = transform(pe.getProperty());
         var result = new PropertyExpression(objectExpression, property, pe.isSafe());
+        result.setSpreadSafe(pe.isSpreadSafe());
         // attempt to resolve property expression as a fully-qualified class name
         var className = lookupClassName(result);
         if( className != null ) {
@@ -409,6 +410,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         var result = new MethodCallExpression(object, method, args);
         result.setMethodTarget(mce.getMethodTarget());
         result.setImplicitThis(mce.isImplicitThis());
+        result.setSpreadSafe(mce.isSpreadSafe());
         result.setSafe(mce.isSafe());
         return result;
     }
