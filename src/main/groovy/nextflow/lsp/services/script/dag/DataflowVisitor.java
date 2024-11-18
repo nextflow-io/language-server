@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.services.script.dag;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -111,7 +112,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     private void visitWorkflowTakes(WorkflowNode node, Map<String,Node> result) {
         for( var stmt : asBlockStatements(node.takes) ) {
             var name = asVarX(stmt).getName();
-            var dn = addNode(name, Node.Type.NAME);
+            var dn = addNode(name, Node.Type.NAME, stmt);
             current.putSymbol(name, dn);
             result.put(name, dn);
         }
@@ -172,7 +173,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         var defNode = ASTUtils.getMethodFromCallExpression(node, astCache);
         if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
             var preds = visitWithPreds(node.getArguments());
-            current.putSymbol(name, addNode(name, Node.Type.OPERATOR, preds));
+            current.putSymbol(name, addNode(name, Node.Type.OPERATOR, defNode, preds));
             return;
         }
 
@@ -197,7 +198,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         var preds = visitWithPreds(node.getRightExpression());
         var targets = getAssignmentTargets(node.getLeftExpression());
         for( var name : targets ) {
-            var dn = addNode(name, Node.Type.NAME, preds);
+            var dn = addNode(name, Node.Type.NAME, null, preds);
             current.putSymbol(name, dn);
         }
     }
@@ -237,7 +238,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
                 var label = ((MethodNode) defNode).getName();
                 var preds = visitWithPreds(lhs);
-                current.putSymbol(label, addNode(label, Node.Type.OPERATOR, preds));
+                current.putSymbol(label, addNode(label, Node.Type.OPERATOR, defNode, preds));
                 return;
             }
         }
@@ -259,7 +260,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         if( isEntryParam(node) ) {
             var name = node.getPropertyAsString();
             if( !current.inputs.containsKey(name) )
-                current.inputs.put(name, addNode(name, Node.Type.NAME));
+                current.inputs.put(name, addNode(name, Node.Type.NAME, null));
             var dn = current.inputs.get(name);
             currentPreds().add(dn);
             return;
@@ -307,17 +308,17 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private void visitProcessOut(ProcessNode process, String label, String propName) {
         if( propName == null ) {
-            addOperatorPred(label);
+            addOperatorPred(label, process);
             return;
         }
         asDirectives(process.outputs)
             .filter((call) -> {
                 var emitName = getProcessEmitName(call);
-                return propName == null ? emitName == null : propName.equals(emitName);
+                return propName.equals(emitName);
             })
             .findFirst()
             .ifPresent((call) -> {
-                addOperatorPred(label);
+                addOperatorPred(label, process);
             });
     }
 
@@ -337,18 +338,18 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private void visitWorkflowOut(WorkflowNode workflow, String label, String propName) {
         if( propName == null ) {
-            addOperatorPred(label);
+            addOperatorPred(label, workflow);
             return;
         }
         asBlockStatements(workflow.emits).stream()
             .map(stmt -> ((ExpressionStatement) stmt).getExpression())
             .filter((emit) -> {
                 var emitName = getWorkflowEmitName(emit);
-                return propName == null ? emitName == null : propName.equals(emitName);
+                return propName.equals(emitName);
             })
             .findFirst()
             .ifPresent((call) -> {
-                addOperatorPred(label);
+                addOperatorPred(label, workflow);
             });
     }
 
@@ -363,12 +364,12 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return null;
     }
 
-    private void addOperatorPred(String label) {
+    private void addOperatorPred(String label, ASTNode an) {
         var dn = current.getSymbol(label);
         if( dn != null )
             currentPreds().add(dn);
         else
-            current.putSymbol(label, addNode(label, Node.Type.OPERATOR));
+            current.putSymbol(label, addNode(label, Node.Type.OPERATOR, an));
     }
 
     @Override
@@ -405,14 +406,15 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return visitWithPreds(node).stream().findFirst().orElse(null);
     }
 
-    private Node addNode(String label, Node.Type type, Set<Node> preds) {
-        var dn = current.addNode(label, type, preds);
+    private Node addNode(String label, Node.Type type, ASTNode an, Set<Node> preds) {
+        var uri = astCache.getURI(an);
+        var dn = current.addNode(label, type, uri, preds);
         currentPreds().add(dn);
         return dn;
     }
 
-    private Node addNode(String label, Node.Type type) {
-        return addNode(label, type, new HashSet<>());
+    private Node addNode(String label, Node.Type type, ASTNode an) {
+        return addNode(label, type, an, new HashSet<>());
     }
 
 }
@@ -461,9 +463,9 @@ class Graph {
         scopes.get(0).put(name, dn);
     }
 
-    public Node addNode(String label, Node.Type type, Set preds) {
+    public Node addNode(String label, Node.Type type, URI uri, Set preds) {
         var id = nodes.size();
-        var dn = new Node(id, label, type, preds);
+        var dn = new Node(id, label, type, uri, preds);
         nodes.put(id, dn);
         return dn;
     }
@@ -479,12 +481,14 @@ class Node {
     public final int id;
     public final String label;
     public final Type type;
+    public final URI uri;
     public final Set<Node> preds;
 
-    public Node(int id, String label, Type type, Set<Node> preds) {
+    public Node(int id, String label, Type type, URI uri, Set<Node> preds) {
         this.id = id;
         this.label = label;
         this.type = type;
+        this.uri = uri;
         this.preds = preds;
     }
 
