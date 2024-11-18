@@ -249,10 +249,10 @@ outputDef
     ;
 
 outputBody
-    :   sep? outputTargetBlock (sep outputTargetBlock)*
+    :   sep? outputTargetBody (sep outputTargetBody)*
     ;
 
-outputTargetBlock
+outputTargetBody
     : statement
     ;
 

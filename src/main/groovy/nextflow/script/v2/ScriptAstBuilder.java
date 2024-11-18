@@ -616,13 +616,13 @@ public class ScriptAstBuilder {
     private Statement outputBody(OutputBodyContext ctx) {
         if( ctx == null )
             return EmptyStatement.INSTANCE;
-        var statements = ctx.outputTargetBlock().stream()
-            .map(this::outputTargetBlock)
+        var statements = ctx.outputTargetBody().stream()
+            .map(this::outputTargetBody)
             .collect(Collectors.toList());
         return ast( block(null, statements), ctx );
     }
 
-    private Statement outputTargetBlock(OutputTargetBlockContext ctx) {
+    private Statement outputTargetBody(OutputTargetBodyContext ctx) {
         var stmt = statement(ctx.statement());
         var call = asMethodCallX(stmt);
         if( call != null ) {

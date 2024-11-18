@@ -455,7 +455,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
         @Override
         public void visitOutput(OutputNode node) {
             fmt.appendLeadingComments(node);
-            fmt.append("output {");
+            fmt.append("output {\n");
             fmt.incIndent();
             visitOutputBody(node.body);
             fmt.decIndent();
@@ -463,10 +463,14 @@ public class ScriptFormattingProvider implements FormattingProvider {
         }
 
         protected void visitOutputBody(Statement body) {
-            asDirectives(body).forEach((call) -> {
+            asBlockStatements(body).forEach((stmt) -> {
+                var call = asMethodCallX(stmt);
+                if( call == null )
+                    return;
+
                 var code = asDslBlock(call, 1);
                 if( code != null ) {
-                    fmt.appendNewLine();
+                    fmt.appendLeadingComments(stmt);
                     fmt.appendIndent();
                     fmt.visit(call.getMethod());
                     fmt.append(" {\n");
@@ -480,13 +484,17 @@ public class ScriptFormattingProvider implements FormattingProvider {
         }
 
         protected void visitTargetBody(BlockStatement block) {
-            asDirectives(block).forEach((call) -> {
+            asBlockStatements(block).forEach((stmt) -> {
+                var call = asMethodCallX(stmt);
+                if( call == null )
+                    return;
+
                 // treat as index definition
                 var name = call.getMethodAsString();
                 if( "index".equals(name) ) {
                     var code = asDslBlock(call, 1);
                     if( code != null ) {
-                        fmt.appendNewLine();
+                        fmt.appendLeadingComments(stmt);
                         fmt.appendIndent();
                         fmt.append(name);
                         fmt.append(" {\n");
@@ -500,12 +508,19 @@ public class ScriptFormattingProvider implements FormattingProvider {
                 }
 
                 // treat as regular directive
+                fmt.appendLeadingComments(stmt);
                 visitDirective(call);
             });
         }
 
         protected void visitDirectives(Statement statement) {
-            asDirectives(statement).forEach(this::visitDirective);
+            asBlockStatements(statement).forEach((stmt) -> {
+                var call = asMethodCallX(stmt);
+                if( call == null )
+                    return;
+                fmt.appendLeadingComments(stmt);
+                visitDirective(call);
+            });
         }
 
         protected void visitDirective(MethodCallExpression call) {
