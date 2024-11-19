@@ -79,7 +79,7 @@ public class ASTNodeStringUtils {
         if( node.isEnum() )
             builder.append("enum ");
         else
-            builder.append("type ");
+            builder.append("class ");
         builder.append(node.getNameWithoutPackage());
         return builder.toString();
     }
@@ -190,6 +190,9 @@ public class ASTNodeStringUtils {
         }
 
         var builder = new StringBuilder();
+        if( node instanceof FunctionNode ) {
+            builder.append("def ");
+        }
         if( node.isStatic() ) {
             builder.append(Formatter.prettyPrintTypeName(node.getDeclaringClass()));
             builder.append('.');
