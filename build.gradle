@@ -15,7 +15,10 @@ repositories {
 
 dependencies {
   antlr 'org.antlr:antlr4:4.9.2'
-  implementation 'io.nextflow:nextflow:24.10.0'
+  implementation 'com.google.guava:guava:33.3.1-jre'
+  implementation 'org.apache.groovy:groovy:4.0.24'
+  implementation 'org.apache.groovy:groovy-json:4.0.24'
+  implementation 'org.codehaus.gpars:gpars:1.2.1'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.23.0'
 

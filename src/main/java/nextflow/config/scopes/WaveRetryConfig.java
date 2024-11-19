@@ -17,7 +17,7 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
-import nextflow.util.Duration;
+import nextflow.script.types.Duration;
 
 public class WaveRetryConfig implements ConfigScope {
 

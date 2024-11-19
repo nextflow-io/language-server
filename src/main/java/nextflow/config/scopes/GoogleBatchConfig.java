@@ -19,7 +19,7 @@ import java.util.List;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
-import nextflow.util.MemoryUnit;
+import nextflow.script.types.MemoryUnit;
 
 public class GoogleBatchConfig implements ConfigScope {
 

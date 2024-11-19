@@ -18,7 +18,7 @@ package nextflow.config.scopes;
 import groovy.transform.CompileStatic;
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
-import nextflow.util.Duration;
+import nextflow.script.types.Duration;
 
 public class ApptainerConfig implements ConfigScope {
 

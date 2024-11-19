@@ -17,8 +17,8 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
-import nextflow.util.Duration;
-import nextflow.util.MemoryUnit;
+import nextflow.script.types.Duration;
+import nextflow.script.types.MemoryUnit;
 
 public class ExecutorConfig implements ConfigScope {
 
@@ -55,14 +55,14 @@ public class ExecutorConfig implements ConfigScope {
     @ConfigOption("""
         Determines how often to log the executor status (default: `5 min`).
     """)
-    public Duration dumpInterval = Duration.of("5 min");
+    public Duration dumpInterval;
 
     @ConfigOption("""
         *Used only by grid executors.*
 
         Determines how long to wait for the `.exitcode` file to be created after the task has completed, before returning an error status (default: `270 sec`).
     """)
-    public Duration exitReadTimeout = Duration.of("270 sec");
+    public Duration exitReadTimeout;
 
     @ConfigOption("""
         *Used only by grid executors and Google Batch.*
@@ -132,7 +132,7 @@ public class ExecutorConfig implements ConfigScope {
 
         Determines how often to fetch the queue status from the scheduler (default: `1 min`).
     """)
-    public Duration queueStatInterval = Duration.of("1 min");
+    public Duration queueStatInterval;
 
     @ConfigOption("""
         Determines the max rate of job submission per time unit, for example `'10sec'` (10 jobs per second) or `'50/2min'` (50 jobs every 2 minutes) (default: unlimited).

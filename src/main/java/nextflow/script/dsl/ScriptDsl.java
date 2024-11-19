@@ -23,7 +23,6 @@ import java.util.Map;
 import groovy.lang.Closure;
 import nextflow.script.types.NextflowMetadata;
 import nextflow.script.types.WorkflowMetadata;
-import org.slf4j.Logger;
 
 public interface ScriptDsl extends DslScope {
 
@@ -44,7 +43,7 @@ public interface ScriptDsl extends DslScope {
     @Description("""
         Logger which can be used to log messages to the console.
     """)
-    Logger getLog();
+    Object getLog();
 
     @Constant("moduleDir")
     @Description("""
