@@ -24,7 +24,7 @@ import org.codehaus.groovy.ast.expr.Expression;
  */
 public class ParamNode extends ASTNode {
     public final Expression target;
-    public final Expression value;
+    public Expression value;
 
     public ParamNode(Expression target, Expression value) {
         this.target = target;

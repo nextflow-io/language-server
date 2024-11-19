@@ -63,6 +63,11 @@ public abstract class ScriptExpressionTransformer extends ScriptVisitorSupport i
     }
 
     @Override
+    public void visitParam(ParamNode node) {
+        node.value = transform(node.value);
+    }
+
+    @Override
     public void visitIfElse(IfStatement stmt) {
         stmt.setBooleanExpression((BooleanExpression) transform(stmt.getBooleanExpression()));
         stmt.getIfBlock().visit(this);
