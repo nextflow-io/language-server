@@ -16,7 +16,7 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-package nextflow.script.ast;
+package nextflow.script.parser;
 
 import groovy.lang.groovydoc.Groovydoc;
 import groovy.lang.groovydoc.GroovydocHolder;

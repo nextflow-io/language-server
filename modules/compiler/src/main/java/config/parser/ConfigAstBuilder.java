@@ -13,24 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.ast;
+package nextflow.config.parser;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import com.google.common.hash.Hashing;
 import groovy.lang.Tuple2;
-import nextflow.antlr.ScriptLexer;
-import nextflow.antlr.ScriptParser;
+import nextflow.antlr.ConfigLexer;
+import nextflow.antlr.ConfigParser;
 import nextflow.antlr.DescriptiveErrorStrategy;
+import nextflow.config.ast.ConfigAppendNode;
+import nextflow.config.ast.ConfigAssignNode;
+import nextflow.config.ast.ConfigBlockNode;
+import nextflow.config.ast.ConfigIncludeNode;
+import nextflow.config.ast.ConfigIncompleteNode;
+import nextflow.config.ast.ConfigNode;
+import nextflow.config.ast.ConfigStatement;
 import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -48,7 +53,6 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.apache.groovy.parser.antlr4.GroovySyntaxError;
 import org.apache.groovy.parser.antlr4.util.StringUtils;
 import org.codehaus.groovy.GroovyBugError;
-import org.codehaus.groovy.antlr.EnumHelper;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -80,7 +84,6 @@ import org.codehaus.groovy.ast.stmt.AssertStatement;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.CatchStatement;
 import org.codehaus.groovy.ast.stmt.EmptyStatement;
-import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilePhase;
@@ -91,37 +94,33 @@ import org.codehaus.groovy.syntax.Numbers;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Types;
 
-import static nextflow.antlr.ScriptParser.*;
+import static nextflow.antlr.ConfigParser.*;
 import static nextflow.antlr.PositionConfigureUtils.ast;
-import static nextflow.script.ast.ASTHelpers.*;
 import static org.codehaus.groovy.ast.expr.VariableExpression.THIS_EXPRESSION;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
 /**
- * Transform a Nextflow script parse tree into a Groovy AST.
+ * Transform a Nextflow config parse tree into a Groovy AST.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class ScriptAstBuilder {
+public class ConfigAstBuilder {
 
     private SourceUnit sourceUnit;
-    private ScriptNode moduleNode;
-    private ScriptLexer lexer;
-    private ScriptParser parser;
-    private final GroovydocManager groovydocManager;
+    private ConfigNode moduleNode;
+    private ConfigLexer lexer;
+    private ConfigParser parser;
 
     private Tuple2<ParserRuleContext,Exception> numberFormatError;
 
-    public ScriptAstBuilder(SourceUnit sourceUnit, boolean groovydocEnabled) {
+    public ConfigAstBuilder(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
-        this.moduleNode = new ScriptNode(sourceUnit);
+        this.moduleNode = new ConfigNode(sourceUnit);
 
         var charStream = createCharStream(sourceUnit);
-        this.lexer = new ScriptLexer(charStream);
-        this.parser = new ScriptParser(new CommonTokenStream(lexer));
+        this.lexer = new ConfigLexer(charStream);
+        this.parser = new ConfigParser(new CommonTokenStream(lexer));
         parser.setErrorHandler(new DescriptiveErrorStrategy(charStream));
-
-        this.groovydocManager = new GroovydocManager(groovydocEnabled);
     }
 
     private CharStream createCharStream(SourceUnit sourceUnit) {
@@ -184,50 +183,23 @@ public class ScriptAstBuilder {
         }
     }
 
-    /// SCRIPT STATEMENTS
-
-    private static final List<String> SCRIPT_DEF_NAMES = List.of("process", "workflow", "output");
+    /// CONFIG STATEMENTS
 
     private ModuleNode compilationUnit(CompilationUnitContext ctx) {
-        var statements = new ArrayList<Statement>();
-        boolean hasDeclarations = false;
-
-        for( var declOrStmt : ctx.scriptDeclarationOrStatement() ) {
-            if( declOrStmt.scriptDeclaration() != null )
-                hasDeclarations |= scriptDeclaration(declOrStmt.scriptDeclaration());
-            if( declOrStmt.statement() != null )
-                statements.add(statement(declOrStmt.statement()));
-        }
-
-        for( int i = 0; i < statements.size(); i++ ) {
-            var stmt = statements.get(i);
-            var defName = stmt instanceof ExpressionStatement es && es.getExpression() instanceof MethodCallExpression mce
-                ? mce.getMethodAsString()
-                : null;
-            if( defName != null && SCRIPT_DEF_NAMES.contains(defName) ) {
-                collectSyntaxError(new SyntaxException("Invalid " + defName + " definition -- check for missing or out-of-order section labels", stmt));
-                statements.set(i, ast(new InvalidDeclaration(), stmt));
-                hasDeclarations = true;
-            }
-        }
-
-        if( hasDeclarations ) {
-            for( var stmt : statements ) {
-                if( !(stmt instanceof InvalidDeclaration) )
-                    collectSyntaxError(new SyntaxException("Statements cannot be mixed with script declarations -- move statements into a process or workflow", stmt));
-            }
-        }
-
-        if( !statements.isEmpty() ) {
-            var main = block(new VariableScope(), statements);
-            var workflowNode = workflowDef(main);
-            moduleNode.addWorkflow(workflowNode);
-            if( !hasDeclarations )
-                moduleNode.setEntry(workflowNode);
-        }
+        for( var stmt : ctx.configStatement() )
+            moduleNode.addConfigStatement(configStatement(stmt));
 
         var scriptClassNode = moduleNode.getScriptClassDummy();
         scriptClassNode.setName(getMainClassName());
+
+        var statements = moduleNode.getConfigStatements();
+        if( scriptClassNode != null && !statements.isEmpty() ) {
+            var first = statements.get(0);
+            var last = statements.get(statements.size() - 1);
+            scriptClassNode.setSourcePosition(first);
+            scriptClassNode.setLastColumnNumber(last.getLastColumnNumber());
+            scriptClassNode.setLastLineNumber(last.getLastLineNumber());
+        }
 
         if( numberFormatError != null )
             throw createParsingFailedException(numberFormatError.getV2().getMessage(), numberFormatError.getV1());
@@ -240,416 +212,129 @@ public class ScriptAstBuilder {
             var reader = sourceUnit.getSource().getReader();
             var text = IOGroovyMethods.getText(reader);
             var hash = Hashing.sipHash24().newHasher().putUnencodedChars(text).hash();
-            return "_nf_script_" + hash.toString();
+            return "_nf_config_" + hash.toString();
         }
         catch( IOException e ) {
             throw new GroovyBugError("Failed to create main class name", e);
         }
     }
 
-    private boolean scriptDeclaration(ScriptDeclarationContext ctx) {
-        if( ctx instanceof FeatureFlagDeclAltContext ffac ) {
-            var node = featureFlagDeclaration(ffac.featureFlagDeclaration());
-            saveLeadingComments(node, ctx);
-            moduleNode.addFeatureFlag(node);
-        }
+    private ConfigStatement configStatement(ConfigStatementContext ctx) {
+        ConfigStatement result;
 
-        else if( ctx instanceof EnumDefAltContext edac ) {
-            var node = enumDef(edac.enumDef());
-            saveLeadingComments(node, ctx);
-            moduleNode.addClass(node);
-        }
+        if( ctx instanceof ConfigIncludeStmtAltContext ciac )
+            result = ast( configInclude(ciac.configInclude()), ciac );
 
-        else if( ctx instanceof FunctionDefAltContext fdac ) {
-            var node = functionDef(fdac.functionDef());
-            saveLeadingComments(node, ctx);
-            moduleNode.addFunction(node);
-        }
+        else if( ctx instanceof ConfigAssignmentStmtAltContext caac )
+            result = ast( configAssignment(caac.configAssignment()), caac );
 
-        else if( ctx instanceof ImportDeclAltContext iac ) {
-            var node = ast( new EmptyStatement(), iac );
-            collectSyntaxError(new SyntaxException("Groovy `import` declarations are not supported -- use fully-qualified name inline instead", node));
-            return false;
-        }
+        else if( ctx instanceof ConfigBlockStmtAltContext cbac )
+            result = ast( configBlock(cbac.configBlock()), cbac );
 
-        else if( ctx instanceof IncludeDeclAltContext iac ) {
-            var node = includeDeclaration(iac.includeDeclaration());
-            saveLeadingComments(node, ctx);
-            moduleNode.addInclude(node);
-        }
+        else if( ctx instanceof ConfigAppendBlockStmtAltContext cbac )
+            result = ast( configAppendBlock(cbac.configAppendBlock()), cbac );
 
-        else if( ctx instanceof OutputDefAltContext odac ) {
-            var node = outputDef(odac.outputDef());
-            saveLeadingComments(node, ctx);
-            if( moduleNode.getOutput() != null )
-                collectSyntaxError(new SyntaxException("Output block defined more than once", node));
-            moduleNode.setOutput(node);
-        }
-
-        else if( ctx instanceof ParamDeclAltContext pac ) {
-            var node = paramDeclaration(pac.paramDeclaration());
-            saveLeadingComments(node, ctx);
-            moduleNode.addParam(node);
-        }
-
-        else if( ctx instanceof ProcessDefAltContext pdac ) {
-            var node = processDef(pdac.processDef());
-            saveLeadingComments(node, ctx);
-            moduleNode.addProcess(node);
-        }
-
-        else if( ctx instanceof WorkflowDefAltContext wdac ) {
-            var node = workflowDef(wdac.workflowDef());
-            saveLeadingComments(node, ctx);
-            if( node.getName() == null ) {
-                if( moduleNode.getEntry() != null )
-                    collectSyntaxError(new SyntaxException("Entry workflow defined more than once", node));
-                moduleNode.setEntry(node);
-            }
-            moduleNode.addWorkflow(node);
-        }
-
-        else if( ctx instanceof IncompleteScriptDeclAltContext iac ) {
-            incompleteScriptDeclaration(iac.incompleteScriptDeclaration());
-            return false;
-        }
+        else if( ctx instanceof ConfigIncompleteStmtAltContext ciac )
+            result = ast( configIncomplete(ciac.configIncomplete()), ciac );
 
         else
-            throw createParsingFailedException("Invalid script declaration: " + ctx.getText(), ctx);
+            throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
 
-        return true;
+        saveLeadingComments(result, ctx);
+        return result;
     }
 
-    private FeatureFlagNode featureFlagDeclaration(FeatureFlagDeclarationContext ctx) {
-        var name = ctx.featureFlagName().getText();
+    private ConfigStatement configInclude(ConfigIncludeContext ctx) {
+        var source = expression(ctx.expression());
+        return new ConfigIncludeNode(source);
+    }
+
+    private ConfigStatement configAssignment(ConfigAssignmentContext ctx) {
+        var names = ctx.configAssignmentPath().configPrimary().stream()
+            .map(this::configPrimary)
+            .collect(Collectors.toList());
         var value = expression(ctx.expression());
-        var result = ast( new FeatureFlagNode(name, value), ctx );
-        if( !(value instanceof ConstantExpression) )
-            collectSyntaxError(new SyntaxException("Feature flag value should be a literal value (number, string, true/false)", result));
+        return ast( new ConfigAssignNode(names, value), ctx );
+    }
+
+    private String configPrimary(ConfigPrimaryContext ctx) {
+        if( ctx.identifier() != null )
+            return identifier(ctx.identifier());
+
+        if( ctx.stringLiteral() != null )
+            return stringLiteral(ctx.stringLiteral());
+
+        if( ctx.builtInType() != null )
+            return ctx.builtInType().getText();
+
+        throw new IllegalStateException();
+    }
+
+    private ConfigStatement configBlock(ConfigBlockContext ctx) {
+        var name = configPrimary(ctx.configPrimary());
+        var statements = ctx.configBlockStatement().stream()
+            .map(this::configBlockStatement)
+            .collect(Collectors.toList());
+        return new ConfigBlockNode(name, statements);
+    }
+
+    private ConfigStatement configBlockStatement(ConfigBlockStatementContext ctx) {
+        ConfigStatement result;
+
+        if( ctx instanceof ConfigIncludeBlockStmtAltContext ciac )
+            result = ast( configInclude(ciac.configInclude()), ciac );
+
+        else if( ctx instanceof ConfigAssignmentBlockStmtAltContext caac )
+            result = ast( configAssignment(caac.configAssignment()), caac );
+
+        else if( ctx instanceof ConfigBlockBlockStmtAltContext cbac )
+            result = ast( configBlock(cbac.configBlock()), cbac );
+
+        else if( ctx instanceof ConfigAppendBlockBlockStmtAltContext cbac )
+            result = ast( configAppendBlock(cbac.configAppendBlock()), cbac );
+
+        else if( ctx instanceof ConfigSelectorBlockStmtAltContext csac )
+            result = ast( configSelector(csac.configSelector()), csac );
+
+        else if( ctx instanceof ConfigIncompleteBlockStmtAltContext ciac )
+            result = ast( configIncomplete(ciac.configIncomplete()), ciac );
+
+        else
+            throw createParsingFailedException("Invalid statement in config block: " + ctx.getText(), ctx);
+
+        saveLeadingComments(result, ctx);
         return result;
     }
 
-    private ParamNode paramDeclaration(ParamDeclarationContext ctx) {
-        Expression target = ast( varX("params"), ctx.PARAMS() );
-        for( var ident : ctx.identifier() ) {
-            var name = ast( constX(identifier(ident)), ident );
-            target = ast( propX(target, name), target, name );
-        }
-        var value = expression(ctx.expression());
-        return ast( new ParamNode(target, value), ctx );
-    }
-
-    private IncludeNode includeDeclaration(IncludeDeclarationContext ctx) {
-        var source = ast( string(ctx.stringLiteral()), ctx.stringLiteral() );
-        var modules = ctx.includeNames().includeName().stream()
-            .map(it -> {
-                var name = it.name.getText();
-                var alias = it.alias != null ? it.alias.getText() : null;
-                return ast( new IncludeVariable(name, alias), it );
-            })
+    private ConfigStatement configSelector(ConfigSelectorContext ctx) {
+        var kind = ctx.kind.getText();
+        var target = configPrimary(ctx.target);
+        var statements = ctx.configAssignment().stream()
+            .map(this::configAssignment)
             .collect(Collectors.toList());
-
-        return ast( new IncludeNode(source, modules), ctx );
+        return new ConfigBlockNode(kind, target, statements);
     }
 
-    private ClassNode enumDef(EnumDefContext ctx) {
+    private ConfigStatement configAppendBlock(ConfigAppendBlockContext ctx) {
+        var name = configPrimary(ctx.configPrimary());
+        var statements = ctx.configAppendBlockStatement().stream()
+            .map(this::configAppendBlockStatement)
+            .collect(Collectors.toList());
+        var result = ast( new ConfigBlockNode(name, statements), ctx );
+        if( !"plugins".equals(name) )
+            collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (i.e. no equals sign)", result));
+        return result;
+    }
+
+    private ConfigStatement configAppendBlockStatement(ConfigAppendBlockStatementContext ctx) {
         var name = identifier(ctx.identifier());
-        var result = ast( EnumHelper.makeEnumNode(name, Modifier.PUBLIC, null, null), ctx );
-        if( ctx.enumBody() != null ) {
-            for( var ident : ctx.enumBody().identifier() ) {
-                var fn = ast( EnumHelper.addEnumConstant(result, identifier(ident), null), ident );
-                groovydocManager.handle(fn, ident);
-            }
-        }
-        groovydocManager.handle(result, ctx);
-        return result;
+        var value = literal(ctx.literal());
+        return ast( new ConfigAppendNode(List.of(name), value), ctx );
     }
 
-    private ProcessNode processDef(ProcessDefContext ctx) {
-        var name = ctx.name.getText();
-        if( ctx.body == null ) {
-            var empty = EmptyStatement.INSTANCE;
-            var result = ast( new ProcessNode(name, empty, empty, empty, EmptyExpression.INSTANCE, null, empty, empty), ctx );
-            collectSyntaxError(new SyntaxException("Missing process script body", result));
-            return result;
-        }
-
-        var directives = processDirectives(ctx.body.processDirectives());
-        var inputs = processInputs(ctx.body.processInputs());
-        var outputs = processOutputs(ctx.body.processOutputs());
-        var when = processWhen(ctx.body.processWhen());
-        var type = processType(ctx.body.processExec());
-        var exec = ctx.body.blockStatements() != null
-            ? blockStatements(ctx.body.blockStatements())
-            : blockStatements(ctx.body.processExec().blockStatements());
-        var stub = processStub(ctx.body.processStub());
-
-        if( ctx.body.blockStatements() != null ) {
-            if( !(directives instanceof EmptyStatement) || !(inputs instanceof EmptyStatement) || !(outputs instanceof EmptyStatement) )
-                collectSyntaxError(new SyntaxException("The `script:` or `exec:` label is required when other sections are present", exec));
-        }
-
-        var result = ast( new ProcessNode(name, directives, inputs, outputs, when, type, exec, stub), ctx );
-        groovydocManager.handle(result, ctx);
-        return result;
-    }
-
-    private Statement processDirectives(ProcessDirectivesContext ctx) {
-        if( ctx == null )
-            return EmptyStatement.INSTANCE;
-        var statements = ctx.statement().stream()
-            .map(this::statement)
-            .map(stmt -> checkDirective(stmt, "Invalid process directive"))
-            .collect(Collectors.toList());
-        return ast( block(null, statements), ctx );
-    }
-
-    private Statement processInputs(ProcessInputsContext ctx) {
-        if( ctx == null )
-            return EmptyStatement.INSTANCE;
-        var statements = ctx.statement().stream()
-            .map(this::statement)
-            .map(stmt -> checkDirective(stmt, "Invalid process input"))
-            .collect(Collectors.toList());
-        return ast( block(null, statements), ctx );
-    }
-
-    private Statement processOutputs(ProcessOutputsContext ctx) {
-        if( ctx == null )
-            return EmptyStatement.INSTANCE;
-        var statements = ctx.statement().stream()
-            .map(this::statement)
-            .map(stmt -> checkDirective(stmt, "Invalid process output"))
-            .collect(Collectors.toList());
-        return ast( block(null, statements), ctx );
-    }
-
-    private Statement checkDirective(Statement stmt, String errorMessage) {
-        if( !(stmt instanceof ExpressionStatement) ) {
-            collectSyntaxError(new SyntaxException(errorMessage, stmt));
-            return ast( new EmptyStatement(), stmt );
-        }
-
-        var stmtX = (ExpressionStatement) stmt;
-        var expression = stmtX.getExpression();
-        if( expression instanceof VariableExpression ve ) {
-            var method = ast( constX(ve.getName()), ve );
-            var call = ast( callX(THIS_EXPRESSION, method, new ArgumentListExpression()), stmtX );
-            stmtX.setExpression(call);
-            return stmtX;
-        }
-        if( isDirectiveWithNegativeValue(expression) ) {
-            var binary = (BinaryExpression) expression;
-            var left = (VariableExpression) binary.getLeftExpression();
-            var method = ast( constX(left.getName()), left );
-            var value = (Expression) ast( new UnaryMinusExpression(binary.getRightExpression()), binary.getRightExpression() );
-            var arguments = ast( args(value), value );
-            var call = ast( callX(THIS_EXPRESSION, method, arguments), stmtX );
-            stmtX.setExpression(call);
-            return stmtX;
-        }
-        if( !(expression instanceof MethodCallExpression) ) {
-            collectSyntaxError(new SyntaxException(errorMessage, stmtX));
-            return ast( new EmptyStatement(), stmtX );
-        }
-
-        var call = (MethodCallExpression) expression;
-        if( !call.isImplicitThis() || !(call.getMethod() instanceof ConstantExpression) ) {
-            collectSyntaxError(new SyntaxException(errorMessage, stmtX));
-            return ast( new EmptyStatement(), stmtX );
-        }
-
-        return stmtX;
-    }
-
-    private boolean isDirectiveWithNegativeValue(Expression expression) {
-        if( !(expression instanceof BinaryExpression) )
-            return false;
-        var binary = (BinaryExpression) expression;
-        if( !(binary.getLeftExpression() instanceof VariableExpression) )
-            return false;
-        if( binary.getOperation().getType() != Types.MINUS )
-            return false;
-        return true;
-    }
-
-    private Expression processWhen(ProcessWhenContext ctx) {
-        if( ctx == null )
-            return EmptyExpression.INSTANCE;
-        return ast( expression(ctx.expression()), ctx );
-    }
-
-    private String processType(ProcessExecContext ctx) {
-        if( ctx == null )
-            return "script";
-
-        if( ctx.EXEC() != null ) {
-            return "exec";
-        }
-        if( ctx.SHELL() != null ) {
-            collectWarning("The `shell` block is deprecated, use `script` instead", ast( new EmptyExpression(), ctx.SHELL() ));
-            return "shell";
-        }
-        return "script";
-    }
-
-    private Statement processStub(ProcessStubContext ctx) {
-        if( ctx == null )
-            return EmptyStatement.INSTANCE;
-        return ast( blockStatements(ctx.blockStatements()), ctx );
-    }
-
-    private WorkflowNode workflowDef(WorkflowDefContext ctx) {
-        var name = ctx.name != null ? ctx.name.getText() : null;
-
-        if( ctx.body == null ) {
-            var result = ast( new WorkflowNode(name, null, null, null, null), ctx );
-            groovydocManager.handle(result, ctx);
-            return result;
-        }
-
-        var takes = workflowTakes(ctx.body.workflowTakes());
-        var emits = workflowEmits(ctx.body.workflowEmits());
-        var publishers = workflowPublishers(ctx.body.workflowPublishers());
-        var main = blockStatements(
-            ctx.body.workflowMain() != null
-                ? ctx.body.workflowMain().blockStatements()
-                : null
-        );
-
-        if( name == null ) {
-            if( takes instanceof BlockStatement )
-                collectSyntaxError(new SyntaxException("Entry workflow cannot have a take section", takes));
-            if( emits instanceof BlockStatement )
-                collectSyntaxError(new SyntaxException("Entry workflow cannot have an emit section", emits));
-        }
-
-        var result = ast( new WorkflowNode(name, takes, main, emits, publishers), ctx );
-        groovydocManager.handle(result, ctx);
-        return result;
-    }
-
-    private WorkflowNode workflowDef(BlockStatement main) {
-        var takes = EmptyStatement.INSTANCE;
-        var emits = EmptyStatement.INSTANCE;
-        var publishers = EmptyStatement.INSTANCE;
-        return new WorkflowNode(null, takes, main, emits, publishers);
-    }
-
-    private Statement workflowTakes(WorkflowTakesContext ctx) {
-        if( ctx == null )
-            return EmptyStatement.INSTANCE;
-
-        var statements = ctx.identifier().stream()
-            .map(this::workflowTake)
-            .collect(Collectors.toList());
-        return ast( block(null, statements), ctx );
-    }
-
-    private Statement workflowTake(IdentifierContext ctx) {
-        var result = ast( stmt(variableName(ctx)), ctx );
-        saveTrailingComment(result, ctx);
-        return result;
-    }
-
-    private Statement workflowEmits(WorkflowEmitsContext ctx) {
-        if( ctx == null )
-            return EmptyStatement.INSTANCE;
-
-        var statements = ctx.statement().stream()
-            .map(this::workflowEmit)
-            .filter(stmt -> stmt != null)
-            .collect(Collectors.toList());
-        var result = ast( block(null, statements), ctx );
-        var hasEmitExpression = statements.stream().anyMatch(this::isEmitExpression);
-        if( hasEmitExpression && statements.size() > 1 )
-            collectSyntaxError(new SyntaxException("Every emit must be assigned to a name when there are multiple emits", result));
-        return result;
-    }
-
-    private Statement workflowEmit(StatementContext ctx) {
-        var result = statement(ctx);
-        if( !(result instanceof ExpressionStatement) ) {
-            collectSyntaxError(new SyntaxException("Invalid workflow emit -- should be a name, assignment, or expression", result));
-            return null;
-        }
-        saveTrailingComment(result, ctx);
-        return result;
-    }
-
-    private boolean isEmitExpression(Statement stmt) {
-        if( stmt instanceof ExpressionStatement es ) {
-            var exp = es.getExpression();
-            return !(exp instanceof VariableExpression || exp instanceof AssignmentExpression);
-        }
-        return false;
-    }
-
-    private Statement workflowPublishers(WorkflowPublishersContext ctx) {
-        if( ctx == null )
-            return EmptyStatement.INSTANCE;
-
-        var statements = ctx.statement().stream()
-            .map(this::statement)
-            .map(this::checkWorkflowPublisher)
-            .filter(stmt -> stmt != null)
-            .collect(Collectors.toList());
-        return ast( block(null, statements), ctx );
-    }
-
-    private Statement checkWorkflowPublisher(Statement stmt) {
-        var valid = stmt instanceof ExpressionStatement es
-            && es.getExpression() instanceof BinaryExpression be
-            && be.getOperation().getType() == Types.RIGHT_SHIFT;
-        if( !valid ) {
-            collectSyntaxError(new SyntaxException("Invalid workflow publisher", stmt));
-            return null;
-        }
-        return stmt;
-    }
-
-    private OutputNode outputDef(OutputDefContext ctx) {
-        var body = outputBody(ctx.outputBody());
-        return ast( new OutputNode(body), ctx );
-    }
-
-    private Statement outputBody(OutputBodyContext ctx) {
-        if( ctx == null )
-            return EmptyStatement.INSTANCE;
-        var statements = ctx.outputTargetBody().stream()
-            .map(this::outputTargetBody)
-            .collect(Collectors.toList());
-        return ast( block(null, statements), ctx );
-    }
-
-    private Statement outputTargetBody(OutputTargetBodyContext ctx) {
-        var stmt = statement(ctx.statement());
-        var call = asMethodCallX(stmt);
-        if( call != null ) {
-            var block = asDslBlock(call, 1);
-            if( block != null )
-                return stmt;
-        }
-        collectSyntaxError(new SyntaxException("Invalid output target block", stmt));
-        return ast( new EmptyStatement(), stmt );
-    }
-
-    private FunctionNode functionDef(FunctionDefContext ctx) {
-        checkLegacyType(ctx.legacyType());
-
-        var name = identifier(ctx.identifier());
-        var params = Optional.ofNullable(formalParameterList(ctx.formalParameterList())).orElse(Parameter.EMPTY_ARRAY);
-        var code = blockStatements(ctx.blockStatements());
-
-        var result = ast( new FunctionNode(name, null, params, code), ctx );
-        checkInvalidVarName(name, result);
-        groovydocManager.handle(result, ctx);
-        return result;
-    }
-
-    private Statement incompleteScriptDeclaration(IncompleteScriptDeclarationContext ctx) {
-        var result = ast( new IncompleteNode(ctx.getText()), ctx );
-        collectSyntaxError(new SyntaxException("Incomplete declaration", result));
+    private ConfigStatement configIncomplete(ConfigIncompleteContext ctx) {
+        var result = ast( new ConfigIncompleteNode(ctx.getText()), ctx );
+        collectSyntaxError(new SyntaxException("Incomplete statement", result));
         return result;
     }
 
@@ -787,8 +472,6 @@ public class ScriptAstBuilder {
         }
         else {
             // single assignment
-            checkLegacyType(ctx.legacyType());
-
             var target = variableName(ctx.identifier());
             var initializer = ctx.initializer != null
                 ? expression(ctx.initializer)
@@ -811,27 +494,15 @@ public class ScriptAstBuilder {
         return result;
     }
 
-    private static final String KEYWORD_FOR = Types.getText(Types.KEYWORD_FOR);
-    private static final String KEYWORD_SWITCH = Types.getText(Types.KEYWORD_SWITCH);
-    private static final String KEYWORD_WHILE = Types.getText(Types.KEYWORD_WHILE);
-
     private void checkInvalidVarName(String name, ASTNode node) {
-        if( "_".equals(name) )
-            collectSyntaxError(new SyntaxException("`_` is not allowed as an identifier because it is reserved for future use", node));
-        if( !GROOVY_KEYWORDS.contains(name) )
-            return;
-        if( KEYWORD_FOR.equals(name) || KEYWORD_WHILE.equals(name) )
-            collectSyntaxError(new SyntaxException("`" + name + "` loops are no longer supported", node));
-        else if( KEYWORD_SWITCH.equals(name) )
-            collectSyntaxError(new SyntaxException("`switch` statements are no longer supported", node));
-        else
+        if( GROOVY_KEYWORDS.contains(name) )
             collectSyntaxError(new SyntaxException("`" + name + "` is not allowed as an identifier because it is a Groovy keyword", node));
     }
 
     private Statement assignment(MultipleAssignmentStatementContext ctx) {
         var left = variableNames(ctx.variableNames());
         var right = expression(ctx.expression());
-        return stmt(ast( new AssignmentExpression(left, right), ctx ));
+        return stmt(ast( assignX(left, right), ctx ));
     }
 
     private Statement assignment(AssignmentStatementContext ctx) {
@@ -841,11 +512,11 @@ public class ScriptAstBuilder {
                 throw createParsingFailedException("Nested parenthesis is not allowed in multiple assignment, e.g. ((a)) = b", ctx);
 
             var tuple = ast( new TupleExpression(left), ctx.left );
-            return stmt(ast( new AssignmentExpression(tuple, token(ctx.op), expression(ctx.right)), ctx ));
+            return stmt(ast( binX(tuple, token(ctx.op), expression(ctx.right)), ctx ));
         }
 
         if ( isAssignmentLhsValid(left) )
-            return stmt(ast( new AssignmentExpression(left, token(ctx.op), expression(ctx.right)), ctx ));
+            return stmt(ast( binX(left, token(ctx.op), expression(ctx.right)), ctx ));
 
         throw createParsingFailedException("Invalid assignment target -- should be a variable, index, or property expression", ctx);
     }
@@ -933,9 +604,6 @@ public class ScriptAstBuilder {
         if( ctx instanceof UnaryNotExprAltContext unac )
             return ast( unaryNot(expression(unac.expression()), unac.op), unac );
 
-        if( ctx instanceof IncompleteExprAltContext iac )
-            return incompleteExpression(iac.incompleteExpression());
-
         throw createParsingFailedException("Invalid expression: " + ctx.getText(), ctx);
     }
 
@@ -976,20 +644,20 @@ public class ScriptAstBuilder {
     }
 
     private Expression unaryAdd(Expression expression, Token op) {
-        if( op.getType() == ScriptParser.ADD )
+        if( op.getType() == ConfigParser.ADD )
             return new UnaryPlusExpression(expression);
 
-        if( op.getType() == ScriptParser.SUB )
+        if( op.getType() == ConfigParser.SUB )
             return new UnaryMinusExpression(expression);
 
         throw new IllegalStateException();
     }
 
     private Expression unaryNot(Expression expression, Token op) {
-        if( op.getType() == ScriptParser.NOT )
+        if( op.getType() == ConfigParser.NOT )
             return new NotExpression(expression);
 
-        if( op.getType() == ScriptParser.BITNOT )
+        if( op.getType() == ConfigParser.BITNOT )
             return new BitwiseNegationExpression(expression);
 
         throw new IllegalStateException();
@@ -1016,11 +684,6 @@ public class ScriptAstBuilder {
         if( ctx instanceof ClosurePathExprAltContext cac ) {
             var closure = closure(cac.closure());
             return ast( pathClosureElement(expression, closure), expression, cac );
-        }
-
-        if( ctx instanceof ClosureWithLabelsPathExprAltContext clac ) {
-            var closure = closureWithLabels(clac.closureWithLabels());
-            return ast( pathClosureElement(expression, closure), expression, clac );
         }
 
         if( ctx instanceof ArgumentsPathExprAltContext aac )
@@ -1322,31 +985,6 @@ public class ScriptAstBuilder {
         return ast( closureX(params, code), ctx );
     }
 
-    private Expression closureWithLabels(ClosureWithLabelsContext ctx) {
-        var params = formalParameterList(ctx.formalParameterList());
-        var code = blockStatementsWithLabels(ctx.blockStatementsWithLabels());
-        return ast( closureX(params, code), ctx );
-    }
-
-    private BlockStatement blockStatementsWithLabels(BlockStatementsWithLabelsContext ctx) {
-        var statements = ctx.statementOrLabeled().stream()
-            .map(this::statementOrLabeled)
-            .collect(Collectors.toList());
-        return ast( block(new VariableScope(), statements), ctx );
-    }
-
-    private Statement statementOrLabeled(StatementOrLabeledContext ctx) {
-        if( ctx.identifier() != null ) {
-            var label = identifier(ctx.identifier());
-            var result = statementOrLabeled(ctx.statementOrLabeled());
-            result.addStatementLabel(label);
-            return result;
-        }
-        else {
-            return statement(ctx.statement());
-        }
-    }
-
     private Expression list(ListContext ctx) {
         if( ctx.COMMA() != null && ctx.expressionList() == null )
             throw createParsingFailedException("Empty list literal should not contain any comma(,)", ctx.COMMA());
@@ -1488,24 +1126,6 @@ public class ScriptAstBuilder {
         }
     }
 
-    private Expression incompleteExpression(IncompleteExpressionContext ctx) {
-        var prop = propertyExpression(ctx.identifier());
-        var result = ast( propX(prop, ""), ctx );
-        collectSyntaxError(new SyntaxException("Incomplete expression", result));
-        return result;
-    }
-
-    private Expression propertyExpression(List<IdentifierContext> idents) {
-        var head = idents.get(0);
-        Expression result = variableName(head);
-        for( int i = 1; i < idents.size(); i++ ) {
-            var ident = idents.get(i);
-            var name = ast( constX(identifier(ident)), ident );
-            result = ast( propX(result, name), result, name );
-        }
-        return result;
-    }
-
     /// MISCELLANEOUS
 
     private Parameter[] formalParameterList(FormalParameterListContext ctx) {
@@ -1530,8 +1150,6 @@ public class ScriptAstBuilder {
     }
 
     private Parameter formalParameter(FormalParameterContext ctx) {
-        checkLegacyType(ctx.legacyType());
-
         var type = ClassHelper.dynamicType();
         var name = identifier(ctx.identifier());
         var defaultValue = ctx.expression() != null
@@ -1676,46 +1294,8 @@ public class ScriptAstBuilder {
         // remove leading newline
         if( added ) {
             var last = comments.get(comments.size() - 1);
-            if( "\n".equals(last) ) {
+            if( "\n".equals(last) )
                 comments.remove(comments.size() - 1);
-            }
-            else if( last.startsWith("#!") ) {
-                moduleNode.setShebang(last);
-                comments.remove(comments.size() - 1);
-            }
-        }
-
-        return false;
-    }
-
-    private void saveTrailingComment(ASTNode node, ParserRuleContext ctx) {
-        var child = ctx;
-        while( saveTrailingComment0(child, node) )
-            child = child.getParent();
-    }
-
-    private boolean saveTrailingComment0(ParserRuleContext ctx, ASTNode node) {
-        var parent = ctx.getParent();
-        if( parent == null )
-            return false;
-
-        // find index of token among siblings
-        var siblings = parent.children;
-        int i = 0;
-        while( i < siblings.size() && siblings.get(i) != ctx ) {
-            i++;
-        }
-
-        // check parent context for additional comments
-        if( i == siblings.size() - 1 )
-            return true;
-
-        // save trailing inline comment
-        var next = siblings.get(i + 1);
-        if( next instanceof SepContext sep ) {
-            var text = sep.children.get(0).getText();
-            if( !";".equals(text) && !"\n".equals(text) )
-                node.putNodeMetaData(TRAILING_COMMENT, text);
         }
 
         return false;
@@ -1726,13 +1306,6 @@ public class ScriptAstBuilder {
     private boolean isInsideParentheses(NodeMetaDataHandler nodeMetaDataHandler) {
         Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
         return insideParenLevel != null && insideParenLevel.intValue() > 0;
-    }
-
-    private void checkLegacyType(ParserRuleContext ctx) {
-        if( ctx != null ) {
-            var node = ast( new EmptyStatement(), ctx );
-            collectWarning("Groovy-style type annotations are ignored", node);
-        }
     }
 
     private CompilationFailedException createParsingFailedException(String msg, ParserRuleContext ctx) {
@@ -1804,10 +1377,6 @@ public class ScriptAstBuilder {
         sourceUnit.getErrorCollector().addException(e, sourceUnit);
     }
 
-    private void collectWarning(String text, ASTNode node) {
-        sourceUnit.addWarning(text, node);
-    }
-
     private void removeErrorListeners() {
         lexer.removeErrorListeners();
         parser.removeErrorListeners();
@@ -1847,7 +1416,6 @@ public class ScriptAstBuilder {
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
     private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
-    private static final String TRAILING_COMMENT = "_TRAILING_COMMENT";
     private static final String VERBATIM_TEXT = "_VERBATIM_TEXT";
 
     private static final List<String> GROOVY_KEYWORDS = List.of(
@@ -1866,7 +1434,7 @@ public class ScriptAstBuilder {
         Types.getText(Types.KEYWORD_FOR),
         Types.getText(Types.KEYWORD_GOTO),
         Types.getText(Types.KEYWORD_IMPLEMENTS),
-        // Types.getText(Types.KEYWORD_IMPORT),
+        Types.getText(Types.KEYWORD_IMPORT),
         Types.getText(Types.KEYWORD_INTERFACE),
         Types.getText(Types.KEYWORD_NATIVE),
         Types.getText(Types.KEYWORD_PACKAGE),

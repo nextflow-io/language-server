@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.ast;
+package nextflow.config.parser;
 
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ModuleNode;
@@ -27,9 +27,9 @@ import java.io.IOException;
 import java.io.Reader;
 
 /**
- * Parser plugin for the Nextflow parser.
+ * Parser plugin for the Nextflow config parser.
  */
-public class ScriptParserPlugin implements ParserPlugin {
+public class ConfigParserPlugin implements ParserPlugin {
 
     @Override
     public Reduction parseCST(SourceUnit sourceUnit, Reader reader) {
@@ -48,9 +48,6 @@ public class ScriptParserPlugin implements ParserPlugin {
 
     @Override
     public ModuleNode buildAST(SourceUnit sourceUnit, ClassLoader classLoader, Reduction cst) {
-        return new ScriptAstBuilder(
-            sourceUnit,
-            sourceUnit.getConfiguration().isGroovydocEnabled()
-        ).buildAST();
+        return new ConfigAstBuilder(sourceUnit).buildAST();
     }
 }
