@@ -18,12 +18,12 @@ package nextflow.lsp.services.script;
 import java.util.Optional;
 
 import nextflow.lsp.ast.ASTUtils;
-import nextflow.lsp.compiler.PhaseAware;
-import nextflow.lsp.compiler.Phases;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.control.PhaseAware;
+import nextflow.script.control.Phases;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.expr.BinaryExpression;

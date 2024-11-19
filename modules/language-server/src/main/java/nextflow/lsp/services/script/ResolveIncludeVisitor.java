@@ -22,11 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import nextflow.lsp.compiler.PhaseAware;
-import nextflow.lsp.compiler.Phases;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
+import nextflow.script.control.PhaseAware;
+import nextflow.script.control.Phases;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;

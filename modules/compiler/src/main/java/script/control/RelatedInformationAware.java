@@ -13,17 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.compiler;
+package nextflow.script.control;
+
+import org.codehaus.groovy.ast.ASTNode;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class Phases {
-    public static final int SYNTAX = 1;
-    public static final int NAME_RESOLUTION = 2;
-    public static final int INCLUDE_RESOLUTION = 3;
-    public static final int TYPE_INFERENCE = 4;
-
-    public static final int ALL = TYPE_INFERENCE;
+public interface RelatedInformationAware {
+    String getOtherMessage();
+    ASTNode getOtherNode();
 }

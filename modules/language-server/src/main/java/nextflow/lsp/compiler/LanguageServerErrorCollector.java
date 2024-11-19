@@ -17,6 +17,7 @@ package nextflow.lsp.compiler;
 
 import java.util.List;
 
+import nextflow.script.control.PhaseAware;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.messages.Message;

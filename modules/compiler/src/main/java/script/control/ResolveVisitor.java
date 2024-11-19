@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services.script;
+package nextflow.script.control;
 
 import java.util.HashSet;
 import java.util.List;
@@ -21,8 +21,6 @@ import java.util.Map;
 import java.util.Set;
 
 import groovy.lang.Tuple2;
-import nextflow.lsp.compiler.PhaseAware;
-import nextflow.lsp.compiler.Phases;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.ScriptExpressionTransformer;

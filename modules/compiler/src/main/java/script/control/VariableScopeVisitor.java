@@ -13,27 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services.script;
+package nextflow.script.control;
 
-import java.io.IOException;
-import java.lang.reflect.Modifier;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import groovy.json.JsonSlurper;
-import nextflow.lsp.compiler.FutureWarning;
-import nextflow.lsp.compiler.PhaseAware;
-import nextflow.lsp.compiler.Phases;
-import nextflow.lsp.compiler.RelatedInformationAware;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
@@ -52,9 +40,7 @@ import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDsl;
 import nextflow.script.dsl.ScriptDsl;
 import nextflow.script.dsl.WorkflowDsl;
-import nextflow.script.types.ParamsMap;
 import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.DynamicVariable;
@@ -83,7 +69,6 @@ import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
-import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Token;
 import org.codehaus.groovy.syntax.Types;
@@ -106,8 +91,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private MethodNode currentDefinition;
 
     private VariableScope currentScope;
-
-    private ClassNode paramsType;
 
     private Set<Variable> declaredVariables = Collections.newSetFromMap(new IdentityHashMap<>());
 
@@ -211,16 +194,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitWorkflow(WorkflowNode node) {
-        if( node.isEntry() ) {
-            try {
-                declareParameters();
-            }
-            catch( Exception e ) {
-                System.err.println("Failed to parse parameter schema (nextflow_schema.json): " + e.toString());
-                addError("Failed to parse parameter schema -- check nextflow_schema.json for possible errors", node);
-            }
-        }
-
         pushState(node.isEntry() ? EntryWorkflowDsl.class : WorkflowDsl.class);
         currentDefinition = node;
         node.setVariableScope(currentScope);
@@ -236,92 +209,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
         currentDefinition = null;
         popState();
-
-        if( node.isEntry() )
-            this.paramsType = null;
-    }
-
-    private void declareParameters() {
-        // load parameter schema
-        var uri = sourceUnit.getSource().getURI();
-        var schemaPath = Path.of(uri).getParent().resolve("nextflow_schema.json");
-        if( !Files.exists(schemaPath) )
-            return;
-        var schemaJson = getParameterSchema(schemaPath);
-
-        var defs = Optional.ofNullable(schemaJson)
-            .flatMap(json -> asMap(json))
-            .flatMap(json ->
-                json.containsKey("$defs")
-                    ? asMap(json.get("$defs")) :
-                json.containsKey("defs")
-                    ? asMap(json.get("defs")) :
-                json.containsKey("definitions")
-                    ? asMap(json.get("definitions"))
-                    : Optional.empty()
-            )
-            .orElse(Collections.emptyMap());
-
-        var entries = (List<Map.Entry>) defs.values().stream()
-            .filter(defn -> defn instanceof Map)
-            .map(defn -> ((Map) defn).get("properties"))
-            .filter(props -> props instanceof Map)
-            .flatMap(props -> ((Map) props).entrySet().stream())
-            .collect(Collectors.toList());
-
-        if( entries.isEmpty() )
-            return;
-
-        // create synthetic params type
-        var cn = new ClassNode(ParamsMap.class);
-
-        for( var entry : entries ) {
-            var name = (String) entry.getKey();
-            var attrs = asMap(entry.getValue()).orElse(null);
-            if( attrs == null )
-                continue;
-            var type = getTypeClassFromString((String) attrs.get("type"));
-            var description = (String) attrs.get("description");
-            var fn = new FieldNode(name, Modifier.PUBLIC, type, cn, null);
-            fn.setHasNoRealSourcePosition(true);
-            fn.setDeclaringClass(cn);
-            fn.setSynthetic(true);
-            var an = new AnnotationNode(ClassHelper.makeCached(Description.class));
-            an.addMember("value", new ConstantExpression(description));
-            fn.addAnnotation(an);
-            cn.addField(fn);
-        }
-
-        this.paramsType = cn;
-    }
-
-    private Object getParameterSchema(Path schemaPath) {
-        try {
-            var schemaText = IOGroovyMethods.getText(Files.newInputStream(schemaPath));
-            return new JsonSlurper().parseText(schemaText);
-        }
-        catch( IOException e ) {
-            System.err.println("Failed to read parameter schema: " + e.toString());
-            return null;
-        }
-    }
-
-    private static Optional<Map> asMap(Object value) {
-        return value instanceof Map
-            ? Optional.of((Map) value)
-            : Optional.empty();
-    }
-
-    private ClassNode getTypeClassFromString(String type) {
-        if( "boolean".equals(type) )
-            return ClassHelper.boolean_TYPE;
-        if( "integer".equals(type) )
-            return ClassHelper.long_TYPE;
-        if( "number".equals(type) )
-            return ClassHelper.double_TYPE;
-        if( "string".equals(type) )
-            return ClassHelper.STRING_TYPE;
-        return ClassHelper.dynamicType();
     }
 
     private void declareWorkflowInputs(Statement takes) {
@@ -551,7 +438,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         popState();
     }
 
-    // statements
+    // expressions
 
     private static final List<String> KEYWORDS = List.of(
         "case",
@@ -724,31 +611,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         popState();
 
         currentClosure = cl;
-    }
-
-    @Override
-    public void visitPropertyExpression(PropertyExpression node) {
-        super.visitPropertyExpression(node);
-
-        // validate parameter against schema if applicable
-        // NOTE: should be incorporated into type-checking visitor
-        if( paramsType == null )
-            return;
-        if( !(node.getObjectExpression() instanceof VariableExpression) )
-            return;
-        var varX = (VariableExpression) node.getObjectExpression();
-        if( !"params".equals(varX.getName()) )
-            return;
-        var property = node.getPropertyAsString();
-        if( paramsType.getDeclaredField(property) == null ) {
-            addError("Unrecognized parameter `" + property + "`", node);
-            return;
-        }
-        var variable = varX.getAccessedVariable();
-        if( variable instanceof PropertyNode pn ) {
-            var mn = (MethodNode) pn.getNodeMetaData("access.method");
-            mn.setReturnType(paramsType);
-        }
     }
 
     @Override

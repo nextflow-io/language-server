@@ -35,8 +35,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.Compiler;
-import nextflow.lsp.compiler.FutureWarning;
-import nextflow.lsp.compiler.RelatedInformationAware;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.services.util.FormattingOptions;
@@ -44,6 +42,8 @@ import nextflow.lsp.util.DebouncingExecutor;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
+import nextflow.script.control.FutureWarning;
+import nextflow.script.control.RelatedInformationAware;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyItem;

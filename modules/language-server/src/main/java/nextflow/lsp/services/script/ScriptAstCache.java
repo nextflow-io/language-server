@@ -35,8 +35,6 @@ import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTParentVisitor;
 import nextflow.lsp.compiler.Compiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
-import nextflow.lsp.compiler.PhaseAware;
-import nextflow.lsp.compiler.Phases;
 import nextflow.lsp.file.FileCache;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
@@ -49,6 +47,10 @@ import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptParserPluginFactory;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.control.PhaseAware;
+import nextflow.script.control.Phases;
+import nextflow.script.control.ResolveVisitor;
+import nextflow.script.control.VariableScopeVisitor;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -105,8 +107,10 @@ public class ScriptAstCache extends ASTNodeCache {
 
         // phase 2: name resolution
         // NOTE: must be done before visiting parents because it transforms nodes
-        if( sourceUnit != null )
+        if( sourceUnit != null ) {
             new ResolveVisitor(sourceUnit, compilationUnit, libClasses).visit();
+            new ParameterSchemaVisitor(sourceUnit).visit();
+        }
         return sourceUnit;
     }
 
