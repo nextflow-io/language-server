@@ -20,10 +20,10 @@ import java.util.Optional;
 import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
-import nextflow.script.v2.ProcessNode;
-import nextflow.script.v2.ScriptNode;
-import nextflow.script.v2.ScriptVisitorSupport;
-import nextflow.script.v2.WorkflowNode;
+import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ScriptNode;
+import nextflow.script.ast.ScriptVisitorSupport;
+import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.expr.BinaryExpression;
@@ -37,7 +37,7 @@ import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
-import static nextflow.script.v2.ASTHelpers.*;
+import static nextflow.script.ast.ASTHelpers.*;
 
 /**
  * Validate process and workflow invocations.

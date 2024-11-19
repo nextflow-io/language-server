@@ -20,9 +20,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import nextflow.config.v2.ConfigAssignNode;
-import nextflow.config.v2.ConfigBlockNode;
-import nextflow.config.v2.ConfigIncompleteNode;
+import nextflow.config.ast.ConfigAssignNode;
+import nextflow.config.ast.ConfigBlockNode;
+import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.dsl.ConfigSchema;
 import nextflow.config.dsl.ConfigScope;
 import nextflow.lsp.ast.ASTNodeCache;

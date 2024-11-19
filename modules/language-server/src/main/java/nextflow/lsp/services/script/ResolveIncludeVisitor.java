@@ -24,9 +24,9 @@ import java.util.Set;
 
 import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
-import nextflow.script.v2.IncludeNode;
-import nextflow.script.v2.ScriptNode;
-import nextflow.script.v2.ScriptVisitorSupport;
+import nextflow.script.ast.IncludeNode;
+import nextflow.script.ast.ScriptNode;
+import nextflow.script.ast.ScriptVisitorSupport;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;

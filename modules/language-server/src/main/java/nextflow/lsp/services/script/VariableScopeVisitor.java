@@ -34,6 +34,15 @@ import nextflow.lsp.compiler.FutureWarning;
 import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
 import nextflow.lsp.compiler.RelatedInformationAware;
+import nextflow.script.ast.AssignmentExpression;
+import nextflow.script.ast.FeatureFlagNode;
+import nextflow.script.ast.FunctionNode;
+import nextflow.script.ast.IncludeNode;
+import nextflow.script.ast.OutputNode;
+import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ScriptNode;
+import nextflow.script.ast.ScriptVisitorSupport;
+import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.dsl.EntryWorkflowDsl;
@@ -44,15 +53,6 @@ import nextflow.script.dsl.ProcessDsl;
 import nextflow.script.dsl.ScriptDsl;
 import nextflow.script.dsl.WorkflowDsl;
 import nextflow.script.types.ParamsMap;
-import nextflow.script.v2.AssignmentExpression;
-import nextflow.script.v2.FeatureFlagNode;
-import nextflow.script.v2.FunctionNode;
-import nextflow.script.v2.IncludeNode;
-import nextflow.script.v2.OutputNode;
-import nextflow.script.v2.ProcessNode;
-import nextflow.script.v2.ScriptNode;
-import nextflow.script.v2.ScriptVisitorSupport;
-import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -88,7 +88,7 @@ import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Token;
 import org.codehaus.groovy.syntax.Types;
 
-import static nextflow.script.v2.ASTHelpers.*;
+import static nextflow.script.ast.ASTHelpers.*;
 
 /**
  * Initialize the variable scopes for an AST.

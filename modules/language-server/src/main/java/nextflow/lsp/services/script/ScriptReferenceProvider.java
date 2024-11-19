@@ -26,7 +26,7 @@ import nextflow.lsp.services.ReferenceProvider;
 import nextflow.lsp.services.RenameProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
-import nextflow.script.v2.IncludeVariable;
+import nextflow.script.ast.IncludeVariable;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;

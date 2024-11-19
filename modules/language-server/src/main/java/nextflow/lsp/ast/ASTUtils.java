@@ -20,8 +20,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import nextflow.script.v2.FeatureFlagNode;
-import nextflow.script.v2.IncludeVariable;
+import nextflow.script.ast.FeatureFlagNode;
+import nextflow.script.ast.IncludeVariable;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;

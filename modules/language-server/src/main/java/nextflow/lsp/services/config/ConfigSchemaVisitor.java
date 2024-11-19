@@ -18,12 +18,12 @@ package nextflow.lsp.services.config;
 import java.util.ArrayList;
 import java.util.List;
 
+import nextflow.config.ast.ConfigAssignNode;
+import nextflow.config.ast.ConfigBlockNode;
+import nextflow.config.ast.ConfigIncludeNode;
+import nextflow.config.ast.ConfigNode;
+import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.dsl.ConfigSchema;
-import nextflow.config.v2.ConfigAssignNode;
-import nextflow.config.v2.ConfigBlockNode;
-import nextflow.config.v2.ConfigIncludeNode;
-import nextflow.config.v2.ConfigNode;
-import nextflow.config.v2.ConfigVisitorSupport;
 import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
 import org.codehaus.groovy.ast.ASTNode;

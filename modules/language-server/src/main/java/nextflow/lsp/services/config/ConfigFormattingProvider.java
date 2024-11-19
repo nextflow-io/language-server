@@ -21,12 +21,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import nextflow.config.v2.ConfigAppendNode;
-import nextflow.config.v2.ConfigAssignNode;
-import nextflow.config.v2.ConfigBlockNode;
-import nextflow.config.v2.ConfigIncludeNode;
-import nextflow.config.v2.ConfigNode;
-import nextflow.config.v2.ConfigVisitorSupport;
+import nextflow.config.ast.ConfigAppendNode;
+import nextflow.config.ast.ConfigAssignNode;
+import nextflow.config.ast.ConfigBlockNode;
+import nextflow.config.ast.ConfigIncludeNode;
+import nextflow.config.ast.ConfigNode;
+import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.lsp.services.util.FormattingOptions;
 import nextflow.lsp.services.util.Formatter;
 import nextflow.lsp.services.FormattingProvider;

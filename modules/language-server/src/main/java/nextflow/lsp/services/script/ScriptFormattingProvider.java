@@ -25,17 +25,17 @@ import nextflow.lsp.services.util.Formatter;
 import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
-import nextflow.script.v2.AssignmentExpression;
-import nextflow.script.v2.FeatureFlagNode;
-import nextflow.script.v2.FunctionNode;
-import nextflow.script.v2.IncludeNode;
-import nextflow.script.v2.IncludeVariable;
-import nextflow.script.v2.OutputNode;
-import nextflow.script.v2.ParamNode;
-import nextflow.script.v2.ProcessNode;
-import nextflow.script.v2.ScriptNode;
-import nextflow.script.v2.ScriptVisitorSupport;
-import nextflow.script.v2.WorkflowNode;
+import nextflow.script.ast.AssignmentExpression;
+import nextflow.script.ast.FeatureFlagNode;
+import nextflow.script.ast.FunctionNode;
+import nextflow.script.ast.IncludeNode;
+import nextflow.script.ast.IncludeVariable;
+import nextflow.script.ast.OutputNode;
+import nextflow.script.ast.ParamNode;
+import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ScriptNode;
+import nextflow.script.ast.ScriptVisitorSupport;
+import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.expr.EmptyExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
@@ -51,7 +51,7 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
 
-import static nextflow.script.v2.ASTHelpers.*;
+import static nextflow.script.ast.ASTHelpers.*;
 
 /**
  * Provide formatting for a script.

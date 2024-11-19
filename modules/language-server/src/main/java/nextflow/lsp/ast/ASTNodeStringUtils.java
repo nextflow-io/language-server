@@ -21,17 +21,17 @@ import java.util.stream.Stream;
 import groovy.lang.groovydoc.Groovydoc;
 import nextflow.lsp.services.util.FormattingOptions;
 import nextflow.lsp.services.util.Formatter;
+import nextflow.script.ast.AssignmentExpression;
+import nextflow.script.ast.FeatureFlagNode;
+import nextflow.script.ast.FunctionNode;
+import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.Operator;
 import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDsl;
-import nextflow.script.v2.AssignmentExpression;
-import nextflow.script.v2.FeatureFlagNode;
-import nextflow.script.v2.FunctionNode;
-import nextflow.script.v2.ProcessNode;
-import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -43,7 +43,7 @@ import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 
-import static nextflow.script.v2.ASTHelpers.*;
+import static nextflow.script.ast.ASTHelpers.*;
 
 /**
  * Utility methods for retreiving text information for ast nodes.

@@ -21,9 +21,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import nextflow.config.v2.ConfigIncludeNode;
-import nextflow.config.v2.ConfigNode;
-import nextflow.config.v2.ConfigVisitorSupport;
+import nextflow.config.ast.ConfigIncludeNode;
+import nextflow.config.ast.ConfigNode;
+import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.lsp.services.LinkProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.LanguageServerUtils;

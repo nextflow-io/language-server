@@ -19,9 +19,9 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
+import nextflow.config.ast.ConfigAssignNode;
+import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.dsl.ConfigSchema;
-import nextflow.config.v2.ConfigAssignNode;
-import nextflow.config.v2.ConfigBlockNode;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.services.HoverProvider;
 import nextflow.lsp.util.Logger;

@@ -21,9 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import nextflow.config.v2.ConfigIncludeNode;
-import nextflow.config.v2.ConfigNode;
-import nextflow.config.v2.ConfigVisitorSupport;
+import nextflow.config.ast.ConfigIncludeNode;
+import nextflow.config.ast.ConfigNode;
+import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.lsp.compiler.PhaseAware;
 import nextflow.lsp.compiler.Phases;
 import org.codehaus.groovy.ast.ASTNode;

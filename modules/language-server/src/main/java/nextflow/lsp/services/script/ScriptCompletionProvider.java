@@ -30,16 +30,16 @@ import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
+import nextflow.script.ast.FunctionNode;
+import nextflow.script.ast.InvalidDeclaration;
+import nextflow.script.ast.OutputNode;
+import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
 import nextflow.script.types.Types;
-import nextflow.script.v2.FunctionNode;
-import nextflow.script.v2.InvalidDeclaration;
-import nextflow.script.v2.OutputNode;
-import nextflow.script.v2.ProcessNode;
-import nextflow.script.v2.WorkflowNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -70,7 +70,7 @@ import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
-import static nextflow.script.v2.ASTHelpers.*;
+import static nextflow.script.ast.ASTHelpers.*;
 
 /**
  * Provide suggestions for an incomplete expression or statement

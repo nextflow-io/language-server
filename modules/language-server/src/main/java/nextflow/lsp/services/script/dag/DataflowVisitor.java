@@ -31,11 +31,11 @@ import java.util.stream.Collectors;
 import groovy.lang.Tuple3;
 import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.script.ScriptAstCache;
-import nextflow.script.v2.AssignmentExpression;
-import nextflow.script.v2.ProcessNode;
-import nextflow.script.v2.ScriptNode;
-import nextflow.script.v2.ScriptVisitorSupport;
-import nextflow.script.v2.WorkflowNode;
+import nextflow.script.ast.AssignmentExpression;
+import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ScriptNode;
+import nextflow.script.ast.ScriptVisitorSupport;
+import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.expr.*;
@@ -43,7 +43,7 @@ import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.syntax.Types;
 
-import static nextflow.script.v2.ASTHelpers.*;
+import static nextflow.script.ast.ASTHelpers.*;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
 
