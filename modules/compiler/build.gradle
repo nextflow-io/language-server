@@ -1,0 +1,18 @@
+plugins {
+  id 'antlr'
+}
+
+dependencies {
+  antlr 'org.antlr:antlr4:4.9.2'
+  implementation 'com.google.guava:guava:33.3.1-jre'
+  api 'org.apache.groovy:groovy:4.0.24'
+  api 'org.apache.groovy:groovy-json:4.0.24'
+  implementation 'org.codehaus.gpars:gpars:1.2.1'
+
+  testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
+  testImplementation ('org.spockframework:spock-core:2.3-groovy-4.0') { exclude group: 'org.apache.groovy' }
+}
+
+generateGrammarSource {
+  arguments += ['-no-listener', '-no-visitor']
+}

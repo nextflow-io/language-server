@@ -1,0 +1,17 @@
+plugins {
+  id 'com.gradleup.shadow' version '8.3.5'
+  id 'application'
+}
+
+dependencies {
+  implementation project(':modules:compiler')
+  implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
+  implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.23.0'
+
+  testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
+  testImplementation ('org.spockframework:spock-core:2.3-groovy-4.0') { exclude group: 'org.apache.groovy' }
+}
+
+application {
+  mainClass = 'nextflow.lsp.NextflowLanguageServer'
+}
