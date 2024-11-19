@@ -21,6 +21,8 @@ import java.util.Map;
 
 import nextflow.config.scopes.*;
 import nextflow.script.dsl.Description;
+import nextflow.script.dsl.FeatureFlag;
+import nextflow.script.dsl.FeatureFlagDsl;
 import nextflow.script.dsl.ProcessDsl;
 
 public class ConfigSchema {
@@ -108,13 +110,19 @@ public class ConfigSchema {
                 result.put(name, annot.value());
             }
         }
-        // derive process config from process directives
+        // derive nextflow config scope from feature flags
+        for( var field : FeatureFlagDsl.class.getDeclaredFields() ) {
+            var name = field.getAnnotation(FeatureFlag.class);
+            var description = field.getAnnotation(Description.class);
+            result.put(name.value(), description.value());
+        }
+        // derive process config scope from process directives
         for( var method : ProcessDsl.DirectiveDsl.class.getDeclaredMethods() ) {
-            var annot = method.getAnnotation(Description.class);
-            if( annot == null )
+            var description = method.getAnnotation(Description.class);
+            if( description == null )
                 continue;
             var name = "process." + method.getName();
-            result.put(name, annot.value());
+            result.put(name, description.value());
         }
         return result;
     }
