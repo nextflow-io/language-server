@@ -17,13 +17,13 @@
 package nextflow.lsp.ast
 
 import groovy.lang.groovydoc.Groovydoc
+import nextflow.script.ast.FeatureFlagNode
+import nextflow.script.ast.FunctionNode
+import nextflow.script.ast.ProcessNode
+import nextflow.script.ast.WorkflowNode
 import nextflow.script.dsl.FeatureFlagDsl
 import nextflow.script.dsl.ProcessDsl
 import nextflow.script.types.Channel
-import nextflow.script.v2.FeatureFlagNode
-import nextflow.script.v2.FunctionNode
-import nextflow.script.v2.ProcessNode
-import nextflow.script.v2.WorkflowNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.Parameter
