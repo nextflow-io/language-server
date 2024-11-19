@@ -41,9 +41,12 @@ options {
 }
 
 @header {
-package nextflow.antlr;
+package nextflow.config.parser;
 
+import nextflow.script.parser.AbstractParser;
 import org.apache.groovy.parser.antlr4.GroovySyntaxError;
+
+import static nextflow.script.parser.SemanticPredicates.*;
 }
 
 @members {
@@ -233,7 +236,7 @@ assignmentStatement
 expressionStatement
     :   expression
         (
-            { SemanticPredicates.isValidDirective($expression.ctx) }? argumentList
+            { isValidDirective($expression.ctx) }? argumentList
         |
             /* only certain expressions can be called as a directive (no parens) */
         )

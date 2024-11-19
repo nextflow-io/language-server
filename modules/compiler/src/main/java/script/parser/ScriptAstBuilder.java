@@ -28,9 +28,6 @@ import java.util.stream.Collectors;
 
 import com.google.common.hash.Hashing;
 import groovy.lang.Tuple2;
-import nextflow.antlr.ScriptLexer;
-import nextflow.antlr.ScriptParser;
-import nextflow.antlr.DescriptiveErrorStrategy;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
@@ -103,8 +100,8 @@ import org.codehaus.groovy.syntax.Numbers;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Types;
 
-import static nextflow.antlr.ScriptParser.*;
-import static nextflow.antlr.PositionConfigureUtils.ast;
+import static nextflow.script.parser.PositionConfigureUtils.ast;
+import static nextflow.script.parser.ScriptParser.*;
 import static nextflow.script.ast.ASTHelpers.*;
 import static org.codehaus.groovy.ast.expr.VariableExpression.THIS_EXPRESSION;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;

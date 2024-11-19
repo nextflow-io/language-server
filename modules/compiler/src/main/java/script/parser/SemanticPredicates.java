@@ -16,13 +16,14 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-package nextflow.antlr;
+package nextflow.script.parser;
 
 import java.util.regex.Pattern;
 
 import org.antlr.v4.runtime.CharStream;
 import org.codehaus.groovy.GroovyBugError;
 
+import static nextflow.script.parser.ScriptParser.*;
 import static org.apache.groovy.parser.antlr4.util.StringUtils.matches;
 
 /**
@@ -94,14 +95,14 @@ public class SemanticPredicates {
      *
      * @param context
      */
-    public static boolean isValidDirective(nextflow.antlr.ConfigParser.ExpressionContext context) {
-        if (!(context instanceof nextflow.antlr.ConfigParser.PathExprAltContext))
+    public static boolean isValidDirective(nextflow.config.parser.ConfigParser.ExpressionContext context) {
+        if (!(context instanceof nextflow.config.parser.ConfigParser.PathExprAltContext))
             return false;
 
         try {
-            var peac = (nextflow.antlr.ConfigParser.PathExprAltContext) context;
+            var peac = (nextflow.config.parser.ConfigParser.PathExprAltContext) context;
             var last = peac.getChild(peac.getChildCount() - 1);
-            return last instanceof nextflow.antlr.ConfigParser.IdentifierPrmrAltContext || last instanceof nextflow.antlr.ConfigParser.PropertyPathExprAltContext;
+            return last instanceof nextflow.config.parser.ConfigParser.IdentifierPrmrAltContext || last instanceof nextflow.config.parser.ConfigParser.PropertyPathExprAltContext;
         } catch (IndexOutOfBoundsException | ClassCastException e) {
             throw new GroovyBugError("Unexpected structure of expression context: " + context, e);
         }
@@ -113,14 +114,14 @@ public class SemanticPredicates {
      *
      * @param context
      */
-    public static boolean isValidDirective(nextflow.antlr.ScriptParser.ExpressionContext context) {
-        if (!(context instanceof nextflow.antlr.ScriptParser.PathExprAltContext))
+    public static boolean isValidDirective(ExpressionContext context) {
+        if (!(context instanceof PathExprAltContext))
             return false;
 
         try {
-            var peac = (nextflow.antlr.ScriptParser.PathExprAltContext) context;
+            var peac = (PathExprAltContext) context;
             var last = peac.getChild(peac.getChildCount() - 1);
-            return last instanceof nextflow.antlr.ScriptParser.IdentifierPrmrAltContext || last instanceof nextflow.antlr.ScriptParser.PropertyPathExprAltContext;
+            return last instanceof IdentifierPrmrAltContext || last instanceof PropertyPathExprAltContext;
         } catch (IndexOutOfBoundsException | ClassCastException e) {
             throw new GroovyBugError("Unexpected structure of expression context: " + context, e);
         }

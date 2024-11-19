@@ -40,14 +40,15 @@ options {
 }
 
 @header {
-package nextflow.antlr;
+package nextflow.config.parser;
 
 import java.util.*;
 import java.util.regex.Pattern;
+import nextflow.script.parser.AbstractLexer;
 import org.antlr.v4.runtime.CharStream;
 import org.apache.groovy.parser.antlr4.GroovySyntaxError;
 
-import static nextflow.antlr.SemanticPredicates.*;
+import static nextflow.script.parser.SemanticPredicates.*;
 }
 
 @members {

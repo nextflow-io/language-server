@@ -16,7 +16,7 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-package nextflow.antlr;
+package nextflow.script.parser;
 
 import groovy.lang.Tuple2;
 import org.antlr.v4.runtime.ParserRuleContext;

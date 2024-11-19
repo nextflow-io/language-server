@@ -20,7 +20,6 @@ package nextflow.script.parser;
 
 import groovy.lang.groovydoc.Groovydoc;
 import groovy.lang.groovydoc.GroovydocHolder;
-import nextflow.antlr.ScriptParser;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ASTNode;

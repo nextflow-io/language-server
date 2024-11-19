@@ -26,9 +26,6 @@ import java.util.stream.Collectors;
 
 import com.google.common.hash.Hashing;
 import groovy.lang.Tuple2;
-import nextflow.antlr.ConfigLexer;
-import nextflow.antlr.ConfigParser;
-import nextflow.antlr.DescriptiveErrorStrategy;
 import nextflow.config.ast.ConfigAppendNode;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
@@ -36,6 +33,7 @@ import nextflow.config.ast.ConfigIncludeNode;
 import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigStatement;
+import nextflow.script.parser.DescriptiveErrorStrategy;
 import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -94,8 +92,8 @@ import org.codehaus.groovy.syntax.Numbers;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Types;
 
-import static nextflow.antlr.ConfigParser.*;
-import static nextflow.antlr.PositionConfigureUtils.ast;
+import static nextflow.config.parser.ConfigParser.*;
+import static nextflow.script.parser.PositionConfigureUtils.ast;
 import static org.codehaus.groovy.ast.expr.VariableExpression.THIS_EXPRESSION;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
