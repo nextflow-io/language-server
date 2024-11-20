@@ -36,14 +36,14 @@ import spock.lang.Specification
  */
 class ASTNodeStringUtilsTest extends Specification {
 
-    def 'should get the label and docs for a type' () {
+    def 'should get the label and docs for a class' () {
         when:
         def classNode = Mock(ClassNode) {
             isEnum() >> false
             getNameWithoutPackage() >> 'Channel'
         }
         then:
-        ASTNodeStringUtils.getLabel(classNode) == 'type Channel'
+        ASTNodeStringUtils.getLabel(classNode) == 'class Channel'
 
         when:
         def enumNode = Mock(ClassNode) {
@@ -154,7 +154,7 @@ class ASTNodeStringUtilsTest extends Specification {
                 '''.stripIndent(true)
         }
         then:
-        ASTNodeStringUtils.getLabel(node) == 'sayHello(message, target)'
+        ASTNodeStringUtils.getLabel(node) == 'def sayHello(message, target)'
         ASTNodeStringUtils.getDocumentation(node) == 'Say hello to someone.'
     }
 

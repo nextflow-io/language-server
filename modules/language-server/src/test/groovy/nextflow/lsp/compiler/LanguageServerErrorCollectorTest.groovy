@@ -17,6 +17,7 @@
 package nextflow.lsp.compiler
 
 import nextflow.script.control.PhaseAware
+import nextflow.script.control.Phases
 import org.codehaus.groovy.ast.expr.EmptyExpression
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.SourceUnit
