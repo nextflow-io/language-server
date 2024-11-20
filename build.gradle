@@ -1,18 +1,10 @@
-plugins {
-  id 'java'
+
+task copyJar(type: Copy) {
+  dependsOn ':modules:language-server:build'
+  from "$projectDir/modules/language-server/build/libs/language-server-all.jar"
+  into "$buildDir/libs"
 }
 
-allprojects {
-  java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-  }
-
-  repositories {
-    mavenCentral()
-  }
-
-  test {
-    useJUnitPlatform()
-  }
+task build {
+  dependsOn copyJar
 }
