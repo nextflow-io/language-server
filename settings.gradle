@@ -1,0 +1,4 @@
+rootProject.name = 'language-server'
+
+include 'modules:compiler'
+include 'modules:language-server'

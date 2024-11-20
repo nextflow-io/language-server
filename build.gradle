@@ -1,39 +1,10 @@
-plugins {
-  id 'com.gradleup.shadow' version '8.3.5'
-  id 'application'
-  id 'antlr'
+
+task copyJar(type: Copy) {
+  dependsOn ':modules:language-server:build'
+  from "$projectDir/modules/language-server/build/libs/language-server-all.jar"
+  into "$buildDir/libs"
 }
 
-java {
-  sourceCompatibility = JavaVersion.VERSION_17
-  targetCompatibility = JavaVersion.VERSION_17
-}
-
-repositories {
-  mavenCentral()
-}
-
-dependencies {
-  antlr 'org.antlr:antlr4:4.9.2'
-  implementation 'com.google.guava:guava:33.3.1-jre'
-  implementation 'org.apache.groovy:groovy:4.0.24'
-  implementation 'org.apache.groovy:groovy-json:4.0.24'
-  implementation 'org.codehaus.gpars:gpars:1.2.1'
-  implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
-  implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.23.0'
-
-  testImplementation ("net.bytebuddy:byte-buddy:1.14.17")
-  testImplementation ("org.spockframework:spock-core:2.3-groovy-4.0") { exclude group: 'org.apache.groovy' }
-}
-
-generateGrammarSource {
-  arguments += ['-no-listener', '-no-visitor']
-}
-
-application {
-  mainClass = 'nextflow.lsp.NextflowLanguageServer'
-}
-
-test {
-  useJUnitPlatform()
+task build {
+  dependsOn copyJar
 }
