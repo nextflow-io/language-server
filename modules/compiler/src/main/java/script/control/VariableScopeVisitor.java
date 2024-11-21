@@ -512,7 +512,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void declareAssignedVariable(VariableExpression ve) {
         var variable = findVariableDeclaration(ve.getName(), ve);
         if( variable != null ) {
-            if( variable instanceof PropertyNode pn && pn.getNodeMetaData("access.method") != null )
+            if( isBuiltinVariable(variable) )
                 addError("Built-in variable cannot be re-assigned", ve);
             else
                 checkExternalWriteInClosure(ve, variable);
@@ -528,6 +528,12 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         else {
             addError("`" + ve.getName() + "` was assigned but not declared", ve);
         }
+    }
+
+    private boolean isBuiltinVariable(Variable variable) {
+        return variable instanceof PropertyNode pn
+            && pn.getNodeMetaData("access.method") instanceof MethodNode mn
+            && findAnnotation(mn, Constant.class).isPresent();
     }
 
     private void visitMutatedVariable(Expression node) {
@@ -550,7 +556,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( target == null )
             return;
         var variable = findVariableDeclaration(target.getName(), target);
-        if( variable instanceof PropertyNode pn && pn.getNodeMetaData("access.method") != null ) {
+        if( isBuiltinVariable(variable) ) {
             if( "params".equals(variable.getName()) )
                 sourceUnit.addWarning("Params should be declared at the top-level (i.e. outside the workflow)", target);
             // TODO: re-enable after workflow.onComplete bug is fixed
