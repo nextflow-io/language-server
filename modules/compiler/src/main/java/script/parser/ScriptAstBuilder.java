@@ -193,7 +193,7 @@ public class ScriptAstBuilder {
         }
     }
 
-    /// SCRIPT STATEMENTS
+    /// SCRIPT DECLARATIONS
 
     private static final List<String> SCRIPT_DEF_NAMES = List.of("process", "workflow", "output");
 
@@ -662,7 +662,7 @@ public class ScriptAstBuilder {
         return result;
     }
 
-    /// GROOVY STATEMENTS
+    /// STATEMENTS
 
     private Statement statement(StatementContext ctx) {
         Statement result;
@@ -880,7 +880,7 @@ public class ScriptAstBuilder {
         return ast( stmt(expression), ctx );
     }
 
-    /// GROOVY EXPRESSIONS
+    /// EXPRESSIONS
 
     private Expression expression(ExpressionContext ctx) {
         if( ctx instanceof AddSubExprAltContext asac )
