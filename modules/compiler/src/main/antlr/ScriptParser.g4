@@ -598,7 +598,7 @@ mapEntryList
     ;
 
 mapEntry
-    :   mapEntryLabel COLON nls expression
+    :   mapEntryLabel COLON expression
     ;
 
 mapEntryLabel
@@ -626,7 +626,7 @@ argumentListElement
     ;
 
 namedArg
-    :   namedProperty COLON nls expression
+    :   namedProperty COLON expression
     ;
 
 // -- incomplete expression
