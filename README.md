@@ -16,6 +16,10 @@ The following language features are currently supported:
 
 The language server requires Java 17 or later.
 
+## Configuration
+
+The language server exposes a set of configuration settings that can be controlled through the `workspace/didChangeConfiguration` event. See the [Nextflow VS Code extension](https://github.com/nextflow-io/vscode-language-nextflow/blob/master/package.json) for an example of how to set up these configuration settings with sensible defaults.
+
 ## Development
 
 To build from the command line:
