@@ -194,7 +194,7 @@ catchTypes
 
 // -- assert statement
 assertStatement
-    :   ASSERT condition=expression (nls (COLON | COMMA) nls message=expression)?
+    :   ASSERT condition=expression (nls COLON nls message=expression)?
     ;
 
 // -- variable declaration
@@ -429,7 +429,7 @@ list
     ;
 
 expressionList
-    :   expression (COMMA nls expression)*
+    :   expression (nls COMMA nls expression)*
     ;
 
 // -- map expression
@@ -439,7 +439,7 @@ map
     ;
 
 mapEntryList
-    :   mapEntry (COMMA nls mapEntry)*
+    :   mapEntry (nls COMMA nls mapEntry)*
     ;
 
 mapEntry
@@ -462,7 +462,7 @@ arguments
     ;
 
 argumentList
-    :   argumentListElement (COMMA nls argumentListElement)*
+    :   argumentListElement (nls COMMA nls argumentListElement)*
     ;
 
 argumentListElement
