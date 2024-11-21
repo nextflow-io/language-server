@@ -205,6 +205,17 @@ public class ScriptAstCache extends ASTNodeCache {
             var moduleNode = sourceUnit.getAST();
             if( moduleNode == null )
                 return;
+            var packageName = libDir
+                .relativize(Path.of(uri).getParent())
+                .toString()
+                .replaceAll("/", ".");
+            moduleNode.setPackageName(packageName);
+            for( var cn : moduleNode.getClasses() ) {
+                var className = packageName.isEmpty()
+                    ? cn.getNameWithoutPackage()
+                    : packageName + "." + cn.getNameWithoutPackage();
+                cn.setName(className);
+            }
             result.addAll(moduleNode.getClasses());
 
             var entry = libCache.get(uri);
