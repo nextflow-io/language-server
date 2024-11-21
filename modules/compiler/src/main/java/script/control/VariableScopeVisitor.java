@@ -32,7 +32,6 @@ import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
-import nextflow.script.dsl.Description;
 import nextflow.script.dsl.EntryWorkflowDsl;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
@@ -513,7 +512,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void declareAssignedVariable(VariableExpression ve) {
         var variable = findVariableDeclaration(ve.getName(), ve);
         if( variable != null ) {
-            if( variable instanceof FieldNode fn && findAnnotation(fn, Description.class).isPresent() )
+            if( variable instanceof PropertyNode pn && pn.getNodeMetaData("access.method") != null )
                 addError("Built-in variable cannot be re-assigned", ve);
             else
                 checkExternalWriteInClosure(ve, variable);
@@ -551,7 +550,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( target == null )
             return;
         var variable = findVariableDeclaration(target.getName(), target);
-        if( variable instanceof FieldNode fn && findAnnotation(fn, Description.class).isPresent() ) {
+        if( variable instanceof PropertyNode pn && pn.getNodeMetaData("access.method") != null ) {
             if( "params".equals(variable.getName()) )
                 sourceUnit.addWarning("Params should be declared at the top-level (i.e. outside the workflow)", target);
             // TODO: re-enable after workflow.onComplete bug is fixed
@@ -645,7 +644,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void checkGlobalVariableInProcess(Variable variable, ASTNode context) {
         if( !(currentDefinition instanceof ProcessNode) )
             return;
-        if( variable instanceof FieldNode fn && fn.getDeclaringClass().getTypeClass() == ScriptDsl.class ) {
+        if( variable instanceof PropertyNode pn && pn.getDeclaringClass().getTypeClass() == ScriptDsl.class ) {
             if( WARN_GLOBALS.contains(variable.getName()) )
                 sourceUnit.addWarning("The use of `" + variable.getName() + "` in a process is discouraged -- input files should be provided as process inputs", context);
         }
