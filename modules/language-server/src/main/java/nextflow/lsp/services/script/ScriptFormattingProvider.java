@@ -88,7 +88,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
         }
 
         var range = new Range(new Position(0, 0), Positions.getPosition(oldText, oldText.length()));
-        var visitor = new Visitor(sourceUnit, options, ast);
+        var visitor = new Visitor(sourceUnit, options);
         visitor.visit();
         var newText = visitor.toString();
 
@@ -101,16 +101,13 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         private FormattingOptions options;
 
-        private ScriptAstCache ast;
-
         private Formatter fmt;
 
         private int maxIncludeWidth = 0;
 
-        public Visitor(SourceUnit sourceUnit, FormattingOptions options, ScriptAstCache ast) {
+        public Visitor(SourceUnit sourceUnit, FormattingOptions options) {
             this.sourceUnit = sourceUnit;
             this.options = options;
-            this.ast = ast;
             this.fmt = new Formatter(options);
         }
 
