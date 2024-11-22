@@ -19,8 +19,8 @@ package nextflow.lsp.services.script
 import java.nio.file.Files
 import java.nio.file.Path
 
-import nextflow.lsp.services.util.FormattingOptions
 import nextflow.lsp.TestLanguageClient
+import nextflow.script.formatter.FormattingOptions
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.TextDocumentItem

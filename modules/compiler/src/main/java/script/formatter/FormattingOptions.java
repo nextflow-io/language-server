@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services.util;
+package nextflow.script.formatter;
 
 public record FormattingOptions(
     int tabSize,

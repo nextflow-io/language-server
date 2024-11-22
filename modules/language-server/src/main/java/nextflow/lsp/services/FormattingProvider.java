@@ -18,7 +18,7 @@ package nextflow.lsp.services;
 import java.net.URI;
 import java.util.List;
 
-import nextflow.lsp.services.util.FormattingOptions;
+import nextflow.script.formatter.FormattingOptions;
 import org.eclipse.lsp4j.TextEdit;
 
 public interface FormattingProvider {
