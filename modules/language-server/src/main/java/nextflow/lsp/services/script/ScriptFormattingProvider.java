@@ -188,7 +188,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
         @Override
         public void visitInclude(IncludeNode node) {
-            var wrap = node.modules.size() > 1;
+            var wrap = node.getLineNumber() < node.getLastLineNumber();
             fmt.appendLeadingComments(node);
             fmt.append("include {");
             if( wrap )
@@ -207,7 +207,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
                     fmt.append(" as ");
                     fmt.append(module.alias);
                 }
-                if( !wrap && options.harshilAlignment() ) {
+                if( !wrap && node.modules.size() == 1 && options.harshilAlignment() ) {
                     var padding = maxIncludeWidth - getIncludeWidth(module);
                     fmt.append(" ".repeat(padding));
                 }
