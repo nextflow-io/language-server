@@ -22,6 +22,8 @@ import java.util.stream.Collectors;
 
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.IncludeVariable;
+import nextflow.script.dsl.Constant;
+import nextflow.script.dsl.Description;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -41,6 +43,8 @@ import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
+
+import static nextflow.script.ast.ASTHelpers.*;
 
 /**
  * Utility methods for querying an AST.
@@ -170,10 +174,30 @@ public class ASTUtils {
     }
 
     private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
-        var classNode = getTypeOfNode(node.getObjectExpression(), ast);
-        if( classNode == null )
+        var cn = getTypeOfNode(node.getObjectExpression(), ast);
+        if( cn == null )
             return null;
-        return classNode.getField(node.getPropertyAsString());
+        var name = node.getPropertyAsString();
+        var result = cn.getField(name);
+        if( result != null )
+            return result;
+        return cn.getMethods().stream()
+            .filter((mn) -> {
+                if( !mn.isPublic() )
+                    return false;
+                var an = findAnnotation(mn, Constant.class);
+                if( !an.isPresent() )
+                    return false;
+                return name.equals(an.get().getMember("value").getText());
+            })
+            .map((mn) -> {
+                var fn = new FieldNode(name, 0xF, mn.getReturnType(), mn.getDeclaringClass(), null);
+                findAnnotation(mn, Description.class).ifPresent((an) -> {
+                    fn.addAnnotation(an);
+                });
+                return fn;
+            })
+            .findFirst().orElse(null);
     }
 
     /**
