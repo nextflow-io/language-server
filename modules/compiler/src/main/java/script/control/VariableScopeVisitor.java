@@ -475,7 +475,10 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var varX = asVarX(code.getStatements().get(0));
         if( varX == null )
             return;
-        currentScope.putDeclaredVariable(varX);
+        var scope = currentScope;
+        currentScope = currentDefinition.getVariableScope();
+        declare(varX);
+        currentScope = scope;
     }
 
     @Override
