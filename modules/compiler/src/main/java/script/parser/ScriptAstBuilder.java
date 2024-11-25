@@ -791,7 +791,7 @@ public class ScriptAstBuilder {
                 .map(ident -> (Expression) variableName(ident))
                 .collect(Collectors.toList());
             var target = new ArgumentListExpression(variables);
-            var initializer = expression(ctx.initializer);
+            var initializer = expressionOrIncomplete(ctx.initializer);
             return stmt(ast( declX(target, initializer), ctx ));
         }
         else {
@@ -800,7 +800,7 @@ public class ScriptAstBuilder {
 
             var target = variableName(ctx.identifier());
             var initializer = ctx.initializer != null
-                ? expression(ctx.initializer)
+                ? expressionOrIncomplete(ctx.initializer)
                 : EmptyExpression.INSTANCE;
             return stmt(ast( declX(target, initializer), ctx ));
         }
@@ -818,6 +818,12 @@ public class ScriptAstBuilder {
         var result = ast( varX(name), ctx );
         checkInvalidVarName(name, result);
         return result;
+    }
+
+    private Expression expressionOrIncomplete(ExpressionOrIncompleteContext ctx) {
+        return ctx.incompleteExpression() != null
+            ? incompleteExpression(ctx.incompleteExpression())
+            : expression(ctx.expression());
     }
 
     private static final String KEYWORD_FOR = Types.getText(Types.KEYWORD_FOR);
@@ -839,7 +845,7 @@ public class ScriptAstBuilder {
 
     private Statement assignment(MultipleAssignmentStatementContext ctx) {
         var left = variableNames(ctx.variableNames());
-        var right = expression(ctx.expression());
+        var right = expressionOrIncomplete(ctx.expressionOrIncomplete());
         return stmt(ast( new AssignmentExpression(left, right), ctx ));
     }
 
@@ -850,11 +856,11 @@ public class ScriptAstBuilder {
                 throw createParsingFailedException("Nested parenthesis is not allowed in multiple assignment, e.g. ((a)) = b", ctx);
 
             var tuple = ast( new TupleExpression(left), ctx.left );
-            return stmt(ast( new AssignmentExpression(tuple, token(ctx.op), expression(ctx.right)), ctx ));
+            return stmt(ast( new AssignmentExpression(tuple, token(ctx.op), expressionOrIncomplete(ctx.right)), ctx ));
         }
 
         if ( isAssignmentLhsValid(left) )
-            return stmt(ast( new AssignmentExpression(left, token(ctx.op), expression(ctx.right)), ctx ));
+            return stmt(ast( new AssignmentExpression(left, token(ctx.op), expressionOrIncomplete(ctx.right)), ctx ));
 
         throw createParsingFailedException("Invalid assignment target -- should be a variable, index, or property expression", ctx);
     }
@@ -873,6 +879,8 @@ public class ScriptAstBuilder {
     }
 
     private Statement expressionStatement(ExpressionStatementContext ctx) {
+        if( ctx.incompleteExpression() != null )
+            return ast( stmt(incompleteExpression(ctx.incompleteExpression())), ctx );
         var base = expression(ctx.expression());
         var expression = ctx.argumentList() != null
             ? methodCall(base, argumentList(ctx.argumentList()))
@@ -941,9 +949,6 @@ public class ScriptAstBuilder {
 
         if( ctx instanceof UnaryNotExprAltContext unac )
             return ast( unaryNot(expression(unac.expression()), unac.op), unac );
-
-        if( ctx instanceof IncompleteExprAltContext iac )
-            return incompleteExpression(iac.incompleteExpression());
 
         throw createParsingFailedException("Invalid expression: " + ctx.getText(), ctx);
     }
@@ -1498,20 +1503,9 @@ public class ScriptAstBuilder {
     }
 
     private Expression incompleteExpression(IncompleteExpressionContext ctx) {
-        var prop = propertyExpression(ctx.identifier());
-        var result = ast( propX(prop, ""), ctx );
+        var object = expression(ctx.expression());
+        var result = ast( propX(object, ""), ctx );
         collectSyntaxError(new SyntaxException("Incomplete expression", result));
-        return result;
-    }
-
-    private Expression propertyExpression(List<IdentifierContext> idents) {
-        var head = idents.get(0);
-        Expression result = variableName(head);
-        for( int i = 1; i < idents.size(); i++ ) {
-            var ident = idents.get(i);
-            var name = ast( constX(identifier(ident)), ident );
-            result = ast( propX(result, name), result, name );
-        }
         return result;
     }
 

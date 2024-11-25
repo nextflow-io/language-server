@@ -321,17 +321,22 @@ assertStatement
 
 // -- variable declaration
 variableDeclaration
-    :   (DEF | legacyType | DEF legacyType) identifier (nls ASSIGN nls initializer=expression)?
-    |   DEF variableNames nls ASSIGN nls initializer=expression
+    :   (DEF | legacyType | DEF legacyType) identifier (nls ASSIGN nls initializer=expressionOrIncomplete)?
+    |   DEF variableNames nls ASSIGN nls initializer=expressionOrIncomplete
     ;
 
 variableNames
     :   LPAREN identifier (COMMA identifier)+ rparen
     ;
 
+expressionOrIncomplete
+    :   expression
+    |   incompleteExpression
+    ;
+
 // -- assignment statement
 multipleAssignmentStatement
-    :   variableNames nls ASSIGN nls expression
+    :   variableNames nls ASSIGN nls expressionOrIncomplete
     ;
 
 assignmentStatement
@@ -351,7 +356,7 @@ assignmentStatement
         |   POWER_ASSIGN
         |   ELVIS_ASSIGN
         ) nls
-        right=expression
+        right=expressionOrIncomplete
     ;
 
 // -- expression statement
@@ -362,6 +367,7 @@ expressionStatement
         |
             /* only certain expressions can be called as a directive (no parens) */
         )
+    |   incompleteExpression
     ;
 
 
@@ -436,9 +442,6 @@ expression
         |   ELVIS nls
         )
         fb=expression                                                                       #conditionalExprAlt
-
-    // incomplete expression
-    |   incompleteExpression                                                                #incompleteExprAlt
     ;
 
 primary
@@ -631,7 +634,7 @@ namedArg
 
 // -- incomplete expression
 incompleteExpression
-    :   identifier (DOT identifier)* DOT
+    :   expression nls (DOT | SPREAD_DOT | SAFE_DOT)
     ;
 
 //
