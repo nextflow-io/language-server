@@ -27,6 +27,7 @@ import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.eclipse.lsp4j.Hover;
@@ -65,6 +66,8 @@ public class ScriptHoverProvider implements HoverProvider {
 
         var offsetNode = nodeStack.get(0);
         var defNode = ASTUtils.getDefinition(offsetNode, ast);
+        if( defNode instanceof VariableExpression ve && ve.isDynamicTyped() )
+            ve.setType(ASTUtils.getTypeOfNode(ve, ast));
 
         var builder = new StringBuilder();
 

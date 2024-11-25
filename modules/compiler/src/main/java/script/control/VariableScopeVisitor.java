@@ -437,58 +437,25 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         popState();
     }
 
-    // expressions
-
-    private static final List<String> KEYWORDS = List.of(
-        "case",
-        "for",
-        "switch",
-        "while"
-    );
-
     @Override
-    public void visitMethodCallExpression(MethodCallExpression node) {
-        if( currentDefinition instanceof WorkflowNode ) {
-            visitAssignmentOperator(node);
-        }
-        if( node.isImplicitThis() && node.getMethod() instanceof ConstantExpression ) {
-            var name = node.getMethodAsString();
-            var variable = findVariableDeclaration(name, node);
-            if( variable == null ) {
-                if( !KEYWORDS.contains(name) )
-                    addError("`" + name + "` is not defined", node.getMethod());
+    public void visitExpressionStatement(ExpressionStatement node) {
+        var exp = node.getExpression();
+        if( exp instanceof AssignmentExpression ae ) {
+            var source = ae.getRightExpression();
+            var target = ae.getLeftExpression();
+            visit(source);
+            if( checkImplicitDeclaration(target) ) {
+                var de = new DeclarationExpression(target, ae.getOperation(), source);
+                de.setSourcePosition(ae);
+                node.setExpression(de);
+            }
+            else {
+                visitMutatedVariable(target);
+                visit(target);
             }
         }
-        super.visitMethodCallExpression(node);
-    }
-
-    /**
-     * Treat `set` operator as an assignment.
-     */
-    private void visitAssignmentOperator(MethodCallExpression node) {
-        var name = node.getMethodAsString();
-        if( !("set".equals(name) || "tap".equals(name)) )
-            return;
-        var code = asDslBlock(node, 1);
-        if( code == null || code.getStatements().size() != 1 )
-            return;
-        var varX = asVarX(code.getStatements().get(0));
-        if( varX == null )
-            return;
-        var scope = currentScope;
-        currentScope = currentDefinition.getVariableScope();
-        declare(varX);
-        currentScope = scope;
-    }
-
-    @Override
-    public void visitBinaryExpression(BinaryExpression node) {
-        if( node instanceof AssignmentExpression ) {
-            visit(node.getRightExpression());
-            visitAssignmentTarget(node.getLeftExpression());
-        }
         else {
-            super.visitBinaryExpression(node);
+            super.visitExpressionStatement(node);
         }
     }
 
@@ -498,27 +465,27 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
      *
      * @param node
      */
-    private void visitAssignmentTarget(Expression node) {
+    private boolean checkImplicitDeclaration(Expression node) {
         if( node instanceof TupleExpression te ) {
+            var result = false;
             for( var el : te.getExpressions() )
-                declareAssignedVariable((VariableExpression) el);
+                result |= declareAssignedVariable((VariableExpression) el);
+            return result;
         }
         else if( node instanceof VariableExpression ve ) {
-            declareAssignedVariable(ve);
+            return declareAssignedVariable(ve);
         }
-        else {
-            visitMutatedVariable(node);
-            visit(node);
-        }
+        return false;
     }
 
-    private void declareAssignedVariable(VariableExpression ve) {
+    private boolean declareAssignedVariable(VariableExpression ve) {
         var variable = findVariableDeclaration(ve.getName(), ve);
         if( variable != null ) {
             if( isBuiltinVariable(variable) )
                 addError("Built-in variable cannot be re-assigned", ve);
             else
                 checkExternalWriteInClosure(ve, variable);
+            return false;
         }
         else if( currentDefinition instanceof ProcessNode || currentDefinition instanceof WorkflowNode ) {
             if( currentClosure != null )
@@ -527,9 +494,11 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             currentScope = currentDefinition.getVariableScope();
             declare(ve);
             currentScope = scope;
+            return true;
         }
         else {
             addError("`" + ve.getName() + "` was assigned but not declared", ve);
+            return true;
         }
     }
 
@@ -578,6 +547,50 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var name = variable.getName();
         if( scope.isReferencedLocalVariable(name) && scope.getDeclaredVariable(name) == null )
             addFutureWarning("Mutating an external variable in a closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
+    }
+
+    // expressions
+
+    private static final List<String> KEYWORDS = List.of(
+        "case",
+        "for",
+        "switch",
+        "while"
+    );
+
+    @Override
+    public void visitMethodCallExpression(MethodCallExpression node) {
+        if( currentDefinition instanceof WorkflowNode ) {
+            visitAssignmentOperator(node);
+        }
+        if( node.isImplicitThis() && node.getMethod() instanceof ConstantExpression ) {
+            var name = node.getMethodAsString();
+            var variable = findVariableDeclaration(name, node);
+            if( variable == null ) {
+                if( !KEYWORDS.contains(name) )
+                    addError("`" + name + "` is not defined", node.getMethod());
+            }
+        }
+        super.visitMethodCallExpression(node);
+    }
+
+    /**
+     * Treat `set` operator as an assignment.
+     */
+    private void visitAssignmentOperator(MethodCallExpression node) {
+        var name = node.getMethodAsString();
+        if( !("set".equals(name) || "tap".equals(name)) )
+            return;
+        var code = asDslBlock(node, 1);
+        if( code == null || code.getStatements().size() != 1 )
+            return;
+        var varX = asVarX(code.getStatements().get(0));
+        if( varX == null )
+            return;
+        var scope = currentScope;
+        currentScope = currentDefinition.getVariableScope();
+        declare(varX);
+        currentScope = scope;
     }
 
     @Override

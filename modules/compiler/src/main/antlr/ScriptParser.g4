@@ -301,7 +301,6 @@ blockStatements
     ;
 
 // -- try/catch statement
-
 tryCatchStatement
     :   TRY nls statementOrBlock (nls catchClause)*
     ;
