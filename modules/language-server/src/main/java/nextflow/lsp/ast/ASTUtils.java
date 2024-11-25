@@ -15,16 +15,24 @@
  */
 package nextflow.lsp.ast;
 
+import java.lang.reflect.Modifier;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.IncludeVariable;
+import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
+import nextflow.script.types.Channel;
+import nextflow.script.types.NamedTuple;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
@@ -43,6 +51,7 @@ import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
+import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 
 import static nextflow.script.ast.ASTHelpers.*;
 
@@ -138,16 +147,21 @@ public class ASTUtils {
         }
 
         if( node instanceof MethodCallExpression mce ) {
-            var methodNode = getMethodFromCallExpression(mce, ast);
-            return methodNode != null
-                ? methodNode.getReturnType()
+            var mn = getMethodFromCallExpression(mce, ast);
+            return mn != null
+                ? mn.getReturnType()
                 : mce.getType();
         }
 
         if( node instanceof PropertyExpression pe ) {
-            var fieldNode = getFieldFromExpression(pe, ast);
-            return fieldNode != null
-                ? getTypeOfNode(fieldNode, ast)
+            var mn = asMethodOutput(pe, ast);
+            if( mn instanceof ProcessNode pn )
+                return asProcessOut(pn);
+            if( mn instanceof WorkflowNode wn )
+                return asWorkflowOut(wn);
+            var fn = getFieldFromExpression(pe, ast);
+            return fn != null
+                ? getTypeOfNode(fn, ast)
                 : pe.getType();
         }
 
@@ -159,8 +173,8 @@ public class ASTUtils {
                         return getTypeOfNode(defVar.getInitialExpression(), ast);
                     }
                     var declNode = ast.getParent(defNode);
-                    if( declNode instanceof DeclarationExpression declExp )
-                        return getTypeOfNode(declExp.getRightExpression(), ast);
+                    if( declNode instanceof DeclarationExpression de )
+                        return getTypeOfNode(de.getRightExpression(), ast);
                 }
             }
 
@@ -171,6 +185,69 @@ public class ASTUtils {
         return node instanceof Expression exp
             ? exp.getType()
             : null;
+    }
+
+    private static MethodNode asMethodOutput(PropertyExpression node, ASTNodeCache ast) {
+        if( node.getObjectExpression() instanceof VariableExpression ve && "out".equals(node.getPropertyAsString()) ) {
+            var defNode = ASTUtils.getDefinition(ve, ast);
+            if( defNode instanceof MethodNode mn )
+                return mn;
+        }
+        return null;
+    }
+
+    private static ClassNode asProcessOut(ProcessNode pn) {
+        var cn = new ClassNode(NamedTuple.class);
+        asDirectives(pn.outputs)
+            .map(call -> getProcessEmitName(call))
+            .filter(name -> name != null)
+            .forEach((name) -> {
+                var type = ClassHelper.makeCached(Channel.class);
+                var fn = new FieldNode(name, Modifier.PUBLIC, type, cn, null);
+                fn.setDeclaringClass(cn);
+                cn.addField(fn);
+            });
+        return cn;
+    }
+
+    private static String getProcessEmitName(MethodCallExpression output) {
+        return Optional.of(output)
+            .flatMap(call -> Optional.ofNullable(asNamedArgs(call)))
+            .flatMap(namedArgs ->
+                namedArgs.stream()
+                    .filter(entry -> "emit".equals(entry.getKeyExpression().getText()))
+                    .findFirst()
+            )
+            .flatMap(entry -> Optional.ofNullable(
+                entry.getValueExpression() instanceof VariableExpression ve ? ve.getName() : null
+            ))
+            .orElse(null);
+    }
+
+    private static ClassNode asWorkflowOut(WorkflowNode wn) {
+        var cn = new ClassNode(NamedTuple.class);
+        asBlockStatements(wn.emits).stream()
+            .map(stmt -> ((ExpressionStatement) stmt).getExpression())
+            .map(emit -> getWorkflowEmitName(emit))
+            .filter(name -> name != null)
+            .forEach((name) -> {
+                var type = ClassHelper.dynamicType();
+                var fn = new FieldNode(name, Modifier.PUBLIC, type, cn, null);
+                fn.setDeclaringClass(cn);
+                cn.addField(fn);
+            });
+        return cn;
+    }
+
+    private static String getWorkflowEmitName(Expression emit) {
+        if( emit instanceof VariableExpression ve ) {
+            return ve.getName();
+        }
+        else if( emit instanceof AssignmentExpression ae ) {
+            var left = (VariableExpression)ae.getLeftExpression();
+            return left.getName();
+        }
+        return null;
     }
 
     private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
