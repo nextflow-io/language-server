@@ -19,8 +19,6 @@ import java.util.List;
 import java.util.Map;
 
 import groovy.lang.Closure;
-import groovyx.gpars.dataflow.DataflowReadChannel;
-import groovyx.gpars.dataflow.DataflowWriteChannel;
 import nextflow.script.types.Channel;
 
 public interface WorkflowDsl extends DslScope {
@@ -37,7 +35,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#branch)
     """)
-    Object branch(DataflowReadChannel source, Closure action);
+    Object branch(Channel source, Closure action);
 
     @Operator
     @Description("""
@@ -45,7 +43,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#buffer)
     """)
-    DataflowWriteChannel buffer(DataflowReadChannel source, Closure openingCondition, Closure closingCondition);
+    Channel buffer(Channel source, Closure openingCondition, Closure closingCondition);
 
     @Operator
     @Description("""
@@ -53,7 +51,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#collate)
     """)
-    DataflowWriteChannel collate(DataflowReadChannel source, int size, int step, boolean remainder);
+    Channel collate(Channel source, int size, int step, boolean remainder);
 
     @Operator
     @Description("""
@@ -61,7 +59,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#collect)
     """)
-    DataflowWriteChannel collect(DataflowReadChannel source, Closure action);
+    Channel collect(Channel source, Closure action);
 
     @Operator
     @Description("""
@@ -69,7 +67,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#collectfile)
     """)
-    DataflowWriteChannel collectFile(DataflowReadChannel source, Map<String,?> opts, Closure closure);
+    Channel collectFile(Channel source, Map<String,?> opts, Closure closure);
 
     @Operator
     @Description("""
@@ -77,7 +75,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#combine)
     """)
-    DataflowWriteChannel combine(DataflowReadChannel left, Map<String,?> opts, Object right);
+    Channel combine(Channel left, Map<String,?> opts, Object right);
 
     @Operator
     @Description("""
@@ -85,7 +83,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#concat)
     """)
-    DataflowWriteChannel concat(DataflowReadChannel source, DataflowReadChannel... others);
+    Channel concat(Channel source, Channel... others);
 
     @Operator
     @Description("""
@@ -93,7 +91,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#count)
     """)
-    DataflowWriteChannel count(DataflowReadChannel source);
+    Channel count(Channel source);
 
     @Operator
     @Description("""
@@ -101,7 +99,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#cross)
     """)
-    DataflowWriteChannel cross(DataflowReadChannel left, DataflowReadChannel right, Closure mapper);
+    Channel cross(Channel left, Channel right, Closure mapper);
 
     @Operator
     @Description("""
@@ -109,7 +107,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#distinct)
     """)
-    DataflowWriteChannel distinct(DataflowReadChannel source);
+    Channel distinct(Channel source);
 
     @Operator
     @Description("""
@@ -117,7 +115,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#dump)
     """)
-    DataflowWriteChannel dump(DataflowReadChannel source, Map<String,?> opts);
+    Channel dump(Channel source, Map<String,?> opts);
 
     @Operator
     @Description("""
@@ -125,7 +123,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#filter)
     """)
-    DataflowWriteChannel filter(DataflowReadChannel source, Closure<Boolean> closure);
+    Channel filter(Channel source, Closure<Boolean> closure);
 
     @Operator
     @Description("""
@@ -133,7 +131,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#first)
     """)
-    DataflowWriteChannel first(DataflowReadChannel source, Object criteria);
+    Channel first(Channel source, Object criteria);
 
     @Operator
     @Description("""
@@ -143,7 +141,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#flatmap)
     """)
-    DataflowWriteChannel flatMap(DataflowReadChannel source, Closure closure);
+    Channel flatMap(Channel source, Closure closure);
 
     @Operator
     @Description("""
@@ -151,7 +149,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#flatten)
     """)
-    DataflowWriteChannel flatten(DataflowReadChannel source);
+    Channel flatten(Channel source);
 
     @Operator
     @Description("""
@@ -159,7 +157,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#grouptuple)
     """)
-    DataflowWriteChannel groupTuple(DataflowReadChannel source, Map<String,?> opts);
+    Channel groupTuple(Channel source, Map<String,?> opts);
 
     @Operator
     @Description("""
@@ -167,7 +165,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#ifempty)
     """)
-    DataflowWriteChannel ifEmpty(DataflowReadChannel source, Object value);
+    Channel ifEmpty(Channel source, Object value);
 
     @Operator
     @Description("""
@@ -175,7 +173,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#join)
     """)
-    DataflowWriteChannel join(DataflowReadChannel left, DataflowReadChannel right);
+    Channel join(Channel left, Channel right);
 
     @Operator
     @Description("""
@@ -183,7 +181,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#last)
     """)
-    DataflowWriteChannel last(DataflowReadChannel source);
+    Channel last(Channel source);
 
     @Operator
     @Description("""
@@ -191,7 +189,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#map)
     """)
-    DataflowWriteChannel map(DataflowReadChannel source, Closure closure);
+    Channel map(Channel source, Closure closure);
 
     @Operator
     @Description("""
@@ -199,7 +197,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#max)
     """)
-    DataflowWriteChannel max(DataflowReadChannel source, Closure comparator);
+    Channel max(Channel source, Closure comparator);
 
     @Deprecated
     @Operator
@@ -208,7 +206,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#merge)
     """)
-    DataflowWriteChannel merge(DataflowReadChannel source, DataflowReadChannel... others);
+    Channel merge(Channel source, Channel... others);
 
     @Operator
     @Description("""
@@ -216,7 +214,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#min)
     """)
-    DataflowWriteChannel min(DataflowReadChannel source, Closure comparator);
+    Channel min(Channel source, Closure comparator);
 
     @Operator
     @Description("""
@@ -224,7 +222,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#mix)
     """)
-    DataflowWriteChannel mix(DataflowReadChannel source, DataflowReadChannel... others);
+    Channel mix(Channel source, Channel... others);
 
     @Operator
     @Description("""
@@ -232,7 +230,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#multimap)
     """)
-    Object multiMap(DataflowReadChannel source, Closure action);
+    Object multiMap(Channel source, Closure action);
 
     @Operator
     @Description("""
@@ -240,7 +238,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#randomsample)
     """)
-    DataflowWriteChannel randomSample(DataflowReadChannel source, int n, Long seed);
+    Channel randomSample(Channel source, int n, Long seed);
 
     @Operator
     @Description("""
@@ -248,7 +246,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#reduce)
     """)
-    DataflowWriteChannel reduce(DataflowReadChannel source, Object seed, Closure closure);
+    Channel reduce(Channel source, Object seed, Closure closure);
 
     @Operator
     @Description("""
@@ -256,7 +254,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#set)
     """)
-    void set(DataflowReadChannel source, Closure holder);
+    void set(Channel source, Closure holder);
 
     @Operator
     @Description("""
@@ -264,7 +262,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#splitcsv)
     """)
-    DataflowWriteChannel splitCsv(DataflowReadChannel source, Map<String,?> opts);
+    Channel splitCsv(Channel source, Map<String,?> opts);
 
     @Operator
     @Description("""
@@ -272,7 +270,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#splitfasta)
     """)
-    DataflowWriteChannel splitFasta(DataflowReadChannel source, Map<String,?> opts);
+    Channel splitFasta(Channel source, Map<String,?> opts);
 
     @Operator
     @Description("""
@@ -280,7 +278,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#splitfastq)
     """)
-    DataflowWriteChannel splitFastq(DataflowReadChannel source, Map<String,?> opts);
+    Channel splitFastq(Channel source, Map<String,?> opts);
 
     @Operator
     @Description("""
@@ -288,7 +286,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#splittext)
     """)
-    DataflowWriteChannel splitText(DataflowReadChannel source, Map<String,?> opts, Closure action);
+    Channel splitText(Channel source, Map<String,?> opts, Closure action);
 
     @Operator
     @Description("""
@@ -296,7 +294,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#subscribe)
     """)
-    DataflowReadChannel subscribe(DataflowReadChannel source, Closure closure);
+    void subscribe(Channel source, Closure closure);
 
     @Operator
     @Description("""
@@ -304,7 +302,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#sum)
     """)
-    DataflowWriteChannel sum(DataflowReadChannel source, Closure closure);
+    Channel sum(Channel source, Closure closure);
 
     @Operator
     @Description("""
@@ -312,7 +310,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#take)
     """)
-    DataflowWriteChannel take(DataflowReadChannel source, int n);
+    Channel take(Channel source, int n);
 
     @Operator
     @Description("""
@@ -320,7 +318,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#to;ist)
     """)
-    DataflowWriteChannel toList(DataflowReadChannel source);
+    Channel toList(Channel source);
 
     @Operator
     @Description("""
@@ -328,7 +326,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#tosortedlist)
     """)
-    DataflowWriteChannel toSortedList(DataflowReadChannel source);
+    Channel toSortedList(Channel source);
 
     @Operator
     @Description("""
@@ -336,7 +334,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#transpose)
     """)
-    DataflowWriteChannel transpose(DataflowReadChannel source, Map<String,?> opts);
+    Channel transpose(Channel source, Map<String,?> opts);
 
     @Operator
     @Description("""
@@ -344,7 +342,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#unique)
     """)
-    DataflowWriteChannel unique(DataflowReadChannel source, Closure comparator);
+    Channel unique(Channel source, Closure comparator);
 
     @Operator
     @Description("""
@@ -352,7 +350,7 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#until)
     """)
-    DataflowWriteChannel until(DataflowReadChannel source, Closure<Boolean> closure);
+    Channel until(Channel source, Closure<Boolean> closure);
 
     @Operator
     @Description("""
@@ -360,6 +358,6 @@ public interface WorkflowDsl extends DslScope {
 
         [Read more](https://nextflow.io/docs/latest/reference/operator.html#view)
     """)
-    DataflowWriteChannel view(DataflowReadChannel source, Closure closure);
+    Channel view(Channel source, Closure closure);
 
 }
