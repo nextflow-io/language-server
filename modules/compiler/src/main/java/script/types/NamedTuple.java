@@ -15,24 +15,5 @@
  */
 package nextflow.script.types;
 
-import java.nio.file.Path;
-import java.util.List;
-
-import org.codehaus.groovy.ast.ClassNode;
-
-public class Types {
-
-    public static final List<ClassNode> TYPES = List.of(
-        new ClassNode(Channel.class),
-        new ClassNode(Duration.class),
-        new ClassNode(MemoryUnit.class),
-        new ClassNode(Path.class)
-    );
-
-    public static String normalize(String name) {
-        if( "Object".equals(name) )
-            return "?";
-        return name;
-    }
-
+public class NamedTuple {
 }

@@ -240,7 +240,7 @@ public class ASTNodeStringUtils {
     private static String variableToLabel(Variable variable) {
         var builder = new StringBuilder();
         builder.append(variable.getName());
-        var type = variable.getOriginType() != null
+        var type = !ClassHelper.isDynamicTyped(variable.getOriginType())
             ? variable.getOriginType()
             : variable.getType();
         if( type.isArray() )

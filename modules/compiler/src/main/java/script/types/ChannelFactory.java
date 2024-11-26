@@ -20,31 +20,29 @@ import java.util.Collection;
 import java.util.Map;
 
 import groovy.lang.Closure;
-import groovyx.gpars.dataflow.DataflowVariable;
-import groovyx.gpars.dataflow.DataflowWriteChannel;
 
 public interface ChannelFactory {
 
-    DataflowWriteChannel empty();
+    Channel empty();
 
-    <T> DataflowWriteChannel<T> from(T... values);
+    <T> Channel<T> from(T... values);
 
-    <T> DataflowWriteChannel<T> from(Collection<T> values);
+    <T> Channel<T> from(Collection<T> values);
 
-    DataflowWriteChannel fromFilePairs(Map<String,?> opts, String pattern, Closure grouping);
+    Channel fromFilePairs(Map<String,?> opts, String pattern, Closure grouping);
 
-    <T> DataflowWriteChannel<T> fromList(Collection<T> values);
+    <T> Channel<T> fromList(Collection<T> values);
 
-    DataflowWriteChannel<Path> fromPath(Map<String,?> opts, String pattern);
+    Channel<Path> fromPath(Map<String,?> opts, String pattern);
 
-    DataflowWriteChannel fromSRA(Map<String,?> opts, String query);
+    Channel fromSRA(Map<String,?> opts, String query);
 
-    <T> DataflowWriteChannel<T> of(T... values);
+    <T> Channel<T> of(T... values);
 
-    DataflowWriteChannel topic(String name);
+    Channel topic(String name);
 
-    <T> DataflowVariable<T> value(T value);
+    <T> Channel<T> value(T value);
 
-    DataflowWriteChannel<Path> watchPath(String filePattern, String events);
+    Channel<Path> watchPath(String filePattern, String events);
 
 }

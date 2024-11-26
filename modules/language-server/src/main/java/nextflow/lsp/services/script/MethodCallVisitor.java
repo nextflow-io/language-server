@@ -18,6 +18,7 @@ package nextflow.lsp.services.script;
 import java.util.Optional;
 
 import nextflow.lsp.ast.ASTUtils;
+import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
@@ -184,8 +185,8 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
         if( emit instanceof VariableExpression ve ) {
             return ve.getName();
         }
-        else if( emit instanceof BinaryExpression be ) {
-            var left = (VariableExpression)be.getLeftExpression();
+        else if( emit instanceof AssignmentExpression ae ) {
+            var left = (VariableExpression)ae.getLeftExpression();
             return left.getName();
         }
         return null;
