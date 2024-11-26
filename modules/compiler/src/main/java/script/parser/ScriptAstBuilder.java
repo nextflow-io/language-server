@@ -791,7 +791,7 @@ public class ScriptAstBuilder {
                 .map(ident -> (Expression) variableName(ident))
                 .collect(Collectors.toList());
             var target = new ArgumentListExpression(variables);
-            var initializer = expressionOrIncomplete(ctx.initializer);
+            var initializer = expression(ctx.initializer);
             return stmt(ast( declX(target, initializer), ctx ));
         }
         else {
@@ -800,7 +800,7 @@ public class ScriptAstBuilder {
 
             var target = variableName(ctx.identifier());
             var initializer = ctx.initializer != null
-                ? expressionOrIncomplete(ctx.initializer)
+                ? expression(ctx.initializer)
                 : EmptyExpression.INSTANCE;
             return stmt(ast( declX(target, initializer), ctx ));
         }
@@ -818,12 +818,6 @@ public class ScriptAstBuilder {
         var result = ast( varX(name), ctx );
         checkInvalidVarName(name, result);
         return result;
-    }
-
-    private Expression expressionOrIncomplete(ExpressionOrIncompleteContext ctx) {
-        return ctx.incompleteExpression() != null
-            ? incompleteExpression(ctx.incompleteExpression())
-            : expression(ctx.expression());
     }
 
     private static final String KEYWORD_FOR = Types.getText(Types.KEYWORD_FOR);
@@ -845,7 +839,7 @@ public class ScriptAstBuilder {
 
     private Statement assignment(MultipleAssignmentStatementContext ctx) {
         var left = variableNames(ctx.variableNames());
-        var right = expressionOrIncomplete(ctx.expressionOrIncomplete());
+        var right = expression(ctx.expression());
         return stmt(ast( new AssignmentExpression(left, right), ctx ));
     }
 
@@ -856,11 +850,11 @@ public class ScriptAstBuilder {
                 throw createParsingFailedException("Nested parenthesis is not allowed in multiple assignment, e.g. ((a)) = b", ctx);
 
             var tuple = ast( new TupleExpression(left), ctx.left );
-            return stmt(ast( new AssignmentExpression(tuple, token(ctx.op), expressionOrIncomplete(ctx.right)), ctx ));
+            return stmt(ast( new AssignmentExpression(tuple, token(ctx.op), expression(ctx.right)), ctx ));
         }
 
         if ( isAssignmentLhsValid(left) )
-            return stmt(ast( new AssignmentExpression(left, token(ctx.op), expressionOrIncomplete(ctx.right)), ctx ));
+            return stmt(ast( new AssignmentExpression(left, token(ctx.op), expression(ctx.right)), ctx ));
 
         throw createParsingFailedException("Invalid assignment target -- should be a variable, index, or property expression", ctx);
     }
@@ -879,8 +873,6 @@ public class ScriptAstBuilder {
     }
 
     private Statement expressionStatement(ExpressionStatementContext ctx) {
-        if( ctx.incompleteExpression() != null )
-            return ast( stmt(incompleteExpression(ctx.incompleteExpression())), ctx );
         var base = expression(ctx.expression());
         var expression = ctx.argumentList() != null
             ? methodCall(base, argumentList(ctx.argumentList()))
@@ -949,6 +941,13 @@ public class ScriptAstBuilder {
 
         if( ctx instanceof UnaryNotExprAltContext unac )
             return ast( unaryNot(expression(unac.expression()), unac.op), unac );
+
+        if( ctx instanceof IncompleteExprAltContext iac ) {
+            var object = expression(iac.expression());
+            var result = ast( propX(object, ""), iac );
+            collectSyntaxError(new SyntaxException("Incomplete expression", result));
+            return result;
+        }
 
         throw createParsingFailedException("Invalid expression: " + ctx.getText(), ctx);
     }
@@ -1500,13 +1499,6 @@ public class ScriptAstBuilder {
             if( arg.getKeyExpression().getText().equals(name) )
                 throw createParsingFailedException("Duplicated named argument '" + name + "' found", namedArg);
         }
-    }
-
-    private Expression incompleteExpression(IncompleteExpressionContext ctx) {
-        var object = expression(ctx.expression());
-        var result = ast( propX(object, ""), ctx );
-        collectSyntaxError(new SyntaxException("Incomplete expression", result));
-        return result;
     }
 
     /// MISCELLANEOUS
