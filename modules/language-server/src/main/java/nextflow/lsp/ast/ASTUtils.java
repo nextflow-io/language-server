@@ -135,7 +135,7 @@ public class ASTUtils {
      * @param node
      * @param ast
      */
-    public static ClassNode getTypeOfNode(ASTNode node, ASTNodeCache ast) {
+    public static ClassNode getType(ASTNode node, ASTNodeCache ast) {
         if( node instanceof ClassExpression ce ) {
             // type(Foo.bar) -> type(Foo)
             return ce.getType();
@@ -161,7 +161,7 @@ public class ASTUtils {
                 return asWorkflowOut(wn);
             var fn = getFieldFromExpression(pe, ast);
             return fn != null
-                ? getTypeOfNode(fn, ast)
+                ? getType(fn, ast)
                 : pe.getType();
         }
 
@@ -170,11 +170,11 @@ public class ASTUtils {
                 var defNode = getDefinition(node, ast);
                 if( defNode instanceof Variable defVar ) {
                     if( defVar.hasInitialExpression() ) {
-                        return getTypeOfNode(defVar.getInitialExpression(), ast);
+                        return getType(defVar.getInitialExpression(), ast);
                     }
                     var declNode = ast.getParent(defNode);
                     if( declNode instanceof DeclarationExpression de )
-                        return getTypeOfNode(de.getRightExpression(), ast);
+                        return getType(de.getRightExpression(), ast);
                 }
             }
 
@@ -251,7 +251,7 @@ public class ASTUtils {
     }
 
     private static FieldNode getFieldFromExpression(PropertyExpression node, ASTNodeCache ast) {
-        var cn = getTypeOfNode(node.getObjectExpression(), ast);
+        var cn = getType(node.getObjectExpression(), ast);
         if( cn == null )
             return null;
         var name = node.getPropertyAsString();
@@ -314,7 +314,7 @@ public class ASTUtils {
                     return List.of(mn);
             }
             else {
-                var leftType = getTypeOfNode(mce.getObjectExpression(), ast);
+                var leftType = getType(mce.getObjectExpression(), ast);
                 if( leftType != null )
                     return leftType.getMethods(mce.getMethodAsString());
             }

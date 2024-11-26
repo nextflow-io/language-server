@@ -174,7 +174,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateItemsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
-        ClassNode cn = ASTUtils.getTypeOfNode(object, ast);
+        ClassNode cn = ASTUtils.getType(object, ast);
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var isStatic = object instanceof ClassExpression;
 
@@ -206,7 +206,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateMethodsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
-        ClassNode cn = ASTUtils.getTypeOfNode(object, ast);
+        ClassNode cn = ASTUtils.getType(object, ast);
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var isStatic = object instanceof ClassExpression;
 

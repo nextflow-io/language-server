@@ -67,7 +67,7 @@ public class ScriptHoverProvider implements HoverProvider {
         var offsetNode = nodeStack.get(0);
         var defNode = ASTUtils.getDefinition(offsetNode, ast);
         if( defNode instanceof VariableExpression ve && ve.isDynamicTyped() )
-            ve.setType(ASTUtils.getTypeOfNode(ve, ast));
+            ve.setType(ASTUtils.getType(ve, ast));
 
         var builder = new StringBuilder();
 
