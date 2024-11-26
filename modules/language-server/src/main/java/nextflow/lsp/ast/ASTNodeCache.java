@@ -379,9 +379,10 @@ public abstract class ASTNodeCache {
         var last = node.getLastLineNumber();
         var firstCol = node.getColumnNumber();
         var lastCol = node.getLastColumnNumber();
-        if( maxLines != -1 && first + maxLines < last )
-            last = first + maxLines;
-        for( int i = first; i <= last; i++ ) {
+        var lastWithMax = maxLines != -1 && first + maxLines < last
+            ? first + maxLines - 1
+            : last;
+        for( int i = first; i <= lastWithMax; i++ ) {
             var line = sourceUnit.getSource().getLine(i, null);
 
             if( i == first && leadingIndent ) {

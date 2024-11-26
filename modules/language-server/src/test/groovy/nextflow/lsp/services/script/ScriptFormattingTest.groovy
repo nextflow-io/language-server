@@ -19,8 +19,8 @@ package nextflow.lsp.services.script
 import java.nio.file.Files
 import java.nio.file.Path
 
-import nextflow.lsp.services.util.FormattingOptions
 import nextflow.lsp.TestLanguageClient
+import nextflow.script.formatter.FormattingOptions
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.TextDocumentItem
@@ -32,6 +32,20 @@ import spock.lang.Specification
  */
 class ScriptFormattingTest extends Specification {
 
+    Path getWorkspaceRoot() {
+        def workspaceRoot = Path.of(System.getProperty('user.dir')).resolve('build/test_workspace/')
+        if( !Files.exists(workspaceRoot) )
+            workspaceRoot.toFile().mkdirs()
+        return workspaceRoot
+    }
+
+    ScriptService getService(Path workspaceRoot) {
+        def service = new ScriptService()
+        service.connect(new TestLanguageClient())
+        service.initialize(workspaceRoot.toUri().toString(), Collections.emptyList(), false)
+        return service
+    }
+
     String openAndFormat(ScriptService service, Path filePath, String contents) {
         def uri = filePath.toUri()
         def textDocumentItem = new TextDocumentItem(uri.toString(), 'nextflow', 1, contents)
@@ -42,16 +56,11 @@ class ScriptFormattingTest extends Specification {
 
     def 'should format a script' () {
         given:
-        def workspaceRoot = Path.of(System.getProperty('user.dir')).resolve('build/test_workspace/')
-        if( !Files.exists(workspaceRoot) )
-            workspaceRoot.toFile().mkdirs()
-
-        def service = new ScriptService()
-        service.connect(new TestLanguageClient())
-        service.initialize(workspaceRoot.toUri().toString(), Collections.emptyList(), false)
+        def workspaceRoot = getWorkspaceRoot()
+        def service = getService(workspaceRoot)
+        def filePath = workspaceRoot.resolve('main.nf')
 
         when:
-        def filePath = workspaceRoot.resolve('main.nf')
         def contents = '''\
             workflow { println 'Hello!' }
             '''.stripIndent()
@@ -73,6 +82,36 @@ class ScriptFormattingTest extends Specification {
             workflow {
                 println('Hello!')
             }
+            '''.stripIndent()
+    }
+
+    def 'should format an include declaration' () {
+        given:
+        def workspaceRoot = getWorkspaceRoot()
+        def service = getService(workspaceRoot)
+        def filePath = workspaceRoot.resolve('main.nf')
+
+        when:
+        def contents = '''\
+            include{foo;bar}from'./foobar.nf'
+            '''.stripIndent()
+        then:
+        openAndFormat(service, filePath, contents) == '''\
+            include { foo ; bar } from './foobar.nf'
+            '''.stripIndent()
+
+        when:
+        contents = '''\
+            include{
+            foo;bar
+            }from'./foobar.nf'
+            '''.stripIndent()
+        then:
+        openAndFormat(service, filePath, contents) == '''\
+            include {
+                foo ;
+                bar
+            } from './foobar.nf'
             '''.stripIndent()
     }
 

@@ -30,12 +30,8 @@ public class Types {
     );
 
     public static String normalize(String name) {
-        if( "DataflowReadChannel".equals(name) )
-            return "Channel";
-        if( "DataflowWriteChannel".equals(name) )
-            return "Channel";
-        if( "DataflowVariable".equals(name) )
-            return "Channel";
+        if( "Object".equals(name) )
+            return "?";
         return name;
     }
 

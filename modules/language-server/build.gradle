@@ -12,6 +12,10 @@ dependencies {
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.23.0'
 
+  // runtime dependencies for Nextflow scripts
+  runtimeOnly 'org.apache.groovy:groovy-templates:4.0.24'
+  runtimeOnly 'org.yaml:snakeyaml:2.2'
+
   testImplementation ('org.objenesis:objenesis:3.4')
   testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
   testImplementation ('org.spockframework:spock-core:2.3-groovy-4.0') { exclude group: 'org.apache.groovy' }

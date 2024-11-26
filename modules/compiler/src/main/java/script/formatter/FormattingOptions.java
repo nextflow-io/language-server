@@ -13,16 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services;
+package nextflow.script.formatter;
 
-import java.net.URI;
-import java.util.List;
-
-import nextflow.script.formatter.FormattingOptions;
-import org.eclipse.lsp4j.TextEdit;
-
-public interface FormattingProvider {
-
-    List<? extends TextEdit> formatting(URI uri, FormattingOptions options);
-
-}
+public record FormattingOptions(
+    int tabSize,
+    boolean insertSpaces,
+    boolean harshilAlignment
+) {}

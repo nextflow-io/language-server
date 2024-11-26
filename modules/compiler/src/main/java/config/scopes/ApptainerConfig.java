@@ -64,6 +64,11 @@ public class ApptainerConfig implements ConfigScope {
     public String envWhitelist;
 
     @ConfigOption("""
+        Directory where remote Apptainer images are retrieved. When using a computing cluster it must be a shared folder accessible to all compute nodes.
+    """)
+    public String libraryDir;
+
+    @ConfigOption("""
         Pull the Apptainer image with http protocol (default: `false`).
     """)
     public boolean noHttps;

@@ -437,56 +437,37 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         popState();
     }
 
-    // expressions
-
-    private static final List<String> KEYWORDS = List.of(
-        "case",
-        "for",
-        "switch",
-        "while"
-    );
-
     @Override
-    public void visitMethodCallExpression(MethodCallExpression node) {
-        if( currentDefinition instanceof WorkflowNode ) {
-            visitAssignmentOperator(node);
+    public void visitExpressionStatement(ExpressionStatement node) {
+        var exp = node.getExpression();
+        if( exp instanceof AssignmentExpression ae ) {
+            var source = ae.getRightExpression();
+            var target = ae.getLeftExpression();
+            visit(source);
+            if( checkImplicitDeclaration(target) ) {
+                var de = new DeclarationExpression(target, ae.getOperation(), source);
+                de.setSourcePosition(ae);
+                node.setExpression(de);
+            }
+            else {
+                visitMutatedVariable(target);
+                visit(target);
+            }
+            return;
         }
-        if( node.isImplicitThis() && node.getMethod() instanceof ConstantExpression ) {
-            var name = node.getMethodAsString();
-            var variable = findVariableDeclaration(name, node);
-            if( variable == null ) {
-                if( !KEYWORDS.contains(name) )
-                    addError("`" + name + "` is not defined", node.getMethod());
+        if( exp instanceof MethodCallExpression mce ) {
+            var source = mce.getObjectExpression();
+            var target = checkSetAssignment(mce);
+            if( target != null ) {
+                visit(source);
+                declareAssignedVariable(target);
+                var ae = new AssignmentExpression(target, source);
+                ae.setSourcePosition(mce);
+                node.setExpression(ae);
+                return;
             }
         }
-        super.visitMethodCallExpression(node);
-    }
-
-    /**
-     * Treat `set` operator as an assignment.
-     */
-    private void visitAssignmentOperator(MethodCallExpression node) {
-        var name = node.getMethodAsString();
-        if( !("set".equals(name) || "tap".equals(name)) )
-            return;
-        var code = asDslBlock(node, 1);
-        if( code == null || code.getStatements().size() != 1 )
-            return;
-        var varX = asVarX(code.getStatements().get(0));
-        if( varX == null )
-            return;
-        currentScope.putDeclaredVariable(varX);
-    }
-
-    @Override
-    public void visitBinaryExpression(BinaryExpression node) {
-        if( node instanceof AssignmentExpression ) {
-            visit(node.getRightExpression());
-            visitAssignmentTarget(node.getLeftExpression());
-        }
-        else {
-            super.visitBinaryExpression(node);
-        }
+        super.visitExpressionStatement(node);
     }
 
     /**
@@ -495,27 +476,28 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
      *
      * @param node
      */
-    private void visitAssignmentTarget(Expression node) {
+    private boolean checkImplicitDeclaration(Expression node) {
         if( node instanceof TupleExpression te ) {
+            var result = false;
             for( var el : te.getExpressions() )
-                declareAssignedVariable((VariableExpression) el);
+                result |= declareAssignedVariable((VariableExpression) el);
+            return result;
         }
         else if( node instanceof VariableExpression ve ) {
-            declareAssignedVariable(ve);
+            return declareAssignedVariable(ve);
         }
-        else {
-            visitMutatedVariable(node);
-            visit(node);
-        }
+        return false;
     }
 
-    private void declareAssignedVariable(VariableExpression ve) {
+    private boolean declareAssignedVariable(VariableExpression ve) {
         var variable = findVariableDeclaration(ve.getName(), ve);
         if( variable != null ) {
-            if( variable instanceof PropertyNode pn && pn.getNodeMetaData("access.method") != null )
+            if( isBuiltinVariable(variable) )
                 addError("Built-in variable cannot be re-assigned", ve);
             else
                 checkExternalWriteInClosure(ve, variable);
+            ve.setAccessedVariable(variable);
+            return false;
         }
         else if( currentDefinition instanceof ProcessNode || currentDefinition instanceof WorkflowNode ) {
             if( currentClosure != null )
@@ -524,10 +506,18 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             currentScope = currentDefinition.getVariableScope();
             declare(ve);
             currentScope = scope;
+            return true;
         }
         else {
             addError("`" + ve.getName() + "` was assigned but not declared", ve);
+            return true;
         }
+    }
+
+    private boolean isBuiltinVariable(Variable variable) {
+        return variable instanceof PropertyNode pn
+            && pn.getNodeMetaData("access.method") instanceof MethodNode mn
+            && findAnnotation(mn, Constant.class).isPresent();
     }
 
     private void visitMutatedVariable(Expression node) {
@@ -550,7 +540,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( target == null )
             return;
         var variable = findVariableDeclaration(target.getName(), target);
-        if( variable instanceof PropertyNode pn && pn.getNodeMetaData("access.method") != null ) {
+        if( isBuiltinVariable(variable) ) {
             if( "params".equals(variable.getName()) )
                 sourceUnit.addWarning("Params should be declared at the top-level (i.e. outside the workflow)", target);
             // TODO: re-enable after workflow.onComplete bug is fixed
@@ -569,6 +559,43 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var name = variable.getName();
         if( scope.isReferencedLocalVariable(name) && scope.getDeclaredVariable(name) == null )
             addFutureWarning("Mutating an external variable in a closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
+    }
+
+    /**
+     * Treat `set` operator as an assignment.
+     */
+    private VariableExpression checkSetAssignment(MethodCallExpression node) {
+        if( !(currentDefinition instanceof WorkflowNode) )
+            return null;
+        var name = node.getMethodAsString();
+        if( !"set".equals(name) )
+            return null;
+        var code = asDslBlock(node, 1);
+        if( code == null || code.getStatements().size() != 1 )
+            return null;
+        return asVarX(code.getStatements().get(0));
+    }
+
+    // expressions
+
+    private static final List<String> KEYWORDS = List.of(
+        "case",
+        "for",
+        "switch",
+        "while"
+    );
+
+    @Override
+    public void visitMethodCallExpression(MethodCallExpression node) {
+        if( node.isImplicitThis() && node.getMethod() instanceof ConstantExpression ) {
+            var name = node.getMethodAsString();
+            var variable = findVariableDeclaration(name, node);
+            if( variable == null ) {
+                if( !KEYWORDS.contains(name) )
+                    addError("`" + name + "` is not defined", node.getMethod());
+            }
+        }
+        super.visitMethodCallExpression(node);
     }
 
     @Override

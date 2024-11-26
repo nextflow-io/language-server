@@ -336,7 +336,7 @@ public class ConfigAstBuilder {
         return result;
     }
 
-    /// GROOVY STATEMENTS
+    /// STATEMENTS
 
     private Statement statement(StatementContext ctx) {
         Statement result;
@@ -540,7 +540,7 @@ public class ConfigAstBuilder {
         return ast( stmt(expression), ctx );
     }
 
-    /// GROOVY EXPRESSIONS
+    /// EXPRESSIONS
 
     private Expression expression(ExpressionContext ctx) {
         if( ctx instanceof AddSubExprAltContext asac )

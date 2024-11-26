@@ -139,6 +139,8 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
             return true;
         if( resolveFromModule(type) )
             return true;
+        if( resolveFromLibImports(type) )
+            return true;
         if( !type.hasPackageName() && resolveFromDefaultImports(type) )
             return true;
         return resolveFromClassResolver(type.getName()) != null;
@@ -178,18 +180,22 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         return false;
     }
 
-    protected boolean resolveFromDefaultImports(ClassNode type) {
-        // resolve from script imports
-        var typeName = type.getName();
-        for( var cn : Types.TYPES ) {
-            if( typeName.equals(cn.getNameWithoutPackage()) || typeName.equals(cn.getName()) ) {
+    protected boolean resolveFromLibImports(ClassNode type) {
+        var name = type.getName();
+        for( var cn : libClasses ) {
+            if( name.equals(cn.getName()) ) {
                 type.setRedirect(cn);
                 return true;
             }
         }
-        // resolve from lib directory
-        for( var cn : libClasses ) {
-            if( typeName.equals(cn.getNameWithoutPackage()) || typeName.equals(cn.getName()) ) {
+        return false;
+    }
+
+    protected boolean resolveFromDefaultImports(ClassNode type) {
+        // resolve from script imports
+        var typeName = type.getName();
+        for( var cn : Types.TYPES ) {
+            if( typeName.equals(cn.getNameWithoutPackage()) ) {
                 type.setRedirect(cn);
                 return true;
             }

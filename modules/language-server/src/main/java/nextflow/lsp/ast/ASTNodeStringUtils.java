@@ -19,8 +19,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import groovy.lang.groovydoc.Groovydoc;
-import nextflow.lsp.services.util.FormattingOptions;
-import nextflow.lsp.services.util.Formatter;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
@@ -32,6 +30,8 @@ import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.Operator;
 import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDsl;
+import nextflow.script.formatter.FormattingOptions;
+import nextflow.script.formatter.Formatter;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -240,7 +240,7 @@ public class ASTNodeStringUtils {
     private static String variableToLabel(Variable variable) {
         var builder = new StringBuilder();
         builder.append(variable.getName());
-        var type = variable.getOriginType() != null
+        var type = !ClassHelper.isDynamicTyped(variable.getOriginType())
             ? variable.getOriginType()
             : variable.getType();
         if( type.isArray() )

@@ -301,7 +301,6 @@ blockStatements
     ;
 
 // -- try/catch statement
-
 tryCatchStatement
     :   TRY nls statementOrBlock (nls catchClause)*
     ;
@@ -438,7 +437,7 @@ expression
         fb=expression                                                                       #conditionalExprAlt
 
     // incomplete expression
-    |   incompleteExpression                                                                #incompleteExprAlt
+    |   expression nls (DOT | SPREAD_DOT | SAFE_DOT)                                        #incompleteExprAlt
     ;
 
 primary
@@ -634,11 +633,6 @@ argumentListElement
 
 namedArg
     :   namedProperty COLON expression
-    ;
-
-// -- incomplete expression
-incompleteExpression
-    :   identifier (DOT identifier)* DOT
     ;
 
 //

@@ -128,8 +128,8 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
             var attrs = asMap(entry.getValue()).orElse(null);
             if( attrs == null )
                 continue;
-            var type = getTypeClassFromString((String) attrs.get("type"));
-            var description = (String) attrs.get("description");
+            var type = getTypeClassFromString(asString(attrs.get("type")));
+            var description = asString(attrs.get("description"));
             var fn = new FieldNode(name, Modifier.PUBLIC, type, cn, null);
             fn.setHasNoRealSourcePosition(true);
             fn.setDeclaringClass(cn);
@@ -158,6 +158,12 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
         return value instanceof Map
             ? Optional.of((Map) value)
             : Optional.empty();
+    }
+
+    private static String asString(Object value) {
+        return value instanceof String
+            ? (String) value
+            : null;
     }
 
     private ClassNode getTypeClassFromString(String type) {
