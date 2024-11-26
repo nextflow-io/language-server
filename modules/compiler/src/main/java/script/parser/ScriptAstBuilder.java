@@ -1282,6 +1282,8 @@ public class ScriptAstBuilder {
             return TDQ_STR;
         if( text.startsWith(DQ_STR) )
             return DQ_STR;
+        if( text.startsWith(SLASH_STR) )
+            return SLASH_STR;
 
         throw new IllegalStateException();
     }
