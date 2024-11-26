@@ -942,8 +942,12 @@ public class ScriptAstBuilder {
         if( ctx instanceof UnaryNotExprAltContext unac )
             return ast( unaryNot(expression(unac.expression()), unac.op), unac );
 
-        if( ctx instanceof IncompleteExprAltContext iac )
-            return incompleteExpression(iac.incompleteExpression());
+        if( ctx instanceof IncompleteExprAltContext iac ) {
+            var object = expression(iac.expression());
+            var result = ast( propX(object, ""), iac );
+            collectSyntaxError(new SyntaxException("Incomplete expression", result));
+            return result;
+        }
 
         throw createParsingFailedException("Invalid expression: " + ctx.getText(), ctx);
     }
@@ -1495,24 +1499,6 @@ public class ScriptAstBuilder {
             if( arg.getKeyExpression().getText().equals(name) )
                 throw createParsingFailedException("Duplicated named argument '" + name + "' found", namedArg);
         }
-    }
-
-    private Expression incompleteExpression(IncompleteExpressionContext ctx) {
-        var prop = propertyExpression(ctx.identifier());
-        var result = ast( propX(prop, ""), ctx );
-        collectSyntaxError(new SyntaxException("Incomplete expression", result));
-        return result;
-    }
-
-    private Expression propertyExpression(List<IdentifierContext> idents) {
-        var head = idents.get(0);
-        Expression result = variableName(head);
-        for( int i = 1; i < idents.size(); i++ ) {
-            var ident = idents.get(i);
-            var name = ast( constX(identifier(ident)), ident );
-            result = ast( propX(result, name), result, name );
-        }
-        return result;
     }
 
     /// MISCELLANEOUS
