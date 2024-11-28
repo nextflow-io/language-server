@@ -98,13 +98,14 @@ public interface ScriptDsl extends DslScope {
     void exit(int exitCode, String message);
 
     @Description("""
-        Get one or more files from a path or glob pattern. Returns a Path or list of Paths if there are multiple files.
+        Get a file from a path or glob pattern. Returns a collection if there are zero or multiple files.
+
+        *NOTE: use `files()` to get a collection of files.*
     """)
-    /* Path | Collection<Path> */
-    Object file(Map<String,?> opts, String filePattern);
+    Path file(Map<String,?> opts, String filePattern);
 
     @Description("""
-        Convenience method for `file()` that always returns a list.
+        Get a collection of files from a path or glob pattern.
     """)
     Collection<Path> files(Map<String,?> opts, String filePattern);
 
