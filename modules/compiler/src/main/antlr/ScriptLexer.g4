@@ -139,6 +139,9 @@ GStringBegin
 TdqGStringBegin
     :   TdqStringQuotationMark -> pushMode(TDQ_GSTRING_MODE)
     ;
+SlashyGStringBegin
+    :   Slash { this.isRegexAllowed() && _input.LA(1) != '*' }? SlashyStringCharacter* Dollar { isFollowedByJavaLetterInGString(_input) }? -> pushMode(SLASHY_GSTRING_MODE)
+    ;
 
 mode DQ_GSTRING_MODE;
 GStringEnd
@@ -171,6 +174,23 @@ TdqGStringText
     ;
 
 TdqGStringExprStart
+    :   '${' -> pushMode(DEFAULT_MODE)
+    ;
+
+mode SLASHY_GSTRING_MODE;
+SlashyGStringEnd
+    :   Dollar? Slash  -> popMode
+    ;
+
+SlashyGStringPath
+    :   Dollar IdentifierInGString (Dot IdentifierInGString)*
+    ;
+
+SlashyGStringText
+    :   SlashyStringCharacter+
+    ;
+
+SlashyGStringExprStart
     :   '${' -> pushMode(DEFAULT_MODE)
     ;
 
