@@ -139,6 +139,11 @@ public interface ScriptDsl extends DslScope {
     void sendMail(Map<String,?> params);
 
     @Description("""
+        Sleep for the given number of milliseconds.
+    """)
+    void sleep(long milliseconds);
+
+    @Description("""
         Create a tuple object from the given arguments.
     """)
     List<?> tuple(Object... args);
