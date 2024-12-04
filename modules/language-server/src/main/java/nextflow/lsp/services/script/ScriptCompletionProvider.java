@@ -365,8 +365,10 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
     private Range getAddIncludeRange(URI uri) {
         var includeNodes = ast.getIncludeNodes(uri);
-        if( includeNodes.isEmpty() )
-            return new Range(new Position(1, 0), new Position(1, 0));
+        if( includeNodes.isEmpty() ) {
+            var line = ast.getScriptNode(uri).getShebang() != null ? 1 : 0;
+            return new Range(new Position(line, 0), new Position(line, 0));
+        }
         var lastInclude = includeNodes.get(includeNodes.size() - 1);
         var lastIncludeRange = LanguageServerUtils.astNodeToRange(lastInclude);
         var includeLine = lastIncludeRange != null ? lastIncludeRange.getEnd().getLine() + 1 : 0;
