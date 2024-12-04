@@ -282,7 +282,7 @@ public class ScriptAstCache extends ASTNodeCache {
             .isPresent();
     }
 
-    private List<ScriptNode> getScriptNodes() {
+    public List<ScriptNode> getScriptNodes() {
         var result = new ArrayList<ScriptNode>();
         for( var sourceUnit : getSourceUnits() ) {
             if( sourceUnit.getAST() instanceof ScriptNode sn )
@@ -291,7 +291,7 @@ public class ScriptAstCache extends ASTNodeCache {
         return result;
     }
 
-    private ScriptNode getScriptNode(URI uri) {
+    public ScriptNode getScriptNode(URI uri) {
         return (ScriptNode) getSourceUnit(uri).getAST();
     }
 
