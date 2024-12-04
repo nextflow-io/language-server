@@ -19,6 +19,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import com.google.gson.JsonNull;
 import com.google.gson.JsonPrimitive;
@@ -53,7 +54,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
         }
 
         var uri = URI.create(textDocument.getUri());
-        if( !ast.hasAST(uri) || ast.hasErrors(uri) )
+        if( !ast.hasAST(uri) )
             return Collections.emptyList();
 
         var result = new ArrayList<CodeLens>();
@@ -70,10 +71,10 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
         return result;
     }
 
-    public String previewDag(String documentUri, String name) {
+    public Map<String,String> previewDag(String documentUri, String name) {
         var uri = URI.create(documentUri);
         if( !ast.hasAST(uri) || ast.hasErrors(uri) )
-            return null;
+            return Map.ofEntries(Map.entry("error", "DAG preview cannot be shown because the script has errors."));
 
         var sourceUnit = ast.getSourceUnit(uri);
         return ast.getWorkflowNodes(uri).stream()
@@ -86,7 +87,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
                 var graph = visitor.getGraph(wn.isEntry() ? "<entry>" : wn.getName());
                 var result = new MermaidRenderer().render(wn.getName(), graph);
                 log.debug(result);
-                return result;
+                return Map.ofEntries(Map.entry("result", result));
             })
             .orElse(null);
     }
