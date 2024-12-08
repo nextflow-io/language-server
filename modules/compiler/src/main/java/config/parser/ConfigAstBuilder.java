@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-import com.google.common.hash.Hashing;
 import groovy.lang.Tuple2;
 import nextflow.config.ast.ConfigAppendNode;
 import nextflow.config.ast.ConfigAssignNode;
@@ -87,7 +86,6 @@ import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
-import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.codehaus.groovy.syntax.Numbers;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Types;
@@ -188,8 +186,6 @@ public class ConfigAstBuilder {
             moduleNode.addConfigStatement(configStatement(stmt));
 
         var scriptClassNode = moduleNode.getScriptClassDummy();
-        scriptClassNode.setName(getMainClassName());
-
         var statements = moduleNode.getConfigStatements();
         if( scriptClassNode != null && !statements.isEmpty() ) {
             var first = statements.get(0);
@@ -203,18 +199,6 @@ public class ConfigAstBuilder {
             throw createParsingFailedException(numberFormatError.getV2().getMessage(), numberFormatError.getV1());
 
         return moduleNode;
-    }
-
-    private String getMainClassName() {
-        try {
-            var reader = sourceUnit.getSource().getReader();
-            var text = IOGroovyMethods.getText(reader);
-            var hash = Hashing.sipHash24().newHasher().putUnencodedChars(text).hash();
-            return "_nf_config_" + hash.toString();
-        }
-        catch( IOException e ) {
-            throw new GroovyBugError("Failed to create main class name", e);
-        }
     }
 
     private ConfigStatement configStatement(ConfigStatementContext ctx) {

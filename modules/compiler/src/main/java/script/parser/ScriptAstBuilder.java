@@ -26,7 +26,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-import com.google.common.hash.Hashing;
 import groovy.lang.Tuple2;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
@@ -95,7 +94,6 @@ import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
-import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.codehaus.groovy.syntax.Numbers;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Types;
@@ -236,24 +234,11 @@ public class ScriptAstBuilder {
         }
 
         var scriptClassNode = moduleNode.getScriptClassDummy();
-        scriptClassNode.setName(getMainClassName());
 
         if( numberFormatError != null )
             throw createParsingFailedException(numberFormatError.getV2().getMessage(), numberFormatError.getV1());
 
         return moduleNode;
-    }
-
-    private String getMainClassName() {
-        try {
-            var reader = sourceUnit.getSource().getReader();
-            var text = IOGroovyMethods.getText(reader);
-            var hash = Hashing.sipHash24().newHasher().putUnencodedChars(text).hash();
-            return "_nf_script_" + hash.toString();
-        }
-        catch( IOException e ) {
-            throw new GroovyBugError("Failed to create main class name", e);
-        }
     }
 
     private boolean scriptDeclaration(ScriptDeclarationContext ctx) {
