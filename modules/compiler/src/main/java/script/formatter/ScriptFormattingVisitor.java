@@ -372,6 +372,10 @@ public class ScriptFormattingVisitor extends ScriptVisitorSupport {
     public void visitFunction(FunctionNode node) {
         fmt.appendLeadingComments(node);
         fmt.append("def ");
+        if( Formatter.isLegacyType(node.getReturnType()) ) {
+            fmt.visitTypeName(node.getReturnType());
+            fmt.append(' ');
+        }
         fmt.append(node.getName());
         fmt.append('(');
         fmt.visitParameters(node.getParameters());

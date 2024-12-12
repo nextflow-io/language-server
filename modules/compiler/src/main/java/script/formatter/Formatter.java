@@ -347,6 +347,8 @@ public class Formatter extends CodeVisitorSupport {
         }
     }
 
+    private boolean inVariableDeclaration;
+
     private boolean inWrappedPipeChain;
 
     @Override
@@ -354,7 +356,9 @@ public class Formatter extends CodeVisitorSupport {
         if( node instanceof DeclarationExpression ) {
             if( node.getNodeMetaData(IMPLICIT_DECLARATION) != Boolean.TRUE )
                 append("def ");
+            inVariableDeclaration = true;
             visit(node.getLeftExpression());
+            inVariableDeclaration = false;
             if( !(node.getRightExpression() instanceof EmptyExpression) ) {
                 append(" = ");
                 visit(node.getRightExpression());
@@ -475,6 +479,10 @@ public class Formatter extends CodeVisitorSupport {
     public void visitParameters(Parameter[] parameters) {
         for( int i = 0; i < parameters.length; i++ ) {
             var param = parameters[i];
+            if( isLegacyType(param.getType()) ) {
+                visitTypeName(param.getType());
+                append(' ');
+            }
             append(param.getName());
             if( param.hasInitialExpression() ) {
                 append('=');
@@ -618,6 +626,10 @@ public class Formatter extends CodeVisitorSupport {
     }
 
     protected void visitTypeName(ClassNode type) {
+        if( isLegacyType(type) ) {
+            append(type.getNodeMetaData(LEGACY_TYPE));
+            return;
+        }
         if( type.isArray() ) {
             visitTypeName(type.getComponentType());
             return;
@@ -644,6 +656,10 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitVariableExpression(VariableExpression node) {
+        if( inVariableDeclaration && isLegacyType(node.getType()) ) {
+            visitTypeName(node.getType());
+            append(' ');
+        }
         append(node.getText());
     }
 
@@ -697,6 +713,10 @@ public class Formatter extends CodeVisitorSupport {
 
     // helpers
 
+    public static boolean isLegacyType(ClassNode cn) {
+        return cn.getNodeMetaData(LEGACY_TYPE) != null;
+    }
+
     private boolean shouldWrapExpression(Expression node) {
         return node.getLineNumber() < node.getLastLineNumber();
     }
@@ -739,6 +759,7 @@ public class Formatter extends CodeVisitorSupport {
     private static final String IMPLICIT_DECLARATION = "_IMPLICIT_DECLARATION";
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
     private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
+    private static final String LEGACY_TYPE = "_LEGACY_TYPE";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
     private static final String TRAILING_COMMENT = "_TRAILING_COMMENT";
     private static final String VERBATIM_TEXT = "_VERBATIM_TEXT";

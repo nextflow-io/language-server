@@ -629,13 +629,12 @@ public class ScriptAstBuilder {
     }
 
     private FunctionNode functionDef(FunctionDefContext ctx) {
-        checkLegacyType(ctx.legacyType());
-
         var name = identifier(ctx.identifier());
+        var returnType = legacyType(ctx.legacyType());
         var params = Optional.ofNullable(formalParameterList(ctx.formalParameterList())).orElse(Parameter.EMPTY_ARRAY);
         var code = blockStatements(ctx.blockStatements());
 
-        var result = ast( new FunctionNode(name, null, params, code), ctx );
+        var result = ast( new FunctionNode(name, returnType, params, code), ctx );
         checkInvalidVarName(name, result);
         groovydocManager.handle(result, ctx);
         return result;
@@ -781,9 +780,8 @@ public class ScriptAstBuilder {
         }
         else {
             // single assignment
-            checkLegacyType(ctx.legacyType());
-
             var target = variableName(ctx.identifier());
+            target.setType(legacyType(ctx.legacyType()));
             var initializer = ctx.initializer != null
                 ? expression(ctx.initializer)
                 : EmptyExpression.INSTANCE;
@@ -1510,9 +1508,7 @@ public class ScriptAstBuilder {
     }
 
     private Parameter formalParameter(FormalParameterContext ctx) {
-        checkLegacyType(ctx.legacyType());
-
-        var type = ClassHelper.dynamicType();
+        var type = legacyType(ctx.legacyType());
         var name = identifier(ctx.identifier());
         var defaultValue = ctx.expression() != null
             ? expression(ctx.expression())
@@ -1605,6 +1601,13 @@ public class ScriptAstBuilder {
 
     private GenericsType genericsType(TypeContext ctx) {
         return ast( new GenericsType(type(ctx)), ctx );
+    }
+
+    private ClassNode legacyType(ParserRuleContext ctx) {
+        var result = ClassHelper.dynamicType();
+        if( ctx != null )
+            result.putNodeMetaData(LEGACY_TYPE, ctx.getText());
+        return result;
     }
 
     /// COMMENTS
@@ -1706,13 +1709,6 @@ public class ScriptAstBuilder {
     private boolean isInsideParentheses(NodeMetaDataHandler nodeMetaDataHandler) {
         Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
         return insideParenLevel != null && insideParenLevel.intValue() > 0;
-    }
-
-    private void checkLegacyType(ParserRuleContext ctx) {
-        if( ctx != null ) {
-            var node = ast( new EmptyStatement(), ctx );
-            collectWarning("Groovy-style type annotations are ignored", node);
-        }
     }
 
     private CompilationFailedException createParsingFailedException(String msg, ParserRuleContext ctx) {
@@ -1826,6 +1822,7 @@ public class ScriptAstBuilder {
     private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
     private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
+    private static final String LEGACY_TYPE = "_LEGACY_TYPE";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
     private static final String TRAILING_COMMENT = "_TRAILING_COMMENT";
     private static final String VERBATIM_TEXT = "_VERBATIM_TEXT";
