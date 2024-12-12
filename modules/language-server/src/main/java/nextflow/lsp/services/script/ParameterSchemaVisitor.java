@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import groovy.json.JsonSlurper;
 import nextflow.script.ast.ScriptNode;
@@ -97,8 +98,8 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
             return;
         var schemaJson = getParameterSchema(schemaPath);
 
-        var defs = Optional.ofNullable(schemaJson)
-            .flatMap(json -> asMap(json))
+        var schema = asMap(schemaJson).orElse(Collections.emptyMap());
+        var defs = Optional.of(schema)
             .flatMap(json ->
                 json.containsKey("$defs")
                     ? asMap(json.get("$defs")) :
@@ -110,11 +111,17 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
             )
             .orElse(Collections.emptyMap());
 
-        var entries = (List<Map.Entry>) defs.values().stream()
-            .filter(defn -> defn instanceof Map)
-            .map(defn -> ((Map) defn).get("properties"))
-            .filter(props -> props instanceof Map)
-            .flatMap(props -> ((Map) props).entrySet().stream())
+        var entries = (List<Map.Entry>) Stream.concat(Stream.of(schema), defs.values().stream())
+            .flatMap(defn ->
+                defn instanceof Map map
+                    ? Stream.of(map.get("properties"))
+                    : Stream.empty()
+            )
+            .flatMap(props ->
+                props instanceof Map map
+                    ? map.entrySet().stream()
+                    : Stream.empty()
+            )
             .collect(Collectors.toList());
 
         if( entries.isEmpty() )
