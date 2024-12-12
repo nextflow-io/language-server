@@ -120,12 +120,12 @@ public abstract class LanguageService {
 
     private volatile boolean initialized;
 
-    private volatile boolean suppressFutureWarnings;
+    private volatile boolean paranoidWarnings;
 
-    public void initialize(String rootUri, List<String> excludes, boolean suppressFutureWarnings) {
+    public void initialize(String rootUri, List<String> excludes, boolean paranoidWarnings) {
         synchronized (this) {
             this.initialized = false;
-            this.suppressFutureWarnings = suppressFutureWarnings;
+            this.paranoidWarnings = paranoidWarnings;
 
             var uris = rootUri != null
                 ? getWorkspaceFiles(rootUri, excludes)
@@ -384,7 +384,7 @@ public abstract class LanguageService {
             }
 
             for( var warning : astCache.getWarnings(uri) ) {
-                if( suppressFutureWarnings && warning instanceof FutureWarning )
+                if( !paranoidWarnings && warning instanceof FutureWarning )
                     continue;
 
                 var message = warning.getMessage();
