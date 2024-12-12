@@ -493,7 +493,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( isBuiltinVariable(variable) )
                 addError("Built-in variable cannot be re-assigned", ve);
             else
-                checkExternalWriteInClosure(ve, variable);
+                checkExternalWriteInAsyncClosure(ve, variable);
             ve.setAccessedVariable(variable);
             return false;
         }
@@ -546,17 +546,20 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             //     addError("Built-in variable cannot be mutated", target);
         }
         else if( variable != null ) {
-            checkExternalWriteInClosure(target, variable);
+            checkExternalWriteInAsyncClosure(target, variable);
         }
     }
 
-    private void checkExternalWriteInClosure(VariableExpression target, Variable variable) {
+    private void checkExternalWriteInAsyncClosure(VariableExpression target, Variable variable) {
+        if( !(currentDefinition instanceof WorkflowNode) )
+            return;
         if( currentClosure == null )
             return;
         var scope = currentClosure.getVariableScope();
         var name = variable.getName();
+        // TODO: should apply only to operator closures
         if( scope.isReferencedLocalVariable(name) && scope.getDeclaredVariable(name) == null )
-            addFutureWarning("Mutating an external variable in a closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
+            addFutureWarning("Mutating an external variable in an operator closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
     }
 
     /**
@@ -641,7 +644,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         Variable variable = findVariableDeclaration(name, node);
         if( variable == null ) {
             if( "it".equals(name) ) {
-                addFutureWarning("Implicit variable `it` in closure will not be supported in a future version", node);
+                addFutureWarning("Implicit closure parameter `it` will not be supported in a future version", node);
             }
             else if( "args".equals(name) ) {
                 addFutureWarning("The use of `args` outside the entry workflow will not be supported in a future version", node);
