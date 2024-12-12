@@ -201,7 +201,11 @@ public class ScriptCompletionProvider implements CompletionProvider {
                     break;
             }
 
-            cn = cn.getSuperClass();
+            cn = cn.getSuperClass() != null
+                ? cn.getSuperClass()
+                : cn.getInterfaces().length == 1
+                    ? cn.getInterfaces()[0]
+                    : null;
         }
     }
 
@@ -219,7 +223,11 @@ public class ScriptCompletionProvider implements CompletionProvider {
                     break;
             }
 
-            cn = cn.getSuperClass();
+            cn = cn.getSuperClass() != null
+                ? cn.getSuperClass()
+                : cn.getInterfaces().length == 1
+                    ? cn.getInterfaces()[0]
+                    : null;
         }
     }
 

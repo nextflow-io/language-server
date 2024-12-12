@@ -100,8 +100,7 @@ public interface ScriptDsl extends DslScope {
     @Description("""
         Get one or more files from a path or glob pattern. Returns a Path or list of Paths if there are multiple files.
     """)
-    /* Path | Collection<Path> */
-    Object file(Map<String,?> opts, String filePattern);
+    Path file(Map<String,?> opts, String filePattern);
 
     @Description("""
         Convenience method for `file()` that always returns a list.
