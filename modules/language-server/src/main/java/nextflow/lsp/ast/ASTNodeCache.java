@@ -84,6 +84,7 @@ public abstract class ASTNodeCache {
             }
             sourcesByUri.remove(uri);
             errorsByUri.put(uri, new ArrayList<>());
+            warningsByUri.put(uri, new ArrayList<>());
         }
 
         // parse source files
@@ -108,15 +109,13 @@ public abstract class ASTNodeCache {
         }
 
         // perform additional ast analysis
-        var changedUris = visitAST(
-            sources.stream()
-                .map(su -> su.getSource().getURI())
-                .collect(Collectors.toSet())
-        );
+        var changedUris = visitAST(uris);
 
         // update diagnostics cache
         for( var uri : changedUris ) {
             var sourceUnit = sourcesByUri.get(uri);
+            if( sourceUnit == null )
+                continue;
 
             var errors = new ArrayList<SyntaxException>();
             var errorMessages = sourceUnit.getErrorCollector().getErrors();

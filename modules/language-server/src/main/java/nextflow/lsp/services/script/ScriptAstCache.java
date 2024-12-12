@@ -261,6 +261,8 @@ public class ScriptAstCache extends ASTNodeCache {
         // phase 4: type inference
         for( var uri : changedUris ) {
             var sourceUnit = getSourceUnit(uri);
+            if( sourceUnit == null )
+                continue;
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;
             var visitor = new MethodCallVisitor(sourceUnit, this);
