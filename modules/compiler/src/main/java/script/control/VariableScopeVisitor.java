@@ -447,6 +447,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( checkImplicitDeclaration(target) ) {
                 var de = new DeclarationExpression(target, ae.getOperation(), source);
                 de.setSourcePosition(ae);
+                de.putNodeMetaData(IMPLICIT_DECLARATION, Boolean.TRUE);
                 node.setExpression(de);
             }
             else {
@@ -461,9 +462,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( target != null ) {
                 visit(source);
                 declareAssignedVariable(target);
-                var ae = new AssignmentExpression(target, source);
-                ae.setSourcePosition(mce);
-                node.setExpression(ae);
                 return;
             }
         }
@@ -869,5 +867,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             return otherNode;
         }
     }
+
+    private static final String IMPLICIT_DECLARATION = "_IMPLICIT_DECLARATION";
 
 }

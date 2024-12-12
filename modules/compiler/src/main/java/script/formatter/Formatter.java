@@ -352,7 +352,8 @@ public class Formatter extends CodeVisitorSupport {
     @Override
     public void visitBinaryExpression(BinaryExpression node) {
         if( node instanceof DeclarationExpression ) {
-            append("def ");
+            if( node.getNodeMetaData(IMPLICIT_DECLARATION) != Boolean.TRUE )
+                append("def ");
             visit(node.getLeftExpression());
             if( !(node.getRightExpression() instanceof EmptyExpression) ) {
                 append(" = ");
@@ -735,6 +736,7 @@ public class Formatter extends CodeVisitorSupport {
     private static final String DQ_STR = "\"";
 
     private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
+    private static final String IMPLICIT_DECLARATION = "_IMPLICIT_DECLARATION";
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
     private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";

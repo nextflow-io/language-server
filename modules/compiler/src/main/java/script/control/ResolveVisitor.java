@@ -391,6 +391,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
             return de;
         var result = new DeclarationExpression(left, de.getOperation(), right);
         result.setDeclaringClass(de.getDeclaringClass());
+        result.copyNodeMetaData(de);
         return result;
     }
 
