@@ -726,6 +726,8 @@ public class ConfigAstBuilder {
 
     private Expression pathArgumentsElement(Expression caller, ArgumentsContext ctx) {
         var arguments = argumentList(ctx.argumentList());
+        if( ctx.COMMA() != null )
+            arguments.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
         return ast( methodCall(caller, arguments), caller, ctx );
     }
 
@@ -952,6 +954,8 @@ public class ConfigAstBuilder {
     private Expression creator(CreatorContext ctx) {
         var type = createdName(ctx.createdName());
         var arguments = argumentList(ctx.arguments().argumentList());
+        if( ctx.arguments().COMMA() != null )
+            arguments.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
         return ctorX(type, arguments);
     }
 
@@ -971,7 +975,10 @@ public class ConfigAstBuilder {
         if( ctx.COMMA() != null && ctx.expressionList() == null )
             throw createParsingFailedException("Empty list literal should not contain any comma(,)", ctx.COMMA());
 
-        return listX(expressionList(ctx.expressionList()));
+        var result = listX(expressionList(ctx.expressionList()));
+        if( ctx.COMMA() != null )
+            result.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
+        return result;
     }
 
     private List<Expression> expressionList(ExpressionListContext ctx) {
@@ -990,7 +997,10 @@ public class ConfigAstBuilder {
         var entries = ctx.mapEntryList().mapEntry().stream()
             .map(this::mapEntry)
             .collect(Collectors.toList());
-        return mapX(entries);
+        var result = mapX(entries);
+        if( ctx.COMMA() != null )
+            result.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
+        return result;
     }
 
     private MapEntryExpression mapEntry(MapEntryContext ctx) {
@@ -1398,6 +1408,7 @@ public class ConfigAstBuilder {
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
     private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
+    private static final String TRAILING_COMMA = "_TRAILING_COMMA";
     private static final String VERBATIM_TEXT = "_VERBATIM_TEXT";
 
     private static final List<String> GROOVY_KEYWORDS = List.of(

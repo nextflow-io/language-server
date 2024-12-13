@@ -179,12 +179,12 @@ public class Formatter extends CodeVisitorSupport {
         }
     }
 
-    private Expression currentStmtExpr;
+    private Expression currentRootExpr;
 
     @Override
     public void visitExpressionStatement(ExpressionStatement node) {
-        var cse = currentStmtExpr;
-        currentStmtExpr = node.getExpression();
+        var cre = currentRootExpr;
+        currentRootExpr = node.getExpression();
         appendLeadingComments(node);
         appendIndent();
         if( node.getStatementLabels() != null ) {
@@ -195,16 +195,19 @@ public class Formatter extends CodeVisitorSupport {
         }
         visit(node.getExpression());
         appendNewLine();
-        currentStmtExpr = cse;
+        currentRootExpr = cre;
     }
 
     @Override
     public void visitReturnStatement(ReturnStatement node) {
+        var cre = currentRootExpr;
+        currentRootExpr = node.getExpression();
         appendLeadingComments(node);
         appendIndent();
         append("return ");
         visit(node.getExpression());
         appendNewLine();
+        currentRootExpr = cre;
     }
 
     @Override
@@ -359,9 +362,13 @@ public class Formatter extends CodeVisitorSupport {
             inVariableDeclaration = true;
             visit(node.getLeftExpression());
             inVariableDeclaration = false;
-            if( !(node.getRightExpression() instanceof EmptyExpression) ) {
+            var source = node.getRightExpression();
+            if( !(source instanceof EmptyExpression) ) {
                 append(" = ");
-                visit(node.getRightExpression());
+                var cre = currentRootExpr;
+                currentRootExpr = source;
+                visit(source);
+                currentRootExpr = cre;
             }
             return;
         }
@@ -378,12 +385,6 @@ public class Formatter extends CodeVisitorSupport {
         if( beginWrappedPipeChain )
             inWrappedPipeChain = true;
 
-        Expression cse = null;
-        if( currentStmtExpr == node && node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
-            cse = currentStmtExpr;
-            currentStmtExpr = node.getRightExpression();
-        }
-
         visit(node.getLeftExpression());
 
         if( inWrappedPipeChain ) {
@@ -399,14 +400,20 @@ public class Formatter extends CodeVisitorSupport {
 
         var iwpc = inWrappedPipeChain;
         inWrappedPipeChain = false;
-        visit(node.getRightExpression());
+        if( node.getOperation().isA(Types.ASSIGNMENT_OPERATOR) ) {
+            var source = node.getRightExpression();
+            var cre = currentRootExpr;
+            currentRootExpr = source;
+            visit(source);
+            currentRootExpr = cre;
+        }
+        else {
+            visit(node.getRightExpression());
+        }
         inWrappedPipeChain = iwpc;
 
         if( inWrappedPipeChain )
             decIndent();
-
-        if( cse != null )
-            currentStmtExpr = cse;
 
         if( beginWrappedPipeChain )
             inWrappedPipeChain = false;
@@ -485,7 +492,7 @@ public class Formatter extends CodeVisitorSupport {
             }
             append(param.getName());
             if( param.hasInitialExpression() ) {
-                append('=');
+                append(" = ");
                 visit(param.getInitialExpression());
             }
             if( i + 1 < parameters.length )
@@ -510,7 +517,7 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitListExpression(ListExpression node) {
-        var wrap = shouldWrapExpression(node);
+        var wrap = hasTrailingComma(node) || shouldWrapExpression(node);
         append('[');
         if( wrap )
             incIndent();
@@ -525,13 +532,14 @@ public class Formatter extends CodeVisitorSupport {
 
     protected void visitPositionalArgs(List<Expression> args, boolean wrap) {
         var comma = wrap ? "," : ", ";
+        var trailingComma = wrap && args.size() > 1;
         for( int i = 0; i < args.size(); i++ ) {
             if( wrap ) {
                 appendNewLine();
                 appendIndent();
             }
             visit(args.get(i));
-            if( i + 1 < args.size() )
+            if( trailingComma || i + 1 < args.size() )
                 append(comma);
         }
     }
@@ -542,7 +550,7 @@ public class Formatter extends CodeVisitorSupport {
             append("[:]");
             return;
         }
-        var wrap = shouldWrapExpression(node);
+        var wrap = hasTrailingComma(node) || shouldWrapExpression(node);
         append('[');
         if( wrap )
             incIndent();
@@ -557,13 +565,14 @@ public class Formatter extends CodeVisitorSupport {
 
     protected void visitNamedArgs(List<MapEntryExpression> args, boolean wrap) {
         var comma = wrap ? "," : ", ";
+        var trailingComma = wrap && args.size() > 1;
         for( int i = 0; i < args.size(); i++ ) {
             if( wrap ) {
                 appendNewLine();
                 appendIndent();
             }
             visit(args.get(i));
-            if( i + 1 < args.size() )
+            if( trailingComma || i + 1 < args.size() )
                 append(comma);
         }
     }
@@ -713,6 +722,10 @@ public class Formatter extends CodeVisitorSupport {
 
     // helpers
 
+    private static boolean hasTrailingComma(Expression node) {
+        return node.getNodeMetaData(TRAILING_COMMA) != null;
+    }
+
     public static boolean isLegacyType(ClassNode cn) {
         return cn.getNodeMetaData(LEGACY_TYPE) != null;
     }
@@ -722,13 +735,15 @@ public class Formatter extends CodeVisitorSupport {
     }
 
     private boolean shouldWrapMethodCall(MethodCallExpression node) {
+        if( hasTrailingComma(node.getArguments()) )
+            return true;
         var start = node.getMethod();
         var end = node.getArguments();
         return start.getLineNumber() < end.getLastLineNumber();
     }
 
     private boolean shouldWrapMethodChain(MethodCallExpression node) {
-        if( currentStmtExpr != node )
+        if( currentRootExpr != node )
             return false;
         if( !shouldWrapExpression(node) )
             return false;
@@ -746,7 +761,7 @@ public class Formatter extends CodeVisitorSupport {
     }
 
     private boolean shouldWrapPipeExpression(BinaryExpression node) {
-        return currentStmtExpr == node && node.getOperation().isA(Types.PIPE) && shouldWrapExpression(node);
+        return currentRootExpr == node && node.getOperation().isA(Types.PIPE) && shouldWrapExpression(node);
     }
 
     private static final String SLASH_STR = "/";
@@ -761,6 +776,7 @@ public class Formatter extends CodeVisitorSupport {
     private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
     private static final String LEGACY_TYPE = "_LEGACY_TYPE";
     private static final String QUOTE_CHAR = "_QUOTE_CHAR";
+    private static final String TRAILING_COMMA = "_TRAILING_COMMA";
     private static final String TRAILING_COMMENT = "_TRAILING_COMMENT";
     private static final String VERBATIM_TEXT = "_VERBATIM_TEXT";
 
