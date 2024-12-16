@@ -1207,9 +1207,6 @@ public class ScriptAstBuilder {
             text = StringUtils.trimQuotations(text, 3);
         }
         else if( text.startsWith(SQ_STR) || text.startsWith(DQ_STR) || startsWithSlash ) {
-            // the slashy string can span rows, so we have to remove CR for it
-            if( startsWithSlash )
-                text = StringUtils.removeCR(text);
             text = StringUtils.trimQuotations(text, 1);
         }
 
@@ -1249,6 +1246,17 @@ public class ScriptAstBuilder {
                 values.add(expression(eac.expression()));
         }
 
+        for( var part : ctx.gstringSlashyPart() ) {
+            if( part instanceof GstringSlashyTextAltContext tac )
+                strings.add(ast( gstringText(tac, beginQuotation), tac ));
+
+            if( part instanceof GstringSlashyPathAltContext pac )
+                values.add(ast( gstringPath(pac), pac ));
+
+            if( part instanceof GstringSlashyExprAltContext eac )
+                values.add(expression(eac.expression()));
+        }
+
         var result = new GStringExpression(verbatimText, strings, values);
         result.putNodeMetaData(QUOTE_CHAR, beginQuotation);
         return result;
@@ -1259,6 +1267,8 @@ public class ScriptAstBuilder {
             return TDQ_STR;
         if( text.startsWith(DQ_STR) )
             return DQ_STR;
+        if( text.startsWith(SLASH_STR) )
+            return SLASH_STR;
 
         throw new IllegalStateException();
     }

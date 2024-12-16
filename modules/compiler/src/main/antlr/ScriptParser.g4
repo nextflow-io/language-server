@@ -522,6 +522,7 @@ stringLiteral
 gstring
     :   GStringBegin gstringDqPart* GStringEnd
     |   TdqGStringBegin gstringTdqPart* TdqGStringEnd
+    |   SlashyGStringBegin gstringSlashyPart* SlashyGStringEnd
     ;
 
 gstringDqPart
@@ -534,6 +535,12 @@ gstringTdqPart
     :   TdqGStringText                          #gstringTdqTextAlt
     |   TdqGStringPath                          #gstringTdqPathAlt
     |   TdqGStringExprStart expression RBRACE   #gstringTdqExprAlt
+    ;
+
+gstringSlashyPart
+    :   SlashyGStringText                         #gstringSlashyTextAlt
+    |   SlashyGStringPath                         #gstringSlashyPathAlt
+    |   SlashyGStringExprStart expression RBRACE  #gstringSlashyExprAlt
     ;
 
 // -- constructor method call
