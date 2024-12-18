@@ -183,7 +183,7 @@ public class ConfigAstBuilder {
 
     private ModuleNode compilationUnit(CompilationUnitContext ctx) {
         for( var stmt : ctx.configStatement() )
-            moduleNode.addConfigStatement(configStatement(stmt));
+            configStatement(stmt);
 
         var scriptClassNode = moduleNode.getScriptClassDummy();
         var statements = moduleNode.getConfigStatements();
@@ -201,7 +201,7 @@ public class ConfigAstBuilder {
         return moduleNode;
     }
 
-    private ConfigStatement configStatement(ConfigStatementContext ctx) {
+    private void configStatement(ConfigStatementContext ctx) {
         ConfigStatement result;
 
         if( ctx instanceof ConfigIncludeStmtAltContext ciac )
@@ -219,11 +219,16 @@ public class ConfigAstBuilder {
         else if( ctx instanceof ConfigIncompleteStmtAltContext ciac )
             result = ast( configIncomplete(ciac.configIncomplete()), ciac );
 
+        else if( ctx instanceof ConfigInvalidStmtAltContext ciac ) {
+            invalidStatement(ciac.invalidStatement());
+            return;
+        }
+    
         else
             throw createParsingFailedException("Invalid statement: " + ctx.getText(), ctx);
 
         saveLeadingComments(result, ctx);
-        return result;
+        moduleNode.addConfigStatement(result);
     }
 
     private ConfigStatement configInclude(ConfigIncludeContext ctx) {
@@ -256,6 +261,7 @@ public class ConfigAstBuilder {
         var name = configPrimary(ctx.configPrimary());
         var statements = ctx.configBlockStatement().stream()
             .map(this::configBlockStatement)
+            .filter(stmt -> stmt != null)
             .collect(Collectors.toList());
         return new ConfigBlockNode(name, statements);
     }
@@ -281,6 +287,11 @@ public class ConfigAstBuilder {
         else if( ctx instanceof ConfigIncompleteBlockStmtAltContext ciac )
             result = ast( configIncomplete(ciac.configIncomplete()), ciac );
 
+        else if( ctx instanceof ConfigInvalidBlockStmtAltContext ciac ) {
+            invalidStatement(ciac.invalidStatement());
+            return null;
+        }
+    
         else
             throw createParsingFailedException("Invalid statement in config block: " + ctx.getText(), ctx);
 
@@ -318,6 +329,19 @@ public class ConfigAstBuilder {
         var result = ast( new ConfigIncompleteNode(ctx.getText()), ctx );
         collectSyntaxError(new SyntaxException("Incomplete statement", result));
         return result;
+    }
+
+    private void invalidStatement(InvalidStatementContext ctx) {
+        String message;
+        if( ctx.ifElseStatement() != null )
+            message = "If statements cannot be mixed with config statements";
+        else if( ctx.tryCatchStatement() != null )
+            message = "Try-catch blocks cannot be mixed with config statements";
+        else if( ctx.variableDeclaration() != null )
+            message = "Variable declarations cannot be mixed with config statements";
+        else
+            message = "Invalid config statement";
+        collectSyntaxError(new SyntaxException(message, ast( new EmptyStatement(), ctx )));
     }
 
     /// STATEMENTS
