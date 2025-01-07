@@ -93,6 +93,7 @@ configStatement
     |   configBlock                 #configBlockStmtAlt
     |   configAppendBlock           #configAppendBlockStmtAlt
     |   configIncomplete            #configIncompleteStmtAlt
+    |   invalidStatement            #configInvalidStmtAlt
     ;
 
 // -- include statement
@@ -127,6 +128,7 @@ configBlockStatement
     |   configAppendBlock           #configAppendBlockBlockStmtAlt
     |   configSelector              #configSelectorBlockStmtAlt
     |   configIncomplete            #configIncompleteBlockStmtAlt
+    |   invalidStatement            #configInvalidBlockStmtAlt
     ;
 
 configSelector
@@ -145,6 +147,15 @@ configAppendBlockStatement
 // -- incomplete config statement
 configIncomplete
     :   configPrimary (DOT configPrimary)* DOT?
+    ;
+
+//
+// -- invalid statements
+//
+invalidStatement
+    :   ifElseStatement
+    |   tryCatchStatement
+    |   variableDeclaration
     ;
 
 
@@ -198,7 +209,7 @@ assertStatement
 
 // -- variable declaration
 variableDeclaration
-    :   DEF identifier (nls ASSIGN nls initializer=expression)?
+    :   (DEF | legacyType | DEF legacyType) identifier (nls ASSIGN nls initializer=expression)?
     |   DEF variableNames nls ASSIGN nls initializer=expression
     ;
 
@@ -338,6 +349,7 @@ pathElement
 
     // method call expression (with closure)
     |   closure                                         #closurePathExprAlt
+    |   closureWithLabels                               #closureWithLabelsPathExprAlt
 
     // method call expression
     |   arguments                                       #argumentsPathExprAlt
@@ -419,7 +431,20 @@ formalParameterList
     ;
 
 formalParameter
-    :   identifier (nls ASSIGN nls expression)?
+    :   DEF? legacyType? identifier (nls ASSIGN nls expression)?
+    ;
+
+closureWithLabels
+    :   LBRACE (nls (formalParameterList nls)? ARROW)? nls blockStatementsWithLabels RBRACE
+    ;
+
+blockStatementsWithLabels
+    :   statementOrLabeled (sep statementOrLabeled)* sep?
+    ;
+
+statementOrLabeled
+    :   identifier COLON nls statementOrLabeled
+    |   statement
     ;
 
 // -- list expression
@@ -506,6 +531,10 @@ className
 
 typeArguments
     :   LT type (COMMA type)* GT
+    ;
+
+legacyType
+    :   type (LBRACK RBRACK)*
     ;
 
 
