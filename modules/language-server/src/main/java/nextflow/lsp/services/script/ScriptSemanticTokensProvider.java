@@ -31,7 +31,6 @@ import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.OutputNode;
-import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
@@ -40,8 +39,6 @@ import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.DynamicVariable;
 import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.ast.expr.BinaryExpression;
-import org.codehaus.groovy.ast.expr.ClassExpression;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.MapEntryExpression;
 import org.codehaus.groovy.ast.expr.MapExpression;
@@ -251,17 +248,6 @@ class ScriptSemanticTokensVisitor extends ScriptVisitorSupport {
     }
 
     @Override
-    public void visitProcess(ProcessNode node) {
-        visit(node.directives);
-        visit(node.inputs);
-        visit(node.outputs);
-        visit(node.when);
-        // TODO: highlight embedded scripts
-        visit(node.exec);
-        visit(node.stub);
-    }
-
-    @Override
     public void visitFunction(FunctionNode node) {
         visitParameters(node.getParameters());
         visit(node.getCode());
@@ -271,7 +257,6 @@ class ScriptSemanticTokensVisitor extends ScriptVisitorSupport {
         for( int i = 0; i < parameters.length; i++ ) {
             var param = parameters[i];
             addToken(param.getNodeMetaData("_START_NAME"), param.getName(), SemanticTokenTypes.Parameter);
-            visitTypeName(param.getType());
             if( param.hasInitialExpression() )
                 visit(param.getInitialExpression());
         }
@@ -313,16 +298,6 @@ class ScriptSemanticTokensVisitor extends ScriptVisitorSupport {
     }
 
     @Override
-    public void visitBinaryExpression(BinaryExpression node) {
-        visit(node.getLeftExpression());
-
-        // TODO: fix division + comment parsed as regex
-        // addToken(node.getOperation(), SemanticTokenTypes.Operator);
-
-        visit(node.getRightExpression());
-    }
-
-    @Override
     public void visitClosureExpression(ClosureExpression node) {
         if( node.getParameters() != null )
             visitParameters(node.getParameters());
@@ -342,15 +317,6 @@ class ScriptSemanticTokensVisitor extends ScriptVisitorSupport {
             addToken(namedArg.getKeyExpression(), SemanticTokenTypes.Parameter);
             visit(namedArg.getValueExpression());
         }
-    }
-
-    @Override
-    public void visitClassExpression(ClassExpression node) {
-        visitTypeName(node.getType());
-    }
-
-    protected void visitTypeName(ClassNode type) {
-        // addToken(type, SemanticTokenTypes.Type);
     }
 
     @Override
