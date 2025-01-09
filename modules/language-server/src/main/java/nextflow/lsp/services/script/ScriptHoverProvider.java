@@ -103,12 +103,6 @@ public class ScriptHoverProvider implements HoverProvider {
                 }
                 builder.append('\n');
             }
-            var tokenType = ScriptSemanticTokensProvider.getTokenType(offsetNode, ast);
-            if( tokenType != null ) {
-                builder.append("semantic token: ");
-                builder.append(tokenType);
-                builder.append('\n');
-            }
             builder.append("\n```");
         }
 
