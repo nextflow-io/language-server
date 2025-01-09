@@ -135,4 +135,12 @@ public class PositionConfigureUtils {
 
         return astNode;
     }
+
+    public static TokenPosition tokenPosition(ParserRuleContext ctx) {
+        var token = ctx.getStart();
+        return new TokenPosition(
+            token.getLine() - 1,
+            token.getCharPositionInLine()
+        );
+    }
 }

@@ -35,6 +35,7 @@ import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.parser.TokenPosition;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.DynamicVariable;
@@ -183,16 +184,30 @@ class ScriptSemanticTokensVisitor extends ScriptVisitorSupport {
         ));
     }
 
+    protected void addToken(TokenPosition start, String text, String type) {
+        var position = new Position(start.line(), start.character());
+        var length = text.length();
+        tokens.add(new SemanticToken(
+            position,
+            length,
+            type
+        ));
+    }
+
     public List<SemanticToken> getTokens() {
         return tokens;
     }
 
     // script declarations
 
-    // TODO: highlight include name and alias as definitions?
-    // @Override
-    // public void visitInclude(IncludeNode node) {
-    // }
+    @Override
+    public void visitInclude(IncludeNode node) {
+        for( var module : node.modules ) {
+            addToken(module.getNodeMetaData("_START_NAME"), module.name, SemanticTokenTypes.Function);
+            if( module.alias != null )
+                addToken(module.getNodeMetaData("_START_ALIAS"), module.alias, SemanticTokenTypes.Function);
+        }
+    }
 
     @Override
     public void visitWorkflow(WorkflowNode node) {
@@ -255,8 +270,7 @@ class ScriptSemanticTokensVisitor extends ScriptVisitorSupport {
     public void visitParameters(Parameter[] parameters) {
         for( int i = 0; i < parameters.length; i++ ) {
             var param = parameters[i];
-            // TODO: highlight param name
-            // addToken(param.getName(), SemanticTokenTypes.Parameter);
+            addToken(param.getNodeMetaData("_START_NAME"), param.getName(), SemanticTokenTypes.Parameter);
             visitTypeName(param.getType());
             if( param.hasInitialExpression() )
                 visit(param.getInitialExpression());

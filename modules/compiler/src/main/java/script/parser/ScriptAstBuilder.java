@@ -99,6 +99,7 @@ import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Types;
 
 import static nextflow.script.parser.PositionConfigureUtils.ast;
+import static nextflow.script.parser.PositionConfigureUtils.tokenPosition;
 import static nextflow.script.parser.ScriptParser.*;
 import static nextflow.script.ast.ASTHelpers.*;
 import static org.codehaus.groovy.ast.expr.VariableExpression.THIS_EXPRESSION;
@@ -339,7 +340,11 @@ public class ScriptAstBuilder {
             .map(it -> {
                 var name = it.name.getText();
                 var alias = it.alias != null ? it.alias.getText() : null;
-                return ast( new IncludeVariable(name, alias), it );
+                var result = new IncludeVariable(name, alias);
+                result.putNodeMetaData("_START_NAME", tokenPosition(it.name));
+                if( it.alias != null )
+                    result.putNodeMetaData("_START_ALIAS", tokenPosition(it.alias));
+                return ast( result, it );
             })
             .collect(Collectors.toList());
 
@@ -1525,6 +1530,7 @@ public class ScriptAstBuilder {
             : null;
         var result = ast( param(type, name, defaultValue), ctx );
         checkInvalidVarName(name, result);
+        result.putNodeMetaData("_START_NAME", tokenPosition(ctx.identifier()));
         return result;
     }
 
