@@ -31,6 +31,7 @@ import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.OutputNode;
+import nextflow.script.ast.ParamNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
@@ -204,6 +205,12 @@ class ScriptSemanticTokensVisitor extends ScriptVisitorSupport {
             if( module.alias != null )
                 addToken(module.getNodeMetaData("_START_ALIAS"), module.alias, SemanticTokenTypes.Function);
         }
+    }
+
+    @Override
+    public void visitParam(ParamNode node) {
+        visit(node.target);
+        visit(node.value);
     }
 
     @Override
