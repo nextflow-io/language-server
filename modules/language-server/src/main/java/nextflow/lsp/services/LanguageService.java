@@ -73,6 +73,8 @@ import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.eclipse.lsp4j.ReferenceParams;
 import org.eclipse.lsp4j.RenameParams;
+import org.eclipse.lsp4j.SemanticTokens;
+import org.eclipse.lsp4j.SemanticTokensParams;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
@@ -116,6 +118,7 @@ public abstract class LanguageService {
     protected LinkProvider getLinkProvider() { return null; }
     protected ReferenceProvider getReferenceProvider() { return null; }
     protected RenameProvider getRenameProvider() { return null; }
+    protected SemanticTokensProvider getSemanticTokensProvider() { return null; }
     protected SymbolProvider getSymbolProvider() { return null; }
 
     private volatile boolean initialized;
@@ -293,6 +296,15 @@ public abstract class LanguageService {
             return null;
 
         return provider.rename(params.getTextDocument(), params.getPosition(), params.getNewName());
+    }
+
+    public SemanticTokens semanticTokensFull(SemanticTokensParams params) {
+        var provider = getSemanticTokensProvider();
+        if( provider == null )
+            return null;
+
+        awaitUpdate();
+        return provider.semanticTokensFull(params.getTextDocument());
     }
 
     public List<? extends WorkspaceSymbol> symbol(WorkspaceSymbolParams params) {

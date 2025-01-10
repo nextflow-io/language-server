@@ -31,6 +31,7 @@ import com.google.gson.JsonPrimitive;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.services.LanguageService;
+import nextflow.lsp.services.SemanticTokensVisitor;
 import nextflow.lsp.services.config.ConfigService;
 import nextflow.lsp.services.script.ScriptService;
 import nextflow.script.formatter.FormattingOptions;
@@ -76,6 +77,10 @@ import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.ReferenceParams;
 import org.eclipse.lsp4j.RenameParams;
+import org.eclipse.lsp4j.SemanticTokens;
+import org.eclipse.lsp4j.SemanticTokensLegend;
+import org.eclipse.lsp4j.SemanticTokensParams;
+import org.eclipse.lsp4j.SemanticTokensWithRegistrationOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.SetTraceParams;
 import org.eclipse.lsp4j.SymbolInformation;
@@ -164,6 +169,14 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         serverCapabilities.setExecuteCommandProvider(executeCommandOptions);
         serverCapabilities.setHoverProvider(true);
         serverCapabilities.setReferencesProvider(true);
+        var semanticTokensOptions = new SemanticTokensWithRegistrationOptions(
+            new SemanticTokensLegend(
+                SemanticTokensVisitor.TOKEN_TYPES,
+                Collections.emptyList()
+            ),
+            true,
+            false);
+        serverCapabilities.setSemanticTokensProvider(semanticTokensOptions);
         serverCapabilities.setRenameProvider(true);
         serverCapabilities.setWorkspaceSymbolProvider(true);
 
@@ -405,6 +418,19 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             if( service == null )
                 return null;
             return service.rename(params);
+        });
+    }
+
+    @Override
+    public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var uri = params.getTextDocument().getUri();
+            log.debug("textDocument/semanticTokens/full " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return null;
+            return service.semanticTokensFull(params);
         });
     }
 

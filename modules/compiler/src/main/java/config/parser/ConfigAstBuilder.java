@@ -92,6 +92,7 @@ import org.codehaus.groovy.syntax.Types;
 
 import static nextflow.config.parser.ConfigParser.*;
 import static nextflow.script.parser.PositionConfigureUtils.ast;
+import static nextflow.script.parser.PositionConfigureUtils.tokenPosition;
 import static org.codehaus.groovy.ast.expr.VariableExpression.THIS_EXPRESSION;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
@@ -1173,6 +1174,7 @@ public class ConfigAstBuilder {
             : null;
         var result = ast( param(type, name, defaultValue), ctx );
         checkInvalidVarName(name, result);
+        result.putNodeMetaData("_START_NAME", tokenPosition(ctx.identifier()));
         return result;
     }
 

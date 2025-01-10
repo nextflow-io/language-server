@@ -135,4 +135,17 @@ public class PositionConfigureUtils {
 
         return astNode;
     }
+
+    /**
+     * Get the zero-based start position (line, character) of a token.
+     *
+     * @param ctx
+     */
+    public static TokenPosition tokenPosition(ParserRuleContext ctx) {
+        var token = ctx.getStart();
+        return new TokenPosition(
+            token.getLine() - 1,
+            token.getCharPositionInLine()
+        );
+    }
 }
