@@ -16,42 +16,27 @@
 package nextflow.lsp.services.script;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.SemanticTokensProvider;
+import nextflow.lsp.services.SemanticTokensVisitor;
 import nextflow.lsp.util.Logger;
-import nextflow.lsp.util.Positions;
-import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.script.ast.AssignmentExpression;
+import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.OutputNode;
 import nextflow.script.ast.ParamNode;
+import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.parser.TokenPosition;
-import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.DynamicVariable;
-import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.ast.expr.ClosureExpression;
-import org.codehaus.groovy.ast.expr.MapEntryExpression;
-import org.codehaus.groovy.ast.expr.MapExpression;
-import org.codehaus.groovy.ast.expr.MethodCallExpression;
-import org.codehaus.groovy.ast.expr.NamedArgumentListExpression;
-import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
-import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.SemanticTokens;
 import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -63,15 +48,6 @@ import static nextflow.script.ast.ASTHelpers.*;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
-
-    public static final List<String> TOKEN_TYPES = List.of(
-        SemanticTokenTypes.EnumMember,
-        SemanticTokenTypes.Function,
-        SemanticTokenTypes.Parameter,
-        SemanticTokenTypes.Property,
-        SemanticTokenTypes.Type,
-        SemanticTokenTypes.Variable
-    );
 
     private static Logger log = Logger.getInstance();
 
@@ -93,249 +69,139 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
             return null;
 
         var sourceUnit = ast.getSourceUnit(uri);
-        var visitor = new ScriptSemanticTokensVisitor(sourceUnit, ast);
+        var visitor = new Visitor(sourceUnit);
         visitor.visit();
+        return visitor.getTokens();
+    }
 
-        var tokens = visitor.getTokens();
-        tokens.sort((a, b) -> Positions.COMPARATOR.compare(a.position(), b.position()));
-
-        var deltaTokens = new ArrayList<SemanticTokenDelta>(tokens.size());
-        int line = 0;
-        int startChar = 0;
-        for( var token : tokens ) {
-            var deltaLine = token.position().getLine() - line;
-            var deltaStartChar = deltaLine > 0
-                ? token.position().getCharacter()
-                : token.position().getCharacter() - startChar;
-            deltaTokens.add(new SemanticTokenDelta(
-                deltaLine,
-                deltaStartChar,
-                token.length(),
-                token.type()
-            ));
-            line = token.position().getLine();
-            startChar = token.position().getCharacter();
+    private static class Visitor extends ScriptVisitorSupport {
+    
+        private SourceUnit sourceUnit;
+    
+        private SemanticTokensVisitor tok;
+    
+        public Visitor(SourceUnit sourceUnit) {
+            this.sourceUnit = sourceUnit;
+            this.tok = new SemanticTokensVisitor();
         }
-
-        var data = deltaTokens.stream()
-            .flatMap(token -> Stream.of(
-                token.deltaLine(),
-                token.deltaStartChar(),
-                token.length(),
-                TOKEN_TYPES.indexOf(token.type()),
-                0
-            ))
-            .collect(Collectors.toList());
-            
-        return new SemanticTokens(data);
-    }
-
-}
-
-
-record SemanticToken(
-    Position position,
-    int length,
-    String type
-) {}
-
-
-record SemanticTokenDelta(
-    int deltaLine,
-    int deltaStartChar,
-    int length,
-    String type
-) {}
-
-
-class ScriptSemanticTokensVisitor extends ScriptVisitorSupport {
-
-    private SourceUnit sourceUnit;
-
-    private ScriptAstCache ast;
-
-    private List<SemanticToken> tokens = new ArrayList<SemanticToken>();
-
-    public ScriptSemanticTokensVisitor(SourceUnit sourceUnit, ScriptAstCache ast) {
-        this.sourceUnit = sourceUnit;
-        this.ast = ast;
-    }
-
-    @Override
-    protected SourceUnit getSourceUnit() {
-        return sourceUnit;
-    }
-
-    public void visit() {
-        var moduleNode = sourceUnit.getAST();
-        if( moduleNode instanceof ScriptNode sn )
-            visit(sn);
-    }
-
-    protected void addToken(ASTNode node, String type) {
-        var position = LanguageServerUtils.groovyToLspPosition(node.getLineNumber(), node.getColumnNumber());
-        var length = node.getLastColumnNumber() - node.getColumnNumber();
-        tokens.add(new SemanticToken(
-            position,
-            length,
-            type
-        ));
-    }
-
-    protected void addToken(TokenPosition start, String text, String type) {
-        var position = new Position(start.line(), start.character());
-        var length = text.length();
-        tokens.add(new SemanticToken(
-            position,
-            length,
-            type
-        ));
-    }
-
-    public List<SemanticToken> getTokens() {
-        return tokens;
-    }
-
-    // script declarations
-
-    @Override
-    public void visitInclude(IncludeNode node) {
-        for( var module : node.modules ) {
-            addToken(module.getNodeMetaData("_START_NAME"), module.name, SemanticTokenTypes.Function);
-            if( module.alias != null )
-                addToken(module.getNodeMetaData("_START_ALIAS"), module.alias, SemanticTokenTypes.Function);
+    
+        @Override
+        protected SourceUnit getSourceUnit() {
+            return sourceUnit;
         }
-    }
-
-    @Override
-    public void visitParam(ParamNode node) {
-        visit(node.target);
-        visit(node.value);
-    }
-
-    @Override
-    public void visitWorkflow(WorkflowNode node) {
-        if( node.takes instanceof BlockStatement block )
-            visitWorkflowTakes(block.getStatements());
-
-        visit(node.main);
-
-        if( node.emits instanceof BlockStatement block )
-            visitWorkflowEmits(block.getStatements());
-
-        visit(node.publishers);
-    }
-
-    protected void visitWorkflowTakes(List<Statement> takes) {
-        for( var stmt : takes ) {
-            var ve = (VariableExpression) asVarX(stmt);
-            addToken(ve, SemanticTokenTypes.Parameter);
+    
+        public void visit() {
+            var moduleNode = sourceUnit.getAST();
+            if( moduleNode instanceof ScriptNode sn )
+                visit(sn);
         }
-    }
-
-    protected void visitWorkflowEmits(List<Statement> emits) {
-        for( var stmt : emits ) {
-            var es = (ExpressionStatement)stmt;
-            var emit = es.getExpression();
-            if( emit instanceof AssignmentExpression assign ) {
-                var ve = (VariableExpression)assign.getLeftExpression();
-                addToken(ve, SemanticTokenTypes.Parameter);
-                visit(assign.getRightExpression());
-            }
-            else if( emit instanceof VariableExpression ve ) {
-                if( emits.size() == 1 )
-                    visit(emit);
-                else
-                    addToken(ve, SemanticTokenTypes.Parameter);
-            }
-            else {
-                visit(stmt);
+    
+        public SemanticTokens getTokens() {
+            return tok.getTokens();
+        }
+    
+        @Override
+        public void visitFeatureFlag(FeatureFlagNode node) {
+            tok.visit(node.value);
+        }
+    
+        @Override
+        public void visitInclude(IncludeNode node) {
+            for( var module : node.modules ) {
+                tok.append(module.getNodeMetaData("_START_NAME"), module.name, SemanticTokenTypes.Function);
+                if( module.alias != null )
+                    tok.append(module.getNodeMetaData("_START_ALIAS"), module.alias, SemanticTokenTypes.Function);
             }
         }
-    }
-
-    @Override
-    public void visitFunction(FunctionNode node) {
-        visitParameters(node.getParameters());
-        visit(node.getCode());
-    }
-
-    public void visitParameters(Parameter[] parameters) {
-        for( int i = 0; i < parameters.length; i++ ) {
-            var param = parameters[i];
-            addToken(param.getNodeMetaData("_START_NAME"), param.getName(), SemanticTokenTypes.Parameter);
-            if( param.hasInitialExpression() )
-                visit(param.getInitialExpression());
+    
+        @Override
+        public void visitParam(ParamNode node) {
+            tok.visit(node.target);
+            tok.visit(node.value);
         }
-    }
-
-    @Override
-    public void visitEnum(ClassNode node) {
-        for( var fn : node.getFields() )
-            addToken(fn, SemanticTokenTypes.EnumMember);
-    }
-
-    @Override
-    public void visitOutput(OutputNode node) {
-        visitOutputBody(node.body);
-    }
-
-    protected void visitOutputBody(Statement body) {
-        asBlockStatements(body).forEach((stmt) -> {
-            var call = asMethodCallX(stmt);
-            if( call == null )
-                return;
-
-            var code = asDslBlock(call, 1);
-            if( code != null ) {
-                addToken(call.getMethod(), SemanticTokenTypes.Parameter);
-                visit(code);
+    
+        @Override
+        public void visitWorkflow(WorkflowNode node) {
+            if( node.takes instanceof BlockStatement block )
+                visitWorkflowTakes(block.getStatements());
+    
+            tok.visit(node.main);
+    
+            if( node.emits instanceof BlockStatement block )
+                visitWorkflowEmits(block.getStatements());
+    
+            tok.visit(node.publishers);
+        }
+    
+        protected void visitWorkflowTakes(List<Statement> takes) {
+            for( var stmt : takes ) {
+                var ve = (VariableExpression) asVarX(stmt);
+                tok.append(ve, SemanticTokenTypes.Parameter);
             }
-        });
-    }
-
-    // expressions
-
-    @Override
-    public void visitMethodCallExpression(MethodCallExpression node) {
-        if( !node.isImplicitThis() )
-            visit(node.getObjectExpression());
-        addToken(node.getMethod(), SemanticTokenTypes.Function);
-        visit(node.getArguments());
-    }
-
-    @Override
-    public void visitClosureExpression(ClosureExpression node) {
-        if( node.getParameters() != null )
-            visitParameters(node.getParameters());
-        visit(node.getCode());
-    }
-
-    @Override
-    public void visitMapExpression(MapExpression node) {
-        if( node instanceof NamedArgumentListExpression )
-            visitNamedArgs(node.getMapEntryExpressions());
-        else
-            super.visitMapExpression(node);
-    }
-
-    protected void visitNamedArgs(List<MapEntryExpression> args) {
-        for( var namedArg : args ) {
-            addToken(namedArg.getKeyExpression(), SemanticTokenTypes.Parameter);
-            visit(namedArg.getValueExpression());
         }
-    }
-
-    @Override
-    public void visitVariableExpression(VariableExpression node) {
-        if( !(node.getAccessedVariable() instanceof DynamicVariable) )
-            addToken(node, SemanticTokenTypes.Variable);
-    }
-
-    @Override
-    public void visitPropertyExpression(PropertyExpression node) {
-        visit(node.getObjectExpression());
-        addToken(node.getProperty(), SemanticTokenTypes.Property);
+    
+        protected void visitWorkflowEmits(List<Statement> emits) {
+            for( var stmt : emits ) {
+                var es = (ExpressionStatement)stmt;
+                var emit = es.getExpression();
+                if( emit instanceof AssignmentExpression assign ) {
+                    var ve = (VariableExpression)assign.getLeftExpression();
+                    tok.append(ve, SemanticTokenTypes.Parameter);
+                    tok.visit(assign.getRightExpression());
+                }
+                else if( emit instanceof VariableExpression ve ) {
+                    if( emits.size() == 1 )
+                        tok.visit(emit);
+                    else
+                        tok.append(ve, SemanticTokenTypes.Parameter);
+                }
+                else {
+                    tok.visit(stmt);
+                }
+            }
+        }
+    
+        @Override
+        public void visitProcess(ProcessNode node) {
+            tok.visit(node.directives);
+            tok.visit(node.inputs);
+            tok.visit(node.outputs);
+            tok.visit(node.when);
+            tok.visit(node.exec);
+            tok.visit(node.stub);
+        }
+    
+        @Override
+        public void visitFunction(FunctionNode node) {
+            tok.visitParameters(node.getParameters());
+            tok.visit(node.getCode());
+        }
+    
+        @Override
+        public void visitEnum(ClassNode node) {
+            for( var fn : node.getFields() )
+                tok.append(fn, SemanticTokenTypes.EnumMember);
+        }
+    
+        @Override
+        public void visitOutput(OutputNode node) {
+            visitOutputBody(node.body);
+        }
+    
+        protected void visitOutputBody(Statement body) {
+            asBlockStatements(body).forEach((stmt) -> {
+                var call = asMethodCallX(stmt);
+                if( call == null )
+                    return;
+    
+                var code = asDslBlock(call, 1);
+                if( code != null ) {
+                    tok.append(call.getMethod(), SemanticTokenTypes.Parameter);
+                    tok.visit(code);
+                }
+            });
+        }
+    
     }
 
 }

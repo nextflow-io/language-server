@@ -31,8 +31,8 @@ import com.google.gson.JsonPrimitive;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.services.LanguageService;
+import nextflow.lsp.services.SemanticTokensVisitor;
 import nextflow.lsp.services.config.ConfigService;
-import nextflow.lsp.services.script.ScriptSemanticTokensProvider;
 import nextflow.lsp.services.script.ScriptService;
 import nextflow.script.formatter.FormattingOptions;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
@@ -171,7 +171,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         serverCapabilities.setReferencesProvider(true);
         var semanticTokensOptions = new SemanticTokensWithRegistrationOptions(
             new SemanticTokensLegend(
-                ScriptSemanticTokensProvider.TOKEN_TYPES,
+                SemanticTokensVisitor.TOKEN_TYPES,
                 List.of()
             ),
             true,

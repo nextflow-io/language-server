@@ -21,6 +21,7 @@ import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.services.HoverProvider;
 import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.LinkProvider;
+import nextflow.lsp.services.SemanticTokensProvider;
 
 /**
  * Implementation of language services for Nextflow config files.
@@ -59,6 +60,11 @@ public class ConfigService extends LanguageService {
     @Override
     protected LinkProvider getLinkProvider() {
         return new ConfigLinkProvider(astCache);
+    }
+
+    @Override
+    protected SemanticTokensProvider getSemanticTokensProvider() {
+        return new ConfigSemanticTokensProvider(astCache);
     }
 
 }
