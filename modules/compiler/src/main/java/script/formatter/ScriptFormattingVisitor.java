@@ -246,9 +246,7 @@ public class ScriptFormattingVisitor extends ScriptVisitorSupport {
             : 0;
 
         for( var stmt : takes ) {
-            var stmtX = (ExpressionStatement)stmt;
-            var emit = stmtX.getExpression();
-            var ve = (VariableExpression) emit;
+            var ve = asVarX(stmt);
             fmt.appendIndent();
             fmt.visit(ve);
             if( fmt.hasTrailingComment(stmt) ) {
