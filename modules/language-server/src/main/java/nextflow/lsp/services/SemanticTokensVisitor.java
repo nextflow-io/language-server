@@ -108,7 +108,7 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
                 0
             ))
             .collect(Collectors.toList());
-            
+
         return new SemanticTokens(data);
     }
 
@@ -186,19 +186,17 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
         inGString = igs;
     }
 
+    private static record SemanticToken(
+        Position position,
+        int length,
+        String type
+    ) {}
+
+    private static record SemanticTokenDelta(
+        int deltaLine,
+        int deltaStartChar,
+        int length,
+        String type
+    ) {}
+
 }
-
-
-record SemanticToken(
-    Position position,
-    int length,
-    String type
-) {}
-
-
-record SemanticTokenDelta(
-    int deltaLine,
-    int deltaStartChar,
-    int length,
-    String type
-) {}

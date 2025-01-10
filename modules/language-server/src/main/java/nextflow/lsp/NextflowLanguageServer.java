@@ -172,7 +172,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var semanticTokensOptions = new SemanticTokensWithRegistrationOptions(
             new SemanticTokensLegend(
                 SemanticTokensVisitor.TOKEN_TYPES,
-                List.of()
+                Collections.emptyList()
             ),
             true,
             false);

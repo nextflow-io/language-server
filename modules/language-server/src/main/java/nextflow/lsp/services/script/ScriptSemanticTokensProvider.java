@@ -75,36 +75,36 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
     }
 
     private static class Visitor extends ScriptVisitorSupport {
-    
+
         private SourceUnit sourceUnit;
-    
+
         private SemanticTokensVisitor tok;
-    
+
         public Visitor(SourceUnit sourceUnit) {
             this.sourceUnit = sourceUnit;
             this.tok = new SemanticTokensVisitor();
         }
-    
+
         @Override
         protected SourceUnit getSourceUnit() {
             return sourceUnit;
         }
-    
+
         public void visit() {
             var moduleNode = sourceUnit.getAST();
             if( moduleNode instanceof ScriptNode sn )
                 visit(sn);
         }
-    
+
         public SemanticTokens getTokens() {
             return tok.getTokens();
         }
-    
+
         @Override
         public void visitFeatureFlag(FeatureFlagNode node) {
             tok.visit(node.value);
         }
-    
+
         @Override
         public void visitInclude(IncludeNode node) {
             for( var module : node.modules ) {
@@ -113,33 +113,33 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
                     tok.append(module.getNodeMetaData("_START_ALIAS"), module.alias, SemanticTokenTypes.Function);
             }
         }
-    
+
         @Override
         public void visitParam(ParamNode node) {
             tok.visit(node.target);
             tok.visit(node.value);
         }
-    
+
         @Override
         public void visitWorkflow(WorkflowNode node) {
             if( node.takes instanceof BlockStatement block )
                 visitWorkflowTakes(block.getStatements());
-    
+
             tok.visit(node.main);
-    
+
             if( node.emits instanceof BlockStatement block )
                 visitWorkflowEmits(block.getStatements());
-    
+
             tok.visit(node.publishers);
         }
-    
+
         protected void visitWorkflowTakes(List<Statement> takes) {
             for( var stmt : takes ) {
                 var ve = (VariableExpression) asVarX(stmt);
                 tok.append(ve, SemanticTokenTypes.Parameter);
             }
         }
-    
+
         protected void visitWorkflowEmits(List<Statement> emits) {
             for( var stmt : emits ) {
                 var es = (ExpressionStatement)stmt;
@@ -160,7 +160,7 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
                 }
             }
         }
-    
+
         @Override
         public void visitProcess(ProcessNode node) {
             tok.visit(node.directives);
@@ -170,30 +170,30 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
             tok.visit(node.exec);
             tok.visit(node.stub);
         }
-    
+
         @Override
         public void visitFunction(FunctionNode node) {
             tok.visitParameters(node.getParameters());
             tok.visit(node.getCode());
         }
-    
+
         @Override
         public void visitEnum(ClassNode node) {
             for( var fn : node.getFields() )
                 tok.append(fn, SemanticTokenTypes.EnumMember);
         }
-    
+
         @Override
         public void visitOutput(OutputNode node) {
             visitOutputBody(node.body);
         }
-    
+
         protected void visitOutputBody(Statement body) {
             asBlockStatements(body).forEach((stmt) -> {
                 var call = asMethodCallX(stmt);
                 if( call == null )
                     return;
-    
+
                 var code = asDslBlock(call, 1);
                 if( code != null ) {
                     tok.append(call.getMethod(), SemanticTokenTypes.Parameter);
@@ -201,7 +201,7 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
                 }
             });
         }
-    
+
     }
 
 }

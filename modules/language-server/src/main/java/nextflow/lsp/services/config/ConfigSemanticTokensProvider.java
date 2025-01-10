@@ -61,43 +61,43 @@ public class ConfigSemanticTokensProvider implements SemanticTokensProvider {
     }
 
     private static class Visitor extends ConfigVisitorSupport {
-    
+
         private SourceUnit sourceUnit;
-    
+
         private SemanticTokensVisitor tok;
-    
+
         public Visitor(SourceUnit sourceUnit) {
             this.sourceUnit = sourceUnit;
             this.tok = new SemanticTokensVisitor();
         }
-    
+
         @Override
         protected SourceUnit getSourceUnit() {
             return sourceUnit;
         }
-    
+
         public void visit() {
             var moduleNode = sourceUnit.getAST();
             if( moduleNode instanceof ConfigNode cn )
                 super.visit(cn);
         }
-    
+
         public SemanticTokens getTokens() {
             return tok.getTokens();
         }
-    
+
         // config statements
-    
+
         @Override
         public void visitConfigAssign(ConfigAssignNode node) {
             tok.visit(node.value);
         }
-    
+
         @Override
         public void visitConfigInclude(ConfigIncludeNode node) {
             tok.visit(node.source);
         }
-    
+
     }
 
 }
