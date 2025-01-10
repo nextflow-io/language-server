@@ -10,6 +10,7 @@ The following language features are currently supported:
 - formatting
 - hover hints
 - rename
+- semantic highlighting
 - DAG preview for workflows
 
 ## Requirements
