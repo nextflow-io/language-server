@@ -456,15 +456,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             }
             return;
         }
-        if( exp instanceof MethodCallExpression mce ) {
-            var source = mce.getObjectExpression();
-            var target = checkSetAssignment(mce);
-            if( target != null ) {
-                visit(source);
-                declareAssignedVariable(target);
-                return;
-            }
-        }
         super.visitExpressionStatement(node);
     }
 
@@ -562,21 +553,6 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             addFutureWarning("Mutating an external variable in an operator closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
     }
 
-    /**
-     * Treat `set` operator as an assignment.
-     */
-    private VariableExpression checkSetAssignment(MethodCallExpression node) {
-        if( !(currentDefinition instanceof WorkflowNode) )
-            return null;
-        var name = node.getMethodAsString();
-        if( !"set".equals(name) )
-            return null;
-        var code = asDslBlock(node, 1);
-        if( code == null || code.getStatements().size() != 1 )
-            return null;
-        return asVarX(code.getStatements().get(0));
-    }
-
     // expressions
 
     private static final List<String> KEYWORDS = List.of(
@@ -588,6 +564,15 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
+        if( !node.isImplicitThis() ) {
+            var source = node.getObjectExpression();
+            var target = checkSetAssignment(node);
+            if( target != null ) {
+                visit(source);
+                declareAssignedVariable(target);
+                return;
+            }
+        }
         if( node.isImplicitThis() && node.getMethod() instanceof ConstantExpression ) {
             var name = node.getMethodAsString();
             var variable = findVariableDeclaration(name, node);
@@ -597,6 +582,21 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             }
         }
         super.visitMethodCallExpression(node);
+    }
+
+    /**
+     * Treat `set` and `tap` operators as assignments.
+     */
+    private VariableExpression checkSetAssignment(MethodCallExpression node) {
+        if( !(currentDefinition instanceof WorkflowNode) )
+            return null;
+        var name = node.getMethodAsString();
+        if( !"set".equals(name) && !"tap".equals(name) )
+            return null;
+        var code = asDslBlock(node, 1);
+        if( code == null || code.getStatements().size() != 1 )
+            return null;
+        return asVarX(code.getStatements().get(0));
     }
 
     @Override

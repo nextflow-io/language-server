@@ -421,6 +421,14 @@ public abstract class Channel<T> {
 
     @Operator
     @Description("""
+        The `tap` operator assigns a source channel to a variable, whose name is specified in a closure.
+
+        [Read more](https://nextflow.io/docs/latest/reference/operator.html#tap)
+    """)
+    public abstract Channel tap(Closure holder);
+
+    @Operator
+    @Description("""
         The `toList` operator collects all the values from a source channel into a list and emits the list as a single value.
 
    public abstract      [Read more](https://nextflow.io/docs/latest/reference/operator.html#to;ist)
