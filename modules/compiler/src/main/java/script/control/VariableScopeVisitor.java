@@ -564,14 +564,11 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
-        if( !node.isImplicitThis() ) {
-            var source = node.getObjectExpression();
-            var target = checkSetAssignment(node);
-            if( target != null ) {
-                visit(source);
-                declareAssignedVariable(target);
-                return;
-            }
+        var target = checkSetAssignment(node);
+        if( target != null ) {
+            visit(node.getObjectExpression());
+            declareAssignedVariable(target);
+            return;
         }
         if( node.isImplicitThis() && node.getMethod() instanceof ConstantExpression ) {
             var name = node.getMethodAsString();
