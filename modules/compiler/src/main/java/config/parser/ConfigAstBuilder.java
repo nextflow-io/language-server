@@ -186,15 +186,8 @@ public class ConfigAstBuilder {
         for( var stmt : ctx.configStatement() )
             configStatement(stmt);
 
-        var scriptClassNode = moduleNode.getScriptClassDummy();
-        var statements = moduleNode.getConfigStatements();
-        if( scriptClassNode != null && !statements.isEmpty() ) {
-            var first = statements.get(0);
-            var last = statements.get(statements.size() - 1);
-            scriptClassNode.setSourcePosition(first);
-            scriptClassNode.setLastColumnNumber(last.getLastColumnNumber());
-            scriptClassNode.setLastLineNumber(last.getLastLineNumber());
-        }
+        // NOTE: required to produce a valid script class
+        moduleNode.addStatement(EmptyStatement.INSTANCE);
 
         if( numberFormatError != null )
             throw createParsingFailedException(numberFormatError.getV2().getMessage(), numberFormatError.getV1());

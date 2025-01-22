@@ -234,7 +234,8 @@ public class ScriptAstBuilder {
                 moduleNode.setEntry(workflowNode);
         }
 
-        var scriptClassNode = moduleNode.getScriptClassDummy();
+        // NOTE: required to produce a valid script class
+        moduleNode.addStatement(EmptyStatement.INSTANCE);
 
         if( numberFormatError != null )
             throw createParsingFailedException(numberFormatError.getV2().getMessage(), numberFormatError.getV1());
