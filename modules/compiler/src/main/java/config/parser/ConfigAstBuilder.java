@@ -518,7 +518,7 @@ public class ConfigAstBuilder {
         if ( isAssignmentLhsValid(left) )
             return stmt(ast( binX(left, token(ctx.op), expression(ctx.right)), ctx ));
 
-        throw createParsingFailedException("Invalid assignment target -- should be a variable, index, or property expression", ctx);
+        throw createParsingFailedException("Invalid assignment target -- must be a variable, index, or property expression", ctx);
     }
 
     private boolean isAssignmentLhsValid(Expression left) {

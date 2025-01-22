@@ -321,7 +321,7 @@ public class ScriptAstBuilder {
         var value = expression(ctx.expression());
         var result = ast( new FeatureFlagNode(name, value), ctx );
         if( !(value instanceof ConstantExpression) )
-            collectSyntaxError(new SyntaxException("Feature flag value should be a literal value (number, string, true/false)", result));
+            collectSyntaxError(new SyntaxException("Feature flag value must be a literal value (number, string, true/false)", result));
         return result;
     }
 
@@ -570,7 +570,7 @@ public class ScriptAstBuilder {
     private Statement workflowEmit(StatementContext ctx) {
         var result = statement(ctx);
         if( !(result instanceof ExpressionStatement) ) {
-            collectSyntaxError(new SyntaxException("Invalid workflow emit -- should be a name, assignment, or expression", result));
+            collectSyntaxError(new SyntaxException("Invalid workflow emit -- must be a name, assignment, or expression", result));
             return null;
         }
         saveTrailingComment(result, ctx);
@@ -845,7 +845,7 @@ public class ScriptAstBuilder {
         if ( isAssignmentLhsValid(left) )
             return stmt(ast( new AssignmentExpression(left, token(ctx.op), expression(ctx.right)), ctx ));
 
-        throw createParsingFailedException("Invalid assignment target -- should be a variable, index, or property expression", ctx);
+        throw createParsingFailedException("Invalid assignment target -- must be a variable, index, or property expression", ctx);
     }
 
     private boolean isAssignmentLhsValid(Expression left) {
