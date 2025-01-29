@@ -6,7 +6,7 @@ plugins {
 }
 
 dependencies {
-  implementation project(':modules:compiler')
+  implementation project(':compiler')
   implementation 'org.apache.groovy:groovy:4.0.24'
   implementation 'org.apache.groovy:groovy-json:4.0.24'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'

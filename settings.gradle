@@ -1,4 +1,8 @@
 rootProject.name = 'language-server'
 
-include 'modules:compiler'
-include 'modules:language-server'
+include 'compiler'
+include 'language-server'
+
+rootProject.children.each { prj ->
+    prj.projectDir = new File("$rootDir/modules/$prj.name")
+}
