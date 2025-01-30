@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.github.nextflow-io'
-version = 'jitpack-SNAPSHOT'
+version = 'main-SNAPSHOT'
 
 repositories {
   mavenCentral()
