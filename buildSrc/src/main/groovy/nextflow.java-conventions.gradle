@@ -1,6 +1,10 @@
 plugins {
   id 'java'
+  id 'maven-publish'
 }
+
+group = 'com.github.nextflow-io'
+version = 'main-SNAPSHOT'
 
 repositories {
   mavenCentral()
@@ -20,4 +24,12 @@ compileJava {
 
 test {
   useJUnitPlatform()
+}
+
+publishing {
+  publications {
+    maven(MavenPublication) {
+      from components.java
+    }
+  }
 }

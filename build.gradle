@@ -1,6 +1,6 @@
 
 task copyJar(type: Copy) {
-  dependsOn ':modules:language-server:build'
+  dependsOn ':language-server:build'
   from "$projectDir/modules/language-server/build/libs/language-server-all.jar"
   into "$buildDir/libs"
 }
