@@ -891,34 +891,61 @@ public class ConfigAstBuilder {
         var text = ctx.getText();
         var beginQuotation = beginQuotation(text);
         var verbatimText = stringLiteral(text);
-        var strings = new ArrayList<ConstantExpression>();
-        var values = new ArrayList<Expression>();
+        var builder = new GStringBuilder();
 
         for( var part : ctx.gstringDqPart() ) {
             if( part instanceof GstringDqTextAltContext tac )
-                strings.add(ast( gstringText(tac, beginQuotation), tac ));
+                builder.appendString(ast( gstringText(tac, beginQuotation), tac ));
 
             if( part instanceof GstringDqPathAltContext pac )
-                values.add(ast( gstringPath(pac), pac ));
+                builder.appendValue(ast( gstringPath(pac), pac ));
 
             if( part instanceof GstringDqExprAltContext eac )
-                values.add(expression(eac.expression()));
+                builder.appendValue(expression(eac.expression()));
         }
 
         for( var part : ctx.gstringTdqPart() ) {
             if( part instanceof GstringTdqTextAltContext tac )
-                strings.add(ast( gstringText(tac, beginQuotation), tac ));
+                builder.appendString(ast( gstringText(tac, beginQuotation), tac ));
 
             if( part instanceof GstringTdqPathAltContext pac )
-                values.add(ast( gstringPath(pac), pac ));
+                builder.appendValue(ast( gstringPath(pac), pac ));
 
             if( part instanceof GstringTdqExprAltContext eac )
-                values.add(expression(eac.expression()));
+                builder.appendValue(expression(eac.expression()));
         }
 
-        var result = new GStringExpression(verbatimText, strings, values);
+        var result = builder.build(verbatimText);
         result.putNodeMetaData(QUOTE_CHAR, beginQuotation);
         return result;
+    }
+
+    /**
+     * Builder for GStringExpression that inserts empty strings
+     * to ensure that there are n+1 strings for n values.
+     * 
+     * @see org.codehaus.groovy.runtime.GStringUtil.writeToImpl()
+     */
+    private static class GStringBuilder {
+        private final List<ConstantExpression> strings = new ArrayList<>();
+        private final List<Expression> values = new ArrayList<>();
+        private boolean appendEmptyString = true;
+
+        public void appendString(ConstantExpression string) {
+            strings.add(string);
+            appendEmptyString = false;
+        }
+
+        public void appendValue(Expression value) {
+            if( appendEmptyString )
+                appendString(constX(""));
+            values.add(value);
+            appendEmptyString = true;
+        }
+
+        public GStringExpression build(String verbatimText) {
+            return new GStringExpression(verbatimText, strings, values);
+        }
     }
 
     private String beginQuotation(String text) {

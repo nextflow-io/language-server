@@ -685,28 +685,21 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitGStringExpression(GStringExpression node) {
+        // see also: GStringUtil.writeToImpl()
         var quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> DQ_STR);
         append(quoteChar);
-        Stream
-            .concat(
-                node.getStrings().stream().map(v -> (Expression) v),
-                node.getValues().stream()
-            )
-            .sorted((a, b) ->
-                a.getLineNumber() != b.getLineNumber()
-                    ? a.getLineNumber() - b.getLineNumber()
-                    : a.getColumnNumber() - b.getColumnNumber()
-            )
-            .forEach((part) -> {
-                if( part.getNodeMetaData(VERBATIM_TEXT) != null ) {
-                    visit(part);
-                }
-                else {
-                    append("${");
-                    visit(part);
-                    append('}');
-                }
-            });
+        var ss = node.getStrings();
+        var vs = node.getValues();
+        for( int i = 0; i < ss.size(); i++ ) {
+            var string = ss.get(i);
+            if( string.getNodeMetaData(VERBATIM_TEXT) != null )
+                visit(string);
+            if( i < vs.size() ) {
+                append("${");
+                visit(vs.get(i));
+                append('}');
+            }
+        }
         append(quoteChar);
     }
 
