@@ -356,7 +356,7 @@ IntegerLiteral
         (Underscore { require(errorIgnored, "Number ending with underscores is invalid", -1, true); })?
 
     // !!! Error Alternative !!!
-    |   Zero ([0-9] { invalidDigitCount++; })+ { require(errorIgnored, "Invalid octal number", -(invalidDigitCount + 1), true); } IntegerTypeSuffix?
+    |   Zero ([0-9] { invalidDigitCount++; })+ { require(errorIgnored, "Invalid octal number", -(invalidDigitCount + 1), true); }
     ;
 
 fragment
@@ -366,31 +366,6 @@ Zero
 
 fragment
 DecimalIntegerLiteral
-    :   DecimalNumeral IntegerTypeSuffix?
-    ;
-
-fragment
-HexIntegerLiteral
-    :   HexNumeral IntegerTypeSuffix?
-    ;
-
-fragment
-OctalIntegerLiteral
-    :   OctalNumeral IntegerTypeSuffix?
-    ;
-
-fragment
-BinaryIntegerLiteral
-    :   BinaryNumeral IntegerTypeSuffix?
-    ;
-
-fragment
-IntegerTypeSuffix
-    :   [lLiIgG]
-    ;
-
-fragment
-DecimalNumeral
     :   Zero
     |   NonZeroDigit (Digits? | Underscores Digits)
     ;
@@ -428,7 +403,7 @@ Underscore
     ;
 
 fragment
-HexNumeral
+HexIntegerLiteral
     :   Zero [xX] HexDigits
     ;
 
@@ -449,7 +424,7 @@ HexDigitOrUnderscore
     ;
 
 fragment
-OctalNumeral
+OctalIntegerLiteral
     :   Zero Underscores? OctalDigits
     ;
 
@@ -470,7 +445,7 @@ OctalDigitOrUnderscore
     ;
 
 fragment
-BinaryNumeral
+BinaryIntegerLiteral
     :   Zero [bB] BinaryDigits
     ;
 
@@ -496,16 +471,15 @@ BinaryDigitOrUnderscore
 //
 FloatingPointLiteral
     :   (   DecimalFloatingPointLiteral
-        |   HexadecimalFloatingPointLiteral
+        |   HexFloatingPointLiteral
         )
         (Underscore { require(errorIgnored, "Number ending with underscores is invalid", -1, true); })?
     ;
 
 fragment
 DecimalFloatingPointLiteral
-    :   Digits? Dot Digits ExponentPart? FloatTypeSuffix?
-    |   Digits ExponentPart FloatTypeSuffix?
-    |   Digits FloatTypeSuffix
+    :   Digits? Dot Digits ExponentPart?
+    |   Digits ExponentPart
     ;
 
 fragment
@@ -529,18 +503,13 @@ Sign
     ;
 
 fragment
-FloatTypeSuffix
-    :   [fFdDgG]
-    ;
-
-fragment
-HexadecimalFloatingPointLiteral
-    :   HexSignificand BinaryExponent FloatTypeSuffix?
+HexFloatingPointLiteral
+    :   HexSignificand BinaryExponent
     ;
 
 fragment
 HexSignificand
-    :   HexNumeral Dot?
+    :   HexIntegerLiteral Dot?
     |   Zero [xX] HexDigits? Dot HexDigits
     ;
 
