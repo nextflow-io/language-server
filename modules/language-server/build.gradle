@@ -24,3 +24,7 @@ dependencies {
 application {
   mainClass = 'nextflow.lsp.NextflowLanguageServer'
 }
+
+shadowJar {
+  archiveVersion = ''
+}
