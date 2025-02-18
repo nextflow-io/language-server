@@ -1166,9 +1166,9 @@ public class ConfigAstBuilder {
     /// MISCELLANEOUS
 
     private Parameter[] formalParameterList(FormalParameterListContext ctx) {
-        // NOTE: implicit `it` is not allowed
+        // NOTE: implicit `it` parameter is deprecated, but allow it for now
         if( ctx == null )
-            return null;
+            return Parameter.EMPTY_ARRAY;
 
         var params = ctx.formalParameter().stream()
             .map(this::formalParameter)
