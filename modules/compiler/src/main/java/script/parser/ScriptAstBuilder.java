@@ -228,6 +228,7 @@ public class ScriptAstBuilder {
 
         if( !statements.isEmpty() ) {
             var main = block(new VariableScope(), statements);
+            ast( main, statements.get(0), statements.get(statements.size() - 1) );
             var workflowNode = workflowDef(main);
             moduleNode.addWorkflow(workflowNode);
             if( !hasDeclarations )
