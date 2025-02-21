@@ -56,7 +56,7 @@ import static org.codehaus.groovy.ast.tools.ClosureUtils.getParametersSafe;
 
 public class ResolveVisitor extends ScriptExpressionTransformer {
 
-    public static final String[] DEFAULT_IMPORTS = { "java.lang.", "java.util.", "java.io.", "java.net.", "groovy.lang.", "groovy.util." };
+    public static final String[] DEFAULT_PACKAGE_PREFIXES = { "java.lang.", "java.util.", "java.io.", "java.net.", "groovy.lang.", "groovy.util." };
 
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
 
@@ -66,12 +66,15 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
 
     private ClassNodeResolver classNodeResolver = new ClassNodeResolver();
 
-    private List<ClassNode> libClasses;
+    private List<ClassNode> defaultImports;
 
-    public ResolveVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<ClassNode> libClasses) {
+    private List<ClassNode> libImports;
+
+    public ResolveVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<ClassNode> defaultImports, List<ClassNode> libImports) {
         this.sourceUnit = sourceUnit;
         this.compilationUnit = compilationUnit;
-        this.libClasses = libClasses;
+        this.defaultImports = defaultImports;
+        this.libImports = libImports;
     }
 
     @Override
@@ -182,7 +185,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
 
     protected boolean resolveFromLibImports(ClassNode type) {
         var name = type.getName();
-        for( var cn : libClasses ) {
+        for( var cn : libImports ) {
             if( name.equals(cn.getName()) ) {
                 type.setRedirect(cn);
                 return true;
@@ -194,7 +197,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
     protected boolean resolveFromDefaultImports(ClassNode type) {
         // resolve from script imports
         var typeName = type.getName();
-        for( var cn : Types.TYPES ) {
+        for( var cn : defaultImports ) {
             if( typeName.equals(cn.getNameWithoutPackage()) ) {
                 type.setRedirect(cn);
                 return true;
@@ -207,7 +210,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
                 return true;
         }
         // resolve from default imports
-        if( resolveFromDefaultImports(type, DEFAULT_IMPORTS) ) {
+        if( resolveFromDefaultImports(type, DEFAULT_PACKAGE_PREFIXES) ) {
             return true;
         }
         if( "BigInteger".equals(typeName) ) {
@@ -223,7 +226,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
 
     private static final Map<String, Set<String>> DEFAULT_IMPORT_CLASS_AND_PACKAGES_CACHE = new UnlimitedConcurrentCache<>();
     static {
-        DEFAULT_IMPORT_CLASS_AND_PACKAGES_CACHE.putAll(VMPluginFactory.getPlugin().getDefaultImportClasses(DEFAULT_IMPORTS));
+        DEFAULT_IMPORT_CLASS_AND_PACKAGES_CACHE.putAll(VMPluginFactory.getPlugin().getDefaultImportClasses(DEFAULT_PACKAGE_PREFIXES));
     }
 
     protected boolean resolveFromDefaultImports(ClassNode type, String[] packagePrefixes) {
@@ -233,7 +236,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
             if( redirect != null ) {
                 type.setRedirect(redirect);
                 // don't update cache when using a cached lookup
-                if( packagePrefixes == DEFAULT_IMPORTS ) {
+                if( packagePrefixes == DEFAULT_PACKAGE_PREFIXES ) {
                     var packagePrefixSet = DEFAULT_IMPORT_CLASS_AND_PACKAGES_CACHE.computeIfAbsent(typeName, key -> new HashSet<>(2));
                     packagePrefixSet.add(packagePrefix);
                 }

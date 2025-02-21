@@ -51,6 +51,7 @@ import nextflow.script.control.Phases;
 import nextflow.script.control.ResolveVisitor;
 import nextflow.script.control.VariableScopeVisitor;
 import nextflow.script.parser.ScriptParserPluginFactory;
+import nextflow.script.types.Types;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -100,7 +101,7 @@ public class ScriptAstCache extends ASTNodeCache {
     @Override
     protected SourceUnit buildAST(URI uri, FileCache fileCache) {
         // compile Groovy classes in lib directory
-        var libClasses = getLibClasses();
+        var libImports = getLibImports();
 
         // phase 1: syntax resolution
         var sourceUnit = compiler.compile(uri, fileCache);
@@ -108,7 +109,7 @@ public class ScriptAstCache extends ASTNodeCache {
         // phase 2: name resolution
         // NOTE: must be done before visiting parents because it transforms nodes
         if( sourceUnit != null ) {
-            new ResolveVisitor(sourceUnit, compilationUnit, libClasses).visit();
+            new ResolveVisitor(sourceUnit, compilationUnit, Types.TYPES, libImports).visit();
             new ParameterSchemaVisitor(sourceUnit).visit();
         }
         return sourceUnit;
@@ -125,7 +126,7 @@ public class ScriptAstCache extends ASTNodeCache {
 
     private Map<URI,Entry> libCache = new HashMap<>();
 
-    private List<ClassNode> getLibClasses() {
+    private List<ClassNode> getLibImports() {
         if( rootUri == null )
             return Collections.emptyList();
 
