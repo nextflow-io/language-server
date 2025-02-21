@@ -87,6 +87,11 @@ public interface ScriptDsl extends DslScope {
     Object branchCriteria(Closure closure);
 
     @Description("""
+        Get the value of an environment variable from the launch environment.
+    """)
+    String env(String name);
+
+    @Description("""
         Throw a script runtime error with an optional error message.
     """)
     void error(String message);
