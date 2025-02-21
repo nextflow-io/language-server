@@ -26,13 +26,13 @@ The language server exposes a set of configuration settings that can be controll
 To build from the command line:
 
 ```sh
-./gradlew build
+make
 ```
 
 To run unit tests:
 
 ```sh
-./gradlew test
+make test
 ```
 
 To run the language server:
