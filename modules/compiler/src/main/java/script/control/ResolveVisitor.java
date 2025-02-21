@@ -247,8 +247,6 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
     }
 
     protected ClassNode resolveFromClassResolver(String name) {
-        if( !name.contains(".") )
-            return null;
         var lookupResult = classNodeResolver.resolveName(name, compilationUnit);
         if( lookupResult == null )
             return null;
