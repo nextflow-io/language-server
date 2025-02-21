@@ -74,10 +74,11 @@ public class ScriptAstCache extends ASTNodeCache {
 
     private CompilationUnit compilationUnit;
 
-    private String rootUri;
-
-    public ScriptAstCache() {
+    public void initialize(String rootUri) {
         var config = createConfiguration();
+        var libDir = Path.of(URI.create(rootUri)).resolve("lib");
+        if( Files.isDirectory(libDir) )
+            config.setClasspath(libDir.toString());
         var classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true);
         compiler = new Compiler(config, classLoader);
         compilationUnit = new CompilationUnit(config, null, classLoader);
@@ -94,145 +95,18 @@ public class ScriptAstCache extends ASTNodeCache {
         return config;
     }
 
-    public void initialize(String rootUri) {
-        this.rootUri = rootUri;
-    }
-
     @Override
     protected SourceUnit buildAST(URI uri, FileCache fileCache) {
-        // compile Groovy classes in lib directory
-        var libImports = getLibImports();
-
         // phase 1: syntax resolution
         var sourceUnit = compiler.compile(uri, fileCache);
 
         // phase 2: name resolution
         // NOTE: must be done before visiting parents because it transforms nodes
         if( sourceUnit != null ) {
-            new ResolveVisitor(sourceUnit, compilationUnit, Types.TYPES, libImports).visit();
+            new ResolveVisitor(sourceUnit, compilationUnit, Types.TYPES).visit();
             new ParameterSchemaVisitor(sourceUnit).visit();
         }
         return sourceUnit;
-    }
-
-    private static class Entry {
-        FileTime lastModified;
-        List<ClassNode> classes;
-
-        Entry(FileTime lastModified) {
-            this.lastModified = lastModified;
-        }
-    }
-
-    private Map<URI,Entry> libCache = new HashMap<>();
-
-    private List<ClassNode> getLibImports() {
-        if( rootUri == null )
-            return Collections.emptyList();
-
-        // collect Groovy files in lib directory
-        var libDir = Path.of(URI.create(rootUri)).resolve("lib");
-        if( !Files.isDirectory(libDir) )
-            return Collections.emptyList();
-
-        Set<URI> uris;
-        try {
-            uris = Files.walk(libDir)
-                .filter(path -> path.toString().endsWith(".groovy"))
-                .map(path -> path.toUri())
-                .collect(Collectors.toSet());
-        }
-        catch( IOException e ) {
-            System.err.println("Failed to read Groovy source files in lib directory: " + e.toString());
-            return Collections.emptyList();
-        }
-
-        if( uris.isEmpty() )
-            return Collections.emptyList();
-
-        // compile source files
-        var cachedClasses = new ArrayList<ClassNode>();
-        var config = new CompilerConfiguration();
-        config.getOptimizationOptions().put(CompilerConfiguration.GROOVYDOC, true);
-        var classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true);
-        var compilationUnit = new CompilationUnit(config, null, classLoader);
-        for( var uri : uris ) {
-            var lastModified = getLastModified(uri);
-            if( libCache.containsKey(uri) ) {
-                var entry = libCache.get(uri);
-                if( lastModified != null && lastModified.equals(entry.lastModified) ) {
-                    if( entry.classes != null )
-                        cachedClasses.addAll(entry.classes);
-                    continue;
-                }
-            }
-
-            System.err.println("compile " + uri.toString());
-            var sourceUnit = new SourceUnit(
-                    new File(uri),
-                    config,
-                    classLoader,
-                    new LanguageServerErrorCollector(config));
-            compilationUnit.addSource(sourceUnit);
-            libCache.put(uri, new Entry(lastModified));
-        }
-
-        try {
-            compilationUnit.compile(org.codehaus.groovy.control.Phases.CANONICALIZATION);
-        }
-        catch( CompilationFailedException e ) {
-            // ignore
-        }
-        catch( GroovyBugError | Exception e ) {
-            System.err.println("Failed to compile Groovy source files in lib directory -- " + e.toString());
-        }
-
-        // collect class nodes and report errors
-        var result = new ArrayList<ClassNode>();
-        result.addAll(cachedClasses);
-        compilationUnit.iterator().forEachRemaining((sourceUnit) -> {
-            var uri = sourceUnit.getSource().getURI();
-            var errors = sourceUnit.getErrorCollector().getErrors();
-            if( errors != null ) {
-                for( var error : errors ) {
-                    if( !(error instanceof SyntaxErrorMessage) )
-                        continue;
-                    var sem = (SyntaxErrorMessage) error;
-                    var cause = sem.getCause();
-                    System.err.println(String.format("Groovy syntax error in %s -- %s: %s", uri, cause, cause.getMessage()));
-                }
-            }
-
-            var moduleNode = sourceUnit.getAST();
-            if( moduleNode == null )
-                return;
-            var packageName = libDir
-                .relativize(Path.of(uri).getParent())
-                .toString()
-                .replaceAll("/", ".");
-            moduleNode.setPackageName(packageName);
-            for( var cn : moduleNode.getClasses() ) {
-                var className = packageName.isEmpty()
-                    ? cn.getNameWithoutPackage()
-                    : packageName + "." + cn.getNameWithoutPackage();
-                cn.setName(className);
-            }
-            result.addAll(moduleNode.getClasses());
-
-            var entry = libCache.get(uri);
-            entry.classes = moduleNode.getClasses();
-        });
-        return result;
-    }
-
-    private FileTime getLastModified(URI uri) {
-        try {
-            return Files.getLastModifiedTime(Path.of(uri));
-        }
-        catch( IOException e ) {
-            System.err.println(String.format("Failed to get last modified time for %s -- %s", uri, e));
-            return null;
-        }
     }
 
     @Override

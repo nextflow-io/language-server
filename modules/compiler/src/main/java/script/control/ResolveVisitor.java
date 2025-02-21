@@ -68,13 +68,10 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
 
     private List<ClassNode> defaultImports;
 
-    private List<ClassNode> libImports;
-
-    public ResolveVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<ClassNode> defaultImports, List<ClassNode> libImports) {
+    public ResolveVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<ClassNode> defaultImports) {
         this.sourceUnit = sourceUnit;
         this.compilationUnit = compilationUnit;
         this.defaultImports = defaultImports;
-        this.libImports = libImports;
     }
 
     @Override
@@ -142,8 +139,6 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
             return true;
         if( resolveFromModule(type) )
             return true;
-        if( resolveFromLibImports(type) )
-            return true;
         if( !type.hasPackageName() && resolveFromDefaultImports(type) )
             return true;
         return resolveFromClassResolver(type.getName()) != null;
@@ -177,17 +172,6 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
             if( name.equals(cn.getName()) ) {
                 if( cn != type )
                     type.setRedirect(cn);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    protected boolean resolveFromLibImports(ClassNode type) {
-        var name = type.getName();
-        for( var cn : libImports ) {
-            if( name.equals(cn.getName()) ) {
-                type.setRedirect(cn);
                 return true;
             }
         }
