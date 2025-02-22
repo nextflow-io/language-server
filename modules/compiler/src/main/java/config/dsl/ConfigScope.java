@@ -15,7 +15,9 @@
  */
 package nextflow.config.dsl;
 
-public interface ConfigScope {
+import org.pf4j.ExtensionPoint;
+
+public interface ConfigScope extends ExtensionPoint {
     String name();
     String description();
 }

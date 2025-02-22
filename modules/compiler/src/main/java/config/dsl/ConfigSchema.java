@@ -77,39 +77,21 @@ public class ConfigSchema {
         new WorkflowOutputConfig()
     );
 
-    public static final Map<String, ConfigScope> SCOPES = getConfigScopes();
+    public static final Map<String, ConfigScope> SCOPES = allScopes();
 
-    public static final Map<String, String> OPTIONS = getConfigOptions();
+    public static final Map<String, String> OPTIONS = allOptions();
 
-    private static Map<String, ConfigScope> getConfigScopes() {
+    private static Map<String, ConfigScope> allScopes() {
         var result = new HashMap<String, ConfigScope>();
         for( var scope : CLASSES )
             result.put(scope.name(), scope);
         return result;
     }
 
-    private static Map<String, String> getConfigOptions() {
+    private static Map<String, String> allOptions() {
         var result = new HashMap<String, String>();
-        for( var scope : CLASSES ) {
-            for( var field : scope.getClass().getDeclaredFields() ) {
-                var annot = field.getAnnotation(ConfigOption.class);
-                if( annot == null )
-                    continue;
-                var name = scope.name().isEmpty()
-                    ? field.getName()
-                    : scope.name() + "." + field.getName();
-                result.put(name, annot.value());
-            }
-            for( var method : scope.getClass().getDeclaredMethods() ) {
-                var annot = method.getAnnotation(ConfigOption.class);
-                if( annot == null )
-                    continue;
-                var name = scope.name().isEmpty()
-                    ? method.getName()
-                    : scope.name() + "." + method.getName();
-                result.put(name, annot.value());
-            }
-        }
+        for( var scope : CLASSES )
+            result.putAll(getConfigOptions(scope));
         // derive nextflow config scope from feature flags
         for( var field : FeatureFlagDsl.class.getDeclaredFields() ) {
             var name = field.getAnnotation(FeatureFlag.class);
@@ -123,6 +105,35 @@ public class ConfigSchema {
                 continue;
             var name = "process." + method.getName();
             result.put(name, description.value());
+        }
+        return result;
+    }
+
+    /**
+     * Get a map of all config options (name and description)
+     * declared in a class.
+     *
+     * @param scope
+     */
+    public static Map<String, String> getConfigOptions(ConfigScope scope) {
+        var result = new HashMap<String, String>();
+        for( var field : scope.getClass().getDeclaredFields() ) {
+            var annot = field.getAnnotation(ConfigOption.class);
+            if( annot == null )
+                continue;
+            var name = scope.name().isEmpty()
+                ? field.getName()
+                : scope.name() + "." + field.getName();
+            result.put(name, annot.value());
+        }
+        for( var method : scope.getClass().getDeclaredMethods() ) {
+            var annot = method.getAnnotation(ConfigOption.class);
+            if( annot == null )
+                continue;
+            var name = scope.name().isEmpty()
+                ? method.getName()
+                : scope.name() + "." + method.getName();
+            result.put(name, annot.value());
         }
         return result;
     }
