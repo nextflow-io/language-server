@@ -339,10 +339,8 @@ public class ScriptFormattingVisitor extends ScriptVisitorSupport {
             visitDirectives(node.inputs);
             fmt.appendNewLine();
         }
-        if( node.outputs instanceof BlockStatement ) {
-            fmt.appendIndent();
-            fmt.append("output:\n");
-            visitDirectives(node.outputs);
+        if( !options.maheshForm() && node.outputs instanceof BlockStatement ) {
+            visitProcessOutputs(node.outputs);
             fmt.appendNewLine();
         }
         if( !(node.when instanceof EmptyExpression) ) {
@@ -362,8 +360,18 @@ public class ScriptFormattingVisitor extends ScriptVisitorSupport {
             fmt.append("stub:\n");
             fmt.visit(node.stub);
         }
+        if( options.maheshForm() && node.outputs instanceof BlockStatement ) {
+            fmt.appendNewLine();
+            visitProcessOutputs(node.outputs);
+        }
         fmt.decIndent();
         fmt.append("}\n");
+    }
+
+    private void visitProcessOutputs(Statement outputs) {
+        fmt.appendIndent();
+        fmt.append("output:\n");
+        visitDirectives(outputs);
     }
 
     @Override

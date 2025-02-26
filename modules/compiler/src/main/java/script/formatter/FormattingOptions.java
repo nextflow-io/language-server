@@ -18,5 +18,10 @@ package nextflow.script.formatter;
 public record FormattingOptions(
     int tabSize,
     boolean insertSpaces,
-    boolean harshilAlignment
-) {}
+    boolean harshilAlignment,
+    boolean maheshForm
+) {
+    public FormattingOptions(int tabSize, boolean insertSpaces) {
+        this(tabSize, insertSpaces, false, false);
+    }
+}

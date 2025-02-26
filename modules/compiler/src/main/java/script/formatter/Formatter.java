@@ -69,7 +69,7 @@ import static nextflow.script.ast.ASTHelpers.*;
 public class Formatter extends CodeVisitorSupport {
 
     public static String prettyPrintTypeName(ClassNode type) {
-        var fmt = new Formatter(new FormattingOptions(0, false, false));
+        var fmt = new Formatter(new FormattingOptions(0, false));
         fmt.visitTypeName(type);
         return fmt.toString();
     }
