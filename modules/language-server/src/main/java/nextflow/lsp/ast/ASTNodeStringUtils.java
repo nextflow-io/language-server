@@ -94,7 +94,7 @@ public class ASTNodeStringUtils {
     private static String workflowToLabel(WorkflowNode node) {
         if( node.isEntry() )
             return "workflow <entry>";
-        var fmt = new Formatter(new FormattingOptions(2, true, false));
+        var fmt = new Formatter(new FormattingOptions(2, true));
         fmt.append("workflow ");
         fmt.append(node.getName());
         fmt.append(" {\n");
@@ -134,7 +134,7 @@ public class ASTNodeStringUtils {
     }
 
     private static String processToLabel(ProcessNode node) {
-        var fmt = new Formatter(new FormattingOptions(2, true, false));
+        var fmt = new Formatter(new FormattingOptions(2, true));
         fmt.append("process ");
         fmt.append(node.getName());
         fmt.append(" {\n");

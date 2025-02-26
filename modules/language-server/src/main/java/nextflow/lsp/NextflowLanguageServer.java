@@ -129,6 +129,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     private List<String> excludePatterns;
     private boolean harshilAlignment;
+    private boolean maheshForm;
     private boolean paranoidWarnings;
 
     // -- LanguageServer
@@ -371,7 +372,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var options = new FormattingOptions(
                 params.getOptions().getTabSize(),
                 params.getOptions().isInsertSpaces(),
-                harshilAlignment
+                harshilAlignment,
+                maheshForm
             );
             log.debug(String.format("textDocument/formatting %s %s %d", relativePath(uri), options.insertSpaces() ? "spaces" : "tabs", options.tabSize()));
             var service = getLanguageService(uri);
@@ -456,6 +458,10 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         if( harshilAlignment != null )
             this.harshilAlignment = harshilAlignment;
 
+        var maheshForm = getJsonBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
+        if( maheshForm != null )
+            this.maheshForm = maheshForm;
+    
         var paranoidWarnings = getJsonBoolean(params.getSettings(), "nextflow.paranoidWarnings");
         if( paranoidWarnings != null && this.paranoidWarnings != paranoidWarnings ) {
             this.paranoidWarnings = paranoidWarnings;

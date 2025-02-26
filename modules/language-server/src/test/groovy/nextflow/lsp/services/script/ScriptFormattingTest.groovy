@@ -50,7 +50,7 @@ class ScriptFormattingTest extends Specification {
         def uri = filePath.toUri()
         def textDocumentItem = new TextDocumentItem(uri.toString(), 'nextflow', 1, contents)
         service.didOpen(new DidOpenTextDocumentParams(textDocumentItem))
-        def textEdits = service.formatting(uri, new FormattingOptions(4, true, false))
+        def textEdits = service.formatting(uri, new FormattingOptions(4, true))
         return textEdits.first().getNewText()
     }
 
