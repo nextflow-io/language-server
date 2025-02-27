@@ -51,7 +51,7 @@ public class WaveConfig implements ConfigScope {
     """)
     public boolean mirror;
 
-    public WaveRetryConfig retry;
+    public WaveRetryConfig retryPolicy;
 
     public WaveScanConfig scan;
 
