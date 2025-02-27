@@ -17,48 +17,46 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class WaveConfig implements ConfigScope {
 
-    public WaveConfig() {}
+    public WaveBuildConfig build;
 
-    @Override
-    public String name() {
-        return "wave";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `wave` scope provides advanced configuration for the use of [Wave containers](https://docs.seqera.io/wave).
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#wave)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable the use of Wave containers.
     """)
     public boolean enabled;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The Wave service endpoint (default: `https://wave.seqera.io`).
     """)
     public String endpoint;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enables Wave container freezing. Wave will provision a non-ephemeral container image that will be pushed to a container repository of your choice.
 
         See also: `wave.build.repository` and `wave.build.cacheRepository`
     """)
     public boolean freeze;
 
-    @ConfigOption("""
+    public WaveHttpConfig http;
+
+    @ConfigOption
+    @Description("""
         Enables Wave container mirroring.
     """)
     public boolean mirror;
 
-    @ConfigOption("""
+    public WaveRetryConfig retry;
+
+    public WaveScanConfig scan;
+
+    @ConfigOption
+    @Description("""
         The strategy to be used when resolving multiple Wave container requirements (default: `'container,dockerfile,conda,spack'`).
     """)
     public String strategy;

@@ -20,96 +20,96 @@ import java.util.Map;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class Manifest implements ConfigScope {
 
-    public Manifest() {}
-
-    @Override
-    public String name() {
-        return "manifest";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `manifest` scope allows you to define some metadata that is useful when publishing or running your pipeline.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#manifest)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Project author name (use a comma to separate multiple names).
     """)
     public String author;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         List of project contributors. Should be a list of maps.
     """)
     public List<Map> contributors;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Git repository default branch (default: `master`).
     """)
     public String defaultBranch;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Free text describing the workflow project.
     """)
     public String description;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Project documentation URL.
     """)
     public String docsUrl;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Project related publication DOI identifier.
     """)
     public String doi;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Project home page URL.
     """)
     public String homePage;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Project related icon location (Relative path or URL).
     """)
     public String icon;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Project license.
     """)
     public String license;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Project main script (default: `main.nf`).
     """)
     public String mainScript;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Project short name.
     """)
     public String name;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Minimum required Nextflow version.
     """)
     public String nextflowVersion;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Project organization.
     """)
     public String organization;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Pull submodules recursively from the Git repository.
     """)
     public boolean recurseSubmodules;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Project version number.
     """)
     public String version;

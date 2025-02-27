@@ -19,22 +19,6 @@ import nextflow.config.dsl.ConfigScope;
 
 public class ProfilesConfig implements ConfigScope {
 
-    public ProfilesConfig() {}
-
-    @Override
-    public String name() {
-        return "profiles";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `profiles` block allows you to define configuration profiles. A profile is a set of configuration settings that can be applied at runtime with the `-profile` command line option.
-
-            [Read more](https://nextflow.io/docs/latest/config.html#config-profiles)
-            """;
-    }
-
     // NOTE: only used to provide completions, hover hints
 
 }

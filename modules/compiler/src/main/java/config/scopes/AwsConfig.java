@@ -17,43 +17,36 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class AwsConfig implements ConfigScope {
 
-    public AwsConfig() {}
-
-    @Override
-    public String name() {
-        return "aws";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `aws` scope controls the interactions with AWS, including AWS Batch and S3.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#aws)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         AWS account access key.
     """)
     public String accessKey;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         AWS profile from `~/.aws/credentials`.
     """)
     public String profile;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         AWS region (e.g. `us-east-1`).
     """)
     public String region;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         AWS account secret key.
     """)
     public String secretKey;
+
+    public AwsBatchConfig batch;
+
+    public AwsClientConfig client;
 
 }

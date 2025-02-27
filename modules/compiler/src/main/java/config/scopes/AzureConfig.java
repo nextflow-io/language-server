@@ -19,20 +19,16 @@ import nextflow.config.dsl.ConfigScope;
 
 public class AzureConfig implements ConfigScope {
 
-    public AzureConfig() {}
+    public AzureActiveDirectoryConfig activeDirectory;
 
-    @Override
-    public String name() {
-        return "azure";
-    }
+    public AzureBatchConfig batch;
 
-    @Override
-    public String description() {
-        return """
-            The `azure` scope allows you to configure the interactions with Azure, including Azure Batch and Azure Blob Storage.
+    public AzureManagedIdentityConfig managedIdentity;
 
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#azure)
-            """;
-    }
+    public AzureRegistryConfig registry;
+
+    public AzureRetryConfig retry;
+
+    public AzureStorageConfig storage;
 
 }

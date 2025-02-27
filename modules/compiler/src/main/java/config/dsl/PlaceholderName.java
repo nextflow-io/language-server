@@ -13,24 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.scopes;
+package nextflow.config.dsl;
 
-import nextflow.config.dsl.ConfigOption;
-import nextflow.config.dsl.ConfigScope;
-import nextflow.script.dsl.Description;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-public class WaveScanConfig implements ConfigScope {
-
-    @ConfigOption
-    @Description("""
-        Determines the allowed security levels when scanning containers for security vulnerabilities.
-    """)
-    public String allowedLevels;
-
-    @ConfigOption
-    @Description("""
-        Determines the container security scanning execution modality.
-    """)
-    public String mode;
-
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ ElementType.FIELD })
+public @interface PlaceholderName {
+    String value();
 }

@@ -17,33 +17,55 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class MailConfig implements ConfigScope {
 
-    public MailConfig() {}
-
-    @Override
-    public String name() {
-        return "mail";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `mail` scope controls the mail server used to send email notifications.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#mail)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true` enables Java Mail logging for debugging purpose.
         """)
     public boolean debug;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Default email sender address.
         """)
     public String from;
+
+    @Description("""
+        The `mail.smtp` scope supports any SMTP configuration property in the [Java Mail API](https://javaee.github.io/javamail/).
+    
+        [Read more](https://javaee.github.io/javamail/docs/api/com/sun/mail/smtp/package-summary.html#properties)
+    """)
+    public MailSmtpConfig smtp;
+
+}
+
+class MailSmtpConfig implements ConfigScope {
+
+    @ConfigOption
+    @Description("""
+        Host name of the mail server.
+        """)
+    public String host;
+
+    @ConfigOption
+    @Description("""
+        User password to connect to the mail server.
+        """)
+    public String password;
+
+    @ConfigOption
+    @Description("""
+        Port number of the mail server.
+        """)
+    public int port;
+
+    @ConfigOption
+    @Description("""
+        User name to connect to the mail server.
+        """)
+    public String user;
 
 }

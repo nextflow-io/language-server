@@ -25,6 +25,7 @@ import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.dsl.ConfigSchema;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.config.dsl.ScopeNode;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.Logger;
@@ -77,17 +78,17 @@ public class ConfigCompletionProvider implements CompletionProvider {
         if( nodeStack.isEmpty() )
             return Either.forLeft(TOPLEVEL_ITEMS);
 
-        var scope = getCurrentScope(nodeStack);
-        if( scope == null )
+        var names = getCurrentScope(nodeStack);
+        if( names == null )
             return Either.forLeft(Collections.emptyList());
 
-        var items = scope.isEmpty()
+        var items = names.isEmpty()
             ? TOPLEVEL_ITEMS
-            : getConfigOptions(scope + ".");
+            : getConfigOptions(names);
         return Either.forLeft(items);
     }
 
-    private String getCurrentScope(List<ASTNode> nodeStack) {
+    private List<String> getCurrentScope(List<ASTNode> nodeStack) {
         var names = new ArrayList<String>();
         for( var node : DefaultGroovyMethods.asReversed(nodeStack) ) {
             if( node instanceof Expression )
@@ -108,46 +109,42 @@ public class ConfigCompletionProvider implements CompletionProvider {
             if( !cin.text.endsWith(".") )
                 names.remove(names.size() - 1);
         }
-        return String.join(".", names);
+        return names;
     }
 
-    private List<CompletionItem> getConfigOptions(String prefix) {
-        var result = new ArrayList<CompletionItem>();
-        ConfigSchema.OPTIONS.forEach((name, documentation) -> {
-            if( !name.startsWith(prefix) )
-                return;
-            var relativeName = name.replace(prefix, "");
-            result.add(getConfigOption(relativeName, documentation));
-        });
-        return result;
+    private List<CompletionItem> getConfigOptions(List<String> names) {
+        var scope = ConfigSchema.getScope(names);
+        if( scope instanceof ScopeNode sn ) {
+            return sn.options().entrySet().stream()
+                .map(entry -> getConfigOption(entry.getKey(), entry.getValue()))
+                .toList();
+        }
+        return Collections.emptyList();
     }
 
     private static List<CompletionItem> getTopLevelItems() {
         var result = new ArrayList<CompletionItem>();
-        ConfigSchema.SCOPES.forEach((name, scope) -> {
-            if( name.isEmpty() )
-                return;
-            if( !"profiles".equals(name) )
-                result.add(getConfigScopeDot(name, scope));
-            if( !name.contains(".") )
-                result.add(getConfigScopeBlock(name, scope));
+        ConfigSchema.ROOT.scopes().forEach((name, scope) -> {
+            if( scope instanceof ScopeNode sn ) {
+                if( !"profiles".equals(name) )
+                    result.add(getConfigScopeDot(name, sn));
+                result.add(getConfigScopeBlock(name, sn));
+            }
         });
-        ConfigSchema.OPTIONS.forEach((name, documentation) -> {
-            if( name.contains(".") )
-                return;
-            result.add(getConfigOption(name, documentation));
+        ConfigSchema.ROOT.options().forEach((name, description) -> {
+            result.add(getConfigOption(name, description));
         });
         return result;
     }
 
-    private static CompletionItem getConfigScopeDot(String name, ConfigScope scope) {
+    private static CompletionItem getConfigScopeDot(String name, ScopeNode scope) {
         var item = new CompletionItem(name);
         item.setKind(CompletionItemKind.Property);
         item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, StringGroovyMethods.stripIndent(scope.description(), true).trim()));
         return item;
     }
 
-    private static CompletionItem getConfigScopeBlock(String name, ConfigScope scope) {
+    private static CompletionItem getConfigScopeBlock(String name, ScopeNode scope) {
         var insertText = String.format(
             """
             %s {

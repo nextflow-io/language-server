@@ -17,41 +17,30 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class TowerConfig implements ConfigScope {
 
-    public TowerConfig() {}
-
-    @Override
-    public String name() {
-        return "tower";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `tower` scope controls the settings for the [Seqera Platform](https://seqera.io) (formerly Tower Cloud).
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#tower)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The unique access token for your Seqera Platform account.
     """)
     public String accessToken;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable workflow monitoring with Seqera Platform (default: `false`).
     """)
     public boolean enabled;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The endpoint of your Seqera Platform instance (default: `https://api.cloud.seqera.io`).
     """)
     public String endpoint;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The workspace ID in Seqera Platform in which to save the run (default: the launching user's personal workspace).
     """)
     public String workspaceId;

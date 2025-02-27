@@ -17,36 +17,24 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class AzureActiveDirectoryConfig implements ConfigScope {
 
-    public AzureActiveDirectoryConfig() {}
-
-    @Override
-    public String name() {
-        return "azure.activeDirectory";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `azure` scope allows you to configure the interactions with Azure, including Azure Batch and Azure Blob Storage.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#azure)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The service principal client ID.
     """)
     public String servicePrincipalId;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The service principal client secret.
     """)
     public String servicePrincipalSecret;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The Azure tenant ID.
     """)
     public String tenantId;

@@ -15,28 +15,10 @@
  */
 package nextflow.config.scopes;
 
-import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
-import nextflow.script.dsl.Description;
 
-public class AzureRegistryConfig implements ConfigScope {
+public class NextflowConfig implements ConfigScope {
 
-    @ConfigOption
-    @Description("""
-        The container registry from which to pull the Docker images (default: `docker.io`).
-    """)
-    public String server;
-
-    @ConfigOption
-    @Description("""
-        The username to connect to a private container registry.
-    """)
-    public String userName;
-
-    @ConfigOption
-    @Description("""
-        The password to connect to a private container registry.
-    """)
-    public String password;
+    // NOTE: `nextflow` config options are inferred from FeatureFlagDsl
 
 }

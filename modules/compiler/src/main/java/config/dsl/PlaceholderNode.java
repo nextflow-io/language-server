@@ -13,24 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.scopes;
+package nextflow.config.dsl;
 
-import nextflow.config.dsl.ConfigOption;
-import nextflow.config.dsl.ConfigScope;
-import nextflow.script.dsl.Description;
-
-public class WaveScanConfig implements ConfigScope {
-
-    @ConfigOption
-    @Description("""
-        Determines the allowed security levels when scanning containers for security vulnerabilities.
-    """)
-    public String allowedLevels;
-
-    @ConfigOption
-    @Description("""
-        Determines the container security scanning execution modality.
-    """)
-    public String mode;
-
-}
+record PlaceholderNode(
+    String description,
+    String placeholderName,
+    ScopeNode scope
+) implements SchemaNode {}

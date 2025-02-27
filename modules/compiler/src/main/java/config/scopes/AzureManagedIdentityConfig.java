@@ -17,40 +17,28 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class AzureManagedIdentityConfig implements ConfigScope {
 
-    public AzureManagedIdentityConfig() {}
-
-    @Override
-    public String name() {
-        return "azure.managedIdentity";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `azure` scope allows you to configure the interactions with Azure, including Azure Batch and Azure Blob Storage.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#azure)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The client ID for an Azure managed identity.
 
         [Read more](https://nextflow.io/docs/latest/azure.html#managed-identities)
     """)
     public String clientId;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true`, use the system-assigned managed identity to authenticate Azure resources.
 
         [Read more](https://nextflow.io/docs/latest/azure.html#managed-identities)
     """)
     public boolean system;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The Azure tenant ID.
     """)
     public String tenantId;

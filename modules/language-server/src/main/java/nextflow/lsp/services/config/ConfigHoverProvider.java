@@ -80,14 +80,6 @@ public class ConfigHoverProvider implements HoverProvider {
                 builder.append("  ".repeat(i));
                 builder.append(node.getClass().getSimpleName());
                 builder.append(String.format("(%d:%d-%d:%d)", node.getLineNumber(), node.getColumnNumber(), node.getLastLineNumber(), node.getLastColumnNumber() - 1));
-                if( node instanceof ConfigBlockNode block ) {
-                    var scope = ConfigSchema.SCOPES.get(block.name);
-                    if( scope != null ) {
-                        builder.append(" [");
-                        builder.append(scope.getClass().getSimpleName());
-                        builder.append(']');
-                    }
-                }
                 builder.append('\n');
             }
             builder.append("\n```");
@@ -106,7 +98,7 @@ public class ConfigHoverProvider implements HoverProvider {
             names.addAll(assign.names);
 
             var fqName = String.join(".", names);
-            var option = ConfigSchema.OPTIONS.get(fqName);
+            var option = ConfigSchema.getOption(names);
             if( option != null ) {
                 var description = StringGroovyMethods.stripIndent(option, true).trim();
                 var builder = new StringBuilder();
@@ -115,7 +107,7 @@ public class ConfigHoverProvider implements HoverProvider {
                 builder.append(description);
                 return builder.toString();
             }
-            else if( fqName != null && Logger.isDebugEnabled() ) {
+            else if( Logger.isDebugEnabled() ) {
                 return "`" + fqName + "`";
             }
         }
@@ -125,13 +117,12 @@ public class ConfigHoverProvider implements HoverProvider {
             if( names.isEmpty() )
                 return null;
 
-            var fqName = String.join(".", names);
-            var scope = ConfigSchema.SCOPES.get(fqName);
+            var scope = ConfigSchema.getScope(names);
             if( scope != null ) {
                 return StringGroovyMethods.stripIndent(scope.description(), true).trim();
             }
-            else if( fqName != null && Logger.isDebugEnabled() ) {
-                return "`" + fqName + "`";
+            else if( Logger.isDebugEnabled() ) {
+                return "`" + String.join(".", names) + "`";
             }
         }
 

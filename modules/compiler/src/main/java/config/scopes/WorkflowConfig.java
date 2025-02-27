@@ -18,38 +18,35 @@ package nextflow.config.scopes;
 import groovy.lang.Closure;
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class WorkflowConfig implements ConfigScope {
 
-    public WorkflowConfig() {}
-
-    @Override
-    public String name() {
-        return "workflow";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `workflow` scope provides workflow execution options.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#workflow)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true`, the pipeline will exit with a non-zero exit code if any failed tasks are ignored using the `ignore` error strategy.
     """)
     public boolean failOnIgnore;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Specify a closure that will be invoked at the end of a workflow run (including failed runs).
     """)
     public Closure onComplete;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Specify a closure that will be invoked if a workflow run is terminated.
     """)
     public Closure onError;
+
+    public WorkflowOutputConfig output;
+
+    @Description("""
+        The `workflow.output` scope provides options for publishing workflow outputs.
+    
+        [Read more](https://nextflow.io/docs/latest/reference/config.html#workflow)
+    """)
+    public WorkflowOutputConfig workflowOutput;
 
 }

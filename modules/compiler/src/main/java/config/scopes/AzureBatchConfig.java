@@ -15,48 +15,41 @@
  */
 package nextflow.config.scopes;
 
+import java.util.Map;
+
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.config.dsl.PlaceholderName;
+import nextflow.script.dsl.Description;
 
 public class AzureBatchConfig implements ConfigScope {
 
-    public AzureBatchConfig() {}
-
-    @Override
-    public String name() {
-        return "azure.batch";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `azure` scope allows you to configure the interactions with Azure, including Azure Batch and Azure Blob Storage.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#azure)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The batch service account name.
     """)
     public String accountName;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The batch service account key.
     """)
     public String accountKey;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable the automatic creation of batch pools specified in the Nextflow configuration file (default: `false`).
     """)
     public boolean allowPoolCreation;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable the automatic creation of batch pools depending on the pipeline resources demand (default: `true`).
     """)
     public String autoPoolMode;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The mode in which the `azcopy` tool is installed by Nextflow (default: `'node'`). The following options are available:
         
         - `'node'`: the `azcopy` tool is installed once during the pool creation
@@ -65,32 +58,41 @@ public class AzureBatchConfig implements ConfigScope {
     """)
     public String copyToolInstallMode;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Delete all jobs when the workflow completes (default: `false`).
     """)
     public boolean deleteJobsOnCompletion;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Delete all compute node pools when the workflow completes (default: `false`).
     """)
     public boolean deletePoolsOnCompletion;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Delete each task when it completes (default: `true`).
     """)
     public boolean deleteTasksOnCompletion;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The batch service endpoint e.g. `https://nfbatch1.westeurope.batch.azure.com`.
     """)
     public String endpoint;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The name of the batch service region, e.g. `westeurope` or `eastus2`. Not needed when the endpoint is specified.
     """)
     public String location;
 
-    @ConfigOption("""
+    @PlaceholderName("<name>")
+    public Map<String, AzureBatchPoolConfig> pools;
+
+    @ConfigOption
+    @Description("""
         When the workflow completes, set all jobs to terminate on task completion (default: `true`).
     """)
     public boolean terminateJobsOnCompletion;

@@ -17,150 +17,160 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 import nextflow.script.types.Duration;
 import nextflow.script.types.MemoryUnit;
 
 public class AwsClientConfig implements ConfigScope {
 
-    public AwsClientConfig() {}
-
-    @Override
-    public String name() {
-        return "aws.client";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `aws` scope controls the interactions with AWS, including AWS Batch and S3.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#aws)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Allow the access of public S3 buckets without providing AWS credentials. Any service that does not accept unsigned requests will return a service access error.
     """)
     public boolean anonymous;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Specify predefined bucket permissions, also known as *canned ACL*. Can be one of `Private`, `PublicRead`, `PublicReadWrite`, `AuthenticatedRead`, `LogDeliveryWrite`, `BucketOwnerRead`, `BucketOwnerFullControl`, or `AwsExecRead`.
         
         [Read more](https://docs.aws.amazon.com/AmazonS3/latest/userguide/acl-overview.html#canned-acl)
     """)
     public String s3Acl;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The amount of time to wait (in milliseconds) when initially establishing a connection before timing out.
     """)
     public int connectionTimeout;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The AWS S3 API entry point e.g. `https://s3-us-west-1.amazonaws.com`. The endpoint must include the protocol prefix e.g. `https://`.
     """)
     public String endpoint;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The maximum number of allowed open HTTP connections.
     """)
     public int maxConnections;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The maximum number of retry attempts for failed retryable requests.
     """)
     public int maxErrorRetry;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The protocol (i.e. HTTP or HTTPS) to use when connecting to AWS.
     """)
     public String protocol;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The proxy host to connect through.
     """)
     public String proxyHost;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The port on the proxy host to connect through.
     """)
     public int proxyPort;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The user name to use when connecting through a proxy.
     """)
     public String proxyUsername;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The password to use when connecting through a proxy.
     """)
     public String proxyPassword;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable the requester pays feature for S3 buckets.
     """)
     public boolean requesterPays;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable the use of path-based access model that is used to specify the address of an object in S3-compatible storage systems.
     """)
     public boolean s3PathStyleAccess;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The name of the signature algorithm to use for signing requests made by the client.
     """)
     public String signerOverride;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The size hint (in bytes) for the low level TCP send buffer.
     """)
     public int socketSendBufferSizeHint;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The size hint (in bytes) for the low level TCP receive buffer.
     """)
     public int socketRecvBufferSizeHint;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The amount of time to wait (in milliseconds) for data to be transferred over an established, open connection before the connection is timed out.
     """)
     public int socketTimeout;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The S3 server side encryption to be used when saving objects on S3, either `AES256` or `aws:kms` values are allowed.
     """)
     public String storageEncryption;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The AWS KMS key Id to be used to encrypt files stored in the target S3 bucket.
     """)
     public String storageKmsKeyId;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The HTTP user agent header passed with all HTTP requests.
     """)
     public String userAgent;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The size of a single part in a multipart upload (default: `100 MB`).
     """)
     public MemoryUnit uploadChunkSize;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The maximum number of upload attempts after which a multipart upload returns an error (default: `5`).
     """)
     public int uploadMaxAttempts;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The maximum number of threads used for multipart upload.
     """)
     public int uploadMaxThreads;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The time to wait after a failed upload attempt to retry the part upload (default: `500ms`).
     """)
     public Duration uploadRetrySleep;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The S3 storage class applied to stored objects, one of \\[`STANDARD`, `STANDARD_IA`, `ONEZONE_IA`, `INTELLIGENT_TIERING`\\] (default: `STANDARD`).
     """)
     public String uploadStorageClass;

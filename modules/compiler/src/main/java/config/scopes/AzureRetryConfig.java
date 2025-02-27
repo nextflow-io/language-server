@@ -17,42 +17,31 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 import nextflow.script.types.Duration;
 
 public class AzureRetryConfig implements ConfigScope {
 
-    public AzureRetryConfig() {}
-
-    @Override
-    public String name() {
-        return "azure.retryPolicy";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `azure` scope allows you to configure the interactions with Azure, including Azure Batch and Azure Blob Storage.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#azure)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Delay when retrying failed API requests (default: `500ms`).
     """)
     public Duration delay;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Jitter value when retrying failed API requests (default: `0.25`).
     """)
     public double jitter;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Max attempts when retrying failed API requests (default: `10`).
     """)
     public int maxAttempts;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Max delay when retrying failed API requests (default: `90s`).
     """)
     public Duration maxDelay;

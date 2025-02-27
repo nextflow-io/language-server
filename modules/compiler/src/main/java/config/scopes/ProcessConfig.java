@@ -19,22 +19,6 @@ import nextflow.config.dsl.ConfigScope;
 
 public class ProcessConfig implements ConfigScope {
 
-    public ProcessConfig() {}
-
-    @Override
-    public String name() {
-        return "process";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `process` scope allows you to specify default directives for processes in your pipeline.
-
-            [Read more](https://nextflow.io/docs/latest/config.html#process-configuration)
-            """;
-    }
-
-    // NOTE: process config options are inferred from ProcessDsl
+    // NOTE: `process` config options are inferred from ProcessDsl
 
 }

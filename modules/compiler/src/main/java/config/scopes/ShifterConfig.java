@@ -17,26 +17,12 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class ShifterConfig implements ConfigScope {
 
-    public ShifterConfig() {}
-
-    @Override
-    public String name() {
-        return "shifter";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `shifter` scope controls how [Shifter](https://docs.nersc.gov/programming/shifter/overview/) containers are executed by Nextflow.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#shifter)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable Shifter execution (default: `false`).
     """)
     public boolean enabled;

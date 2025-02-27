@@ -20,59 +20,51 @@ import java.util.List;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 import nextflow.script.types.Duration;
 
 public class CondaConfig implements ConfigScope {
 
-    public CondaConfig() {}
-
-    @Override
-    public String name() {
-        return "conda";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `conda` scope controls the creation of Conda environments by the Conda package manager.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#conda)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable Conda execution (default: `false`).
     """)
     public boolean enabled;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The path where Conda environments are stored.
     """)
     public Path cacheDir;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The Conda channels that can be used to resolve Conda packages.
     """)
     public List<String> channels;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Extra command line options to append to the `conda create` command.
     """)
     public String createOptions;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The amount of time to wait for the Conda environment to be created before failing (default: `20 min`).
     """)
     public Duration createTimeout;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true`, use `mamba` instead of `conda` to create the Conda environments.
 
         [Read more](https://github.com/mamba-org/mamba)
     """)
     public boolean useMamba;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true`, use `micromamba` instead of `conda` to create the Conda environments.
 
         [Read more](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html)

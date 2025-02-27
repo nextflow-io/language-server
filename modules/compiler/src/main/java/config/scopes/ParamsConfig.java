@@ -18,21 +18,4 @@ package nextflow.config.scopes;
 import nextflow.config.dsl.ConfigScope;
 
 public class ParamsConfig implements ConfigScope {
-
-    public ParamsConfig() {}
-
-    @Override
-    public String name() {
-        return "params";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `params` scope allows you to define parameters that will be accessible in the pipeline script.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#params)
-            """;
-    }
-
 }

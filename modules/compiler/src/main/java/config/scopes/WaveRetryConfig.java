@@ -17,42 +17,31 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 import nextflow.script.types.Duration;
 
 public class WaveRetryConfig implements ConfigScope {
 
-    public WaveRetryConfig() {}
-
-    @Override
-    public String name() {
-        return "wave.retryPolicy";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `wave` scope provides advanced configuration for the use of [Wave containers](https://docs.seqera.io/wave).
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#wave)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The initial delay when a failing HTTP request is retried (default: `150ms`).
     """)
     public Duration delay;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The jitter factor used to randomly vary retry delays (default: `0.25`).
     """)
     public double jitter;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The max number of attempts a failing HTTP request is retried (default: `5`).
     """)
     public int maxAttempts;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The max delay when a failing HTTP request is retried (default: `90 seconds`).
     """)
     public Duration maxDelay;

@@ -17,62 +17,55 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 import nextflow.script.types.MemoryUnit;
 
 public class FusionConfig implements ConfigScope {
 
-    public FusionConfig() {}
-
-    @Override
-    public String name() {
-        return "fusion";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `fusion` scope provides advanced configuration for the use of the [Fusion file system](https://docs.seqera.io/fusion).
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#fusion)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable/disable the use of Fusion file system.
     """)
     public boolean enabled;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The maximum size of the local cache used by the Fusion client.
     """)
     public MemoryUnit cacheSize;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The URL from where the container layer provisioning the Fusion client is downloaded.
     """)
     public String containerConfigUrl;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true` the access credentials required by the underlying object storage are exported to the task execution environment.
     """)
     public boolean exportStorageCredentials;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The level of logging emitted by the Fusion client.
     """)
     public String logLevel;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Where the logging output is written. 
     """)
     public String logOutput;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enables the use of privileged containers when using Fusion (default: `true`).
     """)
     public boolean privileged;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The pattern that determines how tags are applied to files created via the Fusion client (default: `[.command.*|.exitcode|.fusion.*](nextflow.io/metadata=true),[*](nextflow.io/temporary=true)`). Set to `false` to disable tags.
     """)
     public String tags;

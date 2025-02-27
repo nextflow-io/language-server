@@ -82,7 +82,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
         var fqName = String.join(".", names);
         if( fqName.startsWith("process.ext.") )
             return;
-        var option = ConfigSchema.OPTIONS.get(fqName);
+        var option = ConfigSchema.getOption(names);
         if( option == null )
             addWarning("Unrecognized config option '" + fqName + "'", String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
     }

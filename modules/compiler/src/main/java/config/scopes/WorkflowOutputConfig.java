@@ -19,60 +19,52 @@ import java.util.Map;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class WorkflowOutputConfig implements ConfigScope {
 
-    public WorkflowOutputConfig() {}
-
-    @Override
-    public String name() {
-        return "workflow.output";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `workflow.output` scope provides options for publishing workflow outputs.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#workflow)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         *Currently only supported for S3.*
 
         Specify the media type a.k.a. [MIME type](https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_Types) of published files (default: `false`). Can be a string (e.g. `'text/html'`), or `true` to infer the content type from the file extension.
     """)
     public Object contentType;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable or disable publishing (default: `true`).
     """)
     public boolean enabled;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true`, the workflow will not fail if a file can't be published for some reason (default: `false`).
     """)
     public boolean ignoreErrors;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The file publishing method (default: `'symlink'`).
     """)
     public String mode;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true` any existing file in the specified folder will be overwritten (default: `'standard'`).
     """)
     public Object overwrite;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         *Currently only supported for S3.*
 
         Specify the storage class for published files.
     """)
     public String storageClass;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         *Currently only supported for S3.*
 
         Specify arbitrary tags for published files.

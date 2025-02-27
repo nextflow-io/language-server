@@ -17,49 +17,41 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 import nextflow.script.types.Duration;
 
 public class GoogleConfig implements ConfigScope {
 
-    public GoogleConfig() {}
+    public GoogleBatchConfig batch;
 
-    @Override
-    public String name() {
-        return "google";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `google` scope allows you to configure the interactions with Google Cloud, including Google Cloud Batch and Google Cloud Storage.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#google)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true`, the given Google Cloud project ID is used as the billing project for storage access (default: `false`). Required when accessing data from *requester pays enabled* buckets.
 
         [Read more](https://cloud.google.com/storage/docs/requester-pays)
     """)
     public boolean enableRequesterPaysBuckets;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The HTTP connection timeout for Cloud Storage API requests (default: `'60s'`).
     """)
     public Duration httpConnectTimeout;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The HTTP read timeout for Cloud Storage API requests (default: `'60s'`).
     """)
     public Duration httpReadTimeout;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The Google Cloud location where jobs are executed (default: `us-central1`).
     """)
     public String location;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The Google Cloud project ID to use for pipeline execution.
     """)
     public String project;

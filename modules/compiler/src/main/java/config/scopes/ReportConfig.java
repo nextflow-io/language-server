@@ -17,36 +17,24 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class ReportConfig implements ConfigScope {
 
-    public ReportConfig() {}
-
-    @Override
-    public String name() {
-        return "report";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `report` scope allows you to configure the workflow [execution report](https://nextflow.io/docs/latest/tracing.html#execution-report).
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#report)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enable the creation of the workflow execution report.
     """)
     public boolean enabled;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The path of the created execution report file (default: `'report-<timestamp>.html'`).
     """)
     public String file;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true` overwrites any existing report file with the same name.
     """)
     public boolean overwrite;

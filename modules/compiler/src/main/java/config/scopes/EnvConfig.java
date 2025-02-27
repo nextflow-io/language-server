@@ -18,21 +18,4 @@ package nextflow.config.scopes;
 import nextflow.config.dsl.ConfigScope;
 
 public class EnvConfig implements ConfigScope {
-
-    public EnvConfig() {}
-
-    @Override
-    public String name() {
-        return "env";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `env` scope allows you to define environment variables that will be exported into the environment where workflow tasks are executed.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#env)
-            """;
-    }
-
 }

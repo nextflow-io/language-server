@@ -19,42 +19,31 @@ import java.nio.file.Path;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 import nextflow.script.types.Duration;
 
 public class SpackConfig implements ConfigScope {
 
-    public SpackConfig() {}
-
-    @Override
-    public String name() {
-        return "spack";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `spack` scope controls the creation of a Spack environment by the Spack package manager.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#spack)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The path where Spack environments are stored.
     """)
     public Path cacheDir;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Enables checksum verification for source tarballs (default: `true`).
     """)
     public boolean checksum;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The amount of time to wait for the Spack environment to be created before failing (default: `60 min`).
     """)
     public Duration createTimeout;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The maximum number of parallel package builds (default: the number of available CPUs).
     """)
     public int parallelBuilds;

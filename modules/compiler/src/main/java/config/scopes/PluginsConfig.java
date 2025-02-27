@@ -17,26 +17,12 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 
 public class PluginsConfig implements ConfigScope {
 
-    public PluginsConfig() {}
-
-    @Override
-    public String name() {
-        return "plugins";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `plugins` scope allows you to include plugins at runtime.
-
-            [Read more](https://nextflow.io/docs/latest/plugins.html)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The plugin id, can be a name (e.g. `nf-hello`) or a name with a version (e.g. `nf-hello@0.5.0`).
     """)
     public void id(String value) {

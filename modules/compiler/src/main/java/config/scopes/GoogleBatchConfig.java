@@ -19,73 +19,67 @@ import java.util.List;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 import nextflow.script.types.MemoryUnit;
 
 public class GoogleBatchConfig implements ConfigScope {
 
-    public GoogleBatchConfig() {}
-
-    @Override
-    public String name() {
-        return "google.batch";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `google` scope allows you to configure the interactions with Google Cloud, including Google Cloud Batch and Google Cloud Storage.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#google)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The set of allowed locations for VMs to be provisioned (default: no restriction).
 
         [Read more](https://cloud.google.com/batch/docs/reference/rest/v1/projects.locations.jobs#locationpolicy)
     """)
     public List<String> allowedLocations;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The size of the virtual machine boot disk, e.g `50.GB` (default: none).
     """)
     public MemoryUnit bootDiskSize;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The minimum CPU Platform, e.g. `'Intel Skylake'` (default: none).
 
         [Read more](https://cloud.google.com/compute/docs/instances/specify-min-cpu-platform#specifications)
     """)
     public String cpuPlatform;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         Max number of execution attempts of a job interrupted by a Compute Engine spot reclaim event (default: `5`).
     """)
     public int maxSpotAttempts;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The URL of an existing network resource to which the VM will be attached.
     """)
     public String network;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The Google service account email to use for the pipeline execution. If not specified, the default Compute Engine service account for the project will be used.
 
         [Read more](https://www.nextflow.io/docs/latest/google.html#credentials)
     """)
     public String serviceAccountEmail;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true`, enables the usage of *spot* virtual machines (default: `false`).
     """)
     public boolean spot;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The URL of an existing subnetwork resource in the network to which the VM will be attached.
     """)
     public String subnetwork;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         When `true`, the VM will *not* be provided with a public IP address, and only contain an internal IP.
     """)
     public boolean usePrivateAddress;

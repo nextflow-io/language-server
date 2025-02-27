@@ -17,55 +17,45 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 import nextflow.script.types.Duration;
 
 public class ExecutorRetryConfig implements ConfigScope {
 
-    public ExecutorRetryConfig() {}
-
-    @Override
-    public String name() {
-        return "executor.retry";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `executor.retry` scope controls the behavior of retrying failed job submissions.
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#executor)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         *Used only by grid executors.*
 
         Delay when retrying failed job submissions (default: `500ms`).
         """)
     public Duration delay;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         *Used only by grid executors.*
 
         Jitter value when retrying failed job submissions (default: `0.25`).
         """)
     public double jitter;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         *Used only by grid executors.*
 
         Max attempts when retrying failed job submissions (default: `3`).
         """)
     public int maxAttempts;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         *Used only by grid executors.*
 
         Max delay when retrying failed job submissions (default: `30s`).
         """)
     public Duration maxDelay;
 
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         *Used only by grid executors.*
 
         Regex pattern that when verified causes a failed submit operation to be re-tried (default: `Socket timed out`).

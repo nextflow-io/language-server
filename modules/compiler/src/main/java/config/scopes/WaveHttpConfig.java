@@ -17,27 +17,13 @@ package nextflow.config.scopes;
 
 import nextflow.config.dsl.ConfigOption;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.script.dsl.Description;
 import nextflow.script.types.Duration;
 
 public class WaveHttpConfig implements ConfigScope {
 
-    public WaveHttpConfig() {}
-
-    @Override
-    public String name() {
-        return "wave.httpClient";
-    }
-
-    @Override
-    public String description() {
-        return """
-            The `wave` scope provides advanced configuration for the use of [Wave containers](https://docs.seqera.io/wave).
-
-            [Read more](https://nextflow.io/docs/latest/reference/config.html#wave)
-            """;
-    }
-
-    @ConfigOption("""
+    @ConfigOption
+    @Description("""
         The connection timeout for the Wave HTTP client (default: `30s`).
     """)
     public Duration connectTime;
