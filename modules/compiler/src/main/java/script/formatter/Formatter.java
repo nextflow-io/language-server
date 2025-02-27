@@ -459,7 +459,7 @@ public class Formatter extends CodeVisitorSupport {
     @Override
     public void visitClosureExpression(ClosureExpression node) {
         append('{');
-        if( node.getParameters() != null ) {
+        if( node.getParameters() != null && node.getParameters().length > 0 ) {
             append(' ');
             visitParameters(node.getParameters());
             append(" ->");
