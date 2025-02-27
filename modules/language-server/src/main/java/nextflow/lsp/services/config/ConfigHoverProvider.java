@@ -98,7 +98,7 @@ public class ConfigHoverProvider implements HoverProvider {
             names.addAll(assign.names);
 
             var fqName = String.join(".", names);
-            var option = ConfigSchema.getOption(names);
+            var option = ConfigSchema.ROOT.getOption(names);
             if( option != null ) {
                 var description = StringGroovyMethods.stripIndent(option, true).trim();
                 var builder = new StringBuilder();
@@ -117,7 +117,7 @@ public class ConfigHoverProvider implements HoverProvider {
             if( names.isEmpty() )
                 return null;
 
-            var scope = ConfigSchema.getScope(names);
+            var scope = ConfigSchema.ROOT.getScope(names);
             if( scope != null ) {
                 return StringGroovyMethods.stripIndent(scope.description(), true).trim();
             }

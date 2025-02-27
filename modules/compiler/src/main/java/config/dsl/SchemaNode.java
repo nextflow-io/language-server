@@ -15,6 +15,49 @@
  */
 package nextflow.config.dsl;
 
+import java.util.List;
+
 public sealed interface SchemaNode permits ScopeNode, PlaceholderNode {
     String description();
+
+    /**
+     * Get the schema node for a given config scope.
+     *
+     * @param names
+     */
+    default SchemaNode getScope(List<String> names) {
+        SchemaNode node = this;
+        for( var name : names ) {
+            if( node instanceof ScopeNode sn )
+                node = sn.scopes().get(name);
+            else if( node instanceof PlaceholderNode pn )
+                node = pn.scope();
+            else
+                return null;
+        }
+        return node;
+    }
+
+    /**
+     * Get the description for a given config option.
+     *
+     * @param names
+     */
+    default String getOption(List<String> names) {
+        SchemaNode node = this;
+        for( int i = 0; i < names.size() - 1; i++ ) {
+            var name = names.get(i);
+            if( node instanceof ScopeNode sn )
+                node = sn.scopes().get(name);
+            else if( node instanceof PlaceholderNode pn )
+                node = pn.scope();
+            else
+                return null;
+        }
+        var optionName = names.get(names.size() - 1);
+        return node instanceof ScopeNode sn
+            ? sn.options().get(optionName)
+            : null;
+    }
+
 }

@@ -15,13 +15,9 @@
  */
 package nextflow.config.dsl;
 
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.ParameterizedType;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import nextflow.config.scopes.NextflowConfig;
 import nextflow.config.scopes.ProcessConfig;
@@ -33,94 +29,13 @@ import nextflow.script.dsl.ProcessDsl;
 
 public class ConfigSchema {
 
-    public static final ScopeNode ROOT = scopeNode(RootConfig.class, "");
+    public static final ScopeNode ROOT = rootScope();
 
-    /**
-     * Get the schema node for a given config scope.
-     *
-     * @param names
-     */
-    public static SchemaNode getScope(List<String> names) {
-        SchemaNode node = ROOT;
-        for( var name : names ) {
-            if( node instanceof ScopeNode sn )
-                node = sn.scopes().get(name);
-            else if( node instanceof PlaceholderNode pn )
-                node = pn.scope();
-            else
-                return null;
-        }
-        return node;
-    }
-
-    /**
-     * Get the description for a given config option.
-     *
-     * @param names
-     */
-    public static String getOption(List<String> names) {
-        SchemaNode node = ROOT;
-        for( int i = 0; i < names.size() - 1; i++ ) {
-            var name = names.get(i);
-            if( node instanceof ScopeNode sn )
-                node = sn.scopes().get(name);
-            else if( node instanceof PlaceholderNode pn )
-                node = pn.scope();
-            else
-                return null;
-        }
-        var optionName = names.get(names.size() - 1);
-        return node instanceof ScopeNode sn
-            ? sn.options().get(optionName)
-            : null;
-    }
-
-    private static ScopeNode scopeNode(Class<? extends ConfigScope> scope, String description) {
-        if( scope.equals(NextflowConfig.class) )
-            return nextflowScope(description);
-        if( scope.equals(ProcessConfig.class) )
-            return processScope(description);
-        var options = new HashMap<String, String>();
-        var scopes = new HashMap<String, SchemaNode>();
-        for( var field : scope.getDeclaredFields() ) {
-            var name = field.getName();
-            var type = field.getType();
-            var placeholderName = field.getAnnotation(PlaceholderName.class);
-            // fields annotated with @ConfigOption are config options
-            if( field.getAnnotation(ConfigOption.class) != null ) {
-                var desc = annotatedDescription(field, "");
-                options.put(name, desc);
-            }
-            // fields of type ConfigScope are nested config scopes
-            else if( ConfigScope.class.isAssignableFrom(type) ) {
-                var desc = annotatedDescription(field, description);
-                scopes.put(name, scopeNode((Class<? extends ConfigScope>) type, desc));
-            }
-            // fields of type Map<String, ConfigScope> are placeholder scopes
-            // (e.g. `azure.batch.pools.<name>`)
-            else if( Map.class.isAssignableFrom(type) && placeholderName != null ) {
-                var desc = annotatedDescription(field, description);
-                var pt = (ParameterizedType)field.getGenericType();
-                var valueType = (Class<? extends ConfigScope>)pt.getActualTypeArguments()[1];
-                scopes.put(name, placeholderNode(desc, placeholderName.value(), valueType));
-            }
-        }
-        for( var method : scope.getDeclaredMethods() ) {
-            if( method.getAnnotation(ConfigOption.class) != null ) {
-                var desc = annotatedDescription(method, "");
-                options.put(method.getName(), desc);
-            }
-        }
-        return new ScopeNode(description, options, scopes);
-    }
-
-    private static String annotatedDescription(AnnotatedElement el, String defaultValue) {
-        var annot = el.getAnnotation(Description.class);
-        return annot != null ? annot.value() : defaultValue;
-    }
-
-    private static PlaceholderNode placeholderNode(String description, String placeholderName, Class<? extends ConfigScope> valueType) {
-        return new PlaceholderNode(description, placeholderName, scopeNode(valueType, description));
+    private static ScopeNode rootScope() {
+        var result = ScopeNode.of(RootConfig.class, "");
+        result.scopes().put("nextflow", nextflowScope(""));
+        result.scopes().put("process", processScope(""));
+        return result;
     }
 
     /**
@@ -128,7 +43,7 @@ public class ConfigSchema {
      *
      * @param description
      */
-    private static ScopeNode nextflowScope(String description) {
+    private static SchemaNode nextflowScope(String description) {
         var enableOpts = new HashMap<String, String>();
         var previewOpts = new HashMap<String, String>();
         for( var field : FeatureFlagDsl.class.getDeclaredFields() ) {
@@ -144,8 +59,8 @@ public class ConfigSchema {
                 throw new IllegalArgumentException();
         }
         var scopes = Map.ofEntries(
-            Map.entry("enable", new ScopeNode(description, enableOpts, Collections.emptyMap())),
-            Map.entry("preview", new ScopeNode(description, previewOpts, Collections.emptyMap()))
+            Map.entry("enable", (SchemaNode) new ScopeNode(description, enableOpts, Collections.emptyMap())),
+            Map.entry("preview", (SchemaNode) new ScopeNode(description, previewOpts, Collections.emptyMap()))
         );
         return new ScopeNode(description, Collections.emptyMap(), scopes);
     }
@@ -155,7 +70,7 @@ public class ConfigSchema {
      *
      * @param description
      */
-    private static ScopeNode processScope(String description) {
+    private static SchemaNode processScope(String description) {
         var options = new HashMap<String, String>();
         for( var method : ProcessDsl.DirectiveDsl.class.getDeclaredMethods() ) {
             var desc = method.getAnnotation(Description.class);

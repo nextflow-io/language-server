@@ -113,7 +113,7 @@ public class ConfigCompletionProvider implements CompletionProvider {
     }
 
     private List<CompletionItem> getConfigOptions(List<String> names) {
-        var scope = ConfigSchema.getScope(names);
+        var scope = ConfigSchema.ROOT.getScope(names);
         if( scope instanceof ScopeNode sn ) {
             return sn.options().entrySet().stream()
                 .map(entry -> getConfigOption(entry.getKey(), entry.getValue()))
