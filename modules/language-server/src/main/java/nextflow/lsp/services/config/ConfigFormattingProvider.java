@@ -52,8 +52,10 @@ public class ConfigFormattingProvider implements FormattingProvider {
             return Collections.emptyList();
         }
 
-        if( !ast.hasAST(uri) || ast.hasSyntaxErrors(uri) )
+        if( !ast.hasAST(uri) || ast.hasSyntaxErrors(uri) ) {
+            log.showError("Config file could not be formatted because it has syntax errors: " + uri);
             return Collections.emptyList();
+        }
 
         var sourceUnit = ast.getSourceUnit(uri);
         String oldText;
@@ -61,6 +63,7 @@ public class ConfigFormattingProvider implements FormattingProvider {
             oldText = IOGroovyMethods.getText(sourceUnit.getSource().getReader());
         }
         catch( IOException e ) {
+            log.error("Failed to read source file: " + uri + " -- cause: " + e.toString());
             return Collections.emptyList();
         }
 

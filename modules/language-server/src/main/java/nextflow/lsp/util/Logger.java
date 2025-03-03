@@ -72,6 +72,12 @@ public class Logger {
         client.logMessage(new MessageParams(MessageType.Error, message));
     }
 
+    public void showError(String message) {
+        if( !initialized )
+            return;
+        client.showMessage(new MessageParams(MessageType.Error, message));
+    }
+
     public void info(String message) {
         if( !initialized )
             return;
