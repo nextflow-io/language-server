@@ -43,6 +43,17 @@ java -jar build/libs/language-server-all.jar
 
 Protocol messages are exchanged using standard input/output.
 
+## Releasing
+
+The Nextflow language server follows the versioning scheme of Nextflow. For each stable release of Nextflow, there is a corresponding stable release of the language server. There is no correlation between patch releases of Nextflow and the language server -- they are patched independently of each other.
+
+A separate branch is maintained for each stable release, starting with `STABLE-24.10.x`. The `main` branch corresponds to the upcoming stable release. Updates to `main` should be backported as needed to maintain a consistent user experience, for example, when a new configuration option is added.
+
+To make a new release of the language server:
+
+1. Build the language server locally.
+2. Create a new GitHub release with the language server JAR and a list of notable changes.
+
 ## Troubleshooting
 
 Sometimes the language server might crash or get out of sync with your workspace. If this happens, you can restart the server from the command palette. You can also view the server logs from the "Output" tab under "Nextflow Language Server".
