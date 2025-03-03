@@ -22,7 +22,6 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import groovy.lang.Tuple2;
 import nextflow.config.ast.ConfigAppendNode;
@@ -233,7 +232,7 @@ public class ConfigAstBuilder {
     private ConfigStatement configAssignment(ConfigAssignmentContext ctx) {
         var names = ctx.configAssignmentPath().configPrimary().stream()
             .map(this::configPrimary)
-            .collect(Collectors.toList());
+            .toList();
         var value = expression(ctx.expression());
         return ast( new ConfigAssignNode(names, value), ctx );
     }
@@ -256,7 +255,7 @@ public class ConfigAstBuilder {
         var statements = ctx.configBlockStatement().stream()
             .map(this::configBlockStatement)
             .filter(stmt -> stmt != null)
-            .collect(Collectors.toList());
+            .toList();
         return new ConfigBlockNode(name, statements);
     }
 
@@ -298,7 +297,7 @@ public class ConfigAstBuilder {
         var target = configPrimary(ctx.target);
         var statements = ctx.configAssignment().stream()
             .map(this::configAssignment)
-            .collect(Collectors.toList());
+            .toList();
         return new ConfigBlockNode(kind, target, statements);
     }
 
@@ -306,7 +305,7 @@ public class ConfigAstBuilder {
         var name = configPrimary(ctx.configPrimary());
         var statements = ctx.configAppendBlockStatement().stream()
             .map(this::configAppendBlockStatement)
-            .collect(Collectors.toList());
+            .toList();
         var result = ast( new ConfigBlockNode(name, statements), ctx );
         if( !"plugins".equals(name) )
             collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (i.e. no equals sign)", result));
@@ -401,7 +400,7 @@ public class ConfigAstBuilder {
             return block(new VariableScope(), Collections.emptyList());
         var statements = ctx.statement().stream()
             .map(this::statement)
-            .collect(Collectors.toList());
+            .toList();
         return ast( block(new VariableScope(), statements), ctx );
     }
 
@@ -409,7 +408,7 @@ public class ConfigAstBuilder {
         var tryStatement = statementOrBlock(ctx.statementOrBlock());
         var catchClauses = ctx.catchClause().stream()
             .map(this::catchClause)
-            .collect(Collectors.toList());
+            .toList();
         var result = tryCatchS(tryStatement);
         for( var clause : catchClauses )
             for( var stmt : clause )
@@ -427,7 +426,7 @@ public class ConfigAstBuilder {
                 var code = statementOrBlock(ctx.statementOrBlock());
                 return ast( new CatchStatement(variable, code), ctx );
             })
-            .collect(Collectors.toList());
+            .toList();
     }
 
     private List<ClassNode> catchTypes(CatchTypesContext ctx) {
@@ -436,7 +435,7 @@ public class ConfigAstBuilder {
 
         return ctx.qualifiedClassName().stream()
             .map(this::qualifiedClassName)
-            .collect(Collectors.toList());
+            .toList();
     }
 
     private Statement returnStatement(ExpressionContext ctx) {
@@ -465,7 +464,7 @@ public class ConfigAstBuilder {
             // multiple assignment
             var variables = ctx.variableNames().identifier().stream()
                 .map(ident -> (Expression) variableName(ident))
-                .collect(Collectors.toList());
+                .toList();
             var target = new ArgumentListExpression(variables);
             var initializer = expression(ctx.initializer);
             return stmt(ast( declX(target, initializer), ctx ));
@@ -483,7 +482,7 @@ public class ConfigAstBuilder {
     private Expression variableNames(VariableNamesContext ctx) {
         var vars = ctx.identifier().stream()
             .map(this::variableName)
-            .collect(Collectors.toList());
+            .toList();
         return ast( new TupleExpression(vars), ctx );
     }
 
@@ -1032,7 +1031,7 @@ public class ConfigAstBuilder {
         
         return ctx.expression().stream()
             .map(this::expression)
-            .collect(Collectors.toList());
+            .toList();
     }
 
     private Expression map(MapContext ctx) {
@@ -1041,7 +1040,7 @@ public class ConfigAstBuilder {
 
         var entries = ctx.mapEntryList().mapEntry().stream()
             .map(this::mapEntry)
-            .collect(Collectors.toList());
+            .toList();
         var result = mapX(entries);
         if( ctx.COMMA() != null )
             result.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
@@ -1172,7 +1171,7 @@ public class ConfigAstBuilder {
 
         var params = ctx.formalParameter().stream()
             .map(this::formalParameter)
-            .collect(Collectors.toList());
+            .toList();
         for( int n = params.size(), i = n - 1; i >= 0; i -= 1 ) {
             var param = params.get(i);
             for( var other : params ) {

@@ -20,7 +20,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
@@ -325,7 +324,7 @@ public class ASTUtils {
             if( constructorType != null ) {
                 return constructorType.getDeclaredConstructors().stream()
                     .map(ctor -> (MethodNode) ctor)
-                    .collect(Collectors.toList());
+                    .toList();
             }
         }
 

@@ -17,7 +17,6 @@ package nextflow.lsp.services;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import nextflow.lsp.util.Positions;
@@ -107,7 +106,7 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
                 TOKEN_TYPES.indexOf(token.type()),
                 0
             ))
-            .collect(Collectors.toList());
+            .toList();
 
         return new SemanticTokens(data);
     }
