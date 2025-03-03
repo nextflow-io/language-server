@@ -602,7 +602,7 @@ public class ScriptAstBuilder {
             && es.getExpression() instanceof BinaryExpression be
             && be.getOperation().getType() == Types.RIGHT_SHIFT;
         if( !valid ) {
-            collectSyntaxError(new SyntaxException("Invalid workflow publisher", stmt));
+            collectSyntaxError(new SyntaxException("Invalid workflow publish statement", stmt));
             return null;
         }
         return stmt;
