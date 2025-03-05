@@ -48,8 +48,7 @@ import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
-import nextflow.script.control.ResolveVisitor;
-import nextflow.script.control.VariableScopeVisitor;
+import nextflow.script.control.ScriptResolveVisitor;
 import nextflow.script.parser.ScriptParserPluginFactory;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.GroovyBugError;
@@ -109,7 +108,7 @@ public class ScriptAstCache extends ASTNodeCache {
         // phase 2: name resolution
         // NOTE: must be done before visiting parents because it transforms nodes
         if( sourceUnit != null ) {
-            new ResolveVisitor(sourceUnit, compilationUnit, Types.TYPES, libImports).visit();
+            new ScriptResolveVisitor(sourceUnit, compilationUnit, Types.TYPES, libImports).visit();
             new ParameterSchemaVisitor(sourceUnit).visit();
         }
         return sourceUnit;

@@ -25,7 +25,7 @@ import org.codehaus.groovy.ast.expr.Expression;
  */
 public class ConfigAssignNode extends ConfigStatement {
     public final List<String> names;
-    public final Expression value;
+    public Expression value;
 
     public ConfigAssignNode(List<String> names, Expression value) {
         this.names = names;

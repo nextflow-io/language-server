@@ -22,7 +22,7 @@ import org.codehaus.groovy.ast.expr.Expression;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class ConfigIncludeNode extends ConfigStatement {
-    public final Expression source;
+    public Expression source;
 
     public ConfigIncludeNode(Expression source) {
         this.source = source;

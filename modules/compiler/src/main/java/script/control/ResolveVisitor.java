@@ -21,14 +21,9 @@ import java.util.Map;
 import java.util.Set;
 
 import groovy.lang.Tuple2;
-import nextflow.script.ast.AssignmentExpression;
-import nextflow.script.ast.FunctionNode;
-import nextflow.script.ast.ScriptExpressionTransformer;
-import nextflow.script.ast.ScriptNode;
-import nextflow.script.ast.ScriptVisitorSupport;
-import nextflow.script.types.Types;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.ClassCodeExpressionTransformer;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.DynamicVariable;
@@ -49,12 +44,20 @@ import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.runtime.memoize.UnlimitedConcurrentCache;
 import org.codehaus.groovy.syntax.SyntaxException;
+import org.codehaus.groovy.syntax.Types;
 import org.codehaus.groovy.vmplugin.VMPluginFactory;
 
 import static groovy.lang.Tuple.tuple;
 import static org.codehaus.groovy.ast.tools.ClosureUtils.getParametersSafe;
 
-public class ResolveVisitor extends ScriptExpressionTransformer {
+/**
+ * Resolve the name of types and variables.
+ *
+ * See: org.codehaus.groovy.control.ResolveVisitor
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public class ResolveVisitor extends ClassCodeExpressionTransformer {
 
     public static final String[] DEFAULT_PACKAGE_PREFIXES = { "java.lang.", "java.util.", "java.io.", "java.net.", "groovy.lang.", "groovy.util." };
 
@@ -82,43 +85,6 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         return sourceUnit;
     }
 
-    public void visit() {
-        var moduleNode = sourceUnit.getAST();
-        if( !(moduleNode instanceof ScriptNode) )
-            return;
-        var scriptNode = (ScriptNode) moduleNode;
-
-        // initialize variable scopes
-        var variableScopeVisitor = new VariableScopeVisitor(sourceUnit);
-        variableScopeVisitor.declare();
-        variableScopeVisitor.visit();
-
-        // resolve type names
-        for( var paramNode : scriptNode.getParams() )
-            visitParam(paramNode);
-        for( var workflowNode : scriptNode.getWorkflows() )
-            visitWorkflow(workflowNode);
-        for( var processNode : scriptNode.getProcesses() )
-            visitProcess(processNode);
-        for( var functionNode : scriptNode.getFunctions() )
-            visitFunction(functionNode);
-        if( scriptNode.getOutput() != null )
-            visitOutput(scriptNode.getOutput());
-
-        // report errors for any unresolved variable references
-        new DynamicVariablesVisitor().visit(scriptNode);
-    }
-
-    @Override
-    public void visitFunction(FunctionNode node) {
-        for( var param : node.getParameters() ) {
-            param.setInitialExpression(transform(param.getInitialExpression()));
-            resolveOrFail(param.getType(), param.getType());
-        }
-        resolveOrFail(node.getReturnType(), node);
-        visit(node.getCode());
-    }
-
     @Override
     public void visitCatchStatement(CatchStatement cs) {
         resolveOrFail(cs.getExceptionType(), cs);
@@ -127,12 +93,12 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         super.visitCatchStatement(cs);
     }
 
-    protected void resolveOrFail(ClassNode type, ASTNode node) {
+    public void resolveOrFail(ClassNode type, ASTNode node) {
         if( !resolve(type) )
             addError("`" + type.toString(false) + "` is not defined", node);
     }
 
-    protected boolean resolve(ClassNode type) {
+    public boolean resolve(ClassNode type) {
         var genericsTypes = type.getGenericsTypes();
         resolveGenericsTypes(genericsTypes);
 
@@ -398,7 +364,7 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
 
     protected Expression transformBinaryExpression(BinaryExpression be) {
         var left = transform(be.getLeftExpression());
-        if( be instanceof AssignmentExpression && left instanceof ClassExpression ) {
+        if( Types.isAssignment(be.getOperation().getType()) && left instanceof ClassExpression ) {
             addError("`" + left.getType().getName() + "` is already defined as a type", be.getLeftExpression());
             return be;
         }
@@ -444,21 +410,6 @@ public class ResolveVisitor extends ScriptExpressionTransformer {
         var cause = new UnresolvedNameError(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
-    }
-
-    private class DynamicVariablesVisitor extends ScriptVisitorSupport {
-
-        @Override
-        protected SourceUnit getSourceUnit() {
-            return sourceUnit;
-        }
-
-        @Override
-        public void visitVariableExpression(VariableExpression node) {
-            var variable = node.getAccessedVariable();
-            if( variable instanceof DynamicVariable )
-                ResolveVisitor.this.addError("`" + node.getName() + "` is not defined", node);
-        }
     }
 
     private class UnresolvedNameError extends SyntaxException implements PhaseAware {

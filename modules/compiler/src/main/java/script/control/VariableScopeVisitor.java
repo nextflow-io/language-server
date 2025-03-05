@@ -15,12 +15,8 @@
  */
 package nextflow.script.control;
 
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
@@ -43,9 +39,7 @@ import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.DynamicVariable;
-import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.VariableScope;
@@ -66,10 +60,7 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
-import org.codehaus.groovy.control.messages.WarningMessage;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.syntax.SyntaxException;
-import org.codehaus.groovy.syntax.Token;
 import org.codehaus.groovy.syntax.Types;
 
 import static nextflow.script.ast.ASTHelpers.*;
@@ -81,22 +72,17 @@ import static nextflow.script.ast.ASTHelpers.*;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class VariableScopeVisitor extends ScriptVisitorSupport {
+class VariableScopeVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private Map<String,Variable> includes = new HashMap<>();
+    private VariableScopeChecker vsc;
 
     private MethodNode currentDefinition;
 
-    private VariableScope currentScope;
-
-    private Set<Variable> declaredVariables = Collections.newSetFromMap(new IdentityHashMap<>());
-
     public VariableScopeVisitor(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
-        this.currentScope = new VariableScope();
-        this.currentScope.setClassScope(new ClassNode(ScriptDsl.class));
+        this.vsc = new VariableScopeChecker(sourceUnit, new ClassNode(ScriptDsl.class));
     }
 
     @Override
@@ -123,26 +109,26 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     private void declareInclude(IncludeNode node) {
         for( var module : node.modules ) {
             var name = module.getName();
-            var otherInclude = includes.get(name);
+            var otherInclude = vsc.getInclude(name);
             if( otherInclude != null )
-                addError("`" + name + "` is already included", node, "First included here", (ASTNode) otherInclude);
-            includes.put(name, module);
+                vsc.addError("`" + name + "` is already included", node, "First included here", (ASTNode) otherInclude);
+            vsc.include(name, module);
         }
     }
 
     private void declareMethod(MethodNode mn) {
-        var cn = currentScope.getClassScope();
+        var cn = currentScope().getClassScope();
         var name = mn.getName();
-        var otherInclude = includes.get(name);
+        var otherInclude = vsc.getInclude(name);
         if( otherInclude != null ) {
-            addError("`" + name + "` is already included", mn, "First included here", (ASTNode) otherInclude);
+            vsc.addError("`" + name + "` is already included", mn, "First included here", (ASTNode) otherInclude);
         }
         var otherMethods = cn.getDeclaredMethods(name);
         if( otherMethods.size() > 0 ) {
             var other = otherMethods.get(0);
             var first = mn.getLineNumber() < other.getLineNumber() ? mn : other;
             var second = mn.getLineNumber() < other.getLineNumber() ? other : mn;
-            addError("`" + name + "` is already declared", second, "First declared here", first);
+            vsc.addError("`" + name + "` is already declared", second, "First declared here", first);
             return;
         }
         cn.addMethod(mn);
@@ -151,18 +137,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     public void visit() {
         var moduleNode = sourceUnit.getAST();
         if( moduleNode instanceof ScriptNode sn ) {
-            // visit top-level definitions
             super.visit(sn);
-
-            // warn about any unused local variables
-            for( var variable : declaredVariables ) {
-                if( variable instanceof ASTNode node && !variable.getName().startsWith("_") ) {
-                    var message = variable instanceof Parameter
-                        ? "Parameter was not used -- prefix with `_` to suppress warning"
-                        : "Variable was declared but not used";
-                    sourceUnit.addWarning(message, node);
-                }
-            }
+            vsc.checkUnusedVariables();
         }
     }
 
@@ -181,11 +157,11 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( result.isPresent() ) {
             var ffn = result.get();
             if( findAnnotation(ffn, Deprecated.class).isPresent() )
-                addFutureWarning("`" + node.name + "` is deprecated and will be removed in a future version", node.name, node);
+                vsc.addFutureWarning("`" + node.name + "` is deprecated and will be removed in a future version", node.name, node);
             node.target = ffn;
         }
         else {
-            addError("Unrecognized feature flag '" + node.name + "'", node);
+            vsc.addError("Unrecognized feature flag '" + node.name + "'", node);
         }
     }
 
@@ -193,9 +169,9 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitWorkflow(WorkflowNode node) {
-        pushState(node.isEntry() ? EntryWorkflowDsl.class : WorkflowDsl.class);
+        vsc.pushScope(node.isEntry() ? EntryWorkflowDsl.class : WorkflowDsl.class);
         currentDefinition = node;
-        node.setVariableScope(currentScope);
+        node.setVariableScope(currentScope());
 
         declareWorkflowInputs(node.takes);
 
@@ -207,7 +183,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         visit(node.publishers);
 
         currentDefinition = null;
-        popState();
+        vsc.popScope();
     }
 
     private void declareWorkflowInputs(Statement takes) {
@@ -215,14 +191,14 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             var varX = asVarX(stmt);
             if( varX == null )
                 continue;
-            declare(varX);
+            vsc.declare(varX);
         }
     }
 
     private void copyVariableScope(VariableScope source) {
         for( var it = source.getDeclaredVariablesIterator(); it.hasNext(); ) {
             var variable = it.next();
-            currentScope.putDeclaredVariable(variable);
+            currentScope().putDeclaredVariable(variable);
         }
     }
 
@@ -238,7 +214,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                 var name = target.getName();
                 var other = declaredEmits.get(name);
                 if( other != null )
-                    addError("Workflow emit `" + name + "` is already declared", target, "First declared here", other);
+                    vsc.addError("Workflow emit `" + name + "` is already declared", target, "First declared here", other);
                 else
                     declaredEmits.put(name, target);
             }
@@ -250,33 +226,33 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitProcess(ProcessNode node) {
-        pushState(ProcessDsl.class);
+        vsc.pushScope(ProcessDsl.class);
         currentDefinition = node;
-        node.setVariableScope(currentScope);
+        node.setVariableScope(currentScope());
 
         declareProcessInputs(node.inputs);
 
-        pushState(ProcessDsl.InputDsl.class);
+        vsc.pushScope(ProcessDsl.InputDsl.class);
         visitDirectives(node.inputs, "process input qualifier", false);
-        popState();
+        vsc.popScope();
 
         if( !(node.when instanceof EmptyExpression) )
-            addFutureWarning("Process `when` section will not be supported in a future version", node.when);
+            vsc.addFutureWarning("Process `when` section will not be supported in a future version", node.when);
         visit(node.when);
 
         visit(node.exec);
         visit(node.stub);
 
-        pushState(ProcessDsl.DirectiveDsl.class);
+        vsc.pushScope(ProcessDsl.DirectiveDsl.class);
         visitDirectives(node.directives, "process directive", false);
-        popState();
+        vsc.popScope();
 
-        pushState(ProcessDsl.OutputDsl.class);
+        vsc.pushScope(ProcessDsl.OutputDsl.class);
         visitDirectives(node.outputs, "process output qualifier", false);
-        popState();
+        vsc.popScope();
 
         currentDefinition = null;
-        popState();
+        vsc.popScope();
     }
 
     private void declareProcessInputs(Statement inputs) {
@@ -298,7 +274,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
                 if( firstArg instanceof MethodCallExpression mce )
                     declareProcessInput(mce);
                 else if( firstArg instanceof VariableExpression ve )
-                    declare(ve);
+                    vsc.declare(ve);
             }
             else {
                 declareProcessInput(call);
@@ -315,12 +291,12 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         if( args.isEmpty() )
             return;
         if( args.get(args.size() - 1) instanceof VariableExpression ve )
-            declare(ve);
+            vsc.declare(ve);
     }
 
     private void visitDirectives(Statement node, String typeLabel, boolean checkSyntaxErrors) {
         if( node instanceof BlockStatement block )
-            block.setVariableScope(currentScope);
+            block.setVariableScope(currentScope());
         for( var stmt : asBlockStatements(node) ) {
             var call = checkDirective(stmt, typeLabel, checkSyntaxErrors);
             if( call != null )
@@ -336,11 +312,11 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             return null;
         }
         var name = call.getMethodAsString();
-        var variable = findDslMember(currentScope.getClassScope(), name, call.getMethod());
+        var variable = vsc.findDslMember(currentScope().getClassScope(), name, call.getMethod());
         if( variable != null )
-            currentScope.putReferencedClassVariable(variable);
+            currentScope().putReferencedClassVariable(variable);
         else
-            addError("Invalid " + typeLabel + " `" + name + "`", node);
+            vsc.addError("Invalid " + typeLabel + " `" + name + "`", node);
         return call;
     }
 
@@ -348,7 +324,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitMapEntryExpression(MapEntryExpression node) {
-        var classScope = currentScope.getClassScope();
+        var classScope = currentScope().getClassScope();
         if( classScope != null && classScope.getTypeClass() == ProcessDsl.OutputDsl.class ) {
             var key = node.getKeyExpression();
             if( key instanceof ConstantExpression && EMIT_AND_TOPIC.contains(key.getText()) )
@@ -359,19 +335,19 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitFunction(FunctionNode node) {
-        pushState();
+        vsc.pushScope();
         currentDefinition = node;
-        node.setVariableScope(currentScope);
+        node.setVariableScope(currentScope());
 
         for( var parameter : node.getParameters() ) {
             if( parameter.hasInitialExpression() )
                 visit(parameter.getInitialExpression());
-            declare(parameter, node);
+            vsc.declare(parameter, node);
         }
         visit(node.getCode());
 
         currentDefinition = null;
-        popState();
+        vsc.popScope();
     }
 
     @Override
@@ -381,7 +357,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     }
 
     private void visitOutputBody(BlockStatement block) {
-        block.setVariableScope(currentScope);
+        block.setVariableScope(currentScope());
 
         asDirectives(block).forEach((call) -> {
             var code = asDslBlock(call, 1);
@@ -391,8 +367,8 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     }
 
     private void visitTargetBody(BlockStatement block) {
-        pushState(OutputDsl.class);
-        block.setVariableScope(currentScope);
+        vsc.pushScope(OutputDsl.class);
+        block.setVariableScope(currentScope());
 
         asBlockStatements(block).forEach((stmt) -> {
             // validate target directive
@@ -405,9 +381,9 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             if( "index".equals(name) ) {
                 var code = asDslBlock(call, 1);
                 if( code != null ) {
-                    pushState(OutputDsl.IndexDsl.class);
+                    vsc.pushScope(OutputDsl.IndexDsl.class);
                     visitDirectives(code, "output index directive", true);
-                    popState();
+                    vsc.popScope();
                     return;
                 }
             }
@@ -415,7 +391,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
             // treat as regular directive
             super.visitMethodCallExpression(call);
         });
-        popState();
+        vsc.popScope();
     }
 
     // statements
@@ -423,18 +399,18 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     @Override
     public void visitBlockStatement(BlockStatement node) {
         var newScope = node.getVariableScope() != null;
-        if( newScope ) pushState();
-        node.setVariableScope(currentScope);
+        if( newScope ) vsc.pushScope();
+        node.setVariableScope(currentScope());
         super.visitBlockStatement(node);
-        if( newScope ) popState();
+        if( newScope ) vsc.popScope();
     }
 
     @Override
     public void visitCatchStatement(CatchStatement node) {
-        pushState();
-        declare(node.getVariable(), node);
+        vsc.pushScope();
+        vsc.declare(node.getVariable(), node);
         super.visitCatchStatement(node);
-        popState();
+        vsc.popScope();
     }
 
     @Override
@@ -479,10 +455,10 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     }
 
     private boolean declareAssignedVariable(VariableExpression ve) {
-        var variable = findVariableDeclaration(ve.getName(), ve);
+        var variable = vsc.findVariableDeclaration(ve.getName(), ve);
         if( variable != null ) {
             if( isBuiltinVariable(variable) )
-                addError("Built-in variable cannot be re-assigned", ve);
+                vsc.addError("Built-in variable cannot be re-assigned", ve);
             else
                 checkExternalWriteInAsyncClosure(ve, variable);
             ve.setAccessedVariable(variable);
@@ -491,14 +467,14 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         else if( currentDefinition instanceof ProcessNode || currentDefinition instanceof WorkflowNode ) {
             if( currentClosure != null )
                 addError("Variables in a closure should be declared with `def`", ve);
-            var scope = currentScope;
-            currentScope = currentDefinition.getVariableScope();
-            declare(ve);
-            currentScope = scope;
+            var scope = currentScope();
+            currentScope(currentDefinition.getVariableScope());
+            vsc.declare(ve);
+            currentScope(scope);
             return true;
         }
         else {
-            addError("`" + ve.getName() + "` was assigned but not declared", ve);
+            vsc.addError("`" + ve.getName() + "` was assigned but not declared", ve);
             return true;
         }
     }
@@ -528,7 +504,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         }
         if( target == null )
             return;
-        var variable = findVariableDeclaration(target.getName(), target);
+        var variable = vsc.findVariableDeclaration(target.getName(), target);
         if( isBuiltinVariable(variable) ) {
             if( "params".equals(variable.getName()) )
                 sourceUnit.addWarning("Params should be declared at the top-level (i.e. outside the workflow)", target);
@@ -550,7 +526,7 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var name = variable.getName();
         // TODO: should apply only to operator closures
         if( scope.isReferencedLocalVariable(name) && scope.getDeclaredVariable(name) == null )
-            addFutureWarning("Mutating an external variable in an operator closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
+            vsc.addFutureWarning("Mutating an external variable in an operator closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
     }
 
     // expressions
@@ -572,10 +548,10 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         }
         if( node.isImplicitThis() && node.getMethod() instanceof ConstantExpression ) {
             var name = node.getMethodAsString();
-            var variable = findVariableDeclaration(name, node);
+            var variable = vsc.findVariableDeclaration(name, node);
             if( variable == null ) {
                 if( !KEYWORDS.contains(name) )
-                    addError("`" + name + "` is not defined", node.getMethod());
+                    vsc.addError("`" + name + "` is not defined", node.getMethod());
             }
         }
         super.visitMethodCallExpression(node);
@@ -602,10 +578,10 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
         if( node.isMultipleAssignmentDeclaration() ) {
             for( var el : node.getTupleExpression() )
-                declare((VariableExpression) el);
+                vsc.declare((VariableExpression) el);
         }
         else {
-            declare(node.getVariableExpression());
+            vsc.declare(node.getVariableExpression());
         }
     }
 
@@ -616,21 +592,21 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
         var cl = currentClosure;
         currentClosure = node;
 
-        pushState();
-        node.setVariableScope(currentScope);
+        vsc.pushScope();
+        node.setVariableScope(currentScope());
         if( node.getParameters() != null ) {
             for( var parameter : node.getParameters() ) {
-                declare(parameter, parameter);
+                vsc.declare(parameter, parameter);
                 if( parameter.hasInitialExpression() )
                     visit(parameter.getInitialExpression());
             }
         }
         super.visitClosureExpression(node);
-        for( var it = currentScope.getReferencedLocalVariablesIterator(); it.hasNext(); ) {
+        for( var it = currentScope().getReferencedLocalVariablesIterator(); it.hasNext(); ) {
             var variable = it.next();
             variable.setClosureSharedVariable(true);
         }
-        popState();
+        vsc.popScope();
 
         currentClosure = cl;
     }
@@ -638,16 +614,16 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
     @Override
     public void visitVariableExpression(VariableExpression node) {
         var name = node.getName();
-        Variable variable = findVariableDeclaration(name, node);
+        Variable variable = vsc.findVariableDeclaration(name, node);
         if( variable == null ) {
             if( "it".equals(name) ) {
-                addFutureWarning("Implicit closure parameter `it` will not be supported in a future version", node);
+                vsc.addFutureWarning("Implicit closure parameter `it` will not be supported in a future version", node);
             }
             else if( "args".equals(name) ) {
-                addFutureWarning("The use of `args` outside the entry workflow will not be supported in a future version", node);
+                vsc.addFutureWarning("The use of `args` outside the entry workflow will not be supported in a future version", node);
             }
             else if( "params".equals(name) ) {
-                addFutureWarning("The use of `params` outside the entry workflow will not be supported in a future version", node);
+                vsc.addFutureWarning("The use of `params` outside the entry workflow will not be supported in a future version", node);
             }
             else {
                 variable = new DynamicVariable(name, false);
@@ -677,195 +653,18 @@ public class VariableScopeVisitor extends ScriptVisitorSupport {
 
     // helpers
 
-    private void pushState(Class classScope) {
-        currentScope = new VariableScope(currentScope);
-        if( classScope != null )
-            currentScope.setClassScope(ClassHelper.makeCached(classScope));
+    private VariableScope currentScope() {
+        return vsc.getCurrentScope();
     }
 
-    private void pushState() {
-        pushState(null);
+    private void currentScope(VariableScope scope) {
+        vsc.setCurrentScope(scope);
     }
 
-    private void popState() {
-        currentScope = currentScope.getParent();
-    }
-
-    private void declare(VariableExpression variable) {
-        declare(variable, variable);
-        variable.setAccessedVariable(variable);
-    }
-
-    private void declare(Variable variable, ASTNode context) {
-        var name = variable.getName();
-        for( var scope = currentScope; scope != null; scope = scope.getParent() ) {
-            var other = scope.getDeclaredVariable(name);
-            if( other != null ) {
-                addError("`" + name + "` is already declared", context, "First declared here", (ASTNode) other);
-                break;
-            }
-        }
-        currentScope.putDeclaredVariable(variable);
-        declaredVariables.add(variable);
-    }
-
-    /**
-     * Find the declaration of a given variable.
-     *
-     * @param name
-     * @param node
-     */
-    private Variable findVariableDeclaration(String name, ASTNode node) {
-        Variable variable = null;
-        VariableScope scope = currentScope;
-        boolean isClassVariable = false;
-        while( scope != null ) {
-            variable = scope.getDeclaredVariable(name);
-            if( variable != null )
-                break;
-            variable = scope.getReferencedLocalVariable(name);
-            if( variable != null )
-                break;
-            variable = scope.getReferencedClassVariable(name);
-            if( variable != null ) {
-                isClassVariable = true;
-                break;
-            }
-            variable = findDslMember(scope.getClassScope(), name, node);
-            if( variable != null ) {
-                isClassVariable = true;
-                break;
-            }
-            variable = includes.get(name);
-            if( variable != null ) {
-                isClassVariable = true;
-                break;
-            }
-            scope = scope.getParent();
-        }
-        if( variable == null )
-            return null;
-        VariableScope end = scope;
-        scope = currentScope;
-        while( true ) {
-            if( isClassVariable )
-                scope.putReferencedClassVariable(variable);
-            else
-                scope.putReferencedLocalVariable(variable);
-            if( scope == end )
-                break;
-            scope = scope.getParent();
-        }
-        declaredVariables.remove(variable);
-        return variable;
-    }
-
-    private Variable findDslMember(ClassNode cn, String name, ASTNode node) {
-        while( cn != null ) {
-            for( var mn : cn.getMethods() ) {
-                var an = findAnnotation(mn, Constant.class);
-                var memberName = an.isPresent()
-                    ? an.get().getMember("value").getText()
-                    : mn.getName();
-                if( !name.equals(memberName) )
-                    continue;
-                if( findAnnotation(mn, Deprecated.class).isPresent() )
-                    addFutureWarning("`" + name + "` is deprecated and will be removed in a future version", node);
-                return wrapMethodAsVariable(mn, memberName);
-            }
-
-            cn = cn.getInterfaces().length > 0
-                ? cn.getInterfaces()[0]
-                : null;
-        }
-
-        return null;
-    }
-
-    private Variable wrapMethodAsVariable(MethodNode mn, String name) {
-        var cn = mn.getDeclaringClass();
-        var fn = new FieldNode(name, mn.getModifiers() & 0xF, mn.getReturnType(), cn, null);
-        fn.setHasNoRealSourcePosition(true);
-        fn.setDeclaringClass(cn);
-        fn.setSynthetic(true);
-        var pn = new PropertyNode(fn, fn.getModifiers(), null, null);
-        pn.putNodeMetaData("access.method", mn);
-        pn.setDeclaringClass(cn);
-        return pn;
-    }
-
-    protected void addSyntaxError(String message, ASTNode node) {
+    public void addSyntaxError(String message, ASTNode node) {
         var cause = new SyntaxException(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
-    }
-
-    protected void addFutureWarning(String message, String tokenText, ASTNode node, String otherMessage, ASTNode otherNode) {
-        var token = new Token(0, tokenText, node.getLineNumber(), node.getColumnNumber()); // ASTNode to CSTNode
-        var warning = new FutureWarning(WarningMessage.POSSIBLE_ERRORS, message, token, sourceUnit);
-        if( otherNode != null )
-            warning.setRelatedInformation(otherMessage, otherNode);
-        sourceUnit.getErrorCollector().addWarning(warning);
-    }
-
-    protected void addFutureWarning(String message, ASTNode node, String otherMessage, ASTNode otherNode) {
-        addFutureWarning(message, "", node, otherMessage, otherNode);
-    }
-
-    protected void addFutureWarning(String message, String tokenText, ASTNode node) {
-        addFutureWarning(message, tokenText, node, null, null);
-    }
-
-    protected void addFutureWarning(String message, ASTNode node) {
-        addFutureWarning(message, "", node, null, null);
-    }
-
-    @Override
-    public void addError(String message, ASTNode node) {
-        addError(new VariableScopeError(message, node));
-    }
-
-    protected void addError(String message, ASTNode node, String otherMessage, ASTNode otherNode) {
-        var cause = new VariableScopeError(message, node);
-        if( otherNode != null )
-            cause.setRelatedInformation(otherMessage, otherNode);
-        addError(cause);
-    }
-
-    protected void addError(SyntaxException cause) {
-        var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
-        sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
-    }
-
-    private class VariableScopeError extends SyntaxException implements PhaseAware, RelatedInformationAware {
-
-        private String otherMessage;
-
-        private ASTNode otherNode;
-
-        public VariableScopeError(String message, ASTNode node) {
-            super(message, node);
-        }
-
-        public void setRelatedInformation(String otherMessage, ASTNode otherNode) {
-            this.otherMessage = otherMessage;
-            this.otherNode = otherNode;
-        }
-
-        @Override
-        public int getPhase() {
-            return Phases.NAME_RESOLUTION;
-        }
-
-        @Override
-        public String getOtherMessage() {
-            return otherMessage;
-        }
-
-        @Override
-        public ASTNode getOtherNode() {
-            return otherNode;
-        }
     }
 
     private static final String IMPLICIT_DECLARATION = "_IMPLICIT_DECLARATION";

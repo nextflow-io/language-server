@@ -27,6 +27,7 @@ import nextflow.config.ast.ConfigIncludeNode;
 import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigVisitorSupport;
+import nextflow.config.control.ConfigResolveVisitor;
 import nextflow.config.parser.ConfigParserPluginFactory;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTParentVisitor;
@@ -105,8 +106,10 @@ public class ConfigAstCache extends ASTNodeCache {
         var sourceUnit = compiler.compile(uri, fileCache);
 
         // phase 2: name resolution
-        if( sourceUnit != null )
+        if( sourceUnit != null ) {
+            new ConfigResolveVisitor(sourceUnit, compilationUnit).visit();
             new ConfigSchemaVisitor(sourceUnit).visit();
+        }
         return sourceUnit;
     }
 

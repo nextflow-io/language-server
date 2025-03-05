@@ -23,6 +23,8 @@ import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.dsl.ConfigSchema;
 import nextflow.lsp.ast.ASTNodeCache;
+import nextflow.lsp.ast.ASTNodeStringUtils;
+import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.HoverProvider;
 import nextflow.lsp.util.Logger;
 import org.codehaus.groovy.ast.ASTNode;
@@ -63,10 +65,9 @@ public class ConfigHoverProvider implements HoverProvider {
         if( nodeStack.isEmpty() )
             return null;
 
-        var content = getHoverContent(nodeStack);
-
         var builder = new StringBuilder();
 
+        var content = getHoverContent(nodeStack);
         if( content != null ) {
             builder.append(content);
             builder.append('\n');
@@ -124,6 +125,26 @@ public class ConfigHoverProvider implements HoverProvider {
             else if( Logger.isDebugEnabled() ) {
                 return "`" + String.join(".", names) + "`";
             }
+        }
+
+        var defNode = ASTUtils.getDefinition(offsetNode, ast);
+        if( defNode != null ) {
+            var builder = new StringBuilder();
+
+            var label = ASTNodeStringUtils.getLabel(defNode);
+            if( label != null ) {
+                builder.append("```nextflow\n");
+                builder.append(label);
+                builder.append("\n```");
+            }
+    
+            var documentation = ASTNodeStringUtils.getDocumentation(defNode);
+            if( documentation != null ) {
+                builder.append("\n\n---\n\n");
+                builder.append(documentation);
+            }
+
+            return builder.toString();
         }
 
         return null;
