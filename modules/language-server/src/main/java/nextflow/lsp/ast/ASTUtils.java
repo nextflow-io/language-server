@@ -153,7 +153,7 @@ public class ASTUtils {
         }
 
         if( node instanceof PropertyExpression pe ) {
-            var mn = asMethodOutput(pe, ast);
+            var mn = asMethodOutput(pe);
             if( mn instanceof ProcessNode pn )
                 return asProcessOut(pn);
             if( mn instanceof WorkflowNode wn )
@@ -186,9 +186,9 @@ public class ASTUtils {
             : null;
     }
 
-    private static MethodNode asMethodOutput(PropertyExpression node, ASTNodeCache ast) {
+    private static MethodNode asMethodOutput(PropertyExpression node) {
         if( node.getObjectExpression() instanceof VariableExpression ve && "out".equals(node.getPropertyAsString()) ) {
-            var defNode = ASTUtils.getDefinition(ve, ast);
+            var defNode = getDefinitionFromVariable(ve.getAccessedVariable());
             if( defNode instanceof MethodNode mn )
                 return mn;
         }
@@ -284,6 +284,9 @@ public class ASTUtils {
      * @param argIndex
      */
     public static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache ast, int argIndex) {
+        var target = (MethodNode) ((ASTNode) node).getNodeMetaData(METHOD_TARGET);
+        if( target != null )
+            return target;
         var methods = getMethodOverloadsFromCallExpression(node, ast);
         var arguments = (ArgumentListExpression) node.getArguments();
         return methods.stream()
@@ -406,4 +409,5 @@ public class ASTUtils {
         return null;
     }
 
+    private static final String METHOD_TARGET = "_METHOD_TARGET";
 }

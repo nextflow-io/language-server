@@ -40,7 +40,7 @@ class LanguageServerErrorCollectorTest extends Specification {
         collector.addErrorAndContinue(makeErrorWithPhase(Phases.SYNTAX))
         collector.addErrorAndContinue(makeErrorWithPhase(Phases.INCLUDE_RESOLUTION))
         collector.addErrorAndContinue(makeErrorWithPhase(Phases.NAME_RESOLUTION))
-        collector.addErrorAndContinue(makeErrorWithPhase(Phases.TYPE_INFERENCE))
+        collector.addErrorAndContinue(makeErrorWithPhase(Phases.TYPE_CHECKING))
         and:
         collector.updatePhase(Phases.INCLUDE_RESOLUTION, [ newError ])
         then:

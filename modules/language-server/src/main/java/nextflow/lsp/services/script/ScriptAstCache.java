@@ -36,6 +36,7 @@ import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.control.ScriptResolveVisitor;
+import nextflow.script.control.TypeCheckingVisitor;
 import nextflow.script.parser.ScriptParserPluginFactory;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
@@ -109,8 +110,7 @@ public class ScriptAstCache extends ASTNodeCache {
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;
             // phase 4: type checking
-            var visitor = new MethodCallVisitor(sourceUnit, this);
-            visitor.visit();
+            new TypeCheckingVisitor(sourceUnit).visit();
         }
 
         return changedUris;

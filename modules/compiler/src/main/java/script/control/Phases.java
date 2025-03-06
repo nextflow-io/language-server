@@ -23,7 +23,7 @@ public class Phases {
     public static final int SYNTAX = 1;
     public static final int INCLUDE_RESOLUTION = 2;
     public static final int NAME_RESOLUTION = 3;
-    public static final int TYPE_INFERENCE = 4;
+    public static final int TYPE_CHECKING = 4;
 
-    public static final int ALL = TYPE_INFERENCE;
+    public static final int ALL = TYPE_CHECKING;
 }

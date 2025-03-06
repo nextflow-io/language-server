@@ -22,6 +22,7 @@ import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
+import nextflow.script.ast.IncludeVariable;
 import nextflow.script.ast.OutputNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
@@ -546,14 +547,7 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
             declareAssignedVariable(target);
             return;
         }
-        if( node.isImplicitThis() && node.getMethod() instanceof ConstantExpression ) {
-            var name = node.getMethodAsString();
-            var variable = vsc.findVariableDeclaration(name, node);
-            if( variable == null ) {
-                if( !KEYWORDS.contains(name) )
-                    vsc.addError("`" + name + "` is not defined", node.getMethod());
-            }
-        }
+        checkMethodCall(node);
         super.visitMethodCallExpression(node);
     }
 
@@ -570,6 +564,43 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         if( code == null || code.getStatements().size() != 1 )
             return null;
         return asVarX(code.getStatements().get(0));
+    }
+
+    private void checkMethodCall(MethodCallExpression node) {
+        if( !node.isImplicitThis() )
+            return;
+        var name = node.getMethodAsString();
+        var variable = vsc.findVariableDeclaration(name, node);
+        var defNode = methodFromVariable(variable);
+        if( defNode == null ) {
+            if( !KEYWORDS.contains(name) )
+                vsc.addError("`" + name + "` is not defined", node.getMethod());
+            return;
+        }
+        if( defNode instanceof ProcessNode || defNode instanceof WorkflowNode )
+            checkProcessOrWorkflowCall(node, defNode);
+    }
+
+    private static MethodNode methodFromVariable(Variable variable) {
+        if( variable instanceof IncludeVariable iv )
+            return iv.getMethod();
+        if( variable instanceof PropertyNode pn )
+            return (MethodNode) pn.getNodeMetaData("access.method");
+        return null;
+    }
+
+    private void checkProcessOrWorkflowCall(MethodCallExpression node, MethodNode defNode) {
+        if( !(currentDefinition instanceof WorkflowNode) ) {
+            var type = defNode instanceof ProcessNode ? "Processes" : "Workflows";
+            vsc.addError(type + " can only be called from a workflow", node);
+            return;
+        }
+        if( currentClosure != null ) {
+            var type = defNode instanceof ProcessNode ? "Processes" : "Workflows";
+            vsc.addError(type + " cannot be called from within a closure", node);
+            return;
+        }
+        node.putNodeMetaData(METHOD_TARGET, defNode);
     }
 
     @Override
@@ -668,5 +699,6 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
     }
 
     private static final String IMPLICIT_DECLARATION = "_IMPLICIT_DECLARATION";
+    private static final String METHOD_TARGET = "_METHOD_TARGET";
 
 }

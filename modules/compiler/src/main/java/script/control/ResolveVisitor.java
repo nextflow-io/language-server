@@ -384,6 +384,7 @@ public class ResolveVisitor extends ClassCodeExpressionTransformer {
         result.setImplicitThis(mce.isImplicitThis());
         result.setSpreadSafe(mce.isSpreadSafe());
         result.setSafe(mce.isSafe());
+        result.copyNodeMetaData(mce);
         return result;
     }
 

@@ -13,22 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services.script;
+package nextflow.script.control;
 
 import java.util.Optional;
 
-import nextflow.lsp.ast.ASTUtils;
 import nextflow.script.ast.AssignmentExpression;
+import nextflow.script.ast.IncludeVariable;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.control.PhaseAware;
-import nextflow.script.control.Phases;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.expr.BinaryExpression;
-import org.codehaus.groovy.ast.expr.ClosureExpression;
+import org.codehaus.groovy.ast.PropertyNode;
+import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
@@ -41,19 +39,16 @@ import org.codehaus.groovy.syntax.SyntaxException;
 import static nextflow.script.ast.ASTHelpers.*;
 
 /**
- * Validate process and workflow invocations.
+ * Validate types where possible.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class MethodCallVisitor extends ScriptVisitorSupport {
+public class TypeCheckingVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private ScriptAstCache astCache;
-
-    public MethodCallVisitor(SourceUnit sourceUnit, ScriptAstCache astCache) {
+    public TypeCheckingVisitor(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
-        this.astCache = astCache;
     }
 
     @Override
@@ -67,44 +62,22 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
             visit(sn);
     }
 
-    private boolean inWorkflow;
-
-    @Override
-    public void visitWorkflow(WorkflowNode node) {
-        inWorkflow = true;
-        super.visitWorkflow(node);
-        inWorkflow = false;
-    }
-
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
-        checkMethodCall(node);
+        var defNode = (MethodNode) node.getNodeMetaData(METHOD_TARGET);
+        if( defNode instanceof ProcessNode || defNode instanceof WorkflowNode )
+            checkMethodCallArguments(node, defNode);
         super.visitMethodCallExpression(node);
     }
 
-    protected void checkMethodCall(MethodCallExpression node) {
-        var defNode = ASTUtils.getMethodFromCallExpression(node, astCache);
-        if( defNode == null )
-            return;
-        if( !(defNode instanceof ProcessNode) && !(defNode instanceof WorkflowNode) )
-            return;
-        if( !inWorkflow ) {
-            var type = defNode instanceof ProcessNode ? "Processes" : "Workflows";
-            addError(type + " can only be called from a workflow", node);
-            return;
-        }
-        if( inClosure ) {
-            var type = defNode instanceof ProcessNode ? "Processes" : "Workflows";
-            addError(type + " cannot be called from within a closure", node);
-            return;
-        }
+    private void checkMethodCallArguments(MethodCallExpression node, MethodNode defNode) {
         var argsCount = asMethodCallArguments(node).size();
-        var paramsCount = getNumberOfParameters(defNode);
+        var paramsCount = numberOfParameters(defNode);
         if( argsCount != paramsCount )
             addError(String.format("Incorrect number of call arguments, expected %d but received %d", paramsCount, argsCount), node);
     }
 
-    protected static int getNumberOfParameters(MethodNode node) {
+    private static int numberOfParameters(MethodNode node) {
         if( node instanceof ProcessNode pn ) {
             return (int) asBlockStatements(pn.inputs).size();
         }
@@ -112,16 +85,6 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
             return (int) asBlockStatements(wn.takes).size();
         }
         return node.getParameters().length;
-    }
-
-    private boolean inClosure;
-
-    @Override
-    public void visitClosureExpression(ClosureExpression node) {
-        var ic = inClosure;
-        inClosure = true;
-        super.visitClosureExpression(node);
-        inClosure = ic;
     }
 
     @Override
@@ -137,12 +100,17 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
 
     private MethodNode asMethodOutput(PropertyExpression node) {
         if( node.getObjectExpression() instanceof PropertyExpression pe ) {
-            if( pe.getObjectExpression() instanceof VariableExpression ve && "out".equals(pe.getPropertyAsString()) ) {
-                var defNode = ASTUtils.getDefinition(ve, astCache);
-                if( defNode instanceof MethodNode mn )
-                    return mn;
-            }
+            if( pe.getObjectExpression() instanceof VariableExpression ve && "out".equals(pe.getPropertyAsString()) )
+                return methodFromVariable(ve.getAccessedVariable());
         }
+        return null;
+    }
+
+    private static MethodNode methodFromVariable(Variable variable) {
+        if( variable instanceof IncludeVariable iv )
+            return iv.getMethod();
+        if( variable instanceof PropertyNode pn )
+            return (MethodNode) pn.getNodeMetaData("access.method");
         return null;
     }
 
@@ -194,20 +162,22 @@ public class MethodCallVisitor extends ScriptVisitorSupport {
 
     @Override
     public void addError(String message, ASTNode node) {
-        var cause = new MethodCallError(message, node);
+        var cause = new TypeError(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class MethodCallError extends SyntaxException implements PhaseAware {
+    private class TypeError extends SyntaxException implements PhaseAware {
 
-        public MethodCallError(String message, ASTNode node) {
+        public TypeError(String message, ASTNode node) {
             super(message, node);
         }
 
         @Override
         public int getPhase() {
-            return Phases.TYPE_INFERENCE;
+            return Phases.TYPE_CHECKING;
         }
     }
+
+    private static final String METHOD_TARGET = "_METHOD_TARGET";
 }
