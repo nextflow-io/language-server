@@ -21,58 +21,15 @@ import java.util.Map;
 import java.util.Set;
 
 import groovy.lang.GroovyClassLoader;
-import nextflow.config.ast.ConfigAssignNode;
-import nextflow.config.ast.ConfigBlockNode;
-import nextflow.config.ast.ConfigIncludeNode;
-import nextflow.config.ast.ConfigIncompleteNode;
-import nextflow.config.ast.ConfigNode;
-import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.control.ConfigResolveVisitor;
 import nextflow.config.control.ResolveIncludeVisitor;
 import nextflow.config.parser.ConfigParserPluginFactory;
 import nextflow.lsp.ast.ASTNodeCache;
-import nextflow.lsp.ast.ASTParentVisitor;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
-import nextflow.lsp.file.FileCache;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.ast.expr.BinaryExpression;
-import org.codehaus.groovy.ast.expr.BitwiseNegationExpression;
-import org.codehaus.groovy.ast.expr.BooleanExpression;
-import org.codehaus.groovy.ast.expr.CastExpression;
-import org.codehaus.groovy.ast.expr.ClassExpression;
-import org.codehaus.groovy.ast.expr.ClosureExpression;
-import org.codehaus.groovy.ast.expr.ConstantExpression;
-import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
-import org.codehaus.groovy.ast.expr.ElvisOperatorExpression;
-import org.codehaus.groovy.ast.expr.FieldExpression;
-import org.codehaus.groovy.ast.expr.GStringExpression;
-import org.codehaus.groovy.ast.expr.ListExpression;
-import org.codehaus.groovy.ast.expr.MapEntryExpression;
-import org.codehaus.groovy.ast.expr.MapExpression;
-import org.codehaus.groovy.ast.expr.MethodCallExpression;
-import org.codehaus.groovy.ast.expr.NotExpression;
-import org.codehaus.groovy.ast.expr.PropertyExpression;
-import org.codehaus.groovy.ast.expr.RangeExpression;
-import org.codehaus.groovy.ast.expr.StaticMethodCallExpression;
-import org.codehaus.groovy.ast.expr.TernaryExpression;
-import org.codehaus.groovy.ast.expr.TupleExpression;
-import org.codehaus.groovy.ast.expr.UnaryMinusExpression;
-import org.codehaus.groovy.ast.expr.UnaryPlusExpression;
-import org.codehaus.groovy.ast.expr.VariableExpression;
-import org.codehaus.groovy.ast.stmt.AssertStatement;
-import org.codehaus.groovy.ast.stmt.BlockStatement;
-import org.codehaus.groovy.ast.stmt.CatchStatement;
-import org.codehaus.groovy.ast.stmt.EmptyStatement;
-import org.codehaus.groovy.ast.stmt.ExpressionStatement;
-import org.codehaus.groovy.ast.stmt.IfStatement;
-import org.codehaus.groovy.ast.stmt.ReturnStatement;
-import org.codehaus.groovy.ast.stmt.ThrowStatement;
-import org.codehaus.groovy.ast.stmt.TryCatchStatement;
-import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -98,13 +55,6 @@ public class ConfigAstCache extends ASTNodeCache {
         config.setPluginFactory(new ConfigParserPluginFactory());
         config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
         return config;
-    }
-
-    @Override
-    protected Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit) {
-        var visitor = new Visitor(sourceUnit);
-        visitor.visit();
-        return visitor.getParents();
     }
 
     @Override
@@ -140,6 +90,13 @@ public class ConfigAstCache extends ASTNodeCache {
         return changedUris;
     }
 
+    @Override
+    protected Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit) {
+        var visitor = new ConfigAstParentVisitor(sourceUnit);
+        visitor.visit();
+        return visitor.getParents();
+    }
+
     /**
      * Check whether a source file has any errors.
      *
@@ -150,76 +107,6 @@ public class ConfigAstCache extends ASTNodeCache {
             .filter(error -> error instanceof PhaseAware pa ? pa.getPhase() == Phases.SYNTAX : true)
             .findFirst()
             .isPresent();
-    }
-
-    private static class Visitor extends ConfigVisitorSupport {
-
-        private SourceUnit sourceUnit;
-
-        private ASTParentVisitor lookup = new ASTParentVisitor();
-
-        public Visitor(SourceUnit sourceUnit) {
-            this.sourceUnit = sourceUnit;
-        }
-
-        @Override
-        protected SourceUnit getSourceUnit() {
-            return sourceUnit;
-        }
-
-        public void visit() {
-            var moduleNode = sourceUnit.getAST();
-            if( moduleNode instanceof ConfigNode cn )
-                super.visit(cn);
-        }
-
-        public Map<ASTNode, ASTNode> getParents() {
-            return lookup.getParents();
-        }
-
-        @Override
-        public void visitConfigAssign(ConfigAssignNode node) {
-            lookup.push(node);
-            try {
-                lookup.visit(node.value);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitConfigBlock(ConfigBlockNode node) {
-            lookup.push(node);
-            try {
-                super.visitConfigBlock(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitConfigInclude(ConfigIncludeNode node) {
-            lookup.push(node);
-            try {
-                lookup.visit(node.source);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitConfigIncomplete(ConfigIncompleteNode node) {
-            lookup.push(node);
-            try {
-                super.visitConfigIncomplete(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
     }
 
 }

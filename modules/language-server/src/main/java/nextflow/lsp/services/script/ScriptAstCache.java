@@ -25,18 +25,12 @@ import java.util.Set;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.ast.ASTNodeCache;
-import nextflow.lsp.ast.ASTParentVisitor;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
-import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
-import nextflow.script.ast.IncludeVariable;
-import nextflow.script.ast.OutputNode;
-import nextflow.script.ast.ParamNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
-import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
@@ -46,7 +40,6 @@ import nextflow.script.parser.ScriptParserPluginFactory;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
@@ -88,13 +81,6 @@ public class ScriptAstCache extends ASTNodeCache {
     }
 
     @Override
-    protected Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit) {
-        var visitor = new Visitor(sourceUnit);
-        visitor.visit();
-        return visitor.getParents();
-    }
-
-    @Override
     protected Set<URI> analyze(Set<URI> uris) {
         // phase 2: include checking
         var changedUris = new HashSet<>(uris);
@@ -128,6 +114,13 @@ public class ScriptAstCache extends ASTNodeCache {
         }
 
         return changedUris;
+    }
+
+    @Override
+    protected Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit) {
+        var visitor = new ScriptAstParentVisitor(sourceUnit);
+        visitor.visit();
+        return visitor.getParents();
     }
 
     /**
@@ -237,152 +230,6 @@ public class ScriptAstCache extends ASTNodeCache {
                 result.add(cn);
         }
         return result;
-    }
-
-    private static class Visitor extends ScriptVisitorSupport {
-
-        private SourceUnit sourceUnit;
-
-        private ASTParentVisitor lookup = new ASTParentVisitor();
-
-        public Visitor(SourceUnit sourceUnit) {
-            this.sourceUnit = sourceUnit;
-        }
-
-        @Override
-        protected SourceUnit getSourceUnit() {
-            return sourceUnit;
-        }
-
-        public void visit() {
-            var moduleNode = sourceUnit.getAST();
-            if( moduleNode instanceof ScriptNode sn )
-                super.visit(sn);
-        }
-
-        public Map<ASTNode, ASTNode> getParents() {
-            return lookup.getParents();
-        }
-
-        @Override
-        public void visitFeatureFlag(FeatureFlagNode node) {
-            lookup.push(node);
-            try {
-                lookup.visit(node.value);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitInclude(IncludeNode node) {
-            lookup.push(node);
-            try {
-                lookup.visit(node.source);
-                for( var module : node.modules )
-                    visitIncludeVariable(module);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        protected void visitIncludeVariable(IncludeVariable node) {
-            lookup.push(node);
-            try {
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitParam(ParamNode node) {
-            lookup.push(node);
-            try {
-                lookup.visit(node.value);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitWorkflow(WorkflowNode node) {
-            lookup.push(node);
-            try {
-                lookup.visit(node.takes);
-                lookup.visit(node.main);
-                lookup.visit(node.emits);
-                lookup.visit(node.publishers);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitProcess(ProcessNode node) {
-            lookup.push(node);
-            try {
-                lookup.visit(node.directives);
-                lookup.visit(node.inputs);
-                lookup.visit(node.outputs);
-                lookup.visit(node.when);
-                lookup.visit(node.exec);
-                lookup.visit(node.stub);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitFunction(FunctionNode node) {
-            lookup.push(node);
-            try {
-                for( var parameter : node.getParameters() )
-                    lookup.visitParameter(parameter);
-                lookup.visit(node.getCode());
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitEnum(ClassNode node) {
-            lookup.push(node);
-            try {
-                super.visitEnum(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitField(FieldNode node) {
-            lookup.push(node);
-            try {
-                super.visitField(node);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
-
-        @Override
-        public void visitOutput(OutputNode node) {
-            lookup.push(node);
-            try {
-                lookup.visit(node.body);
-            }
-            finally {
-                lookup.pop();
-            }
-        }
     }
 
 }

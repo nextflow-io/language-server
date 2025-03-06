@@ -58,6 +58,7 @@ import org.codehaus.groovy.ast.stmt.ThrowStatement;
 import org.codehaus.groovy.ast.stmt.TryCatchStatement;
 
 /**
+ * Create a reverse lookup of ast node to parent.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
