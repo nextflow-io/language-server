@@ -34,7 +34,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import nextflow.lsp.ast.ASTNodeCache;
-import nextflow.lsp.compiler.Compiler;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.DebouncingExecutor;

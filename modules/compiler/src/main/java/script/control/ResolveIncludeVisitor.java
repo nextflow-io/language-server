@@ -13,21 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services.config;
+package nextflow.script.control;
 
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import nextflow.config.ast.ConfigIncludeNode;
-import nextflow.config.ast.ConfigNode;
-import nextflow.config.ast.ConfigVisitorSupport;
-import nextflow.script.control.PhaseAware;
-import nextflow.script.control.Phases;
+import nextflow.script.ast.IncludeNode;
+import nextflow.script.ast.ScriptNode;
+import nextflow.script.ast.ScriptVisitorSupport;
 import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.ast.expr.ConstantExpression;
+import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
@@ -36,13 +35,13 @@ import org.codehaus.groovy.syntax.SyntaxException;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class ResolveIncludeVisitor extends ConfigVisitorSupport {
+public class ResolveIncludeVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
     private URI uri;
 
-    private ConfigAstCache astCache;
+    private Compiler compiler;
 
     private Set<URI> changedUris;
 
@@ -50,10 +49,10 @@ public class ResolveIncludeVisitor extends ConfigVisitorSupport {
 
     private boolean changed;
 
-    ResolveIncludeVisitor(SourceUnit sourceUnit, ConfigAstCache astCache, Set<URI> changedUris) {
+    public ResolveIncludeVisitor(SourceUnit sourceUnit, Compiler compiler, Set<URI> changedUris) {
         this.sourceUnit = sourceUnit;
         this.uri = sourceUnit.getSource().getURI();
-        this.astCache = astCache;
+        this.compiler = compiler;
         this.changedUris = changedUris;
     }
 
@@ -64,36 +63,70 @@ public class ResolveIncludeVisitor extends ConfigVisitorSupport {
 
     public void visit() {
         var moduleNode = sourceUnit.getAST();
-        if( moduleNode instanceof ConfigNode cn )
-            super.visit(cn);
+        if( moduleNode instanceof ScriptNode sn )
+            super.visit(sn);
     }
 
     @Override
-    public void visitConfigInclude(ConfigIncludeNode node) {
-        if( !(node.source instanceof ConstantExpression) )
-            return;
+    public void visitInclude(IncludeNode node) {
         var source = node.source.getText();
+        if( source.startsWith("plugin/") )
+            return;
         var includeUri = getIncludeUri(uri, source);
-        if( !isIncludeLocal(includeUri) || !isIncludeStale(includeUri) )
+        if( !isIncludeStale(node, includeUri) )
             return;
         changed = true;
-        var includeUnit = astCache.getSourceUnit(includeUri);
+        for( var module : node.modules )
+            module.setMethod(null);
+        var includeUnit = compiler.getSource(includeUri);
         if( includeUnit == null ) {
             addError("Invalid include source: '" + includeUri + "'", node);
             return;
         }
+        if( includeUnit.getAST() == null ) {
+            addError("Module could not be parsed: '" + includeUri + "'", node);
+            return;
+        }
+        var definitions = getDefinitions(includeUri);
+        for( var module : node.modules ) {
+            var includedName = module.name;
+            var includedNode = definitions.stream()
+                .filter(defNode -> includedName.equals(defNode.getName()))
+                .findFirst();
+            if( !includedNode.isPresent() ) {
+                addError("Included name '" + includedName + "' is not defined in module '" + includeUri + "'", node);
+                continue;
+            }
+            module.setMethod(includedNode.get());
+        }
     }
 
     protected static URI getIncludeUri(URI uri, String source) {
-        return Path.of(uri).getParent().resolve(source).normalize().toUri();
+        Path includePath = Path.of(uri).getParent().resolve(source);
+        if( Files.isDirectory(includePath) )
+            includePath = includePath.resolve("main.nf");
+        else if( !source.endsWith(".nf") )
+            includePath = Path.of(includePath.toString() + ".nf");
+        return includePath.normalize().toUri();
     }
 
-    protected static boolean isIncludeLocal(URI includeUri) {
-        return "file".equals(includeUri.getScheme());
+    protected boolean isIncludeStale(IncludeNode node, URI includeUri) {
+        if( changedUris.contains(uri) || changedUris.contains(includeUri) )
+            return true;
+        for( var module : node.modules ) {
+            if( module.getMethod() == null )
+                return true;
+        }
+        return false;
     }
 
-    protected boolean isIncludeStale(URI includeUri) {
-        return changedUris.contains(uri) || changedUris.contains(includeUri);
+    protected List<MethodNode> getDefinitions(URI uri) {
+        var scriptNode = (ScriptNode) compiler.getSource(uri).getAST();
+        var result = new ArrayList<MethodNode>();
+        result.addAll(scriptNode.getWorkflows());
+        result.addAll(scriptNode.getProcesses());
+        result.addAll(scriptNode.getFunctions());
+        return result;
     }
 
     @Override

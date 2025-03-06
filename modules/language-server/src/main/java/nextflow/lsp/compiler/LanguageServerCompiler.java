@@ -22,7 +22,7 @@ import java.nio.file.Path;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.file.FileCache;
-import nextflow.lsp.util.Logger;
+import nextflow.script.control.Compiler;
 import org.antlr.v4.runtime.RecognitionException;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.control.CompilationFailedException;
@@ -31,35 +31,15 @@ import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.SourceUnit;
 
 /**
- * Compile source files and defer any errors to the
- * language server.
+ * Compiler that can load source files from the file cache
+ * and defers errors to the language server.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class Compiler {
+public class LanguageServerCompiler extends Compiler {
 
-    private static Logger log = Logger.getInstance();
-
-    private CompilerConfiguration configuration;
-
-    private GroovyClassLoader classLoader;
-
-    public Compiler(CompilerConfiguration configuration, GroovyClassLoader classLoader) {
-        this.configuration = configuration;
-        this.classLoader = classLoader;
-    }
-
-    /**
-     * Compile a source file.
-     *
-     * @param uri
-     * @param fileCache
-     */
-    public SourceUnit compile(URI uri, FileCache fileCache) {
-        var sourceUnit = getSourceUnit(uri, fileCache);
-        if( sourceUnit != null )
-            compile(sourceUnit);
-        return sourceUnit;
+    public LanguageServerCompiler(CompilerConfiguration configuration, GroovyClassLoader classLoader) {
+        super(configuration, classLoader);
     }
 
     /**
@@ -72,29 +52,29 @@ public class Compiler {
      *
      * @param uri
      */
-    protected SourceUnit getSourceUnit(URI uri, FileCache fileCache) {
+    public SourceUnit getSource(URI uri, FileCache fileCache) {
         if( fileCache.isOpen(uri) ) {
             var contents = fileCache.getContents(uri);
             return new SourceUnit(
                     uri.toString(),
-                    new StringReaderSourceWithURI(contents, uri, configuration),
-                    configuration,
-                    classLoader,
+                    new StringReaderSourceWithURI(contents, uri, getConfiguration()),
+                    getConfiguration(),
+                    getClassLoader(),
                     newErrorCollector());
         }
         else if( Files.exists(Path.of(uri)) ) {
             return new SourceUnit(
                     new File(uri),
-                    configuration,
-                    classLoader,
+                    getConfiguration(),
+                    getClassLoader(),
                     newErrorCollector());
         }
         else
             return null;
     }
 
-    protected ErrorCollector newErrorCollector() {
-        return new LanguageServerErrorCollector(configuration);
+    private ErrorCollector newErrorCollector() {
+        return new LanguageServerErrorCollector(getConfiguration());
     }
 
     /**
@@ -103,17 +83,13 @@ public class Compiler {
      *
      * @param sourceUnit
      */
-    protected void compile(SourceUnit sourceUnit) {
+    @Override
+    public void compile(SourceUnit sourceUnit) {
         try {
-            sourceUnit.parse();
-            sourceUnit.buildAST();
-        }
-        catch( RecognitionException e ) {
-        }
-        catch( CompilationFailedException e ) {
+            super.compile(sourceUnit);
         }
         catch( GroovyBugError | Exception e ) {
-            log.error("Unexpected exception while compiling source files: " + e.toString());
+            System.err.println("Unexpected exception while compiling source files: " + e.toString());
         }
     }
 

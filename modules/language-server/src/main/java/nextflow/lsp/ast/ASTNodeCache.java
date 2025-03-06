@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Positions;
@@ -47,7 +48,7 @@ import org.eclipse.lsp4j.util.Ranges;
  */
 public abstract class ASTNodeCache {
 
-    private Map<URI, SourceUnit> sourcesByUri = new HashMap<>();
+    private LanguageServerCompiler compiler;
 
     private Map<URI, List<SyntaxException>> errorsByUri = new HashMap<>();
 
@@ -57,11 +58,23 @@ public abstract class ASTNodeCache {
 
     private Map<ASTNode, LookupData> lookup = new IdentityHashMap<>();
 
+    protected ASTNodeCache(LanguageServerCompiler compiler) {
+        this.compiler = compiler;
+    }
+
+    protected LanguageServerCompiler compiler() {
+        return compiler;
+    }
+
+    private Map<URI, SourceUnit> sourcesByUri() {
+        return compiler.getSources();
+    }
+
     /**
      * Clear the cache.
      */
     public void clear() {
-        sourcesByUri.clear();
+        sourcesByUri().clear();
         errorsByUri.clear();
         warningsByUri.clear();
         nodesByURI.clear();
@@ -82,23 +95,29 @@ public abstract class ASTNodeCache {
                 for( var node : nodes )
                     lookup.remove(node);
             }
-            sourcesByUri.remove(uri);
+            sourcesByUri().remove(uri);
             errorsByUri.put(uri, new ArrayList<>());
             warningsByUri.put(uri, new ArrayList<>());
         }
 
         // parse source files
         var sources = uris.parallelStream()
-            .map(uri -> buildAST(uri, fileCache))
+            .map(uri -> compiler.getSource(uri, fileCache))
             .filter(sourceUnit -> sourceUnit != null)
+            .map(sourceUnit -> {
+                compiler.addSource(sourceUnit);
+                compiler.compile(sourceUnit);
+                return sourceUnit;
+            })
             .sequential()
             .collect(Collectors.toSet());
 
-        // update ast node cache
+        // perform additional ast analysis
+        var changedUris = analyze(uris);
+
+        // update ast parents cache
         for( var sourceUnit : sources ) {
             var uri = sourceUnit.getSource().getURI();
-            sourcesByUri.put(uri, sourceUnit);
-
             var parents = visitParents(sourceUnit);
             nodesByURI.put(uri, parents.keySet());
 
@@ -108,12 +127,9 @@ public abstract class ASTNodeCache {
             }
         }
 
-        // perform additional ast analysis
-        var changedUris = visitAST(uris);
-
         // update diagnostics cache
         for( var uri : changedUris ) {
-            var sourceUnit = sourcesByUri.get(uri);
+            var sourceUnit = sourcesByUri().get(uri);
             if( sourceUnit == null )
                 continue;
 
@@ -144,12 +160,12 @@ public abstract class ASTNodeCache {
     }
 
     /**
-     * Parse the AST for a set of source files.
+     * Perform additional AST analysis for a set of source files.
+     * Return the set of files whose errors have changed.
      *
-     * @param uri
-     * @param fileCache
+     * @param uris
      */
-    protected abstract SourceUnit buildAST(URI uri, FileCache fileCache);
+    protected abstract Set<URI> analyze(Set<URI> uris);
 
     /**
      * Visit the AST of a source file and retrieve the set of relevant
@@ -160,25 +176,17 @@ public abstract class ASTNodeCache {
     protected abstract Map<ASTNode, ASTNode> visitParents(SourceUnit sourceUnit);
 
     /**
-     * Perform additional AST analysis for a set of source files.
-     * Return the set of files whose errors have changed.
-     *
-     * @param uris
-     */
-    protected abstract Set<URI> visitAST(Set<URI> uris);
-
-    /**
      * Get the list of uris.
      */
     public Set<URI> getUris() {
-        return sourcesByUri.keySet();
+        return sourcesByUri().keySet();
     }
 
     /**
      * Get the list of source units for all cached files.
      */
     public Collection<SourceUnit> getSourceUnits() {
-        return sourcesByUri.values();
+        return sourcesByUri().values();
     }
 
     /**
@@ -187,7 +195,7 @@ public abstract class ASTNodeCache {
      * @param uri
      */
     public SourceUnit getSourceUnit(URI uri) {
-        return sourcesByUri.get(uri);
+        return sourcesByUri().get(uri);
     }
 
     /**
@@ -196,7 +204,7 @@ public abstract class ASTNodeCache {
      * @param uri
      */
     public boolean hasAST(URI uri) {
-        var sourceUnit = sourcesByUri.get(uri);
+        var sourceUnit = sourcesByUri().get(uri);
         return sourceUnit != null && sourceUnit.getAST() != null;
     }
 

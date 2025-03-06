@@ -38,16 +38,15 @@ class LanguageServerErrorCollectorTest extends Specification {
 
         when:
         collector.addErrorAndContinue(makeErrorWithPhase(Phases.SYNTAX))
-        collector.addErrorAndContinue(makeErrorWithPhase(Phases.NAME_RESOLUTION))
         collector.addErrorAndContinue(makeErrorWithPhase(Phases.INCLUDE_RESOLUTION))
+        collector.addErrorAndContinue(makeErrorWithPhase(Phases.NAME_RESOLUTION))
         collector.addErrorAndContinue(makeErrorWithPhase(Phases.TYPE_INFERENCE))
         and:
         collector.updatePhase(Phases.INCLUDE_RESOLUTION, [ newError ])
         then:
-        collector.getErrors().size() == 3
+        collector.getErrors().size() == 2
         collector.getErrors()[0].cause.phase == Phases.SYNTAX
-        collector.getErrors()[1].cause.phase == Phases.NAME_RESOLUTION
-        collector.getErrors()[2] === newError
+        collector.getErrors()[1] === newError
     }
 
     def makeErrorWithPhase(phase) {

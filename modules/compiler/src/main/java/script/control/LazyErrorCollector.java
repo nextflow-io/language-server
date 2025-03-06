@@ -15,15 +15,22 @@
  */
 package nextflow.script.control;
 
+import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.ErrorCollector;
+
 /**
+ * Error collector that does not throw exceptions.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class Phases {
-    public static final int SYNTAX = 1;
-    public static final int INCLUDE_RESOLUTION = 2;
-    public static final int NAME_RESOLUTION = 3;
-    public static final int TYPE_INFERENCE = 4;
+public class LazyErrorCollector extends ErrorCollector {
 
-    public static final int ALL = TYPE_INFERENCE;
+    public LazyErrorCollector(CompilerConfiguration configuration) {
+        super(configuration);
+    }
+
+    @Override
+    protected void failIfErrors() {
+    }
+
 }

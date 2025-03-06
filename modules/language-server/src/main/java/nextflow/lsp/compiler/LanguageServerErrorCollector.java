@@ -17,27 +17,22 @@ package nextflow.lsp.compiler;
 
 import java.util.List;
 
+import nextflow.script.control.LazyErrorCollector;
 import nextflow.script.control.PhaseAware;
 import org.codehaus.groovy.control.CompilerConfiguration;
-import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.messages.Message;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 
 /**
- * Error collector that does not throw exceptions.
+ * Error collector that defers error reporting and can
+ * be updated on re-compilation.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class LanguageServerErrorCollector extends ErrorCollector {
-
-    private static final long serialVersionUID = 1L;
+public class LanguageServerErrorCollector extends LazyErrorCollector {
 
     public LanguageServerErrorCollector(CompilerConfiguration configuration) {
         super(configuration);
-    }
-
-    @Override
-    protected void failIfErrors() {
     }
 
     /**

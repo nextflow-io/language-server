@@ -28,10 +28,11 @@ import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.control.ConfigResolveVisitor;
+import nextflow.config.control.ResolveIncludeVisitor;
 import nextflow.config.parser.ConfigParserPluginFactory;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTParentVisitor;
-import nextflow.lsp.compiler.Compiler;
+import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
 import nextflow.lsp.file.FileCache;
 import nextflow.script.control.PhaseAware;
@@ -82,35 +83,21 @@ import org.codehaus.groovy.control.messages.WarningMessage;
  */
 public class ConfigAstCache extends ASTNodeCache {
 
-    private Compiler compiler;
-
-    private CompilationUnit compilationUnit;
-
     public ConfigAstCache() {
-        var config = createConfiguration();
-        var classLoader = new GroovyClassLoader(ClassLoader.getSystemClassLoader().getParent(), config, true);
-        compiler = new Compiler(config, classLoader);
-        compilationUnit = new CompilationUnit(config, null, classLoader);
+        super(newCompiler());
     }
 
-    protected CompilerConfiguration createConfiguration() {
+    private static LanguageServerCompiler newCompiler() {
+        var config = createConfiguration();
+        var classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true);
+        return new LanguageServerCompiler(config, classLoader);
+    }
+
+    private static CompilerConfiguration createConfiguration() {
         var config = new CompilerConfiguration();
         config.setPluginFactory(new ConfigParserPluginFactory());
         config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
         return config;
-    }
-
-    @Override
-    protected SourceUnit buildAST(URI uri, FileCache fileCache) {
-        // phase 1: syntax resolution
-        var sourceUnit = compiler.compile(uri, fileCache);
-
-        // phase 2: name resolution
-        if( sourceUnit != null ) {
-            new ConfigResolveVisitor(sourceUnit, compilationUnit).visit();
-            new ConfigSchemaVisitor(sourceUnit).visit();
-        }
-        return sourceUnit;
     }
 
     @Override
@@ -121,12 +108,12 @@ public class ConfigAstCache extends ASTNodeCache {
     }
 
     @Override
-    protected Set<URI> visitAST(Set<URI> uris) {
-        // phase 3: include resolution
+    protected Set<URI> analyze(Set<URI> uris) {
+        // phase 2: include checking
         var changedUris = new HashSet<>(uris);
 
         for( var sourceUnit : getSourceUnits() ) {
-            var visitor = new ResolveIncludeVisitor(sourceUnit, this, uris);
+            var visitor = new ResolveIncludeVisitor(sourceUnit, compiler(), uris);
             visitor.visit();
 
             var uri = sourceUnit.getSource().getURI();
@@ -137,8 +124,18 @@ public class ConfigAstCache extends ASTNodeCache {
             }
         }
 
-        // phase 4: type inference
-        // TODO
+        for( var uri : changedUris ) {
+            var sourceUnit = getSourceUnit(uri);
+            if( sourceUnit == null )
+                continue;
+            // phase 3: name checking
+            new ConfigResolveVisitor(sourceUnit, compiler()).visit();
+            new ConfigSchemaVisitor(sourceUnit).visit();
+            if( sourceUnit.getErrorCollector().hasErrors() )
+                continue;
+            // phase 4: type checking
+            // TODO
+        }
 
         return changedUris;
     }
