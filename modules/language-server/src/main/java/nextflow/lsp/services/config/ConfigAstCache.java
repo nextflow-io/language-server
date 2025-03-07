@@ -79,7 +79,7 @@ public class ConfigAstCache extends ASTNodeCache {
             if( sourceUnit == null )
                 continue;
             // phase 3: name checking
-            new ConfigResolveVisitor(sourceUnit, compiler()).visit();
+            new ConfigResolveVisitor(sourceUnit, compiler().compilationUnit()).visit();
             new ConfigSchemaVisitor(sourceUnit).visit();
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;

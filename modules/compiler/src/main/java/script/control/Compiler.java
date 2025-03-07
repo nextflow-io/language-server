@@ -16,6 +16,7 @@
 package nextflow.script.control;
 
 import java.net.URI;
+import java.security.CodeSource;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,23 +28,38 @@ import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
 
 /**
- * Compilation unit that can lookup source units by URI.
+ * Compiler that can lookup source units by URI.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class Compiler extends CompilationUnit {
+public class Compiler {
 
-    protected Map<URI, SourceUnit> sourcesByUri = new HashMap<>();
+    private CompilationUnit compilationUnit;
 
-    public Compiler(CompilerConfiguration config, GroovyClassLoader loader) {
-        super(config, null, loader);
+    private Map<URI, SourceUnit> sourcesByUri = new HashMap<>();
+
+    public Compiler(CompilerConfiguration configuration, GroovyClassLoader classLoader) {
+        this(new CompilationUnit(configuration, null, classLoader));
     }
 
-    @Override
-    public SourceUnit addSource(final SourceUnit source) {
-        super.addSource(source);
+    public Compiler(CompilationUnit compilationUnit) {
+        this.compilationUnit = compilationUnit;
+    }
+
+    public CompilationUnit compilationUnit() {
+        return compilationUnit;
+    }
+
+    protected CompilerConfiguration configuration() {
+        return compilationUnit().getConfiguration();
+    }
+
+    protected GroovyClassLoader classLoader() {
+        return compilationUnit().getClassLoader();
+    }
+
+    public void addSource(SourceUnit source) {
         sourcesByUri.put(source.getSource().getURI(), source);
-        return source;
     }
 
     public Map<URI, SourceUnit> getSources() {

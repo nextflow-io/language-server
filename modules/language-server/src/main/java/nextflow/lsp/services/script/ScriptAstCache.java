@@ -105,7 +105,7 @@ public class ScriptAstCache extends ASTNodeCache {
             if( sourceUnit == null )
                 continue;
             // phase 3: name checking
-            new ScriptResolveVisitor(sourceUnit, compiler(), Types.TYPES, libImports).visit();
+            new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.TYPES, libImports).visit();
             new ParameterSchemaVisitor(sourceUnit).visit();
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;

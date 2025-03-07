@@ -23,9 +23,7 @@ import java.nio.file.Path;
 import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.file.FileCache;
 import nextflow.script.control.Compiler;
-import org.antlr.v4.runtime.RecognitionException;
 import org.codehaus.groovy.GroovyBugError;
-import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.SourceUnit;
@@ -57,16 +55,16 @@ public class LanguageServerCompiler extends Compiler {
             var contents = fileCache.getContents(uri);
             return new SourceUnit(
                     uri.toString(),
-                    new StringReaderSourceWithURI(contents, uri, getConfiguration()),
-                    getConfiguration(),
-                    getClassLoader(),
+                    new StringReaderSourceWithURI(contents, uri, configuration()),
+                    configuration(),
+                    classLoader(),
                     newErrorCollector());
         }
         else if( Files.exists(Path.of(uri)) ) {
             return new SourceUnit(
                     new File(uri),
-                    getConfiguration(),
-                    getClassLoader(),
+                    configuration(),
+                    classLoader(),
                     newErrorCollector());
         }
         else
@@ -74,7 +72,7 @@ public class LanguageServerCompiler extends Compiler {
     }
 
     private ErrorCollector newErrorCollector() {
-        return new LanguageServerErrorCollector(getConfiguration());
+        return new LanguageServerErrorCollector(configuration());
     }
 
     /**
