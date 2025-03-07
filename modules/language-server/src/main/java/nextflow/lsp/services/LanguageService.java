@@ -122,15 +122,15 @@ public abstract class LanguageService {
 
     private volatile boolean initialized;
 
-    private volatile boolean paranoidWarnings;
+    private volatile LanguageServerConfiguration configuration;
 
-    public void initialize(String rootUri, List<String> excludes, boolean paranoidWarnings) {
+    public void initialize(String rootUri, LanguageServerConfiguration configuration) {
         synchronized (this) {
             this.initialized = false;
-            this.paranoidWarnings = paranoidWarnings;
+            this.configuration = configuration;
 
             var uris = rootUri != null
-                ? getWorkspaceFiles(rootUri, excludes)
+                ? getWorkspaceFiles(rootUri)
                 : fileCache.getOpenFiles();
 
             var astCache = getAstCache();
@@ -142,20 +142,20 @@ public abstract class LanguageService {
         }
     }
 
-    protected Set<URI> getWorkspaceFiles(String rootUri, List<String> excludes) {
+    protected Set<URI> getWorkspaceFiles(String rootUri) {
         try {
             var root = Path.of(URI.create(rootUri));
             var result = new HashSet<URI>();
             Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path path, BasicFileAttributes attrs) {
-                    return PathUtils.isPathExcluded(path, excludes)
+                    return PathUtils.isPathExcluded(path, configuration.excludePatterns())
                         ? FileVisitResult.SKIP_SUBTREE
                         : FileVisitResult.CONTINUE;
                 }
                 @Override
                 public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
-                    if( matchesFile(path.toString()) && !PathUtils.isPathExcluded(path, excludes) )
+                    if( matchesFile(path.toString()) && !PathUtils.isPathExcluded(path, configuration.excludePatterns()) )
                         result.add(path.toUri());
                     return FileVisitResult.CONTINUE;
                 }
@@ -395,7 +395,7 @@ public abstract class LanguageService {
             }
 
             for( var warning : astCache.getWarnings(uri) ) {
-                if( !paranoidWarnings && warning instanceof FutureWarning )
+                if( !configuration.paranoidWarnings() && warning instanceof FutureWarning )
                     continue;
 
                 var message = warning.getMessage();
