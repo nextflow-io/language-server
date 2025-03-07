@@ -119,7 +119,7 @@ public class ScriptAstBuilder {
 
     private Tuple2<ParserRuleContext,Exception> numberFormatError;
 
-    public ScriptAstBuilder(SourceUnit sourceUnit, boolean groovydocEnabled) {
+    public ScriptAstBuilder(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
         this.moduleNode = new ScriptNode(sourceUnit);
 
@@ -128,6 +128,7 @@ public class ScriptAstBuilder {
         this.parser = new ScriptParser(new CommonTokenStream(lexer));
         parser.setErrorHandler(new DescriptiveErrorStrategy(charStream));
 
+        var groovydocEnabled = sourceUnit.getConfiguration().isGroovydocEnabled();
         this.groovydocManager = new GroovydocManager(groovydocEnabled);
     }
 
