@@ -25,6 +25,7 @@ import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.services.DefinitionProvider;
 import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.services.HoverProvider;
+import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.LinkProvider;
 import nextflow.lsp.services.ReferenceProvider;
@@ -47,11 +48,11 @@ public class ScriptService extends LanguageService {
     }
 
     @Override
-    public void initialize(String rootUri, List<String> excludes, boolean suppressFutureWarnings) {
+    public void initialize(String rootUri, LanguageServerConfiguration configuration) {
         synchronized (this) {
             astCache.initialize(rootUri);
         }
-        super.initialize(rootUri, excludes, suppressFutureWarnings);
+        super.initialize(rootUri, configuration);
     }
 
     @Override

@@ -30,6 +30,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.Logger;
+import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.SemanticTokensVisitor;
 import nextflow.lsp.services.config.ConfigService;
@@ -127,10 +128,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private Map<String, LanguageService> scriptServices = new HashMap<>();
     private Map<String, LanguageService> configServices = new HashMap<>();
 
-    private List<String> excludePatterns;
-    private boolean harshilAlignment;
-    private boolean maheshForm;
-    private boolean paranoidWarnings;
+    private LanguageServerConfiguration configuration = new LanguageServerConfiguration(Collections.emptyList(), false, false, false);
 
     // -- LanguageServer
 
@@ -372,8 +370,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var options = new FormattingOptions(
                 params.getOptions().getTabSize(),
                 params.getOptions().isInsertSpaces(),
-                harshilAlignment,
-                maheshForm
+                configuration.harshilAlignment(),
+                configuration.maheshForm()
             );
             log.debug(String.format("textDocument/formatting %s %s %d", relativePath(uri), options.insertSpaces() ? "spaces" : "tabs", options.tabSize()));
             var service = getLanguageService(uri);
@@ -449,24 +447,22 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             Logger.setDebugEnabled(debug);
 
         var excludePatterns = getJsonStringArray(params.getSettings(), "nextflow.files.exclude");
-        if( !DefaultGroovyMethods.equals(this.excludePatterns, excludePatterns) ) {
-            this.excludePatterns = excludePatterns;
+        if( !DefaultGroovyMethods.equals(configuration.excludePatterns(), excludePatterns) ) {
             shouldInitialize = true;
         }
-
         var harshilAlignment = getJsonBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
-        if( harshilAlignment != null )
-            this.harshilAlignment = harshilAlignment;
-
         var maheshForm = getJsonBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
-        if( maheshForm != null )
-            this.maheshForm = maheshForm;
-    
         var paranoidWarnings = getJsonBoolean(params.getSettings(), "nextflow.paranoidWarnings");
-        if( paranoidWarnings != null && this.paranoidWarnings != paranoidWarnings ) {
-            this.paranoidWarnings = paranoidWarnings;
+        if( paranoidWarnings != null && configuration.paranoidWarnings() != paranoidWarnings ) {
             shouldInitialize = true;
         }
+
+        configuration = new LanguageServerConfiguration(
+            excludePatterns,
+            harshilAlignment != null ? harshilAlignment : configuration.harshilAlignment(),
+            maheshForm != null ? maheshForm : configuration.maheshForm(),
+            paranoidWarnings != null ? paranoidWarnings : configuration.paranoidWarnings()
+        );
 
         if( shouldInitialize ) {
             var progressToken = "initialize";
@@ -483,8 +479,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 count++;
 
                 var uri = workspaceRoots.get(name);
-                scriptServices.get(name).initialize(uri, this.excludePatterns, this.paranoidWarnings);
-                configServices.get(name).initialize(uri, this.excludePatterns, this.paranoidWarnings);
+                scriptServices.get(name).initialize(uri, configuration);
+                configServices.get(name).initialize(uri, configuration);
             }
 
             progressEnd(progressToken);
@@ -534,8 +530,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var uri = workspaceFolder.getUri();
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
             addWorkspaceFolder(name, uri);
-            scriptServices.get(name).initialize(uri, excludePatterns, paranoidWarnings);
-            configServices.get(name).initialize(uri, excludePatterns, paranoidWarnings);
+            scriptServices.get(name).initialize(uri, configuration);
+            configServices.get(name).initialize(uri, configuration);
         }
     }
 
@@ -621,7 +617,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             return null;
         }
         var path = Path.of(URI.create(uri));
-        if( PathUtils.isPathExcluded(path, excludePatterns) )
+        if( PathUtils.isPathExcluded(path, configuration.excludePatterns()) )
             return null;
         return service;
     }

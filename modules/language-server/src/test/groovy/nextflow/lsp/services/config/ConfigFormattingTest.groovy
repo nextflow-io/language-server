@@ -20,6 +20,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 import nextflow.lsp.TestLanguageClient
+import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.script.formatter.FormattingOptions
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.Position
@@ -47,8 +48,9 @@ class ConfigFormattingTest extends Specification {
             workspaceRoot.toFile().mkdirs()
 
         def service = new ConfigService()
+        def configuration = new LanguageServerConfiguration(Collections.emptyList(), false, false, false)
         service.connect(new TestLanguageClient())
-        service.initialize(workspaceRoot.toUri().toString(), Collections.emptyList(), false)
+        service.initialize(workspaceRoot.toUri().toString(), configuration)
 
         when:
         def filePath = workspaceRoot.resolve('nextflow.config')
