@@ -32,6 +32,10 @@ import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 /**
+ * Resolve includes against included source files.
+ *
+ * This visitor should be applied only after all source files
+ * have been parsed.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

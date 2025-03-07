@@ -51,7 +51,7 @@ import static groovy.lang.Tuple.tuple;
 import static org.codehaus.groovy.ast.tools.ClosureUtils.getParametersSafe;
 
 /**
- * Resolve the name of types and variables.
+ * Resolve the names of symbols.
  *
  * See: org.codehaus.groovy.control.ResolveVisitor
  *
@@ -69,8 +69,14 @@ public class ResolveVisitor extends ClassCodeExpressionTransformer {
 
     private ClassNodeResolver classNodeResolver = new ClassNodeResolver();
 
+    /**
+     * Default imports can be accessed only by their simple name.
+     */
     private List<ClassNode> defaultImports;
 
+    /**
+     * Lib imports can be accessed only by their fully-qualified name.
+     */
     private List<ClassNode> libImports;
 
     public ResolveVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<ClassNode> defaultImports, List<ClassNode> libImports) {

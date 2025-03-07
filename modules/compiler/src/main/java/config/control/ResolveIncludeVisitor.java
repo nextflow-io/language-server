@@ -34,6 +34,7 @@ import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 /**
+ * Resolve includes against included config files.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
