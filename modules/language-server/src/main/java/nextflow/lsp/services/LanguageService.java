@@ -40,7 +40,7 @@ import nextflow.lsp.util.DebouncingExecutor;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
-import nextflow.script.control.FutureWarning;
+import nextflow.script.control.ParanoidWarning;
 import nextflow.script.control.RelatedInformationAware;
 import nextflow.script.formatter.FormattingOptions;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
@@ -395,7 +395,7 @@ public abstract class LanguageService {
             }
 
             for( var warning : astCache.getWarnings(uri) ) {
-                if( !configuration.paranoidWarnings() && warning instanceof FutureWarning )
+                if( !configuration.paranoidWarnings() && warning instanceof ParanoidWarning )
                     continue;
 
                 var message = warning.getMessage();

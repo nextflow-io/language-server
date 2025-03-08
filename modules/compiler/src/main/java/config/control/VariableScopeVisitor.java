@@ -241,7 +241,7 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
         Variable variable = vsc.findVariableDeclaration(name, node);
         if( variable == null ) {
             if( "it".equals(name) ) {
-                vsc.addFutureWarning("Implicit closure parameter `it` will not be supported in a future version", node);
+                vsc.addParanoidWarning("Implicit closure parameter `it` will not be supported in a future version", node);
             }
             else {
                 variable = new DynamicVariable(name, false);

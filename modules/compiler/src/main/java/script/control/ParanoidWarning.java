@@ -24,13 +24,13 @@ import org.codehaus.groovy.syntax.CSTNode;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class FutureWarning extends WarningMessage implements RelatedInformationAware {
+public class ParanoidWarning extends WarningMessage implements RelatedInformationAware {
 
     private String otherMessage;
 
     private ASTNode otherNode;
 
-    public FutureWarning(int importance, String message, CSTNode context, SourceUnit owner) {
+    public ParanoidWarning(int importance, String message, CSTNode context, SourceUnit owner) {
         super(importance, message, context, owner);
     }
 

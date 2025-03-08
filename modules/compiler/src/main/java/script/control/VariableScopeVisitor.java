@@ -158,7 +158,7 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         if( result.isPresent() ) {
             var ffn = result.get();
             if( findAnnotation(ffn, Deprecated.class).isPresent() )
-                vsc.addFutureWarning("`" + node.name + "` is deprecated and will be removed in a future version", node.name, node);
+                vsc.addParanoidWarning("`" + node.name + "` is deprecated and will be removed in a future version", node.name, node);
             node.target = ffn;
         }
         else {
@@ -238,7 +238,7 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         vsc.popScope();
 
         if( !(node.when instanceof EmptyExpression) )
-            vsc.addFutureWarning("Process `when` section will not be supported in a future version", node.when);
+            vsc.addParanoidWarning("Process `when` section will not be supported in a future version", node.when);
         visit(node.when);
 
         visit(node.exec);
@@ -527,7 +527,7 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         var name = variable.getName();
         // TODO: should apply only to operator closures
         if( scope.isReferencedLocalVariable(name) && scope.getDeclaredVariable(name) == null )
-            vsc.addFutureWarning("Mutating an external variable in an operator closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
+            vsc.addParanoidWarning("Mutating an external variable in an operator closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
     }
 
     // expressions
@@ -648,13 +648,13 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         Variable variable = vsc.findVariableDeclaration(name, node);
         if( variable == null ) {
             if( "it".equals(name) ) {
-                vsc.addFutureWarning("Implicit closure parameter `it` will not be supported in a future version", node);
+                vsc.addParanoidWarning("Implicit closure parameter `it` will not be supported in a future version", node);
             }
             else if( "args".equals(name) ) {
-                vsc.addFutureWarning("The use of `args` outside the entry workflow will not be supported in a future version", node);
+                vsc.addParanoidWarning("The use of `args` outside the entry workflow will not be supported in a future version", node);
             }
             else if( "params".equals(name) ) {
-                vsc.addFutureWarning("The use of `params` outside the entry workflow will not be supported in a future version", node);
+                vsc.addParanoidWarning("The use of `params` outside the entry workflow will not be supported in a future version", node);
             }
             else {
                 variable = new DynamicVariable(name, false);

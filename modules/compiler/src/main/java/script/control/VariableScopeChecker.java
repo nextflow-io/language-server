@@ -191,7 +191,7 @@ public class VariableScopeChecker {
                 if( !name.equals(memberName) )
                     continue;
                 if( findAnnotation(mn, Deprecated.class).isPresent() )
-                    addFutureWarning("`" + name + "` is deprecated and will be removed in a future version", node);
+                    addParanoidWarning("`" + name + "` is deprecated and will be removed in a future version", node);
                 return wrapMethodAsVariable(mn, memberName);
             }
 
@@ -215,24 +215,24 @@ public class VariableScopeChecker {
         return pn;
     }
 
-    public void addFutureWarning(String message, String tokenText, ASTNode node, String otherMessage, ASTNode otherNode) {
+    public void addParanoidWarning(String message, String tokenText, ASTNode node, String otherMessage, ASTNode otherNode) {
         var token = new Token(0, tokenText, node.getLineNumber(), node.getColumnNumber()); // ASTNode to CSTNode
-        var warning = new FutureWarning(WarningMessage.POSSIBLE_ERRORS, message, token, sourceUnit);
+        var warning = new ParanoidWarning(WarningMessage.POSSIBLE_ERRORS, message, token, sourceUnit);
         if( otherNode != null )
             warning.setRelatedInformation(otherMessage, otherNode);
         sourceUnit.getErrorCollector().addWarning(warning);
     }
 
-    public void addFutureWarning(String message, ASTNode node, String otherMessage, ASTNode otherNode) {
-        addFutureWarning(message, "", node, otherMessage, otherNode);
+    public void addParanoidWarning(String message, ASTNode node, String otherMessage, ASTNode otherNode) {
+        addParanoidWarning(message, "", node, otherMessage, otherNode);
     }
 
-    public void addFutureWarning(String message, String tokenText, ASTNode node) {
-        addFutureWarning(message, tokenText, node, null, null);
+    public void addParanoidWarning(String message, String tokenText, ASTNode node) {
+        addParanoidWarning(message, tokenText, node, null, null);
     }
 
-    public void addFutureWarning(String message, ASTNode node) {
-        addFutureWarning(message, "", node, null, null);
+    public void addParanoidWarning(String message, ASTNode node) {
+        addParanoidWarning(message, "", node, null, null);
     }
 
     public void addError(String message, ASTNode node) {
