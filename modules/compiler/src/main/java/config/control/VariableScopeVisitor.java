@@ -17,6 +17,7 @@ package nextflow.config.control;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
@@ -58,7 +59,7 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
 
     private VariableScopeChecker vsc;
 
-    private List<String> configScopes = new ArrayList<>();
+    private Stack<String> configScopes = new Stack<>();
 
     public VariableScopeVisitor(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
@@ -76,6 +77,15 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
             super.visit(cn);
             vsc.checkUnusedVariables();
         }
+    }
+
+    @Override
+    public void visitConfigAssign(ConfigAssignNode node) {
+        for( int i = 0; i < node.names.size() - 1; i++ )
+            configScopes.add(node.names.get(i));
+        super.visitConfigAssign(node);
+        for( int i = 0; i < node.names.size() - 1; i++ )
+            configScopes.pop();
     }
 
     @Override
@@ -203,7 +213,7 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
         var ic = inClosure;
         inClosure = true;
         vsc.pushScope(ic ? null : ScriptDsl.class);
-        var inProcess = "process".equals(configScopes.get(configScopes.size() - 1));
+        var inProcess = "process".equals(currentConfigScope());
         if( !ic && inProcess )
             vsc.pushScope(ProcessDsl.class);
         node.setVariableScope(currentScope());
@@ -246,6 +256,17 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
 
     private VariableScope currentScope() {
         return vsc.getCurrentScope();
+    }
+
+    private String currentConfigScope() {
+        if( configScopes.isEmpty() )
+            return null;
+        var names = new ArrayList<>(configScopes);
+        if( "profiles".equals(names.get(0)) ) {
+            if( !names.isEmpty() ) names.remove(0);
+            if( !names.isEmpty() ) names.remove(0);
+        }
+        return !names.isEmpty() ? names.get(0) : null;
     }
 
 }
