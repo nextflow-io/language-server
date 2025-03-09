@@ -29,7 +29,7 @@ import nextflow.script.dsl.Operator;
 
     [Read more](https://nextflow.io/docs/latest/reference/channel.html)
 """)
-public abstract class Channel<T> {
+public abstract class Channel<E> {
 
     protected static ChannelFactory instance;
 
@@ -48,7 +48,7 @@ public abstract class Channel<T> {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
     """)
-    public static <T> Channel<T> from(T... values) {
+    public static <E> Channel<E> from(E... values) {
         return instance.from(values);
     }
 
@@ -58,7 +58,7 @@ public abstract class Channel<T> {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#from)
     """)
-    public static <T> Channel<T> from(Collection<T> values) {
+    public static <E> Channel<E> from(Collection<E> values) {
         return instance.from(values);
     }
 
@@ -78,7 +78,7 @@ public abstract class Channel<T> {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#fromlist)
     """)
-    public static <T> Channel<T> fromList(Collection<T> values) {
+    public static <E> Channel<E> fromList(Collection<E> values) {
         return instance.fromList(values);
     }
 
@@ -105,7 +105,7 @@ public abstract class Channel<T> {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#of)
     """)
-    public static <T> Channel<T> of(T... values) {
+    public static <E> Channel<E> of(E... values) {
         return instance.of(values);
     }
 
@@ -123,7 +123,7 @@ public abstract class Channel<T> {
 
         [Read more](https://nextflow.io/docs/latest/reference/channel.html#value)
     """)
-    public static <T> Channel<T> value(T value) {
+    public static <E> Channel<E> value(E value) {
         return instance.value(value);
     }
 

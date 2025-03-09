@@ -25,23 +25,23 @@ public interface ChannelFactory {
 
     Channel empty();
 
-    <T> Channel<T> from(T... values);
+    <E> Channel<E> from(E... values);
 
-    <T> Channel<T> from(Collection<T> values);
+    <E> Channel<E> from(Collection<E> values);
 
     Channel fromFilePairs(Map<String,?> opts, String pattern, Closure grouping);
 
-    <T> Channel<T> fromList(Collection<T> values);
+    <E> Channel<E> fromList(Collection<E> values);
 
     Channel<Path> fromPath(Map<String,?> opts, String pattern);
 
     Channel fromSRA(Map<String,?> opts, String query);
 
-    <T> Channel<T> of(T... values);
+    <E> Channel<E> of(E... values);
 
     Channel topic(String name);
 
-    <T> Channel<T> value(T value);
+    <E> Channel<E> value(E value);
 
     Channel<Path> watchPath(String filePattern, String events);
 

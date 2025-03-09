@@ -162,7 +162,7 @@ class ASTNodeStringUtilsTest extends Specification {
         when:
         def node = new ClassNode(Channel.class).getDeclaredMethods('of').first()
         then:
-        ASTNodeStringUtils.getLabel(node) == 'Channel.of(arg0...: T) -> Channel<T>'
+        ASTNodeStringUtils.getLabel(node) == 'Channel.of(arg0...: E) -> Channel<E>'
         ASTNodeStringUtils.getDocumentation(node) == '''
             Create a channel that emits each argument.
 
