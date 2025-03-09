@@ -17,6 +17,7 @@ package nextflow.script.ast;
 
 import java.lang.reflect.Modifier;
 
+import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
@@ -28,15 +29,12 @@ import org.codehaus.groovy.ast.stmt.Statement;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class FunctionNode extends MethodNode {
-    public final String documentation;
 
     public FunctionNode(String name, ClassNode returnType, Parameter[] parameters, Statement code) {
         super(name, Modifier.PUBLIC, returnType, parameters, ClassNode.EMPTY_ARRAY, code);
-        this.documentation = null;
     }
 
-    public FunctionNode(String name, String documentation) {
-        super(name, Modifier.PUBLIC, null, Parameter.EMPTY_ARRAY, ClassNode.EMPTY_ARRAY, EmptyStatement.INSTANCE);
-        this.documentation = documentation;
+    public FunctionNode(String name) {
+        super(name, Modifier.PUBLIC, ClassHelper.OBJECT_TYPE, Parameter.EMPTY_ARRAY, ClassNode.EMPTY_ARRAY, EmptyStatement.INSTANCE);
     }
 }

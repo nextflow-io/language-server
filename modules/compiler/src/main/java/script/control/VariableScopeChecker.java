@@ -22,6 +22,8 @@ import java.util.Map;
 import java.util.Set;
 
 import nextflow.script.dsl.Constant;
+import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -52,7 +54,7 @@ public class VariableScopeChecker {
 
     private SourceUnit sourceUnit;
 
-    private Map<String,Variable> includes = new HashMap<>();
+    private Map<String,MethodNode> includes = new HashMap<>();
 
     private VariableScope currentScope;
 
@@ -72,11 +74,11 @@ public class VariableScopeChecker {
         return currentScope;
     }
 
-    public void include(String name, Variable variable) {
+    public void include(String name, MethodNode variable) {
         includes.put(name, variable);
     }
 
-    public Variable getInclude(String name) {
+    public MethodNode getInclude(String name) {
         return includes.get(name);
     }
 
@@ -145,12 +147,7 @@ public class VariableScopeChecker {
                 isClassVariable = true;
                 break;
             }
-            variable = findDslMember(scope.getClassScope(), name, node);
-            if( variable != null ) {
-                isClassVariable = true;
-                break;
-            }
-            variable = includes.get(name);
+            variable = findDslVariable(scope.getClassScope(), name, node);
             if( variable != null ) {
                 isClassVariable = true;
                 break;
@@ -175,24 +172,29 @@ public class VariableScopeChecker {
     }
 
     /**
-     * Find the definition of a built-in variable or function.
+     * Find the definition of a built-in variable.
      *
      * @param cn
      * @param name
      * @param node
      */
-    public Variable findDslMember(ClassNode cn, String name, ASTNode node) {
+    private Variable findDslVariable(ClassNode cn, String name, ASTNode node) {
         while( cn != null ) {
             for( var mn : cn.getMethods() ) {
+                // processes/workflows can be accessed as variables, e.g. `PROC.out`
+                if( mn instanceof ProcessNode || mn instanceof WorkflowNode ) {
+                    if( name.equals(mn.getName()) )
+                        return wrapMethodAsVariable(mn, name);
+                }
+                // built-in variables are methods annotated as @Constant
                 var an = findAnnotation(mn, Constant.class);
-                var memberName = an.isPresent()
-                    ? an.get().getMember("value").getText()
-                    : mn.getName();
-                if( !name.equals(memberName) )
+                if( !an.isPresent() )
+                    continue;
+                if( !name.equals(an.get().getMember("value").getText()) )
                     continue;
                 if( findAnnotation(mn, Deprecated.class).isPresent() )
                     addParanoidWarning("`" + name + "` is deprecated and will be removed in a future version", node);
-                return wrapMethodAsVariable(mn, memberName);
+                return wrapMethodAsVariable(mn, name);
             }
 
             cn = cn.getInterfaces().length > 0
@@ -200,10 +202,13 @@ public class VariableScopeChecker {
                 : null;
         }
 
+        if( includes.containsKey(name) )
+            return wrapMethodAsVariable(includes.get(name), name);
+
         return null;
     }
 
-    private Variable wrapMethodAsVariable(MethodNode mn, String name) {
+    private PropertyNode wrapMethodAsVariable(MethodNode mn, String name) {
         var cn = mn.getDeclaringClass();
         var fn = new FieldNode(name, mn.getModifiers() & 0xF, mn.getReturnType(), cn, null);
         fn.setHasNoRealSourcePosition(true);
@@ -213,6 +218,38 @@ public class VariableScopeChecker {
         pn.putNodeMetaData("access.method", mn);
         pn.setDeclaringClass(cn);
         return pn;
+    }
+
+    /**
+     * Find the definition of a built-in function.
+     *
+     * @param name
+     * @param node
+     */
+    public MethodNode findDslFunction(String name, ASTNode node) {
+        VariableScope scope = currentScope;
+        while( scope != null ) {
+            ClassNode cn = scope.getClassScope();
+            while( cn != null ) {
+                for( var mn : cn.getMethods() ) {
+                    // built-in functions are methods not annotated as @Constant
+                    if( findAnnotation(mn, Constant.class).isPresent() )
+                        continue;
+                    if( !name.equals(mn.getName()) )
+                        continue;
+                    if( findAnnotation(mn, Deprecated.class).isPresent() )
+                        addParanoidWarning("`" + name + "` is deprecated and will be removed in a future version", node);
+                    return mn;
+                }
+    
+                cn = cn.getInterfaces().length > 0
+                    ? cn.getInterfaces()[0]
+                    : null;
+            }
+            scope = scope.getParent();
+        }
+
+        return includes.get(name);
     }
 
     public void addParanoidWarning(String message, String tokenText, ASTNode node, String otherMessage, ASTNode otherNode) {

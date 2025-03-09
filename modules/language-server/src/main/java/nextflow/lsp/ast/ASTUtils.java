@@ -93,7 +93,7 @@ public class ASTUtils {
             return ffn.target != null ? ffn : null;
 
         if( node instanceof IncludeVariable iv )
-            return iv.getMethod();
+            return iv.getTarget();
 
         if( node instanceof ClassNode cn )
             return node;
@@ -385,10 +385,10 @@ public class ASTUtils {
     }
 
     private static ASTNode getDefinitionFromVariable(Variable variable) {
-        if( variable instanceof IncludeVariable iv )
-            return iv.getMethod();
+        // built-in variable or workflow/process as variable
         if( variable instanceof PropertyNode pn )
             return (MethodNode) pn.getNodeMetaData("access.method");
+        // local variable
         if( variable instanceof ASTNode node )
             return node;
         return null;

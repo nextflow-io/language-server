@@ -19,7 +19,6 @@ import java.util.Optional;
 
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
-import nextflow.script.ast.IncludeVariable;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
@@ -122,17 +121,11 @@ public class TypeCheckingVisitor extends ScriptVisitorSupport {
 
     private MethodNode asMethodOutput(PropertyExpression node) {
         if( node.getObjectExpression() instanceof PropertyExpression pe ) {
-            if( pe.getObjectExpression() instanceof VariableExpression ve && "out".equals(pe.getPropertyAsString()) )
-                return methodFromVariable(ve.getAccessedVariable());
+            if( pe.getObjectExpression() instanceof VariableExpression ve && "out".equals(pe.getPropertyAsString()) ) {
+                if( ve.getAccessedVariable() instanceof PropertyNode pn )
+                    return (MethodNode) pn.getNodeMetaData("access.method");
+            }
         }
-        return null;
-    }
-
-    private static MethodNode methodFromVariable(Variable variable) {
-        if( variable instanceof IncludeVariable iv )
-            return iv.getMethod();
-        if( variable instanceof PropertyNode pn )
-            return (MethodNode) pn.getNodeMetaData("access.method");
         return null;
     }
 

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
@@ -74,14 +75,16 @@ public class ResolveIncludeVisitor extends ScriptVisitorSupport {
     @Override
     public void visitInclude(IncludeNode node) {
         var source = node.source.getText();
-        if( source.startsWith("plugin/") )
+        if( source.startsWith("plugin/") ) {
+            setPlaceholderTargets(node);
             return;
+        }
         var includeUri = getIncludeUri(uri, source);
         if( !isIncludeStale(node, includeUri) )
             return;
         changed = true;
         for( var module : node.modules )
-            module.setMethod(null);
+            module.setTarget(null);
         var includeUnit = compiler.getSource(includeUri);
         if( includeUnit == null ) {
             addError("Invalid include source: '" + includeUri + "'", node);
@@ -101,11 +104,20 @@ public class ResolveIncludeVisitor extends ScriptVisitorSupport {
                 addError("Included name '" + includedName + "' is not defined in module '" + includeUri + "'", node);
                 continue;
             }
-            module.setMethod(includedNode.get());
+            module.setTarget(includedNode.get());
         }
     }
 
-    protected static URI getIncludeUri(URI uri, String source) {
+    private static void setPlaceholderTargets(IncludeNode node) {
+        for( var module : node.modules ) {
+            if( module.getTarget() == null ) {
+                var target = new FunctionNode(module.getNameOrAlias());
+                module.setTarget(target);
+            }
+        }
+    }
+
+    private static URI getIncludeUri(URI uri, String source) {
         Path includePath = Path.of(uri).getParent().resolve(source);
         if( Files.isDirectory(includePath) )
             includePath = includePath.resolve("main.nf");
@@ -114,17 +126,17 @@ public class ResolveIncludeVisitor extends ScriptVisitorSupport {
         return includePath.normalize().toUri();
     }
 
-    protected boolean isIncludeStale(IncludeNode node, URI includeUri) {
+    private boolean isIncludeStale(IncludeNode node, URI includeUri) {
         if( changedUris.contains(uri) || changedUris.contains(includeUri) )
             return true;
         for( var module : node.modules ) {
-            if( module.getMethod() == null )
+            if( module.getTarget() == null )
                 return true;
         }
         return false;
     }
 
-    protected List<MethodNode> getDefinitions(URI uri) {
+    private List<MethodNode> getDefinitions(URI uri) {
         var scriptNode = (ScriptNode) compiler.getSource(uri).getAST();
         var result = new ArrayList<MethodNode>();
         result.addAll(scriptNode.getWorkflows());

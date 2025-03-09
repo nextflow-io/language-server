@@ -356,7 +356,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
     private boolean isIncluded(URI uri, MethodNode node) {
         for( var includeNode : ast.getIncludeNodes(uri) ) {
             for( var module : includeNode.modules ) {
-                if( module.getMethod() == node )
+                if( module.getTarget() == node )
                     return true;
             }
         }

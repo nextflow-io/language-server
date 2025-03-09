@@ -22,7 +22,6 @@ import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
-import nextflow.script.ast.IncludeVariable;
 import nextflow.script.ast.OutputNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
@@ -109,11 +108,11 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
 
     private void declareInclude(IncludeNode node) {
         for( var module : node.modules ) {
-            var name = module.getName();
+            var name = module.getNameOrAlias();
             var otherInclude = vsc.getInclude(name);
             if( otherInclude != null )
-                vsc.addError("`" + name + "` is already included", node, "First included here", (ASTNode) otherInclude);
-            vsc.include(name, module);
+                vsc.addError("`" + name + "` is already included", node, "First included here", otherInclude);
+            vsc.include(name, module.getTarget());
         }
     }
 
@@ -122,7 +121,7 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         var name = mn.getName();
         var otherInclude = vsc.getInclude(name);
         if( otherInclude != null ) {
-            vsc.addError("`" + name + "` is already included", mn, "First included here", (ASTNode) otherInclude);
+            vsc.addError("`" + name + "` is already included", mn, "First included here", otherInclude);
         }
         var otherMethods = cn.getDeclaredMethods(name);
         if( otherMethods.size() > 0 ) {
@@ -313,9 +312,9 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
             return null;
         }
         var name = call.getMethodAsString();
-        var variable = vsc.findDslMember(currentScope().getClassScope(), name, call.getMethod());
-        if( variable != null )
-            currentScope().putReferencedClassVariable(variable);
+        var defNode = vsc.findDslFunction(name, call.getMethod());
+        if( defNode != null )
+            call.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, defNode);
         else
             vsc.addError("Invalid " + typeLabel + " `" + name + "`", node);
         return call;
@@ -458,7 +457,7 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
     private boolean declareAssignedVariable(VariableExpression ve) {
         var variable = vsc.findVariableDeclaration(ve.getName(), ve);
         if( variable != null ) {
-            if( isBuiltinVariable(variable) )
+            if( isDslVariable(variable) )
                 vsc.addError("Built-in variable cannot be re-assigned", ve);
             else
                 checkExternalWriteInAsyncClosure(ve, variable);
@@ -480,7 +479,7 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         }
     }
 
-    private boolean isBuiltinVariable(Variable variable) {
+    private boolean isDslVariable(Variable variable) {
         return variable instanceof PropertyNode pn
             && pn.getNodeMetaData("access.method") instanceof MethodNode mn
             && findAnnotation(mn, Constant.class).isPresent();
@@ -506,7 +505,7 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         if( target == null )
             return;
         var variable = vsc.findVariableDeclaration(target.getName(), target);
-        if( isBuiltinVariable(variable) ) {
+        if( isDslVariable(variable) ) {
             if( "params".equals(variable.getName()) )
                 sourceUnit.addWarning("Params should be declared at the top-level (i.e. outside the workflow)", target);
             // TODO: re-enable after workflow.onComplete bug is fixed
@@ -570,23 +569,15 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         if( !node.isImplicitThis() )
             return;
         var name = node.getMethodAsString();
-        var variable = vsc.findVariableDeclaration(name, node);
-        var defNode = methodFromVariable(variable);
-        if( defNode == null ) {
-            if( !KEYWORDS.contains(name) )
-                vsc.addError("`" + name + "` is not defined", node.getMethod());
-            return;
+        var defNode = vsc.findDslFunction(name, node);
+        if( defNode != null ) {
+            if( defNode instanceof ProcessNode || defNode instanceof WorkflowNode )
+                checkProcessOrWorkflowCall(node, defNode);
+            node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, defNode);
         }
-        if( defNode instanceof ProcessNode || defNode instanceof WorkflowNode )
-            checkProcessOrWorkflowCall(node, defNode);
-    }
-
-    private static MethodNode methodFromVariable(Variable variable) {
-        if( variable instanceof IncludeVariable iv )
-            return iv.getMethod();
-        if( variable instanceof PropertyNode pn )
-            return (MethodNode) pn.getNodeMetaData("access.method");
-        return null;
+        else if( !KEYWORDS.contains(name) ) {
+            vsc.addError("`" + name + "` is not defined", node.getMethod());
+        }
     }
 
     private void checkProcessOrWorkflowCall(MethodCallExpression node, MethodNode defNode) {
@@ -600,7 +591,6 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
             vsc.addError(type + " cannot be called from within a closure", node);
             return;
         }
-        node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, defNode);
     }
 
     @Override

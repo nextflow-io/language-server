@@ -16,17 +16,13 @@
 package nextflow.script.ast;
 
 import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.ast.ClassHelper;
-import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.Variable;
-import org.codehaus.groovy.ast.expr.Expression;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class IncludeVariable extends ASTNode implements Variable {
+public class IncludeVariable extends ASTNode {
     public final String name;
     public final String alias;
 
@@ -39,61 +35,17 @@ public class IncludeVariable extends ASTNode implements Variable {
         this(name, null);
     }
 
-    private MethodNode method;
-
-    public void setMethod(MethodNode method) {
-        this.method = method;
-    }
-
-    public MethodNode getMethod() {
-        return method;
-    }
-
-    @Override
-    public ClassNode getType() {
-        return method != null ? method.getReturnType() : ClassHelper.dynamicType();
-    }
-
-    @Override
-    public ClassNode getOriginType() {
-        return method != null ? method.getReturnType() : ClassHelper.dynamicType();
-    }
-
-    @Override
-    public String getName() {
+    public String getNameOrAlias() {
         return alias != null ? alias : name;
     }
 
-    @Override
-    public Expression getInitialExpression() {
-        return null;
+    private MethodNode target;
+
+    public void setTarget(MethodNode target) {
+        this.target = target;
     }
 
-    @Override
-    public boolean hasInitialExpression() {
-        return false;
-    }
-
-    @Override
-    public boolean isInStaticContext() {
-        return false;
-    }
-
-    @Override
-    public boolean isDynamicTyped() {
-        return method == null || method.isDynamicReturnType();
-    }
-
-    @Override
-    public boolean isClosureSharedVariable() {
-        return false;
-    }
-
-    @Override
-    public void setClosureSharedVariable(boolean inClosure) {}
-
-    @Override
-    public int getModifiers() {
-        return method != null ? method.getModifiers() : 0;
+    public MethodNode getTarget() {
+        return target;
     }
 }
