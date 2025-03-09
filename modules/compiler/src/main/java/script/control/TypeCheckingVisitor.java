@@ -86,7 +86,7 @@ public class TypeCheckingVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
-        var defNode = (MethodNode) node.getNodeMetaData(METHOD_TARGET);
+        var defNode = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
         if( defNode instanceof ProcessNode || defNode instanceof WorkflowNode )
             checkMethodCallArguments(node, defNode);
         super.visitMethodCallExpression(node);
@@ -200,6 +200,4 @@ public class TypeCheckingVisitor extends ScriptVisitorSupport {
             return Phases.TYPE_CHECKING;
         }
     }
-
-    private static final String METHOD_TARGET = "_METHOD_TARGET";
 }

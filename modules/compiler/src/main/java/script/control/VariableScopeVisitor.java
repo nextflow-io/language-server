@@ -424,7 +424,7 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
             if( checkImplicitDeclaration(target) ) {
                 var de = new DeclarationExpression(target, ae.getOperation(), source);
                 de.setSourcePosition(ae);
-                de.putNodeMetaData(IMPLICIT_DECLARATION, Boolean.TRUE);
+                de.putNodeMetaData(ASTNodeMarker.IMPLICIT_DECLARATION, Boolean.TRUE);
                 node.setExpression(de);
             }
             else {
@@ -600,7 +600,7 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
             vsc.addError(type + " cannot be called from within a closure", node);
             return;
         }
-        node.putNodeMetaData(METHOD_TARGET, defNode);
+        node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, defNode);
     }
 
     @Override
@@ -697,8 +697,5 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
-
-    private static final String IMPLICIT_DECLARATION = "_IMPLICIT_DECLARATION";
-    private static final String METHOD_TARGET = "_METHOD_TARGET";
 
 }

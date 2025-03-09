@@ -18,6 +18,7 @@ package nextflow.script.formatter;
 import java.util.List;
 import java.util.stream.Stream;
 
+import nextflow.script.control.ASTNodeMarker;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -98,7 +99,7 @@ public class Formatter extends CodeVisitorSupport {
     }
 
     public void appendLeadingComments(ASTNode node) {
-        var comments = (List<String>) node.getNodeMetaData(LEADING_COMMENTS);
+        var comments = (List<String>) node.getNodeMetaData(ASTNodeMarker.LEADING_COMMENTS);
         if( comments == null || comments.isEmpty() )
             return;
 
@@ -114,12 +115,12 @@ public class Formatter extends CodeVisitorSupport {
     }
 
     public boolean hasTrailingComment(ASTNode node) {
-        var comment = (String) node.getNodeMetaData(TRAILING_COMMENT);
+        var comment = (String) node.getNodeMetaData(ASTNodeMarker.TRAILING_COMMENT);
         return comment != null;
     }
 
     public void appendTrailingComment(ASTNode node) {
-        var comment = (String) node.getNodeMetaData(TRAILING_COMMENT);
+        var comment = (String) node.getNodeMetaData(ASTNodeMarker.TRAILING_COMMENT);
         if( comment != null ) {
             append(' ');
             append(comment);
@@ -351,7 +352,7 @@ public class Formatter extends CodeVisitorSupport {
     @Override
     public void visitBinaryExpression(BinaryExpression node) {
         if( node instanceof DeclarationExpression ) {
-            if( node.getNodeMetaData(IMPLICIT_DECLARATION) != Boolean.TRUE )
+            if( node.getNodeMetaData(ASTNodeMarker.IMPLICIT_DECLARATION) != Boolean.TRUE )
                 append("def ");
             inVariableDeclaration = true;
             visit(node.getLeftExpression());
@@ -616,7 +617,7 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitConstantExpression(ConstantExpression node) {
-        var text = (String) node.getNodeMetaData(VERBATIM_TEXT);
+        var text = (String) node.getNodeMetaData(ASTNodeMarker.VERBATIM_TEXT);
         if( text != null )
             append(text);
         else
@@ -630,7 +631,7 @@ public class Formatter extends CodeVisitorSupport {
 
     public void visitTypeAnnotation(ClassNode type) {
         if( isLegacyType(type) ) {
-            append(type.getNodeMetaData(LEGACY_TYPE));
+            append(type.getNodeMetaData(ASTNodeMarker.LEGACY_TYPE));
             return;
         }
 
@@ -660,13 +661,13 @@ public class Formatter extends CodeVisitorSupport {
     @Override
     public void visitGStringExpression(GStringExpression node) {
         // see also: GStringUtil.writeToImpl()
-        var quoteChar = (String) node.getNodeMetaData(QUOTE_CHAR, k -> DQ_STR);
+        var quoteChar = (String) node.getNodeMetaData(ASTNodeMarker.QUOTE_CHAR, k -> DQ_STR);
         append(quoteChar);
         var ss = node.getStrings();
         var vs = node.getValues();
         for( int i = 0; i < ss.size(); i++ ) {
             var string = ss.get(i);
-            if( string.getNodeMetaData(VERBATIM_TEXT) != null )
+            if( string.getNodeMetaData(ASTNodeMarker.VERBATIM_TEXT) != null )
                 visit(string);
             if( i < vs.size() ) {
                 append("${");
@@ -679,7 +680,7 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visit(Expression node) {
-        var number = (Number) node.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
+        var number = (Number) node.getNodeMetaData(ASTNodeMarker.INSIDE_PARENTHESES_LEVEL);
         if( number != null && number.intValue() > 0 )
             append('(');
         super.visit(node);
@@ -690,11 +691,11 @@ public class Formatter extends CodeVisitorSupport {
     // helpers
 
     private static boolean hasTrailingComma(Expression node) {
-        return node.getNodeMetaData(TRAILING_COMMA) != null;
+        return node.getNodeMetaData(ASTNodeMarker.TRAILING_COMMA) != null;
     }
 
     public static boolean isLegacyType(ClassNode cn) {
-        return cn.getNodeMetaData(LEGACY_TYPE) != null;
+        return cn.getNodeMetaData(ASTNodeMarker.LEGACY_TYPE) != null;
     }
 
     private boolean shouldWrapExpression(Expression node) {
@@ -736,15 +737,5 @@ public class Formatter extends CodeVisitorSupport {
     private static final String TSQ_STR = "'''";
     private static final String SQ_STR = "'";
     private static final String DQ_STR = "\"";
-
-    private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
-    private static final String IMPLICIT_DECLARATION = "_IMPLICIT_DECLARATION";
-    private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
-    private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
-    private static final String LEGACY_TYPE = "_LEGACY_TYPE";
-    private static final String QUOTE_CHAR = "_QUOTE_CHAR";
-    private static final String TRAILING_COMMA = "_TRAILING_COMMA";
-    private static final String TRAILING_COMMENT = "_TRAILING_COMMENT";
-    private static final String VERBATIM_TEXT = "_VERBATIM_TEXT";
 
 }

@@ -297,7 +297,7 @@ public class ResolveVisitor extends ClassCodeExpressionTransformer {
         var className = lookupClassName(result);
         if( className != null ) {
             var type = ClassHelper.make(className);
-            type.putNodeMetaData("_FULLY_QUALIFIED", true);
+            type.putNodeMetaData(ASTNodeMarker.FULLY_QUALIFIED, true);
             if( resolve(type) )
                 return new ClassExpression(type);
         }

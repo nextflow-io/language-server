@@ -26,6 +26,7 @@ import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.IncludeVariable;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.control.ASTNodeMarker;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.types.Channel;
@@ -284,7 +285,7 @@ public class ASTUtils {
      * @param argIndex
      */
     public static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache ast, int argIndex) {
-        var target = (MethodNode) ((ASTNode) node).getNodeMetaData(METHOD_TARGET);
+        var target = (MethodNode) ((ASTNode) node).getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
         if( target != null )
             return target;
         var methods = getMethodOverloadsFromCallExpression(node, ast);
@@ -408,6 +409,4 @@ public class ASTUtils {
         }
         return null;
     }
-
-    private static final String METHOD_TARGET = "_METHOD_TARGET";
 }

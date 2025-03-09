@@ -31,6 +31,7 @@ import nextflow.config.ast.ConfigIncludeNode;
 import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigStatement;
+import nextflow.script.control.ASTNodeMarker;
 import nextflow.script.parser.DescriptiveErrorStrategy;
 import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStream;
@@ -507,7 +508,7 @@ public class ConfigAstBuilder {
     private Statement assignment(AssignmentStatementContext ctx) {
         var left = expression(ctx.left);
         if( left instanceof VariableExpression && isInsideParentheses(left) ) {
-            if( left.<Number>getNodeMetaData(INSIDE_PARENTHESES_LEVEL).intValue() > 1 )
+            if( left.<Number>getNodeMetaData(ASTNodeMarker.INSIDE_PARENTHESES_LEVEL).intValue() > 1 )
                 throw createParsingFailedException("Nested parenthesis is not allowed in multiple assignment, e.g. ((a)) = b", ctx);
 
             var tuple = ast( new TupleExpression(left), ctx.left );
@@ -744,7 +745,7 @@ public class ConfigAstBuilder {
     private Expression pathArgumentsElement(Expression caller, ArgumentsContext ctx) {
         var arguments = argumentList(ctx.argumentList());
         if( ctx.COMMA() != null )
-            arguments.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
+            arguments.putNodeMetaData(ASTNodeMarker.TRAILING_COMMA, Boolean.TRUE);
         return ast( methodCall(caller, arguments), caller, ctx );
     }
 
@@ -857,7 +858,7 @@ public class ConfigAstBuilder {
     private ConstantExpression string(ParserRuleContext ctx) {
         var text = ctx.getText();
         var result = constX(stringLiteral(text));
-        result.putNodeMetaData(VERBATIM_TEXT, text);
+        result.putNodeMetaData(ASTNodeMarker.VERBATIM_TEXT, text);
         return result;
     }
 
@@ -915,7 +916,7 @@ public class ConfigAstBuilder {
         }
 
         var result = builder.build(verbatimText);
-        result.putNodeMetaData(QUOTE_CHAR, beginQuotation);
+        result.putNodeMetaData(ASTNodeMarker.QUOTE_CHAR, beginQuotation);
         return result;
     }
 
@@ -963,7 +964,7 @@ public class ConfigAstBuilder {
             .append(beginQuotation)
             .toString();
         var result = constX(stringLiteral(quotedText));
-        result.putNodeMetaData(VERBATIM_TEXT, text);
+        result.putNodeMetaData(ASTNodeMarker.VERBATIM_TEXT, text);
         return result;
     }
 
@@ -999,13 +1000,13 @@ public class ConfigAstBuilder {
         var type = createdName(ctx.createdName());
         var arguments = argumentList(ctx.arguments().argumentList());
         if( ctx.arguments().COMMA() != null )
-            arguments.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
+            arguments.putNodeMetaData(ASTNodeMarker.TRAILING_COMMA, Boolean.TRUE);
         return ctorX(type, arguments);
     }
 
     private Expression parExpression(ParExpressionContext ctx) {
         var expression = expression(ctx.expression());
-        expression.getNodeMetaData(INSIDE_PARENTHESES_LEVEL, k -> new AtomicInteger()).getAndAdd(1);
+        expression.getNodeMetaData(ASTNodeMarker.INSIDE_PARENTHESES_LEVEL, k -> new AtomicInteger()).getAndAdd(1);
         return expression;
     }
 
@@ -1021,7 +1022,7 @@ public class ConfigAstBuilder {
 
         var result = listX(expressionList(ctx.expressionList()));
         if( ctx.COMMA() != null )
-            result.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
+            result.putNodeMetaData(ASTNodeMarker.TRAILING_COMMA, Boolean.TRUE);
         return result;
     }
 
@@ -1043,7 +1044,7 @@ public class ConfigAstBuilder {
             .toList();
         var result = mapX(entries);
         if( ctx.COMMA() != null )
-            result.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
+            result.putNodeMetaData(ASTNodeMarker.TRAILING_COMMA, Boolean.TRUE);
         return result;
     }
 
@@ -1240,7 +1241,7 @@ public class ConfigAstBuilder {
         var text = ctx.getText();
         var classNode = ClassHelper.make(text);
         if( text.contains(".") )
-            classNode.putNodeMetaData(FULLY_QUALIFIED, true);
+            classNode.putNodeMetaData(ASTNodeMarker.FULLY_QUALIFIED, true);
 
         if( classNode.isUsingGenerics() && allowProxy ) {
             var proxy = ClassHelper.makeWithoutCaching(classNode.getName());
@@ -1291,7 +1292,7 @@ public class ConfigAstBuilder {
             child = child.getParent();
 
         if( !comments.isEmpty() )
-            node.putNodeMetaData(LEADING_COMMENTS, comments);
+            node.putNodeMetaData(ASTNodeMarker.LEADING_COMMENTS, comments);
     }
 
     private boolean saveLeadingComments0(ParserRuleContext ctx, List<String> comments) {
@@ -1341,7 +1342,7 @@ public class ConfigAstBuilder {
     /// HELPERS
 
     private boolean isInsideParentheses(NodeMetaDataHandler nodeMetaDataHandler) {
-        Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
+        Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(ASTNodeMarker.INSIDE_PARENTHESES_LEVEL);
         return insideParenLevel != null && insideParenLevel.intValue() > 0;
     }
 
@@ -1448,13 +1449,6 @@ public class ConfigAstBuilder {
     private static final String TSQ_STR = "'''";
     private static final String SQ_STR = "'";
     private static final String DQ_STR = "\"";
-
-    private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
-    private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
-    private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
-    private static final String QUOTE_CHAR = "_QUOTE_CHAR";
-    private static final String TRAILING_COMMA = "_TRAILING_COMMA";
-    private static final String VERBATIM_TEXT = "_VERBATIM_TEXT";
 
     private static final List<String> GROOVY_KEYWORDS = List.of(
         Types.getText(Types.KEYWORD_ABSTRACT),

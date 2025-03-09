@@ -23,6 +23,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 
+import nextflow.script.control.ASTNodeMarker;
 import org.codehaus.groovy.ast.ClassNode;
 
 public class Types {
@@ -77,7 +78,7 @@ public class Types {
             builder.append(getName(type.getTypeClass()));
         }
         else {
-            var fullyQualified = type.getNodeMetaData("_FULLY_QUALIFIED") != null;
+            var fullyQualified = type.getNodeMetaData(ASTNodeMarker.FULLY_QUALIFIED) != null;
             var name = fullyQualified
                 ? type.getName()
                 : type.getNameWithoutPackage();

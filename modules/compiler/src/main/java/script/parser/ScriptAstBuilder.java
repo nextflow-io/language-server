@@ -38,6 +38,7 @@ import nextflow.script.ast.ParamNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.control.ASTNodeMarker;
 import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -836,7 +837,7 @@ public class ScriptAstBuilder {
     private Statement assignment(AssignmentStatementContext ctx) {
         var left = expression(ctx.left);
         if( left instanceof VariableExpression && isInsideParentheses(left) ) {
-            if( left.<Number>getNodeMetaData(INSIDE_PARENTHESES_LEVEL).intValue() > 1 )
+            if( left.<Number>getNodeMetaData(ASTNodeMarker.INSIDE_PARENTHESES_LEVEL).intValue() > 1 )
                 throw createParsingFailedException("Nested parenthesis is not allowed in multiple assignment, e.g. ((a)) = b", ctx);
 
             var tuple = ast( new TupleExpression(left), ctx.left );
@@ -1085,7 +1086,7 @@ public class ScriptAstBuilder {
     private Expression pathArgumentsElement(Expression caller, ArgumentsContext ctx) {
         var arguments = argumentList(ctx.argumentList());
         if( ctx.COMMA() != null )
-            arguments.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
+            arguments.putNodeMetaData(ASTNodeMarker.TRAILING_COMMA, Boolean.TRUE);
         return ast( methodCall(caller, arguments), caller, ctx );
     }
 
@@ -1198,7 +1199,7 @@ public class ScriptAstBuilder {
     private ConstantExpression string(ParserRuleContext ctx) {
         var text = ctx.getText();
         var result = constX(stringLiteral(text));
-        result.putNodeMetaData(VERBATIM_TEXT, text);
+        result.putNodeMetaData(ASTNodeMarker.VERBATIM_TEXT, text);
         return result;
     }
 
@@ -1256,7 +1257,7 @@ public class ScriptAstBuilder {
         }
 
         var result = builder.build(verbatimText);
-        result.putNodeMetaData(QUOTE_CHAR, beginQuotation);
+        result.putNodeMetaData(ASTNodeMarker.QUOTE_CHAR, beginQuotation);
         return result;
     }
 
@@ -1304,7 +1305,7 @@ public class ScriptAstBuilder {
             .append(beginQuotation)
             .toString();
         var result = constX(stringLiteral(quotedText));
-        result.putNodeMetaData(VERBATIM_TEXT, text);
+        result.putNodeMetaData(ASTNodeMarker.VERBATIM_TEXT, text);
         return result;
     }
 
@@ -1340,13 +1341,13 @@ public class ScriptAstBuilder {
         var type = createdName(ctx.createdName());
         var arguments = argumentList(ctx.arguments().argumentList());
         if( ctx.arguments().COMMA() != null )
-            arguments.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
+            arguments.putNodeMetaData(ASTNodeMarker.TRAILING_COMMA, Boolean.TRUE);
         return ctorX(type, arguments);
     }
 
     private Expression parExpression(ParExpressionContext ctx) {
         var expression = expression(ctx.expression());
-        expression.getNodeMetaData(INSIDE_PARENTHESES_LEVEL, k -> new AtomicInteger()).getAndAdd(1);
+        expression.getNodeMetaData(ASTNodeMarker.INSIDE_PARENTHESES_LEVEL, k -> new AtomicInteger()).getAndAdd(1);
         return expression;
     }
 
@@ -1387,7 +1388,7 @@ public class ScriptAstBuilder {
 
         var result = listX(expressionList(ctx.expressionList()));
         if( ctx.COMMA() != null )
-            result.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
+            result.putNodeMetaData(ASTNodeMarker.TRAILING_COMMA, Boolean.TRUE);
         return result;
     }
 
@@ -1409,7 +1410,7 @@ public class ScriptAstBuilder {
             .toList();
         var result = mapX(entries);
         if( ctx.COMMA() != null )
-            result.putNodeMetaData(TRAILING_COMMA, Boolean.TRUE);
+            result.putNodeMetaData(ASTNodeMarker.TRAILING_COMMA, Boolean.TRUE);
         return result;
     }
 
@@ -1606,7 +1607,7 @@ public class ScriptAstBuilder {
         var text = ctx.getText();
         var classNode = ClassHelper.make(text);
         if( text.contains(".") )
-            classNode.putNodeMetaData(FULLY_QUALIFIED, true);
+            classNode.putNodeMetaData(ASTNodeMarker.FULLY_QUALIFIED, true);
 
         if( classNode.isUsingGenerics() && allowProxy ) {
             var proxy = ClassHelper.makeWithoutCaching(classNode.getName());
@@ -1651,7 +1652,7 @@ public class ScriptAstBuilder {
     private ClassNode legacyType(ParserRuleContext ctx) {
         var result = ClassHelper.dynamicType();
         if( ctx != null )
-            result.putNodeMetaData(LEGACY_TYPE, ctx.getText());
+            result.putNodeMetaData(ASTNodeMarker.LEGACY_TYPE, ctx.getText());
         return result;
     }
 
@@ -1664,7 +1665,7 @@ public class ScriptAstBuilder {
             child = child.getParent();
 
         if( !comments.isEmpty() )
-            node.putNodeMetaData(LEADING_COMMENTS, comments);
+            node.putNodeMetaData(ASTNodeMarker.LEADING_COMMENTS, comments);
     }
 
     private boolean saveLeadingComments0(ParserRuleContext ctx, List<String> comments) {
@@ -1743,7 +1744,7 @@ public class ScriptAstBuilder {
         if( next instanceof SepContext sep ) {
             var text = sep.children.get(0).getText();
             if( !";".equals(text) && !"\n".equals(text) )
-                node.putNodeMetaData(TRAILING_COMMENT, text);
+                node.putNodeMetaData(ASTNodeMarker.TRAILING_COMMENT, text);
         }
 
         return false;
@@ -1752,7 +1753,7 @@ public class ScriptAstBuilder {
     /// HELPERS
 
     private boolean isInsideParentheses(NodeMetaDataHandler nodeMetaDataHandler) {
-        Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(INSIDE_PARENTHESES_LEVEL);
+        Number insideParenLevel = nodeMetaDataHandler.getNodeMetaData(ASTNodeMarker.INSIDE_PARENTHESES_LEVEL);
         return insideParenLevel != null && insideParenLevel.intValue() > 0;
     }
 
@@ -1863,15 +1864,6 @@ public class ScriptAstBuilder {
     private static final String TSQ_STR = "'''";
     private static final String SQ_STR = "'";
     private static final String DQ_STR = "\"";
-
-    private static final String FULLY_QUALIFIED = "_FULLY_QUALIFIED";
-    private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
-    private static final String LEADING_COMMENTS = "_LEADING_COMMENTS";
-    private static final String LEGACY_TYPE = "_LEGACY_TYPE";
-    private static final String QUOTE_CHAR = "_QUOTE_CHAR";
-    private static final String TRAILING_COMMA = "_TRAILING_COMMA";
-    private static final String TRAILING_COMMENT = "_TRAILING_COMMENT";
-    private static final String VERBATIM_TEXT = "_VERBATIM_TEXT";
 
     private static final List<String> GROOVY_KEYWORDS = List.of(
         Types.getText(Types.KEYWORD_ABSTRACT),
