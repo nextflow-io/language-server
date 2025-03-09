@@ -15,6 +15,7 @@
  */
 package nextflow.script.types;
 
+import java.lang.String;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -29,10 +30,22 @@ public class Types {
         new ClassNode(Path.class)
     );
 
+    // TODO: normalize ClassNode -> String, rename shim types
     public static String normalize(String name) {
-        if( "Object".equals(name) )
-            return "?";
-        return name;
+        return switch (name) {
+            case "Object" -> "?";
+            default -> name;
+        };
+        // if( "BiConsumer<K, V>".equals(name) )
+        //     return "Closure<(K, V)>";
+        // if( "BiFunction<R, E, R>".equals(name) )
+        //     return "Closure<(R, E) -> R>";
+        // if( "Consumer<E>".equals(name) )
+        //     return "Closure<(E)>";
+        // if( "Function<E, R>".equals(name) )
+        //     return "Closure<(E) -> R>";
+        // if( "Predicate<E>".equals(name) )
+        //     return "Closure<(E) -> boolean>";
     }
 
 }

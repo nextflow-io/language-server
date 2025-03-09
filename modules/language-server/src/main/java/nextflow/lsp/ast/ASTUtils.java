@@ -19,6 +19,7 @@ import java.lang.reflect.Modifier;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import nextflow.script.ast.AssignmentExpression;
@@ -30,6 +31,7 @@ import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.types.Channel;
 import nextflow.script.types.NamedTuple;
+import nextflow.script.types.ShimType;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -128,6 +130,25 @@ public class ASTUtils {
             .iterator();
     }
 
+    private static final Map<ClassNode,ClassNode> SHIM_TYPES = getShimTypes();
+
+    private static Map<ClassNode,ClassNode> getShimTypes() {
+        var types = List.of(
+            nextflow.script.types.List.class,
+            nextflow.script.types.Map.class,
+            nextflow.script.types.Path.class,
+            nextflow.script.types.Set.class,
+            nextflow.script.types.String.class
+        );
+        return types.stream().collect(Collectors.toMap(
+            (clazz) -> {
+                var shim = clazz.getAnnotation(ShimType.class).value();
+                return ClassHelper.makeCached(shim);
+            },
+            (clazz) -> ClassHelper.makeCached(clazz)
+        ));
+    }
+
     /**
      * Get the type (i.e. class node) of an ast node.
      *
@@ -135,6 +156,14 @@ public class ASTUtils {
      * @param ast
      */
     public static ClassNode getType(ASTNode node, ASTNodeCache ast) {
+        var result = getType0(node, ast);
+        var shim = SHIM_TYPES.get(result);
+        if( shim != null )
+            return shim;
+        return result;
+    }
+
+    private static ClassNode getType0(ASTNode node, ASTNodeCache ast) {
         if( node instanceof ClassExpression ce ) {
             // type(Foo.bar) -> type(Foo)
             return ce.getType();
@@ -318,7 +347,7 @@ public class ASTUtils {
             else {
                 var leftType = getType(mce.getObjectExpression(), ast);
                 if( leftType != null )
-                    return leftType.getMethods(mce.getMethodAsString());
+                    return getMethodsForType(leftType, mce.getMethodAsString());
             }
         }
 
@@ -332,6 +361,18 @@ public class ASTUtils {
         }
 
         return Collections.emptyList();
+    }
+
+    private static List<MethodNode> getMethodsForType(ClassNode cn, String name) {
+        try {
+            return cn.getAllDeclaredMethods().stream()
+                .filter(mn -> mn.getName().equals(name))
+                .filter(mn -> !ClassHelper.isObjectType(mn.getDeclaringClass()))
+                .collect(Collectors.toList());
+        }
+        catch( NullPointerException e ) {
+            return Collections.emptyList();
+        }
     }
 
     private static int getArgumentsScore(Parameter[] parameters, ArgumentListExpression arguments, int argIndex) {
