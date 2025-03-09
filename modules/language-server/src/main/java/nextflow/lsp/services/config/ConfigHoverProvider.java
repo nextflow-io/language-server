@@ -27,6 +27,7 @@ import nextflow.lsp.ast.ASTNodeStringUtils;
 import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.HoverProvider;
 import nextflow.lsp.util.Logger;
+import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
@@ -101,9 +102,9 @@ public class ConfigHoverProvider implements HoverProvider {
             var fqName = String.join(".", names);
             var option = ConfigSchema.ROOT.getOption(names);
             if( option != null ) {
-                var description = StringGroovyMethods.stripIndent(option, true).trim();
+                var description = StringGroovyMethods.stripIndent(option.description(), true).trim();
                 var builder = new StringBuilder();
-                builder.append("`" + fqName + "`");
+                builder.append(String.format("`%s (%s)`", fqName, Types.getName(option.type())));
                 builder.append("\n\n");
                 builder.append(description);
                 return builder.toString();

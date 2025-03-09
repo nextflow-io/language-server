@@ -25,6 +25,7 @@ import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.dsl.ConfigSchema;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
+import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
@@ -41,10 +42,13 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit;
 
+    private boolean typeChecking;
+
     private List<String> scopes = new ArrayList<>();
 
-    public ConfigSchemaVisitor(SourceUnit sourceUnit) {
+    public ConfigSchemaVisitor(SourceUnit sourceUnit, boolean typeChecking) {
         this.sourceUnit = sourceUnit;
+        this.typeChecking = typeChecking;
     }
 
     @Override
@@ -78,12 +82,25 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
             return;
         }
 
+        // validate config option
         var fqName = String.join(".", names);
         if( fqName.startsWith("process.ext.") )
             return;
         var option = ConfigSchema.ROOT.getOption(names);
-        if( option == null )
-            addWarning("Unrecognized config option '" + fqName + "'", String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
+        if( option == null ) {
+            var message = "Unrecognized config option '" + fqName + "'";
+            addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
+            return;
+        }
+        // validate type
+        if( typeChecking ) {
+            var expectedType = option.type();
+            var actualType = node.value.getType().getTypeClass();
+            if( expectedType != null && !Types.isAssignableFrom(expectedType, actualType) ) {
+                var message = "Type mismatch for config option '" + fqName + "' -- expected a " + Types.getName(expectedType) + " but received a " + Types.getName(actualType);
+                addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
+            }
+        }
     }
 
     @Override

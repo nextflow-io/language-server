@@ -128,7 +128,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private Map<String, LanguageService> scriptServices = new HashMap<>();
     private Map<String, LanguageService> configServices = new HashMap<>();
 
-    private LanguageServerConfiguration configuration = new LanguageServerConfiguration(Collections.emptyList(), false, false, false);
+    private LanguageServerConfiguration configuration = LanguageServerConfiguration.defaults();
 
     // -- LanguageServer
 
@@ -447,21 +447,23 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             Logger.setDebugEnabled(debug);
 
         var excludePatterns = getJsonStringArray(params.getSettings(), "nextflow.files.exclude");
-        if( !DefaultGroovyMethods.equals(configuration.excludePatterns(), excludePatterns) ) {
+        if( !DefaultGroovyMethods.equals(configuration.excludePatterns(), excludePatterns) )
             shouldInitialize = true;
-        }
         var harshilAlignment = getJsonBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
         var maheshForm = getJsonBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
         var paranoidWarnings = getJsonBoolean(params.getSettings(), "nextflow.paranoidWarnings");
-        if( paranoidWarnings != null && configuration.paranoidWarnings() != paranoidWarnings ) {
+        if( paranoidWarnings != null && configuration.paranoidWarnings() != paranoidWarnings )
             shouldInitialize = true;
-        }
+        var typeChecking = getJsonBoolean(params.getSettings(), "nextflow.typeChecking");
+        if( typeChecking != null && configuration.typeChecking() != typeChecking )
+            shouldInitialize = true;
 
         configuration = new LanguageServerConfiguration(
             excludePatterns,
             harshilAlignment != null ? harshilAlignment : configuration.harshilAlignment(),
             maheshForm != null ? maheshForm : configuration.maheshForm(),
-            paranoidWarnings != null ? paranoidWarnings : configuration.paranoidWarnings()
+            paranoidWarnings != null ? paranoidWarnings : configuration.paranoidWarnings(),
+            typeChecking != null ? typeChecking : configuration.typeChecking()
         );
 
         if( shouldInitialize ) {

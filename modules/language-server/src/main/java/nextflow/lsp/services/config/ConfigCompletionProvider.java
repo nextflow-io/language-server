@@ -25,10 +25,12 @@ import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.dsl.ConfigSchema;
 import nextflow.config.dsl.ConfigScope;
+import nextflow.config.dsl.OptionNode;
 import nextflow.config.dsl.ScopeNode;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.Logger;
+import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
@@ -115,9 +117,15 @@ public class ConfigCompletionProvider implements CompletionProvider {
     private List<CompletionItem> getConfigOptions(List<String> names) {
         var scope = ConfigSchema.ROOT.getScope(names);
         if( scope instanceof ScopeNode sn ) {
-            return sn.options().entrySet().stream()
-                .map(entry -> getConfigOption(entry.getKey(), entry.getValue()))
-                .toList();
+            var result = new ArrayList<CompletionItem>(sn.options().size() + sn.scopes().size());
+            sn.options().forEach((name, option) -> {
+                result.add(getConfigOption(name, option));
+            });
+            sn.scopes().forEach((name, scope1) -> {
+                if( scope1 instanceof ScopeNode sn1 )
+                    result.add(getConfigScopeDot(name, sn1));
+            });
+            return result;
         }
         return Collections.emptyList();
     }
@@ -161,10 +169,12 @@ public class ConfigCompletionProvider implements CompletionProvider {
         return item;
     }
 
-    private static CompletionItem getConfigOption(String name, String documentation) {
+    private static CompletionItem getConfigOption(String name, OptionNode option) {
+        var documentation = StringGroovyMethods.stripIndent(option.description(), true).trim();
         var item = new CompletionItem(name);
         item.setKind(CompletionItemKind.Property);
-        item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, StringGroovyMethods.stripIndent(documentation, true).trim()));
+        item.setDetail(String.format("%s: %s", name, Types.getName(option.type())));
+        item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation));
         item.setInsertText(String.format("%s = $1", name));
         item.setInsertTextFormat(InsertTextFormat.Snippet);
         item.setInsertTextMode(InsertTextMode.AdjustIndentation);

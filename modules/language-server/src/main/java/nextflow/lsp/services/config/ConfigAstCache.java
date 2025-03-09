@@ -27,6 +27,7 @@ import nextflow.config.parser.ConfigParserPluginFactory;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
+import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import org.codehaus.groovy.ast.ASTNode;
@@ -40,11 +41,13 @@ import org.codehaus.groovy.control.messages.WarningMessage;
  */
 public class ConfigAstCache extends ASTNodeCache {
 
+    private LanguageServerConfiguration configuration;
+
     public ConfigAstCache() {
-        super(newCompiler());
+        super(createCompiler());
     }
 
-    private static LanguageServerCompiler newCompiler() {
+    private static LanguageServerCompiler createCompiler() {
         var config = createConfiguration();
         var classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true);
         return new LanguageServerCompiler(config, classLoader);
@@ -55,6 +58,10 @@ public class ConfigAstCache extends ASTNodeCache {
         config.setPluginFactory(new ConfigParserPluginFactory());
         config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
         return config;
+    }
+
+    public void initialize(LanguageServerConfiguration configuration) {
+        this.configuration = configuration;
     }
 
     @Override
@@ -80,7 +87,7 @@ public class ConfigAstCache extends ASTNodeCache {
                 continue;
             // phase 3: name checking
             new ConfigResolveVisitor(sourceUnit, compiler().compilationUnit()).visit();
-            new ConfigSchemaVisitor(sourceUnit).visit();
+            new ConfigSchemaVisitor(sourceUnit, configuration.typeChecking()).visit();
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;
             // phase 4: type checking

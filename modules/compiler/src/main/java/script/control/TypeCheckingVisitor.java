@@ -18,11 +18,13 @@ package nextflow.script.control;
 import java.util.Optional;
 
 import nextflow.script.ast.AssignmentExpression;
+import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.IncludeVariable;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.PropertyNode;
@@ -47,8 +49,11 @@ public class TypeCheckingVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    public TypeCheckingVisitor(SourceUnit sourceUnit) {
+    private boolean experimental;
+
+    public TypeCheckingVisitor(SourceUnit sourceUnit, boolean experimental) {
         this.sourceUnit = sourceUnit;
+        this.experimental = experimental;
     }
 
     @Override
@@ -61,6 +66,23 @@ public class TypeCheckingVisitor extends ScriptVisitorSupport {
         if( moduleNode instanceof ScriptNode sn )
             visit(sn);
     }
+
+    // script declarations
+
+    @Override
+    public void visitFeatureFlag(FeatureFlagNode node) {
+        if( !experimental )
+            return;
+        var fn = node.target;
+        if( fn == null )
+            return;
+        var expectedType = fn.getType();
+        var actualType = node.value.getType();
+        if( !Types.isAssignableFrom(expectedType, actualType) )
+            addError("Type mismatch for feature flag '" + node.name + "' -- expected a " + Types.getName(expectedType) + " but received a " + Types.getName(actualType), node);
+    }
+
+    // expressions
 
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {

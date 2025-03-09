@@ -15,12 +15,24 @@
  */
 package nextflow.lsp.services;
 
+import java.util.Collections;
 import java.util.List;
 
 public record LanguageServerConfiguration(
     List<String> excludePatterns,
     boolean harshilAlignment,
     boolean maheshForm,
-    boolean paranoidWarnings
+    boolean paranoidWarnings,
+    boolean typeChecking
 ) {
+
+    public static LanguageServerConfiguration defaults() {
+        return new LanguageServerConfiguration(
+            Collections.emptyList(),
+            false,
+            false,
+            false,
+            false
+        );
+    }
 }

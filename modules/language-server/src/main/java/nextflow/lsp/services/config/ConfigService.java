@@ -19,6 +19,7 @@ import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.services.HoverProvider;
+import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.LinkProvider;
 import nextflow.lsp.services.SemanticTokensProvider;
@@ -35,6 +36,14 @@ public class ConfigService extends LanguageService {
     @Override
     public boolean matchesFile(String uri) {
         return uri.endsWith(".config") && !uri.endsWith("nf-test.config");
+    }
+
+    @Override
+    public void initialize(String rootUri, LanguageServerConfiguration configuration) {
+        synchronized (this) {
+            astCache.initialize(configuration);
+        }
+        super.initialize(rootUri, configuration);
     }
 
     @Override

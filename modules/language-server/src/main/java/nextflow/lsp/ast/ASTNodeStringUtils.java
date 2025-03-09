@@ -32,6 +32,7 @@ import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDsl;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.script.formatter.Formatter;
+import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -194,7 +195,7 @@ public class ASTNodeStringUtils {
             builder.append("def ");
         }
         if( node.isStatic() ) {
-            builder.append(Formatter.prettyPrintTypeName(node.getDeclaringClass()));
+            builder.append(Types.getName(node.getDeclaringClass()));
             builder.append('.');
         }
         builder.append(node.getName());
@@ -204,7 +205,7 @@ public class ASTNodeStringUtils {
         var returnType = node.getReturnType();
         if( !ClassHelper.OBJECT_TYPE.equals(returnType) && !ClassHelper.VOID_TYPE.equals(returnType) ) {
             builder.append(" -> ");
-            builder.append(Formatter.prettyPrintTypeName(returnType));
+            builder.append(Types.getName(returnType));
         }
         return builder.toString();
     }
@@ -247,7 +248,7 @@ public class ASTNodeStringUtils {
             builder.append("...");
         if( !ClassHelper.OBJECT_TYPE.equals(type) ) {
             builder.append(": ");
-            builder.append(Formatter.prettyPrintTypeName(type));
+            builder.append(Types.getName(type));
         }
         return builder.toString();
     }

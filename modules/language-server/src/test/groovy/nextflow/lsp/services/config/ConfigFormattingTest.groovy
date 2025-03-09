@@ -48,7 +48,7 @@ class ConfigFormattingTest extends Specification {
             workspaceRoot.toFile().mkdirs()
 
         def service = new ConfigService()
-        def configuration = new LanguageServerConfiguration(Collections.emptyList(), false, false, false)
+        def configuration = LanguageServerConfiguration.defaults()
         service.connect(new TestLanguageClient())
         service.initialize(workspaceRoot.toUri().toString(), configuration)
 

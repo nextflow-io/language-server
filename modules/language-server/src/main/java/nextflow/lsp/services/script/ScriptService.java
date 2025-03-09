@@ -50,7 +50,7 @@ public class ScriptService extends LanguageService {
     @Override
     public void initialize(String rootUri, LanguageServerConfiguration configuration) {
         synchronized (this) {
-            astCache.initialize(rootUri);
+            astCache.initialize(rootUri, configuration);
         }
         super.initialize(rootUri, configuration);
     }

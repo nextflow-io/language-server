@@ -393,7 +393,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         populateTypes0(ast.getEnumNodes(uri), namePrefix, items);
 
         // add built-in types
-        populateTypes0(Types.TYPES, namePrefix, items);
+        populateTypes0(Types.DEFAULT_IMPORTS, namePrefix, items);
     }
 
     private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, List<CompletionItem> items) {

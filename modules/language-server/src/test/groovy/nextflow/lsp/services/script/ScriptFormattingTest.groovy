@@ -42,7 +42,7 @@ class ScriptFormattingTest extends Specification {
 
     ScriptService getService(Path workspaceRoot) {
         def service = new ScriptService()
-        def configuration = new LanguageServerConfiguration(Collections.emptyList(), false, false, false)
+        def configuration = LanguageServerConfiguration.defaults()
         service.connect(new TestLanguageClient())
         service.initialize(workspaceRoot.toUri().toString(), configuration)
         return service

@@ -68,12 +68,6 @@ import static nextflow.script.ast.ASTHelpers.*;
  */
 public class Formatter extends CodeVisitorSupport {
 
-    public static String prettyPrintTypeName(ClassNode type) {
-        var fmt = new Formatter(new FormattingOptions(0, false));
-        fmt.visitTypeName(type);
-        return fmt.toString();
-    }
-
     private FormattingOptions options;
 
     private StringBuilder builder = new StringBuilder();
@@ -330,7 +324,7 @@ public class Formatter extends CodeVisitorSupport {
     @Override
     public void visitConstructorCallExpression(ConstructorCallExpression node) {
         append("new ");
-        visitTypeName(node.getType());
+        visitTypeAnnotation(node.getType());
         append('(');
         visitArguments(asMethodCallArguments(node), false);
         append(')');
@@ -487,7 +481,7 @@ public class Formatter extends CodeVisitorSupport {
         for( int i = 0; i < parameters.length; i++ ) {
             var param = parameters[i];
             if( isLegacyType(param.getType()) ) {
-                visitTypeName(param.getType());
+                visitTypeAnnotation(param.getType());
                 append(' ');
             }
             append(param.getName());
@@ -617,7 +611,7 @@ public class Formatter extends CodeVisitorSupport {
     public void visitCastExpression(CastExpression node) {
         visit(node.getExpression());
         append(" as ");
-        visitTypeName(node.getType());
+        visitTypeAnnotation(node.getType());
     }
 
     @Override
@@ -631,42 +625,22 @@ public class Formatter extends CodeVisitorSupport {
 
     @Override
     public void visitClassExpression(ClassExpression node) {
-        visitTypeName(node.getType());
+        visitTypeAnnotation(node.getType());
     }
 
-    protected void visitTypeName(ClassNode type) {
+    public void visitTypeAnnotation(ClassNode type) {
         if( isLegacyType(type) ) {
             append(type.getNodeMetaData(LEGACY_TYPE));
             return;
         }
-        if( type.isArray() ) {
-            visitTypeName(type.getComponentType());
-            return;
-        }
 
-        var fullyQualified = type.getNodeMetaData(FULLY_QUALIFIED) != null;
-        var placeholder = type.isGenericsPlaceHolder();
-        var name = fullyQualified
-            ? type.getName()
-            : placeholder ? type.getUnresolvedName() : type.getNameWithoutPackage();
-        append(nextflow.script.types.Types.normalize(name));
-
-        var genericsTypes = type.getGenericsTypes();
-        if( !placeholder && genericsTypes != null ) {
-            append('<');
-            for( int i = 0; i < genericsTypes.length; i++ ) {
-                if( i > 0 )
-                    append(", ");
-                visitTypeName(genericsTypes[i].getType());
-            }
-            append('>');
-        }
+        append(nextflow.script.types.Types.getName(type));
     }
 
     @Override
     public void visitVariableExpression(VariableExpression node) {
         if( inVariableDeclaration && isLegacyType(node.getType()) ) {
-            visitTypeName(node.getType());
+            visitTypeAnnotation(node.getType());
             append(' ');
         }
         append(node.getText());

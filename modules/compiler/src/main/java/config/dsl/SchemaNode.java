@@ -17,7 +17,7 @@ package nextflow.config.dsl;
 
 import java.util.List;
 
-public sealed interface SchemaNode permits ScopeNode, PlaceholderNode {
+public sealed interface SchemaNode permits ScopeNode, PlaceholderNode, OptionNode {
     String description();
 
     /**
@@ -39,11 +39,11 @@ public sealed interface SchemaNode permits ScopeNode, PlaceholderNode {
     }
 
     /**
-     * Get the description for a given config option.
+     * Get the schema node for a given config option.
      *
      * @param names
      */
-    default String getOption(List<String> names) {
+    default OptionNode getOption(List<String> names) {
         SchemaNode node = this;
         for( int i = 0; i < names.size() - 1; i++ ) {
             var name = names.get(i);

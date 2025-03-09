@@ -44,17 +44,16 @@ public class ConfigSchema {
      * @param description
      */
     private static SchemaNode nextflowScope(String description) {
-        var enableOpts = new HashMap<String, String>();
-        var previewOpts = new HashMap<String, String>();
+        var enableOpts = new HashMap<String, OptionNode>();
+        var previewOpts = new HashMap<String, OptionNode>();
         for( var field : FeatureFlagDsl.class.getDeclaredFields() ) {
             var fqName = field.getAnnotation(FeatureFlag.class).value();
             var names = fqName.split("\\.");
             var simpleName = names[names.length - 1];
-            var desc = field.getAnnotation(Description.class).value();
             if( fqName.startsWith("nextflow.enable.") )
-                enableOpts.put(simpleName, desc);
+                enableOpts.put(simpleName, new OptionNode(field));
             else if( fqName.startsWith("nextflow.preview.") )
-                previewOpts.put(simpleName, desc);
+                previewOpts.put(simpleName, new OptionNode(field));
             else
                 throw new IllegalArgumentException();
         }
@@ -71,13 +70,9 @@ public class ConfigSchema {
      * @param description
      */
     private static SchemaNode processScope(String description) {
-        var options = new HashMap<String, String>();
-        for( var method : ProcessDsl.DirectiveDsl.class.getDeclaredMethods() ) {
-            var desc = method.getAnnotation(Description.class);
-            if( desc != null ) {
-                options.put(method.getName(), desc.value());
-            }
-        }
+        var options = new HashMap<String, OptionNode>();
+        for( var method : ProcessDsl.DirectiveDsl.class.getDeclaredMethods() )
+            options.put(method.getName(), new OptionNode(method));
         return new ScopeNode(description, options, Collections.emptyMap());
     }
 

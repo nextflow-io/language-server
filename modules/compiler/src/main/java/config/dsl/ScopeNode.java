@@ -24,7 +24,7 @@ import nextflow.script.dsl.Description;
 
 public record ScopeNode(
     String description,
-    Map<String, String> options,
+    Map<String, OptionNode> options,
     Map<String, SchemaNode> scopes
 ) implements SchemaNode {
 
@@ -35,17 +35,15 @@ public record ScopeNode(
      * @param description
      */
     public static ScopeNode of(Class<? extends ConfigScope> scope, String description) {
-        var options = new HashMap<String, String>();
+        var options = new HashMap<String, OptionNode>();
         var scopes = new HashMap<String, SchemaNode>();
         for( var field : scope.getDeclaredFields() ) {
             var name = field.getName();
             var type = field.getType();
             var placeholderName = field.getAnnotation(PlaceholderName.class);
             // fields annotated with @ConfigOption are config options
-            if( field.getAnnotation(ConfigOption.class) != null ) {
-                var desc = annotatedDescription(field, "");
-                options.put(name, desc);
-            }
+            if( field.getAnnotation(ConfigOption.class) != null )
+                options.put(name, new OptionNode(field));
             // fields of type ConfigScope are nested config scopes
             else if( ConfigScope.class.isAssignableFrom(type) ) {
                 var desc = annotatedDescription(field, description);
@@ -61,10 +59,8 @@ public record ScopeNode(
             }
         }
         for( var method : scope.getDeclaredMethods() ) {
-            if( method.getAnnotation(ConfigOption.class) != null ) {
-                var desc = annotatedDescription(method, "");
-                options.put(method.getName(), desc);
-            }
+            if( method.getAnnotation(ConfigOption.class) != null )
+                options.put(method.getName(), new OptionNode(method));
         }
         return new ScopeNode(description, options, scopes);
     }

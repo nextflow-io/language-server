@@ -138,7 +138,7 @@ public class GroovyFormatter extends ClassCodeVisitorSupport {
             fmt.append("def ");
         }
         else {
-            fmt.visitTypeName(node.getReturnType());
+            fmt.visitTypeAnnotation(node.getReturnType());
             fmt.append(' ');
         }
         fmt.append(node.getName());
@@ -161,7 +161,7 @@ public class GroovyFormatter extends ClassCodeVisitorSupport {
             fmt.append("def ");
         }
         else {
-            fmt.visitTypeName(node.getType());
+            fmt.visitTypeAnnotation(node.getType());
             fmt.append(' ');
         }
         fmt.append(node.getName());

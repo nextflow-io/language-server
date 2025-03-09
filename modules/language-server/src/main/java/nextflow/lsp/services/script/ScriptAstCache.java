@@ -27,6 +27,7 @@ import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
+import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.ProcessNode;
@@ -54,13 +55,15 @@ public class ScriptAstCache extends ASTNodeCache {
 
     private String rootUri;
 
+    private LanguageServerConfiguration configuration;
+
     private GroovyLibCache libCache = new GroovyLibCache();
 
     public ScriptAstCache() {
-        super(newCompiler());
+        super(createCompiler());
     }
 
-    private static LanguageServerCompiler newCompiler() {
+    private static LanguageServerCompiler createCompiler() {
         var config = createConfiguration();
         var classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true);
         return new LanguageServerCompiler(config, classLoader);
@@ -77,8 +80,9 @@ public class ScriptAstCache extends ASTNodeCache {
         return config;
     }
 
-    public void initialize(String rootUri) {
+    public void initialize(String rootUri, LanguageServerConfiguration configuration) {
         this.rootUri = rootUri;
+        this.configuration = configuration;
     }
 
     @Override
@@ -105,12 +109,12 @@ public class ScriptAstCache extends ASTNodeCache {
             if( sourceUnit == null )
                 continue;
             // phase 3: name checking
-            new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.TYPES, libImports).visit();
+            new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_IMPORTS, libImports).visit();
             new ParameterSchemaVisitor(sourceUnit).visit();
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;
             // phase 4: type checking
-            new TypeCheckingVisitor(sourceUnit).visit();
+            new TypeCheckingVisitor(sourceUnit, configuration.typeChecking()).visit();
         }
 
         return changedUris;

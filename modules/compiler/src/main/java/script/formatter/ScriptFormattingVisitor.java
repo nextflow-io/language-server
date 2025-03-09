@@ -379,7 +379,7 @@ public class ScriptFormattingVisitor extends ScriptVisitorSupport {
         fmt.appendLeadingComments(node);
         fmt.append("def ");
         if( Formatter.isLegacyType(node.getReturnType()) ) {
-            fmt.visitTypeName(node.getReturnType());
+            fmt.visitTypeAnnotation(node.getReturnType());
             fmt.append(' ');
         }
         fmt.append(node.getName());
