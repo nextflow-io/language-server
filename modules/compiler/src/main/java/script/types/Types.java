@@ -19,7 +19,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 
 import org.codehaus.groovy.ast.ClassNode;
 
@@ -105,18 +107,46 @@ public class Types {
         return name;
     }
 
-    private static final Map<Class,Class> NORMALIZED_TYPES = Map.ofEntries(
+    private static final List<Class> STANDARD_TYPES = List.of(
+        Boolean.class,
+        Integer.class,
+        List.class,
+        Map.class,
+        Number.class,
+        Path.class,
+        Set.class,
+        String.class
+    );
+
+    private static final Map<Class,Class> PRIMITIVE_TYPES = Map.ofEntries(
         Map.entry(boolean.class, Boolean.class),
         Map.entry(double.class,  Number.class),
         Map.entry(float.class,   Number.class),
         Map.entry(int.class,     Integer.class),
-        Map.entry(long.class,    Integer.class),
-        Map.entry(BigDecimal.class, Number.class),
-        Map.entry(BigInteger.class, Number.class)
+        Map.entry(long.class,    Integer.class)
     );
 
+    /**
+     * Determine the canonical Nextflow type for a given class.
+     *
+     * @param type
+     */
     private static Class normalize(Class type) {
-        return NORMALIZED_TYPES.getOrDefault(type, type);
+        if( type.isPrimitive() )
+            return PRIMITIVE_TYPES.get(type);
+        var queue = new LinkedList<Class>();
+        queue.add(type);
+        while( !queue.isEmpty() ) {
+            var c = queue.remove();
+            if( c == null )
+                continue;
+            if( STANDARD_TYPES.contains(c) )
+                return c;
+            queue.add(c.getSuperclass());
+            for( var ic : c.getInterfaces() )
+                queue.add(ic);
+        }
+        return type;
     }
 
 }
