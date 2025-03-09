@@ -83,7 +83,23 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
     public void visitConfigAssign(ConfigAssignNode node) {
         for( int i = 0; i < node.names.size() - 1; i++ )
             configScopes.add(node.names.get(i));
+
+        var inProcess = "process".equals(currentConfigScope());
+        var inClosure = node.value instanceof ClosureExpression;
+        if( !inProcess && inClosure )
+            vsc.addError("Dynamic config options are only allowed in the `process` scope", node);
+        if( inProcess && inClosure ) {
+            vsc.pushScope(ScriptDsl.class);
+            vsc.pushScope(ProcessDsl.class);
+        }
+
         super.visitConfigAssign(node);
+
+        if( inProcess && inClosure ) {
+            vsc.popScope();
+            vsc.popScope();
+        }
+
         for( int i = 0; i < node.names.size() - 1; i++ )
             configScopes.pop();
     }
@@ -109,7 +125,7 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
             return;
         if( configScopes.size() == 2 && "profiles".equals(configScopes.get(0)) )
             return;
-        vsc.addError("Config includes are only allowed at the top-level or in a profile.", node);
+        vsc.addError("Config includes are only allowed at the top-level or in a profile", node);
     }
 
     // statements
@@ -206,16 +222,9 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
         }
     }
 
-    private boolean inClosure;
-
     @Override
     public void visitClosureExpression(ClosureExpression node) {
-        var ic = inClosure;
-        inClosure = true;
-        vsc.pushScope(ic ? null : ScriptDsl.class);
-        var inProcess = "process".equals(currentConfigScope());
-        if( !ic && inProcess )
-            vsc.pushScope(ProcessDsl.class);
+        vsc.pushScope();
         node.setVariableScope(currentScope());
         if( node.getParameters() != null ) {
             for( var parameter : node.getParameters() ) {
@@ -229,10 +238,7 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
             var variable = it.next();
             variable.setClosureSharedVariable(true);
         }
-        if( !ic && inProcess )
-            vsc.popScope();
         vsc.popScope();
-        inClosure = ic;
     }
 
     @Override
