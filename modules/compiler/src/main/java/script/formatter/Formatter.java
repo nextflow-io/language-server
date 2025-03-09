@@ -18,7 +18,7 @@ package nextflow.script.formatter;
 import java.util.List;
 import java.util.stream.Stream;
 
-import nextflow.script.control.ASTNodeMarker;
+import nextflow.script.ast.ASTNodeMarker;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;

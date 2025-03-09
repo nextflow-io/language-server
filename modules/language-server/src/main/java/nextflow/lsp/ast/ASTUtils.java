@@ -21,12 +21,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.IncludeVariable;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.control.ASTNodeMarker;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.types.Channel;
@@ -37,7 +37,6 @@ import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.VariableScope;
 import org.codehaus.groovy.ast.expr.ArgumentListExpression;
@@ -386,8 +385,9 @@ public class ASTUtils {
 
     private static ASTNode getDefinitionFromVariable(Variable variable) {
         // built-in variable or workflow/process as variable
-        if( variable instanceof PropertyNode pn )
-            return (MethodNode) pn.getNodeMetaData("access.method");
+        var mn = asMethodVariable(variable);
+        if( mn != null )
+            return mn;
         // local variable
         if( variable instanceof ASTNode node )
             return node;

@@ -23,7 +23,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 
-import nextflow.script.control.ASTNodeMarker;
+import nextflow.script.ast.ASTNodeMarker;
 import org.codehaus.groovy.ast.ClassNode;
 
 public class Types {

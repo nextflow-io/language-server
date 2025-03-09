@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import groovy.lang.Tuple2;
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.config.ast.ConfigAppendNode;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
@@ -31,7 +32,6 @@ import nextflow.config.ast.ConfigIncludeNode;
 import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigStatement;
-import nextflow.script.control.ASTNodeMarker;
 import nextflow.script.parser.DescriptiveErrorStrategy;
 import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStream;

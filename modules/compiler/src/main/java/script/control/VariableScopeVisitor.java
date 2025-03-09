@@ -18,6 +18,7 @@ package nextflow.script.control;
 import java.util.HashMap;
 import java.util.List;
 
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
@@ -40,7 +41,6 @@ import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.DynamicVariable;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.VariableScope;
 import org.codehaus.groovy.ast.expr.BinaryExpression;
@@ -188,10 +188,10 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
 
     private void declareWorkflowInputs(Statement takes) {
         for( var stmt : asBlockStatements(takes) ) {
-            var varX = asVarX(stmt);
-            if( varX == null )
+            var ve = asVarX(stmt);
+            if( ve == null )
                 continue;
-            vsc.declare(varX);
+            vsc.declare(ve);
         }
     }
 
@@ -480,9 +480,8 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
     }
 
     private boolean isDslVariable(Variable variable) {
-        return variable instanceof PropertyNode pn
-            && pn.getNodeMetaData("access.method") instanceof MethodNode mn
-            && findAnnotation(mn, Constant.class).isPresent();
+        var mn = asMethodVariable(variable);
+        return mn != null && findAnnotation(mn, Constant.class).isPresent();
     }
 
     private void visitMutatedVariable(Expression node) {
@@ -666,7 +665,8 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
     private void checkGlobalVariableInProcess(Variable variable, ASTNode context) {
         if( !(currentDefinition instanceof ProcessNode) )
             return;
-        if( variable instanceof PropertyNode pn && pn.getDeclaringClass().getTypeClass() == ScriptDsl.class ) {
+        var mn = asMethodVariable(variable);
+        if( mn != null && mn.getDeclaringClass().getTypeClass() == ScriptDsl.class ) {
             if( WARN_GLOBALS.contains(variable.getName()) )
                 sourceUnit.addWarning("The use of `" + variable.getName() + "` in a process is discouraged -- input files should be provided as process inputs", context);
         }

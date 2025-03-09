@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.control;
+package nextflow.script.ast;
 
 /**
  * Additional markers for AST nodes that are used for static analysis.
@@ -38,6 +38,9 @@ public enum ASTNodeMarker {
 
     // the MethodNode targeted by a MethodCallExpression
     METHOD_TARGET,
+
+    // the MethodNode targeted by a variable expression (PropertyNode)
+    METHOD_VARIABLE_TARGET,
 
     // the starting quote sequence of a string literal or gstring expression
     QUOTE_CHAR,

@@ -21,6 +21,7 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.dsl.Constant;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
@@ -215,7 +216,7 @@ public class VariableScopeChecker {
         fn.setDeclaringClass(cn);
         fn.setSynthetic(true);
         var pn = new PropertyNode(fn, fn.getModifiers(), null, null);
-        pn.putNodeMetaData("access.method", mn);
+        pn.putNodeMetaData(ASTNodeMarker.METHOD_VARIABLE_TARGET, mn);
         pn.setDeclaringClass(cn);
         return pn;
     }

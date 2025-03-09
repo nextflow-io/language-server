@@ -39,7 +39,6 @@ import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
@@ -47,6 +46,8 @@ import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.codehaus.groovy.syntax.SyntaxException;
+
+import static nextflow.script.ast.ASTHelpers.*;
 
 /**
  * Validate params based on the JSON schema.
@@ -194,19 +195,17 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
             return;
         if( !(node.getObjectExpression() instanceof VariableExpression) )
             return;
-        var varX = (VariableExpression) node.getObjectExpression();
-        if( !"params".equals(varX.getName()) )
+        var ve = (VariableExpression) node.getObjectExpression();
+        if( !"params".equals(ve.getName()) )
             return;
         var property = node.getPropertyAsString();
         if( paramsType.getDeclaredField(property) == null ) {
             addError("Unrecognized parameter `" + property + "`", node);
             return;
         }
-        var variable = varX.getAccessedVariable();
-        if( variable instanceof PropertyNode pn ) {
-            var mn = (MethodNode) pn.getNodeMetaData("access.method");
+        var mn = asMethodVariable(ve.getAccessedVariable());
+        if( mn != null )
             mn.setReturnType(paramsType);
-        }
     }
 
     // helpers

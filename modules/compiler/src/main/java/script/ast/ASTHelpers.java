@@ -24,6 +24,9 @@ import java.util.stream.Stream;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
+import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.PropertyNode;
+import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
@@ -123,6 +126,20 @@ public class ASTHelpers {
 
     public static VariableExpression asVarX(Expression expression) {
         return expression instanceof VariableExpression ve ? ve : null;
+    }
+
+    /**
+     * Given a variable which represents a method being accessed
+     * as a variable, return the underlying method.
+     *
+     * @param variable
+     */
+    public static MethodNode asMethodVariable(Variable variable) {
+        if( variable instanceof PropertyNode pn ) {
+            if( pn.getNodeMetaData(ASTNodeMarker.METHOD_VARIABLE_TARGET) instanceof MethodNode mn )
+                return mn;
+        }
+        return null;
     }
 
     /**

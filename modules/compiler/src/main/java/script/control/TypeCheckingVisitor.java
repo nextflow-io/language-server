@@ -17,6 +17,7 @@ package nextflow.script.control;
 
 import java.util.Optional;
 
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.ProcessNode;
@@ -26,7 +27,6 @@ import nextflow.script.ast.WorkflowNode;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
@@ -121,10 +121,8 @@ public class TypeCheckingVisitor extends ScriptVisitorSupport {
 
     private MethodNode asMethodOutput(PropertyExpression node) {
         if( node.getObjectExpression() instanceof PropertyExpression pe ) {
-            if( pe.getObjectExpression() instanceof VariableExpression ve && "out".equals(pe.getPropertyAsString()) ) {
-                if( ve.getAccessedVariable() instanceof PropertyNode pn )
-                    return (MethodNode) pn.getNodeMetaData("access.method");
-            }
+            if( pe.getObjectExpression() instanceof VariableExpression ve && "out".equals(pe.getPropertyAsString()) )
+                return asMethodVariable(ve.getAccessedVariable());
         }
         return null;
     }

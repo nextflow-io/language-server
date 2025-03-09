@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 
 import groovy.lang.Tuple2;
+import nextflow.script.ast.ASTNodeMarker;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassCodeExpressionTransformer;
