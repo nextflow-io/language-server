@@ -71,8 +71,8 @@ public class ScriptService extends LanguageService {
     }
 
     @Override
-    protected CompletionProvider getCompletionProvider(boolean extendedCompletion) {
-        return new ScriptCompletionProvider(astCache, extendedCompletion);
+    protected CompletionProvider getCompletionProvider(int maxCompletionItems, boolean extendedCompletion) {
+        return new ScriptCompletionProvider(astCache, maxCompletionItems, extendedCompletion);
     }
 
     @Override
