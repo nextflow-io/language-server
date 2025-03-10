@@ -59,6 +59,7 @@ import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
+import org.eclipse.lsp4j.CompletionItemLabelDetails;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.InsertTextFormat;
 import org.eclipse.lsp4j.InsertTextMode;
@@ -87,12 +88,14 @@ public class ScriptCompletionProvider implements CompletionProvider {
     private static Logger log = Logger.getInstance();
 
     private ScriptAstCache ast;
+    private boolean extendedCompletion;
     private URI uri;
     private int maxItemCount = 100;
     private boolean isIncomplete = false;
 
-    public ScriptCompletionProvider(ScriptAstCache ast) {
+    public ScriptCompletionProvider(ScriptAstCache ast, boolean extendedCompletion) {
         this.ast = ast;
+        this.extendedCompletion = extendedCompletion;
     }
 
     @Override
@@ -263,17 +266,20 @@ public class ScriptCompletionProvider implements CompletionProvider {
             populateItemsFromDslScope(scope.getClassScope(), namePrefix, items);
             scope = scope.getParent();
         }
+        populateTypes(namePrefix, items);
 
-        if( topNode instanceof FunctionNode || topNode instanceof ProcessNode || topNode instanceof OutputNode )
+        if( !extendedCompletion ) {
+            populateIncludes(namePrefix, items);
+            return;
+        }
+        if( topNode instanceof FunctionNode || topNode instanceof ProcessNode || topNode instanceof OutputNode ) {
             populateExternalFunctions(namePrefix, items);
-
+        }
         if( topNode instanceof WorkflowNode ) {
             populateExternalFunctions(namePrefix, items);
             populateExternalProcesses(namePrefix, items);
             populateExternalWorkflows(namePrefix, items);
         }
-
-        populateTypes(namePrefix, items);
     }
 
     private void populateLocalVariables(VariableScope scope, String namePrefix, List<CompletionItem> items) {
@@ -310,6 +316,32 @@ public class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
+    private void populateIncludes(String namePrefix, List<CompletionItem> items) {
+        for( var includeNode : ast.getIncludeNodes(uri) ) {
+            for( var module : includeNode.modules ) {
+                var node = module.getMethod();
+                if( node == null )
+                    continue;
+
+                var name = module.getName();
+                if( !name.startsWith(namePrefix) )
+                    continue;
+
+                var labelDetails = new CompletionItemLabelDetails();
+                labelDetails.setDescription(getIncludeSource(node));
+
+                var item = new CompletionItem(name);
+                item.setKind(CompletionItemKind.Function);
+                item.setLabelDetails(labelDetails);
+                item.setDetail(astNodeToCompletionItemDetail(node));
+                item.setDocumentation(astNodeToCompletionItemDocumentation(node));
+
+                if( !addItem(item, items) )
+                    break;
+            }
+        }
+    }
+
     private void populateExternalFunctions(String namePrefix, List<CompletionItem> items) {
         var localNodes = ast.getFunctionNodes(uri);
         var allNodes = ast.getFunctionNodes();
@@ -329,7 +361,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateExternalMethods(String namePrefix, List<? extends MethodNode> localNodes, List<? extends MethodNode> allNodes, List<CompletionItem> items) {
-        var addIncludeRange = getAddIncludeRange(uri);
+        var addIncludeRange = getAddIncludeRange();
 
         for( var node : allNodes ) {
             var name = node.getName();
@@ -338,13 +370,17 @@ public class ScriptCompletionProvider implements CompletionProvider {
             if( localNodes.contains(node) )
                 continue;
 
+            var labelDetails = new CompletionItemLabelDetails();
+            labelDetails.setDescription(getIncludeSource(node));
+
             var item = new CompletionItem(name);
             item.setKind(CompletionItemKind.Function);
+            item.setLabelDetails(labelDetails);
             item.setDetail(astNodeToCompletionItemDetail(node));
             item.setDocumentation(astNodeToCompletionItemDocumentation(node));
 
-            if( !isIncluded(uri, node) ) {
-                var textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, node);
+            if( !isIncluded(node) ) {
+                var textEdit = createAddIncludeTextEdit(addIncludeRange, name, node);
                 item.setAdditionalTextEdits( List.of(textEdit) );
             }
 
@@ -353,7 +389,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
-    private boolean isIncluded(URI uri, MethodNode node) {
+    private boolean isIncluded(MethodNode node) {
         for( var includeNode : ast.getIncludeNodes(uri) ) {
             for( var module : includeNode.modules ) {
                 if( module.getMethod() == node )
@@ -363,7 +399,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         return false;
     }
 
-    private Range getAddIncludeRange(URI uri) {
+    private Range getAddIncludeRange() {
         var includeNodes = ast.getIncludeNodes(uri);
         if( includeNodes.isEmpty() ) {
             var line = ast.getScriptNode(uri).getShebang() != null ? 1 : 0;
@@ -375,17 +411,23 @@ public class ScriptCompletionProvider implements CompletionProvider {
         return new Range(new Position(includeLine, 0), new Position(includeLine, 0));
     }
 
-    private TextEdit createAddIncludeTextEdit(Range range, URI uri, String name, ASTNode node) {
+    private TextEdit createAddIncludeTextEdit(Range range, String name, ASTNode node) {
         var source = Path.of(uri).getParent().relativize(Path.of(ast.getURI(node))).toString();
         var newText = new StringBuilder()
             .append("include { ")
             .append(name)
             .append(" } from '")
-            .append(!source.startsWith(".") ? "./" : "")
-            .append(source)
+            .append(getIncludeSource(node))
             .append("'\n")
             .toString();
         return new TextEdit(range, newText);
+    }
+
+    private String getIncludeSource(ASTNode node) {
+        var source = Path.of(uri).getParent().relativize(Path.of(ast.getURI(node))).toString();
+        return source.startsWith(".")
+            ? source
+            : "./" + source;
     }
 
     private void populateTypes(String namePrefix, List<CompletionItem> items) {

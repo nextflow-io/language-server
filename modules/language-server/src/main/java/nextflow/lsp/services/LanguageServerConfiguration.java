@@ -20,6 +20,7 @@ import java.util.List;
 
 public record LanguageServerConfiguration(
     List<String> excludePatterns,
+    boolean extendedCompletion,
     boolean harshilAlignment,
     boolean maheshForm,
     boolean paranoidWarnings
@@ -28,6 +29,7 @@ public record LanguageServerConfiguration(
     public static LanguageServerConfiguration defaults() {
         return new LanguageServerConfiguration(
             Collections.emptyList(),
+            false,
             false,
             false,
             false

@@ -128,7 +128,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private Map<String, LanguageService> scriptServices = new HashMap<>();
     private Map<String, LanguageService> configServices = new HashMap<>();
 
-    private LanguageServerConfiguration configuration = new LanguageServerConfiguration(Collections.emptyList(), false, false, false);
+    private LanguageServerConfiguration configuration = LanguageServerConfiguration.defaults();
 
     // -- LanguageServer
 
@@ -318,7 +318,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var service = getLanguageService(uri);
             if( service == null )
                 return Either.forLeft(Collections.emptyList());
-            return service.completion(params);
+            return service.completion(params, configuration.extendedCompletion());
         });
     }
 
@@ -447,18 +447,18 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             Logger.setDebugEnabled(debug);
 
         var excludePatterns = getJsonStringArray(params.getSettings(), "nextflow.files.exclude");
-        if( !DefaultGroovyMethods.equals(configuration.excludePatterns(), excludePatterns) ) {
+        if( !DefaultGroovyMethods.equals(configuration.excludePatterns(), excludePatterns) )
             shouldInitialize = true;
-        }
+        var extendedCompletion = getJsonBoolean(params.getSettings(), "nextflow.completion.extended");
         var harshilAlignment = getJsonBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
         var maheshForm = getJsonBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
         var paranoidWarnings = getJsonBoolean(params.getSettings(), "nextflow.paranoidWarnings");
-        if( paranoidWarnings != null && configuration.paranoidWarnings() != paranoidWarnings ) {
+        if( paranoidWarnings != null && configuration.paranoidWarnings() != paranoidWarnings )
             shouldInitialize = true;
-        }
 
         configuration = new LanguageServerConfiguration(
             excludePatterns,
+            extendedCompletion != null ? extendedCompletion : configuration.extendedCompletion(),
             harshilAlignment != null ? harshilAlignment : configuration.harshilAlignment(),
             maheshForm != null ? maheshForm : configuration.maheshForm(),
             paranoidWarnings != null ? paranoidWarnings : configuration.paranoidWarnings()
