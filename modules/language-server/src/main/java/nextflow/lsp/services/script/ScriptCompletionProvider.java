@@ -82,7 +82,7 @@ import static nextflow.script.ast.ASTHelpers.*;
  */
 public class ScriptCompletionProvider implements CompletionProvider {
 
-    private static final List<CompletionItem> TOPLEVEL_ITEMS = getTopLevelItems();
+    private static final List<CompletionItem> DECLARATION_SNIPPETS = scriptDeclarationSnippets();
 
     private static Logger log = Logger.getInstance();
 
@@ -110,10 +110,10 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
         var nodeStack = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter());
         if( nodeStack.isEmpty() )
-            return Either.forLeft(TOPLEVEL_ITEMS);
+            return Either.forLeft(DECLARATION_SNIPPETS);
 
         var offsetNode = nodeStack.get(0);
-        var topNode = nodeStack.get(nodeStack.size() - 1);
+        var declarationNode = nodeStack.get(nodeStack.size() - 1);
 
         isIncomplete = false;
         var items = new ArrayList<CompletionItem>();
@@ -123,7 +123,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
             //          ^
             var namePrefix = ve.getName();
             log.debug("completion variable -- '" + namePrefix + "'");
-            populateItemsFromScope(offsetNode, namePrefix, topNode, items);
+            populateItemsFromScope(variableScope(nodeStack), namePrefix, declarationNode, items);
         }
         else if( offsetNode instanceof MethodCallExpression mce ) {
             var namePrefix = mce.getMethodAsString();
@@ -131,7 +131,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
             if( mce.isImplicitThis() ) {
                 // e.g. "foo ()"
                 //          ^
-                populateItemsFromScope(offsetNode, namePrefix, topNode, items);
+                populateItemsFromScope(variableScope(nodeStack), namePrefix, declarationNode, items);
             }
             else {
                 // e.g. "foo.bar ()"
@@ -158,7 +158,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         }
         else {
             log.debug("completion " + offsetNode.getClass().getSimpleName() + " -- '" + offsetNode.getText() + "'");
-            populateItemsFromScope(offsetNode, "", topNode, items);
+            populateItemsFromScope(variableScope(nodeStack), "", declarationNode, items);
         }
 
         return isIncomplete
@@ -252,8 +252,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         return addItem(item, items);
     }
 
-    private void populateItemsFromScope(ASTNode node, String namePrefix, ASTNode topNode, List<CompletionItem> items) {
-        VariableScope scope = ASTUtils.getVariableScope(node, ast);
+    private void populateItemsFromScope(VariableScope scope, String namePrefix, ASTNode declarationNode, List<CompletionItem> items) {
         while( scope != null ) {
             populateLocalVariables(scope, namePrefix, items);
             populateItemsFromDslScope(scope.getClassScope(), namePrefix, items);
@@ -263,9 +262,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
         if( !extendedCompletion )
             return;
-        if( topNode instanceof FunctionNode || topNode instanceof ProcessNode || topNode instanceof OutputNode )
+        if( declarationNode instanceof FunctionNode || declarationNode instanceof ProcessNode || declarationNode instanceof OutputNode )
             populateExternalFunctions(namePrefix, items);
-        if( topNode instanceof WorkflowNode ) {
+        if( declarationNode instanceof WorkflowNode ) {
             populateExternalFunctions(namePrefix, items);
             populateExternalProcesses(namePrefix, items);
             populateExternalWorkflows(namePrefix, items);
@@ -405,6 +404,14 @@ public class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
+    private static VariableScope variableScope(List<ASTNode> nodeStack) {
+        for( var node : nodeStack ) {
+            if( node instanceof BlockStatement block )
+                return block.getVariableScope();
+        }
+        return null;
+    }
+
     private static String astNodeToItemDetail(ASTNode node) {
         return ASTNodeStringUtils.getLabel(node);
     }
@@ -463,7 +470,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         return true;
     }
 
-    private static List<CompletionItem> getTopLevelItems() {
+    private static List<CompletionItem> scriptDeclarationSnippets() {
         var snippets = new ArrayList<Snippet>();
 
         snippets.add(new Snippet(

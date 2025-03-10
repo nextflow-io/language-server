@@ -38,7 +38,6 @@ import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.Variable;
-import org.codehaus.groovy.ast.VariableScope;
 import org.codehaus.groovy.ast.expr.ArgumentListExpression;
 import org.codehaus.groovy.ast.expr.ClassExpression;
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
@@ -48,7 +47,6 @@ import org.codehaus.groovy.ast.expr.MethodCall;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
-import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 
 import static nextflow.script.ast.ASTHelpers.*;
@@ -363,19 +361,4 @@ public class ASTUtils {
         return score;
     }
 
-    /**
-     * Get the nearest variable scope of a node.
-     *
-     * @param node
-     * @param ast
-     */
-    public static VariableScope getVariableScope(ASTNode node, ASTNodeCache ast) {
-        ASTNode current = node;
-        while( current != null ) {
-            if( current instanceof BlockStatement block )
-                return block.getVariableScope();
-            current = ast.getParent(current);
-        }
-        return null;
-    }
 }
