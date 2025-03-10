@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import nextflow.config.scopes.RootConfig;
+import nextflow.config.scopes.Config;
 import nextflow.script.dsl.Description;
 import nextflow.script.dsl.DslScope;
 import nextflow.script.dsl.FeatureFlag;
@@ -41,7 +41,7 @@ public sealed interface SchemaNode {
     public static final Scope ROOT = rootScope();
 
     private static Scope rootScope() {
-        var result = Scope.of(RootConfig.class, "");
+        var result = Scope.of(Config.class, "");
         // derive `nextflow` config options from feature flags.
         result.children().put("nextflow", nextflowScope());
         // derive `process` config options from process directives.

@@ -21,7 +21,7 @@ import nextflow.config.schema.ConfigOption;
 import nextflow.config.schema.ConfigScope;
 import nextflow.script.dsl.Description;
 
-public class RootConfig implements ConfigScope {
+public class Config implements ConfigScope {
 
     // OPTIONS
 
