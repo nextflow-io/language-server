@@ -52,7 +52,7 @@ public class ConfigService extends LanguageService {
     }
 
     @Override
-    protected CompletionProvider getCompletionProvider() {
+    protected CompletionProvider getCompletionProvider(boolean extendedCompletion) {
         return new ConfigCompletionProvider(astCache);
     }
 

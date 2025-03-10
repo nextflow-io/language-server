@@ -318,7 +318,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var service = getLanguageService(uri);
             if( service == null )
                 return Either.forLeft(Collections.emptyList());
-            return service.completion(params);
+            return service.completion(params, configuration.extendedCompletion());
         });
     }
 
@@ -449,6 +449,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var excludePatterns = getJsonStringArray(params.getSettings(), "nextflow.files.exclude");
         if( !DefaultGroovyMethods.equals(configuration.excludePatterns(), excludePatterns) )
             shouldInitialize = true;
+        var extendedCompletion = getJsonBoolean(params.getSettings(), "nextflow.extendedCompletion");
         var harshilAlignment = getJsonBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
         var maheshForm = getJsonBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
         var paranoidWarnings = getJsonBoolean(params.getSettings(), "nextflow.paranoidWarnings");
@@ -460,6 +461,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
         configuration = new LanguageServerConfiguration(
             excludePatterns,
+            extendedCompletion != null ? extendedCompletion : configuration.extendedCompletion(),
             harshilAlignment != null ? harshilAlignment : configuration.harshilAlignment(),
             maheshForm != null ? maheshForm : configuration.maheshForm(),
             paranoidWarnings != null ? paranoidWarnings : configuration.paranoidWarnings(),

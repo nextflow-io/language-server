@@ -110,7 +110,7 @@ public abstract class LanguageService {
     protected abstract ASTNodeCache getAstCache();
     protected CallHierarchyProvider getCallHierarchyProvider() { return null; }
     protected CodeLensProvider getCodeLensProvider() { return null; }
-    protected CompletionProvider getCompletionProvider() { return null; }
+    protected CompletionProvider getCompletionProvider(boolean extendedCompletion) { return null; }
     protected DefinitionProvider getDefinitionProvider() { return null; }
     protected FormattingProvider getFormattingProvider() { return null; }
     protected HoverProvider getHoverProvider() { return null; }
@@ -225,8 +225,8 @@ public abstract class LanguageService {
         return provider.codeLens(params.getTextDocument());
     }
 
-    public Either<List<CompletionItem>, CompletionList> completion(CompletionParams params) {
-        var provider = getCompletionProvider();
+    public Either<List<CompletionItem>, CompletionList> completion(CompletionParams params, boolean extendedCompletion) {
+        var provider = getCompletionProvider(extendedCompletion);
         if( provider == null )
             return Either.forLeft(Collections.emptyList());
 

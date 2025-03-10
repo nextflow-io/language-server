@@ -87,12 +87,14 @@ public class ScriptCompletionProvider implements CompletionProvider {
     private static Logger log = Logger.getInstance();
 
     private ScriptAstCache ast;
+    private boolean extendedCompletion;
     private URI uri;
     private int maxItemCount = 100;
     private boolean isIncomplete = false;
 
-    public ScriptCompletionProvider(ScriptAstCache ast) {
+    public ScriptCompletionProvider(ScriptAstCache ast, boolean extendedCompletion) {
         this.ast = ast;
+        this.extendedCompletion = extendedCompletion;
     }
 
     @Override
@@ -257,17 +259,17 @@ public class ScriptCompletionProvider implements CompletionProvider {
             populateItemsFromDslScope(scope.getClassScope(), namePrefix, items);
             scope = scope.getParent();
         }
+        populateTypes(namePrefix, items);
 
+        if( !extendedCompletion )
+            return;
         if( topNode instanceof FunctionNode || topNode instanceof ProcessNode || topNode instanceof OutputNode )
             populateExternalFunctions(namePrefix, items);
-
         if( topNode instanceof WorkflowNode ) {
             populateExternalFunctions(namePrefix, items);
             populateExternalProcesses(namePrefix, items);
             populateExternalWorkflows(namePrefix, items);
         }
-
-        populateTypes(namePrefix, items);
     }
 
     private void populateLocalVariables(VariableScope scope, String namePrefix, List<CompletionItem> items) {
