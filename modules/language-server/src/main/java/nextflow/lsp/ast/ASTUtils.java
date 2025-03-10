@@ -41,7 +41,6 @@ import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.VariableScope;
 import org.codehaus.groovy.ast.expr.ArgumentListExpression;
 import org.codehaus.groovy.ast.expr.ClassExpression;
-import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
 import org.codehaus.groovy.ast.expr.DeclarationExpression;
 import org.codehaus.groovy.ast.expr.Expression;
@@ -69,18 +68,14 @@ public class ASTUtils {
      * @param ast
      */
     public static ASTNode getDefinition(ASTNode node, ASTNodeCache ast) {
-        if( node instanceof VariableExpression ve ) {
-            var variable = ve.getAccessedVariable();
-            return getDefinitionFromVariable(variable);
-        }
+        if( node instanceof VariableExpression ve )
+            return getDefinitionFromVariable(ve.getAccessedVariable());
 
-        if( node instanceof ConstantExpression ce ) {
-            var parentNode = ast.getParent(ce);
-            if( parentNode instanceof MethodCallExpression mce )
-                return getMethodFromCallExpression(mce, ast);
-            if( parentNode instanceof PropertyExpression pe )
-                return getFieldFromExpression(pe, ast);
-        }
+        if( node instanceof MethodCallExpression mce )
+            return getMethodFromCallExpression(mce, ast);
+
+        if( node instanceof PropertyExpression pe )
+            return getFieldFromExpression(pe, ast);
 
         if( node instanceof ClassExpression ce )
             return ce.getType().redirect();
@@ -103,6 +98,17 @@ public class ASTUtils {
         if( node instanceof Variable )
             return node;
 
+        return null;
+    }
+
+    private static ASTNode getDefinitionFromVariable(Variable variable) {
+        // built-in variable or workflow/process as variable
+        var mn = asMethodVariable(variable);
+        if( mn != null )
+            return mn;
+        // local variable
+        if( variable instanceof ASTNode node )
+            return node;
         return null;
     }
 
@@ -136,12 +142,10 @@ public class ASTUtils {
      */
     public static ClassNode getType(ASTNode node, ASTNodeCache ast) {
         if( node instanceof ClassExpression ce ) {
-            // type(Foo.bar) -> type(Foo)
             return ce.getType();
         }
 
         if( node instanceof ConstructorCallExpression cce ) {
-            // type(new Foo()) -> type(Foo)
             return cce.getType();
         }
 
@@ -187,11 +191,8 @@ public class ASTUtils {
     }
 
     private static MethodNode asMethodOutput(PropertyExpression node) {
-        if( node.getObjectExpression() instanceof VariableExpression ve && "out".equals(node.getPropertyAsString()) ) {
-            var defNode = getDefinitionFromVariable(ve.getAccessedVariable());
-            if( defNode instanceof MethodNode mn )
-                return mn;
-        }
+        if( node.getObjectExpression() instanceof VariableExpression ve && "out".equals(node.getPropertyAsString()) )
+            return asMethodVariable(ve.getAccessedVariable());
         return null;
     }
 
@@ -284,9 +285,6 @@ public class ASTUtils {
      * @param argIndex
      */
     public static MethodNode getMethodFromCallExpression(MethodCall node, ASTNodeCache ast, int argIndex) {
-        var target = (MethodNode) ((ASTNode) node).getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
-        if( target != null )
-            return target;
         var methods = getMethodOverloadsFromCallExpression(node, ast);
         var arguments = (ArgumentListExpression) node.getArguments();
         return methods.stream()
@@ -311,9 +309,9 @@ public class ASTUtils {
     public static List<MethodNode> getMethodOverloadsFromCallExpression(MethodCall node, ASTNodeCache ast) {
         if( node instanceof MethodCallExpression mce ) {
             if( mce.isImplicitThis() ) {
-                var defNode = getDefinitionFromScope(mce, mce.getMethodAsString(), ast);
-                if( defNode instanceof MethodNode mn )
-                    return List.of(mn);
+                var target = (MethodNode) mce.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
+                if( target != null )
+                    return List.of(target);
             }
             else {
                 var leftType = getType(mce.getObjectExpression(), ast);
@@ -363,35 +361,6 @@ public class ASTUtils {
             }
         }
         return score;
-    }
-
-    private static ASTNode getDefinitionFromScope(ASTNode node, String name, ASTNodeCache ast) {
-        Variable variable = null;
-        VariableScope scope = getVariableScope(node, ast);
-        while( scope != null && variable == null ) {
-            variable = scope.getDeclaredVariable(name);
-            if( variable != null )
-                break;
-            variable = scope.getReferencedLocalVariable(name);
-            if( variable != null )
-                break;
-            variable = scope.getReferencedClassVariable(name);
-            if( variable != null )
-                break;
-            scope = scope.getParent();
-        }
-        return getDefinitionFromVariable(variable);
-    }
-
-    private static ASTNode getDefinitionFromVariable(Variable variable) {
-        // built-in variable or workflow/process as variable
-        var mn = asMethodVariable(variable);
-        if( mn != null )
-            return mn;
-        // local variable
-        if( variable instanceof ASTNode node )
-            return node;
-        return null;
     }
 
     /**

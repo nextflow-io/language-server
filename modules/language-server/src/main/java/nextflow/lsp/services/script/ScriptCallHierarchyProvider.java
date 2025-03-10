@@ -30,7 +30,6 @@ import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.control.SourceUnit;
@@ -93,7 +92,7 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
     private ASTNode asMethodOrCallX(ASTNode node) {
         if( node instanceof MethodNode )
             return node;
-        if( node instanceof ConstantExpression && ast.getParent(node) instanceof MethodCallExpression )
+        if( node instanceof MethodCallExpression )
             return node;
         return null;
     }
@@ -101,8 +100,8 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
     private String getMethodOrCallName(ASTNode node) {
         if( node instanceof MethodNode mn )
             return mn.getName() != null ? mn.getName() : "<entry>";
-        if( node instanceof ConstantExpression )
-            return node.getText();
+        if( node instanceof MethodCallExpression mce )
+            return mce.getMethodAsString();
         return null;
     }
 
@@ -128,9 +127,9 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
         var references = ASTUtils.getReferences(offsetNode, ast, false);
         var referencesMap = new HashMap<MethodNode, List<Range>>();
         references.forEachRemaining((refNode) -> {
-            if( !(refNode instanceof ConstantExpression || refNode instanceof VariableExpression) )
+            if( !(refNode instanceof MethodCallExpression || refNode instanceof VariableExpression) )
                 return;
-            var fromNode = getTopLevelNode(refNode);
+            var fromNode = getEnclosingMethod(refNode);
             if( !referencesMap.containsKey(fromNode) )
                 referencesMap.put(fromNode, new ArrayList<>());
             var range = LanguageServerUtils.astNodeToRange(refNode);
@@ -154,7 +153,7 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
         return result;
     }
 
-    private MethodNode getTopLevelNode(ASTNode node) {
+    private MethodNode getEnclosingMethod(ASTNode node) {
         ASTNode current = node;
         while( current != null ) {
             if( current instanceof MethodNode mn )

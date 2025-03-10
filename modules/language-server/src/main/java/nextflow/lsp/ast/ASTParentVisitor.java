@@ -374,13 +374,6 @@ public class ASTParentVisitor extends CodeVisitorSupport {
 
     @Override
     public void visitConstantExpression(ConstantExpression node) {
-        push(node);
-        try {
-            super.visitConstantExpression(node);
-        }
-        finally {
-            pop();
-        }
     }
 
     @Override

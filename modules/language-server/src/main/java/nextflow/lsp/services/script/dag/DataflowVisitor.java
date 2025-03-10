@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import groovy.lang.Tuple3;
 import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.script.ScriptAstCache;
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
@@ -55,15 +56,15 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private ScriptAstCache astCache;
+    private ScriptAstCache ast;
 
     private Map<String,Graph> graphs = new HashMap<>();
 
     private Stack<Set<Node>> stackPreds = new Stack<>();
 
-    public DataflowVisitor(SourceUnit sourceUnit, ScriptAstCache astCache) {
+    public DataflowVisitor(SourceUnit sourceUnit, ScriptAstCache ast) {
         this.sourceUnit = sourceUnit;
-        this.astCache = astCache;
+        this.ast = ast;
 
         stackPreds.add(new HashSet<>());
     }
@@ -170,7 +171,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             }
         }
 
-        var defNode = ASTUtils.getMethodFromCallExpression(node, astCache);
+        var defNode = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
         if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
             var preds = visitWithPreds(node.getArguments());
             current.putSymbol(name, addNode(name, Node.Type.OPERATOR, defNode, preds));
@@ -233,10 +234,10 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         var rhs = node.getRightExpression();
 
         // x | f => f(x)
-        if( rhs instanceof VariableExpression ) {
-            var defNode = ASTUtils.getDefinition(rhs, astCache);
+        if( rhs instanceof VariableExpression ve ) {
+            var defNode = asMethodVariable(ve.getAccessedVariable());
             if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
-                var label = ((MethodNode) defNode).getName();
+                var label = defNode.getName();
                 var preds = visitWithPreds(lhs);
                 current.putSymbol(label, addNode(label, Node.Type.OPERATOR, defNode, preds));
                 return;
@@ -292,15 +293,15 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         // named output e.g. PROC.out.foo
         if( node.getObjectExpression() instanceof PropertyExpression pe ) {
             if( pe.getObjectExpression() instanceof VariableExpression ve && "out".equals(pe.getPropertyAsString()) ) {
-                var defNode = ASTUtils.getDefinition(ve, astCache);
-                if( defNode instanceof MethodNode mn )
+                var mn = asMethodVariable(ve.getAccessedVariable());
+                if( mn != null )
                     return new Tuple3(mn, ve.getName(), node.getPropertyAsString());
             }
         }
         // single output e.g. PROC.out
         else if( node.getObjectExpression() instanceof VariableExpression ve && "out".equals(node.getPropertyAsString()) ) {
-            var defNode = ASTUtils.getDefinition(ve, astCache);
-            if( defNode instanceof MethodNode mn )
+            var mn = asMethodVariable(ve.getAccessedVariable());
+            if( mn != null )
                 return new Tuple3(mn, ve.getName(), null);
         }
         return null;
@@ -407,7 +408,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     }
 
     private Node addNode(String label, Node.Type type, ASTNode an, Set<Node> preds) {
-        var uri = astCache.getURI(an);
+        var uri = ast.getURI(an);
         var dn = current.addNode(label, type, uri, preds);
         currentPreds().add(dn);
         return dn;

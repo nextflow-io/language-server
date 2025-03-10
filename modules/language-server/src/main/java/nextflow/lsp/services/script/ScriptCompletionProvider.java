@@ -49,7 +49,6 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.VariableScope;
 import org.codehaus.groovy.ast.expr.ClassExpression;
-import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
@@ -122,31 +121,28 @@ public class ScriptCompletionProvider implements CompletionProvider {
             //          ^
             var namePrefix = ve.getName();
             log.debug("completion variable -- '" + namePrefix + "'");
-            populateItemsFromScope(ve, namePrefix, topNode, items);
+            populateItemsFromScope(offsetNode, namePrefix, topNode, items);
         }
-        else if( offsetNode instanceof ConstantExpression ce ) {
-            var parentNode = ast.getParent(ce);
-            if( parentNode instanceof MethodCallExpression mce ) {
-                var namePrefix = mce.getMethodAsString();
-                log.debug("completion method call -- '" + namePrefix + "'");
-                if( mce.isImplicitThis() ) {
-                    // e.g. "foo ()"
-                    //          ^
-                    populateItemsFromScope(ce, namePrefix, topNode, items);
-                }
-                else {
-                    // e.g. "foo.bar ()"
-                    //              ^
-                    populateMethodsFromObjectScope(mce.getObjectExpression(), namePrefix, items);
-                }
+        else if( offsetNode instanceof MethodCallExpression mce ) {
+            var namePrefix = mce.getMethodAsString();
+            log.debug("completion method call -- '" + namePrefix + "'");
+            if( mce.isImplicitThis() ) {
+                // e.g. "foo ()"
+                //          ^
+                populateItemsFromScope(offsetNode, namePrefix, topNode, items);
             }
-            else if( parentNode instanceof PropertyExpression pe ) {
-                // e.g. "foo.bar "
+            else {
+                // e.g. "foo.bar ()"
                 //              ^
-                var namePrefix = pe.getPropertyAsString();
-                log.debug("completion property -- '" + namePrefix + "'");
-                populateItemsFromObjectScope(pe.getObjectExpression(), namePrefix, items);
+                populateMethodsFromObjectScope(mce.getObjectExpression(), namePrefix, items);
             }
+        }
+        else if( offsetNode instanceof PropertyExpression pe ) {
+            // e.g. "foo.bar "
+            //              ^
+            var namePrefix = pe.getPropertyAsString();
+            log.debug("completion property -- '" + namePrefix + "'");
+            populateItemsFromObjectScope(pe.getObjectExpression(), namePrefix, items);
         }
         else if( offsetNode instanceof ConstructorCallExpression cce ) {
             // e.g. "new Foo ()"
@@ -154,12 +150,6 @@ public class ScriptCompletionProvider implements CompletionProvider {
             var namePrefix = cce.getType().getNameWithoutPackage();
             log.debug("completion constructor call -- '" + namePrefix + "'");
             populateTypes(namePrefix, items);
-        }
-        else if( offsetNode instanceof PropertyExpression pe ) {
-            // e.g. "foo.bar. "
-            //               ^
-            log.debug("completion property -- ''");
-            populateItemsFromObjectScope(pe.getObjectExpression(), "", items);
         }
         else if( offsetNode instanceof InvalidDeclaration ) {
             return Either.forLeft(Collections.emptyList());
