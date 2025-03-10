@@ -23,6 +23,7 @@ public record LanguageServerConfiguration(
     boolean extendedCompletion,
     boolean harshilAlignment,
     boolean maheshForm,
+    int maxCompletionItems,
     boolean paranoidWarnings,
     boolean typeChecking
 ) {
@@ -33,6 +34,7 @@ public record LanguageServerConfiguration(
             true,
             false,
             false,
+            100,
             false,
             false
         );

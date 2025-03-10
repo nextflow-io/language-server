@@ -25,10 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
 import nextflow.lsp.file.PathUtils;
+import nextflow.lsp.util.JsonUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.services.LanguageService;
@@ -318,7 +316,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var service = getLanguageService(uri);
             if( service == null )
                 return Either.forLeft(Collections.emptyList());
-            return service.completion(params, configuration.extendedCompletion());
+            return service.completion(params, configuration.maxCompletionItems(), configuration.extendedCompletion());
         });
     }
 
@@ -442,20 +440,21 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
         var shouldInitialize = false;
 
-        var debug = getJsonBoolean(params.getSettings(), "nextflow.debug");
+        var debug = JsonUtils.getBoolean(params.getSettings(), "nextflow.debug");
         if( debug != null )
             Logger.setDebugEnabled(debug);
 
-        var excludePatterns = getJsonStringArray(params.getSettings(), "nextflow.files.exclude");
+        var excludePatterns = JsonUtils.getStringArray(params.getSettings(), "nextflow.files.exclude");
         if( !DefaultGroovyMethods.equals(configuration.excludePatterns(), excludePatterns) )
             shouldInitialize = true;
-        var extendedCompletion = getJsonBoolean(params.getSettings(), "nextflow.extendedCompletion");
-        var harshilAlignment = getJsonBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
-        var maheshForm = getJsonBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
-        var paranoidWarnings = getJsonBoolean(params.getSettings(), "nextflow.paranoidWarnings");
+        var extendedCompletion = JsonUtils.getBoolean(params.getSettings(), "nextflow.extendedCompletion");
+        var harshilAlignment = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
+        var maheshForm = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
+        var maxCompletionItems = JsonUtils.getInteger(params.getSettings(), "nextflow.maxCompletionItems");
+        var paranoidWarnings = JsonUtils.getBoolean(params.getSettings(), "nextflow.paranoidWarnings");
         if( paranoidWarnings != null && configuration.paranoidWarnings() != paranoidWarnings )
             shouldInitialize = true;
-        var typeChecking = getJsonBoolean(params.getSettings(), "nextflow.typeChecking");
+        var typeChecking = JsonUtils.getBoolean(params.getSettings(), "nextflow.typeChecking");
         if( typeChecking != null && configuration.typeChecking() != typeChecking )
             shouldInitialize = true;
 
@@ -464,6 +463,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             extendedCompletion != null ? extendedCompletion : configuration.extendedCompletion(),
             harshilAlignment != null ? harshilAlignment : configuration.harshilAlignment(),
             maheshForm != null ? maheshForm : configuration.maheshForm(),
+            maxCompletionItems != null ? maxCompletionItems : configuration.maxCompletionItems(),
             paranoidWarnings != null ? paranoidWarnings : configuration.paranoidWarnings(),
             typeChecking != null ? typeChecking : configuration.typeChecking()
         );
@@ -562,17 +562,13 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var arguments = params.getArguments();
             if( !"nextflow.server.previewDag".equals(command) || arguments.size() != 2 )
                 return null;
-            var uri = getJsonString(arguments.get(0));
+            var uri = JsonUtils.getString(arguments.get(0));
             log.debug(String.format("textDocument/executeCommand %s %s", command, arguments.toString()));
             var service = getLanguageService(uri);
             if( service == null )
                 return null;
             return service.executeCommand(command, arguments);
         });
-    }
-
-    private String getJsonString(Object json) {
-        return json instanceof JsonPrimitive jp ? jp.getAsString() : null;
     }
 
     @Override
@@ -635,51 +631,6 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         if( service == null || !service.matchesFile(uri) )
             return null;
         return service;
-    }
-
-    private List<String> getJsonStringArray(Object json, String path) {
-        var value = getJsonElement(json, path);
-        if( value == null || !value.isJsonArray() )
-            return null;
-        var result = new ArrayList<String>();
-        for( var el : value.getAsJsonArray() ) {
-            try {
-                result.add(el.getAsJsonPrimitive().getAsString());
-            }
-            catch( AssertionError e ) {
-                continue;
-            }
-        }
-        return result;
-    }
-
-    private Boolean getJsonBoolean(Object json, String path) {
-        var value = getJsonElement(json, path);
-        if( value == null || !value.isJsonPrimitive() )
-            return null;
-        var result = value.getAsJsonPrimitive();
-        if( !result.isBoolean() )
-            return null;
-        return result.getAsBoolean();
-    }
-
-    private JsonElement getJsonElement(Object json, String path) {
-        if( !(json instanceof JsonObject) )
-            return null;
-
-        JsonObject object = (JsonObject) json;
-        var names = path.split("\\.");
-        for( int i = 0; i < names.length - 1; i++ ) {
-            var scope = names[i];
-            if( !object.has(scope) || !object.get(scope).isJsonObject() )
-                return null;
-            object = object.get(scope).getAsJsonObject();
-        }
-
-        var property = names[names.length - 1];
-        if( !object.has(property) )
-            return null;
-        return object.get(property);
     }
 
 }

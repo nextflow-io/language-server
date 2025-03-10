@@ -88,13 +88,14 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
     private ScriptAstCache ast;
     private boolean extendedCompletion;
+    private int maxCompletionItems;
     private URI uri;
-    private int maxItemCount = 100;
     private boolean isIncomplete = false;
 
-    public ScriptCompletionProvider(ScriptAstCache ast, boolean extendedCompletion) {
+    public ScriptCompletionProvider(ScriptAstCache ast, int maxCompletionItems, boolean extendedCompletion) {
         this.ast = ast;
         this.extendedCompletion = extendedCompletion;
+        this.maxCompletionItems = maxCompletionItems;
     }
 
     @Override
@@ -471,7 +472,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private boolean addItem(CompletionItem item, List<CompletionItem> items) {
-        if( items.size() >= maxItemCount ) {
+        if( items.size() >= maxCompletionItems ) {
             isIncomplete = true;
             return false;
         }
