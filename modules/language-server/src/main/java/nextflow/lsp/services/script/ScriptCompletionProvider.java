@@ -59,6 +59,7 @@ import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
+import org.eclipse.lsp4j.CompletionItemLabelDetails;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.InsertTextFormat;
 import org.eclipse.lsp4j.InsertTextMode;
@@ -229,8 +230,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
             return true;
         var item = new CompletionItem(name);
         item.setKind(CompletionItemKind.Field);
-        item.setDetail(astNodeToCompletionItemDetail(fn));
-        item.setDocumentation(astNodeToCompletionItemDocumentation(fn));
+        item.setLabelDetails(astNodeToItemLabelDetails(fn));
+        item.setDetail(astNodeToItemDetail(fn));
+        item.setDocumentation(astNodeToItemDocumentation(fn));
         return addItem(item, items);
     }
 
@@ -240,8 +242,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
         var fn = new FieldNode(name, 0xF, mn.getReturnType(), mn.getDeclaringClass(), null);
         var item = new CompletionItem(name);
         item.setKind(CompletionItemKind.Constant);
-        item.setDetail(astNodeToCompletionItemDetail(fn));
-        item.setDocumentation(astNodeToCompletionItemDocumentation(mn));
+        item.setLabelDetails(astNodeToItemLabelDetails(fn));
+        item.setDetail(astNodeToItemDetail(fn));
+        item.setDocumentation(astNodeToItemDocumentation(mn));
         return addItem(item, items);
     }
 
@@ -251,8 +254,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
             return true;
         var item = new CompletionItem(mn.getName());
         item.setKind(CompletionItemKind.Function);
-        item.setDetail(astNodeToCompletionItemDetail(mn));
-        item.setDocumentation(astNodeToCompletionItemDocumentation(mn));
+        item.setLabelDetails(astNodeToItemLabelDetails(mn));
+        item.setDetail(astNodeToItemDetail(mn));
+        item.setDocumentation(astNodeToItemDocumentation(mn));
         return addItem(item, items);
     }
 
@@ -284,6 +288,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 continue;
             var item = new CompletionItem(name);
             item.setKind(CompletionItemKind.Variable);
+            item.setLabelDetails(astNodeToItemLabelDetails(variable));
             if( !addItem(item, items) )
                 break;
         }
@@ -340,8 +345,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
             var item = new CompletionItem(name);
             item.setKind(CompletionItemKind.Function);
-            item.setDetail(astNodeToCompletionItemDetail(node));
-            item.setDocumentation(astNodeToCompletionItemDocumentation(node));
+            item.setLabelDetails(astNodeToItemLabelDetails(node));
+            item.setDetail(astNodeToItemDetail(node));
+            item.setDocumentation(astNodeToItemDocumentation(node));
 
             if( !isIncluded(uri, node) ) {
                 var textEdit = createAddIncludeTextEdit(addIncludeRange, uri, name, node);
@@ -399,26 +405,26 @@ public class ScriptCompletionProvider implements CompletionProvider {
     private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, List<CompletionItem> items) {
         for( var cn : classNodes ) {
             var item = new CompletionItem(cn.getNameWithoutPackage());
-            item.setKind(astNodeToCompletionItemKind(cn));
-            item.setDocumentation(astNodeToCompletionItemDocumentation(cn));
+            item.setKind(astNodeToItemKind(cn));
+            item.setDocumentation(astNodeToItemDocumentation(cn));
 
             if( !addItem(item, items) )
                 break;
         }
     }
 
-    private static String astNodeToCompletionItemDetail(ASTNode node) {
+    private static String astNodeToItemDetail(ASTNode node) {
         return ASTNodeStringUtils.getLabel(node);
     }
 
-    private static MarkupContent astNodeToCompletionItemDocumentation(ASTNode node) {
+    private static MarkupContent astNodeToItemDocumentation(ASTNode node) {
         var documentation = ASTNodeStringUtils.getDocumentation(node);
         return documentation != null
             ? new MarkupContent(MarkupKind.MARKDOWN, documentation)
             : null;
     }
 
-    private static CompletionItemKind astNodeToCompletionItemKind(ASTNode node) {
+    private static CompletionItemKind astNodeToItemKind(ASTNode node) {
         if( node instanceof ClassNode cn ) {
             return cn.isEnum()
                 ? CompletionItemKind.Enum
@@ -433,6 +439,27 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 : CompletionItemKind.Variable;
         }
         return CompletionItemKind.Property;
+    }
+
+    private static CompletionItemLabelDetails astNodeToItemLabelDetails(Object node) {
+        var result = new CompletionItemLabelDetails();
+        if( node instanceof ProcessNode pn ) {
+            result.setDescription("process");
+        }
+        else if( node instanceof WorkflowNode pn ) {
+            result.setDescription("workflow");
+        }
+        else if( node instanceof MethodNode mn ) {
+            result.setDetail("(" + ASTNodeStringUtils.parametersToLabel(mn.getParameters()) + ")");
+
+            var returnType = mn.getReturnType();
+            if( !ClassHelper.OBJECT_TYPE.equals(returnType) && !ClassHelper.VOID_TYPE.equals(returnType) )
+                result.setDescription(Types.getName(returnType));
+        }
+        else if( node instanceof Variable variable ) {
+            result.setDescription(Types.getName(variable.getType()));
+        }
+        return result;
     }
 
     private boolean addItem(CompletionItem item, List<CompletionItem> items) {

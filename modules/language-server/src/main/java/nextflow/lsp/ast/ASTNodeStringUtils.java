@@ -180,7 +180,7 @@ public class ASTNodeStringUtils {
             return variableToLabel(fn);
         }
 
-        var label = getMethodTypeLabel(node);
+        var label = methodTypeLabel(node);
         if( label != null ) {
             var builder = new StringBuilder();
             builder.append('(');
@@ -210,7 +210,7 @@ public class ASTNodeStringUtils {
         return builder.toString();
     }
 
-    private static String getMethodTypeLabel(MethodNode mn) {
+    private static String methodTypeLabel(MethodNode mn) {
         if( mn instanceof FunctionNode )
             return null;
         if( findAnnotation(mn, Operator.class).isPresent() )
@@ -232,7 +232,7 @@ public class ASTNodeStringUtils {
         return null;
     }
 
-    private static String parametersToLabel(Parameter[] params) {
+    public static String parametersToLabel(Parameter[] params) {
         return Stream.of(params)
             .map(param -> variableToLabel(param))
             .collect(Collectors.joining(", "));

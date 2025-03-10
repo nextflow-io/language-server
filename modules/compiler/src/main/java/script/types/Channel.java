@@ -25,7 +25,7 @@ import nextflow.script.dsl.Description;
 import nextflow.script.dsl.Operator;
 
 @Description("""
-    The `Channel` type provides the channel factory methods.
+    A `Channel` is an asynchronous collection that is produced by a process, operator, or channel factory.
 
     [Read more](https://nextflow.io/docs/latest/reference/channel.html)
 """)

@@ -51,8 +51,8 @@ public class Types {
     }
 
     public static boolean isAssignableFrom(Class target, Class source) {
-        target = Types.normalize(target);
-        source = Types.normalize(source);
+        target = normalize(target);
+        source = normalize(source);
         if( target == Integer.class && source == Number.class )
             return false;
         if( target == Number.class && source == Integer.class )
@@ -108,7 +108,7 @@ public class Types {
     }
 
     public static String getName(Class type) {
-        return getName(Types.normalize(type).getSimpleName());
+        return getName(normalize(type).getSimpleName());
     }
 
     public static String getName(String name) {
@@ -119,9 +119,11 @@ public class Types {
 
     private static final List<Class> STANDARD_TYPES = List.of(
         Boolean.class,
+        Duration.class,
         Integer.class,
         List.class,
         Map.class,
+        MemoryUnit.class,
         Number.class,
         Path.class,
         Set.class,
@@ -142,7 +144,7 @@ public class Types {
      * @param type
      */
     private static Class normalize(Class type) {
-        if( type.isPrimitive() )
+        if( type.isPrimitive() && PRIMITIVE_TYPES.containsKey(type) )
             return PRIMITIVE_TYPES.get(type);
         var queue = new LinkedList<Class>();
         queue.add(type);
