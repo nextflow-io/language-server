@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.dsl;
+package nextflow.config.schema;
 
-record PlaceholderNode(
-    String description,
-    String placeholderName,
-    ScopeNode scope
-) implements SchemaNode {}
+import org.pf4j.ExtensionPoint;
+
+public interface ConfigScope extends ExtensionPoint {
+}

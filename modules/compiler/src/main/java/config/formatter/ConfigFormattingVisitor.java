@@ -17,7 +17,8 @@ package nextflow.config.formatter;
 
 import java.util.regex.Pattern;
 
-import nextflow.config.ast.ConfigAppendNode;
+import nextflow.config.ast.ConfigApplyNode;
+import nextflow.config.ast.ConfigApplyBlockNode;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncludeNode;
@@ -27,6 +28,8 @@ import nextflow.script.formatter.FormattingOptions;
 import nextflow.script.formatter.Formatter;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
+
+import static nextflow.script.ast.ASTHelpers.*;
 
 /**
  *
@@ -64,6 +67,29 @@ public class ConfigFormattingVisitor extends ConfigVisitorSupport {
     // config statements
 
     @Override
+    public void visitConfigApplyBlock(ConfigApplyBlockNode node) {
+        fmt.appendLeadingComments(node);
+        fmt.appendIndent();
+        fmt.append(node.name);
+        fmt.append(" {");
+        fmt.appendNewLine();
+
+        fmt.incIndent();
+        super.visitConfigApplyBlock(node);
+        fmt.decIndent();
+
+        fmt.appendIndent();
+        fmt.append('}');
+        fmt.appendNewLine();
+    }
+
+    @Override
+    public void visitConfigApply(ConfigApplyNode node) {
+        fmt.appendLeadingComments(node);
+        fmt.visitDirective(node);
+    }
+
+    @Override
     public void visitConfigAssign(ConfigAssignNode node) {
         fmt.appendLeadingComments(node);
         fmt.appendIndent();
@@ -73,7 +99,7 @@ public class ConfigFormattingVisitor extends ConfigVisitorSupport {
             var padding = currentAlignmentWidth - name.length();
             fmt.append(" ".repeat(padding));
         }
-        fmt.append(node instanceof ConfigAppendNode ? " " : " = ");
+        fmt.append(" = ");
         fmt.visit(node.value);
         fmt.appendNewLine();
     }

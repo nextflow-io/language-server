@@ -30,7 +30,6 @@ import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.expr.EmptyExpression;
-import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
@@ -466,7 +465,7 @@ public class ScriptFormattingVisitor extends ScriptVisitorSupport {
 
             // treat as regular directive
             fmt.appendLeadingComments(stmt);
-            visitDirective(call);
+            fmt.visitDirective(call);
         });
     }
 
@@ -476,19 +475,8 @@ public class ScriptFormattingVisitor extends ScriptVisitorSupport {
             if( call == null )
                 return;
             fmt.appendLeadingComments(stmt);
-            visitDirective(call);
+            fmt.visitDirective(call);
         });
-    }
-
-    protected void visitDirective(MethodCallExpression call) {
-        fmt.appendIndent();
-        fmt.append(call.getMethodAsString());
-        var arguments = asMethodCallArguments(call);
-        if( !arguments.isEmpty() ) {
-            fmt.append(' ');
-            fmt.visitArguments(arguments, false);
-        }
-        fmt.appendNewLine();
     }
 
 }

@@ -15,7 +15,7 @@
  */
 package nextflow.config.scopes;
 
-import nextflow.config.dsl.ConfigScope;
+import nextflow.config.schema.ConfigScope;
 
 public class ProfilesConfig implements ConfigScope {
 

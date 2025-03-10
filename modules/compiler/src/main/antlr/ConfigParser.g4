@@ -89,9 +89,9 @@ compilationUnit
 //
 configStatement
     :   configInclude               #configIncludeStmtAlt
-    |   configAssignment            #configAssignmentStmtAlt
+    |   configAssign                #configAssignStmtAlt
     |   configBlock                 #configBlockStmtAlt
-    |   configAppendBlock           #configAppendBlockStmtAlt
+    |   configApplyBlock            #configApplyBlockStmtAlt
     |   configIncomplete            #configIncompleteStmtAlt
     |   invalidStatement            #configInvalidStmtAlt
     ;
@@ -102,11 +102,11 @@ configInclude
     ;
 
 // -- config assignment
-configAssignment
-    :   configAssignmentPath nls ASSIGN nls expression
+configAssign
+    :   configAssignPath nls ASSIGN nls expression
     ;
 
-configAssignmentPath
+configAssignPath
     :   configPrimary (DOT configPrimary)*
     ;
 
@@ -123,25 +123,25 @@ configBlock
 
 configBlockStatement
     :   configInclude               #configIncludeBlockStmtAlt
-    |   configAssignment            #configAssignmentBlockStmtAlt
+    |   configAssign                #configAssignBlockStmtAlt
     |   configBlock                 #configBlockBlockStmtAlt
-    |   configAppendBlock           #configAppendBlockBlockStmtAlt
+    |   configApplyBlock            #configApplyBlockBlockStmtAlt
     |   configSelector              #configSelectorBlockStmtAlt
     |   configIncomplete            #configIncompleteBlockStmtAlt
     |   invalidStatement            #configInvalidBlockStmtAlt
     ;
 
 configSelector
-    :   kind=Identifier COLON target=configPrimary nls LBRACE nls (configAssignment (sep configAssignment)* sep?)? RBRACE
+    :   kind=Identifier COLON target=configPrimary nls LBRACE nls (configAssign (sep configAssign)* sep?)? RBRACE
     ;
 
-// -- config append block
-configAppendBlock
-    :   configPrimary nls LBRACE nls (configAppendBlockStatement (sep configAppendBlockStatement)* sep?)? RBRACE
+// -- config "apply" block (e.g. plugins)
+configApplyBlock
+    :   configPrimary nls LBRACE nls (configApply (sep configApply)* sep?)? RBRACE
     ;
 
-configAppendBlockStatement
-    :   identifier literal
+configApply
+    :   identifier argumentList
     ;
 
 // -- incomplete config statement

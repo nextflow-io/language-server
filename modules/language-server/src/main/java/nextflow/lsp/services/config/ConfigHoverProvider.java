@@ -19,9 +19,10 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
+import nextflow.config.ast.ConfigApplyBlockNode;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
-import nextflow.config.dsl.ConfigSchema;
+import nextflow.config.schema.SchemaNode;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTNodeStringUtils;
 import nextflow.lsp.ast.ASTUtils;
@@ -100,7 +101,7 @@ public class ConfigHoverProvider implements HoverProvider {
             names.addAll(assign.names);
 
             var fqName = String.join(".", names);
-            var option = ConfigSchema.ROOT.getOption(names);
+            var option = SchemaNode.ROOT.getOption(names);
             if( option != null ) {
                 var description = StringGroovyMethods.stripIndent(option.description(), true).trim();
                 var builder = new StringBuilder();
@@ -114,12 +115,12 @@ public class ConfigHoverProvider implements HoverProvider {
             }
         }
 
-        if( offsetNode instanceof ConfigBlockNode block ) {
+        if( offsetNode instanceof ConfigApplyBlockNode || offsetNode instanceof ConfigBlockNode ) {
             var names = getCurrentScope(nodeStack);
             if( names.isEmpty() )
                 return null;
 
-            var scope = ConfigSchema.ROOT.getScope(names);
+            var scope = SchemaNode.ROOT.getChild(names);
             if( scope != null ) {
                 return StringGroovyMethods.stripIndent(scope.description(), true).trim();
             }
@@ -154,6 +155,8 @@ public class ConfigHoverProvider implements HoverProvider {
     protected List<String> getCurrentScope(List<ASTNode> nodeStack) {
         var names = new ArrayList<String>();
         for( var node : DefaultGroovyMethods.asReversed(nodeStack) ) {
+            if( node instanceof ConfigApplyBlockNode block )
+                names.add(block.name);
             if( node instanceof ConfigBlockNode block && block.kind == null )
                 names.add(block.name);
         }

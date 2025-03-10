@@ -15,8 +15,8 @@
  */
 package nextflow.config.scopes;
 
-import nextflow.config.dsl.ConfigOption;
-import nextflow.config.dsl.ConfigScope;
+import nextflow.config.schema.ConfigOption;
+import nextflow.config.schema.ConfigScope;
 import nextflow.script.dsl.Description;
 
 public class WaveScanConfig implements ConfigScope {

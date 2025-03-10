@@ -25,7 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import groovy.lang.Tuple2;
 import nextflow.script.ast.ASTNodeMarker;
-import nextflow.config.ast.ConfigAppendNode;
+import nextflow.config.ast.ConfigApplyNode;
+import nextflow.config.ast.ConfigApplyBlockNode;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncludeNode;
@@ -201,14 +202,14 @@ public class ConfigAstBuilder {
         if( ctx instanceof ConfigIncludeStmtAltContext ciac )
             result = ast( configInclude(ciac.configInclude()), ciac );
 
-        else if( ctx instanceof ConfigAssignmentStmtAltContext caac )
-            result = ast( configAssignment(caac.configAssignment()), caac );
+        else if( ctx instanceof ConfigApplyBlockStmtAltContext cbac )
+            result = ast( configApplyBlock(cbac.configApplyBlock()), cbac );
+
+        else if( ctx instanceof ConfigAssignStmtAltContext caac )
+            result = ast( configAssign(caac.configAssign()), caac );
 
         else if( ctx instanceof ConfigBlockStmtAltContext cbac )
             result = ast( configBlock(cbac.configBlock()), cbac );
-
-        else if( ctx instanceof ConfigAppendBlockStmtAltContext cbac )
-            result = ast( configAppendBlock(cbac.configAppendBlock()), cbac );
 
         else if( ctx instanceof ConfigIncompleteStmtAltContext ciac )
             result = ast( configIncomplete(ciac.configIncomplete()), ciac );
@@ -230,8 +231,25 @@ public class ConfigAstBuilder {
         return new ConfigIncludeNode(source);
     }
 
-    private ConfigStatement configAssignment(ConfigAssignmentContext ctx) {
-        var names = ctx.configAssignmentPath().configPrimary().stream()
+    private ConfigApplyBlockNode configApplyBlock(ConfigApplyBlockContext ctx) {
+        var name = configPrimary(ctx.configPrimary());
+        var statements = ctx.configApply().stream()
+            .map(this::configApply)
+            .toList();
+        var result = ast( new ConfigApplyBlockNode(name, statements), ctx );
+        if( !"plugins".equals(name) )
+            collectSyntaxError(new SyntaxException("Config directives (i.e. statements without `=`) are only allowed in the `plugins` scope", result));
+        return result;
+    }
+
+    private ConfigApplyNode configApply(ConfigApplyContext ctx) {
+        var method = ast( constX(identifier(ctx.identifier())), ctx.identifier() );
+        var arguments = argumentList(ctx.argumentList());
+        return ast( new ConfigApplyNode(method, arguments), ctx );
+    }
+
+    private ConfigStatement configAssign(ConfigAssignContext ctx) {
+        var names = ctx.configAssignPath().configPrimary().stream()
             .map(this::configPrimary)
             .toList();
         var value = expression(ctx.expression());
@@ -266,14 +284,14 @@ public class ConfigAstBuilder {
         if( ctx instanceof ConfigIncludeBlockStmtAltContext ciac )
             result = ast( configInclude(ciac.configInclude()), ciac );
 
-        else if( ctx instanceof ConfigAssignmentBlockStmtAltContext caac )
-            result = ast( configAssignment(caac.configAssignment()), caac );
+        else if( ctx instanceof ConfigApplyBlockBlockStmtAltContext cbac )
+            result = ast( configApplyBlock(cbac.configApplyBlock()), cbac );
+
+        else if( ctx instanceof ConfigAssignBlockStmtAltContext caac )
+            result = ast( configAssign(caac.configAssign()), caac );
 
         else if( ctx instanceof ConfigBlockBlockStmtAltContext cbac )
             result = ast( configBlock(cbac.configBlock()), cbac );
-
-        else if( ctx instanceof ConfigAppendBlockBlockStmtAltContext cbac )
-            result = ast( configAppendBlock(cbac.configAppendBlock()), cbac );
 
         else if( ctx instanceof ConfigSelectorBlockStmtAltContext csac )
             result = ast( configSelector(csac.configSelector()), csac );
@@ -296,27 +314,10 @@ public class ConfigAstBuilder {
     private ConfigStatement configSelector(ConfigSelectorContext ctx) {
         var kind = ctx.kind.getText();
         var target = configPrimary(ctx.target);
-        var statements = ctx.configAssignment().stream()
-            .map(this::configAssignment)
+        var statements = ctx.configAssign().stream()
+            .map(this::configAssign)
             .toList();
         return new ConfigBlockNode(kind, target, statements);
-    }
-
-    private ConfigStatement configAppendBlock(ConfigAppendBlockContext ctx) {
-        var name = configPrimary(ctx.configPrimary());
-        var statements = ctx.configAppendBlockStatement().stream()
-            .map(this::configAppendBlockStatement)
-            .toList();
-        var result = ast( new ConfigBlockNode(name, statements), ctx );
-        if( !"plugins".equals(name) )
-            collectSyntaxError(new SyntaxException("Only the `plugins` scope can use the append syntax (i.e. no equals sign)", result));
-        return result;
-    }
-
-    private ConfigStatement configAppendBlockStatement(ConfigAppendBlockStatementContext ctx) {
-        var name = identifier(ctx.identifier());
-        var value = literal(ctx.literal());
-        return ast( new ConfigAppendNode(List.of(name), value), ctx );
     }
 
     private ConfigStatement configIncomplete(ConfigIncompleteContext ctx) {

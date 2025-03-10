@@ -17,6 +17,8 @@ package nextflow.lsp.services.config;
 
 import java.util.Map;
 
+import nextflow.config.ast.ConfigApplyNode;
+import nextflow.config.ast.ConfigApplyBlockNode;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncludeNode;
@@ -54,6 +56,22 @@ class ConfigAstParentVisitor extends ConfigVisitorSupport {
 
     public Map<ASTNode, ASTNode> getParents() {
         return lookup.getParents();
+    }
+
+    @Override
+    public void visitConfigApplyBlock(ConfigApplyBlockNode node) {
+        lookup.push(node);
+        try {
+            super.visitConfigApplyBlock(node);
+        }
+        finally {
+            lookup.pop();
+        }
+    }
+
+    @Override
+    public void visitConfigApply(ConfigApplyNode node) {
+        lookup.visitMethodCallExpression(node);
     }
 
     @Override

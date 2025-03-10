@@ -331,6 +331,17 @@ public class Formatter extends CodeVisitorSupport {
         append(')');
     }
 
+    public void visitDirective(MethodCallExpression call) {
+        appendIndent();
+        append(call.getMethodAsString());
+        var arguments = asMethodCallArguments(call);
+        if( !arguments.isEmpty() ) {
+            append(' ');
+            visitArguments(arguments, false);
+        }
+        appendNewLine();
+    }
+
     public void visitArguments(List<Expression> args, boolean wrap) {
         var hasNamedArgs = args.size() > 0 && args.get(0) instanceof NamedArgumentListExpression;
         var positionalArgs = hasNamedArgs

@@ -17,9 +17,9 @@ package nextflow.config.scopes;
 
 import java.util.Map;
 
-import nextflow.config.dsl.ConfigOption;
-import nextflow.config.dsl.ConfigScope;
-import nextflow.config.dsl.PlaceholderName;
+import nextflow.config.schema.ConfigOption;
+import nextflow.config.schema.ConfigScope;
+import nextflow.config.schema.PlaceholderName;
 import nextflow.script.dsl.Description;
 
 public class AzureBatchConfig implements ConfigScope {

@@ -18,8 +18,8 @@ package nextflow.config.scopes;
 import java.util.List;
 import java.util.Map;
 
-import nextflow.config.dsl.ConfigOption;
-import nextflow.config.dsl.ConfigScope;
+import nextflow.config.schema.ConfigOption;
+import nextflow.config.schema.ConfigScope;
 import nextflow.script.dsl.Description;
 import nextflow.script.types.Duration;
 

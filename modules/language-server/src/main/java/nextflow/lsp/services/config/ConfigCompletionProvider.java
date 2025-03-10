@@ -23,10 +23,7 @@ import java.util.List;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncompleteNode;
-import nextflow.config.dsl.ConfigSchema;
-import nextflow.config.dsl.ConfigScope;
-import nextflow.config.dsl.OptionNode;
-import nextflow.config.dsl.ScopeNode;
+import nextflow.config.schema.SchemaNode;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.Logger;
@@ -115,44 +112,41 @@ public class ConfigCompletionProvider implements CompletionProvider {
     }
 
     private List<CompletionItem> getConfigOptions(List<String> names) {
-        var scope = ConfigSchema.ROOT.getScope(names);
-        if( scope instanceof ScopeNode sn ) {
-            var result = new ArrayList<CompletionItem>(sn.options().size() + sn.scopes().size());
-            sn.options().forEach((name, option) -> {
-                result.add(getConfigOption(name, option));
-            });
-            sn.scopes().forEach((name, scope1) -> {
-                if( scope1 instanceof ScopeNode sn1 )
-                    result.add(getConfigScopeDot(name, sn1));
-            });
-            return result;
-        }
-        return Collections.emptyList();
-    }
-
-    private static List<CompletionItem> getTopLevelItems() {
-        var result = new ArrayList<CompletionItem>();
-        ConfigSchema.ROOT.scopes().forEach((name, scope) -> {
-            if( scope instanceof ScopeNode sn ) {
-                if( !"profiles".equals(name) )
-                    result.add(getConfigScopeDot(name, sn));
-                result.add(getConfigScopeBlock(name, sn));
-            }
-        });
-        ConfigSchema.ROOT.options().forEach((name, description) -> {
-            result.add(getConfigOption(name, description));
+        var scope = SchemaNode.ROOT.getScope(names);
+        if( scope == null )
+            return Collections.emptyList();
+        var result = new ArrayList<CompletionItem>(scope.children().size());
+        scope.children().forEach((name, child) -> {
+            if( child instanceof SchemaNode.Option option )
+                result.add(getConfigOption(name, option.description(), option.type()));
+            else
+                result.add(getConfigScope(name, child.description()));
         });
         return result;
     }
 
-    private static CompletionItem getConfigScopeDot(String name, ScopeNode scope) {
+    private static List<CompletionItem> getTopLevelItems() {
+        var result = new ArrayList<CompletionItem>();
+        SchemaNode.ROOT.children().forEach((name, child) -> {
+            if( child instanceof SchemaNode.Option option ) {
+                result.add(getConfigOption(name, option.description(), option.type()));
+            }
+            else {
+                result.add(getConfigScope(name, child.description()));
+                result.add(getConfigScopeBlock(name, child.description()));
+            }
+        });
+        return result;
+    }
+
+    private static CompletionItem getConfigScope(String name, String description) {
         var item = new CompletionItem(name);
         item.setKind(CompletionItemKind.Property);
-        item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, StringGroovyMethods.stripIndent(scope.description(), true).trim()));
+        item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, StringGroovyMethods.stripIndent(description, true).trim()));
         return item;
     }
 
-    private static CompletionItem getConfigScopeBlock(String name, ScopeNode scope) {
+    private static CompletionItem getConfigScopeBlock(String name, String description) {
         var insertText = String.format(
             """
             %s {
@@ -162,18 +156,18 @@ public class ConfigCompletionProvider implements CompletionProvider {
 
         var item = new CompletionItem(name + " {");
         item.setKind(CompletionItemKind.Property);
-        item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, StringGroovyMethods.stripIndent(scope.description(), true).trim()));
+        item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, StringGroovyMethods.stripIndent(description, true).trim()));
         item.setInsertText(StringGroovyMethods.stripIndent(insertText, true).trim());
         item.setInsertTextFormat(InsertTextFormat.Snippet);
         item.setInsertTextMode(InsertTextMode.AdjustIndentation);
         return item;
     }
 
-    private static CompletionItem getConfigOption(String name, OptionNode option) {
-        var documentation = StringGroovyMethods.stripIndent(option.description(), true).trim();
+    private static CompletionItem getConfigOption(String name, String description, Class type) {
+        var documentation = StringGroovyMethods.stripIndent(description, true).trim();
         var item = new CompletionItem(name);
         item.setKind(CompletionItemKind.Property);
-        item.setDetail(String.format("%s: %s", name, Types.getName(option.type())));
+        item.setDetail(String.format("%s: %s", name, Types.getName(type)));
         item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation));
         item.setInsertText(String.format("%s = $1", name));
         item.setInsertTextFormat(InsertTextFormat.Snippet);

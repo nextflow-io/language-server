@@ -17,14 +17,21 @@ package nextflow.config.ast;
 
 import java.util.List;
 
-import org.codehaus.groovy.ast.expr.Expression;
-
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class ConfigAppendNode extends ConfigAssignNode {
-    public ConfigAppendNode(List<String> names, Expression value) {
-        super(names, value);
+public class ConfigApplyBlockNode extends ConfigStatement {
+    public final String name;
+    public final List<ConfigApplyNode> statements;
+
+    public ConfigApplyBlockNode(String name, List<ConfigApplyNode> statements) {
+        this.name = name;
+        this.statements = statements;
+    }
+
+    @Override
+    public void visit(ConfigVisitor visitor) {
+        visitor.visitConfigApplyBlock(this);
     }
 }

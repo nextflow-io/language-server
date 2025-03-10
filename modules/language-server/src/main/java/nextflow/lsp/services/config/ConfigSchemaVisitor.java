@@ -16,13 +16,13 @@
 package nextflow.lsp.services.config;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Stack;
 
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigVisitorSupport;
-import nextflow.config.dsl.ConfigSchema;
+import nextflow.config.schema.SchemaNode;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.types.Types;
@@ -44,7 +44,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
 
     private boolean typeChecking;
 
-    private List<String> scopes = new ArrayList<>();
+    private Stack<String> scopes = new Stack<>();
 
     public ConfigSchemaVisitor(SourceUnit sourceUnit, boolean typeChecking) {
         this.sourceUnit = sourceUnit;
@@ -86,7 +86,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
         var fqName = String.join(".", names);
         if( fqName.startsWith("process.ext.") )
             return;
-        var option = ConfigSchema.ROOT.getOption(names);
+        var option = SchemaNode.ROOT.getOption(names);
         if( option == null ) {
             var message = "Unrecognized config option '" + fqName + "'";
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
@@ -110,7 +110,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
             scopes.add(node.name);
         super.visitConfigBlock(node);
         if( newScope )
-            scopes.remove(scopes.size() - 1);
+            scopes.pop();
     }
 
     @Override

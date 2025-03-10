@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.dsl;
+package nextflow.config.scopes;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import nextflow.script.dsl.Description;
+import nextflow.script.dsl.DslScope;
 
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.FIELD, ElementType.METHOD })
-public @interface ConfigOption {
+public interface PluginsDsl extends DslScope {
+
+    @Description("""
+        Specify a plugin to be used by the pipeline. The plugin id can be a name (e.g. `nf-hello`) or a name with a version (e.g. `nf-hello@0.5.0`).
+    """)
+    public void id(String value);
+
 }

@@ -17,8 +17,8 @@ package nextflow.config.scopes;
 
 import java.nio.file.Path;
 
-import nextflow.config.dsl.ConfigOption;
-import nextflow.config.dsl.ConfigScope;
+import nextflow.config.schema.ConfigOption;
+import nextflow.config.schema.ConfigScope;
 import nextflow.script.dsl.Description;
 
 public class RootConfig implements ConfigScope {
@@ -165,12 +165,13 @@ public class RootConfig implements ConfigScope {
     """)
     public ParamsConfig params;
 
+    @ConfigOption
     @Description("""
         The `plugins` scope allows you to include plugins at runtime.
     
         [Read more](https://nextflow.io/docs/latest/plugins.html)
     """)
-    public PluginsConfig plugins;
+    public PluginsDsl plugins;
 
     @Description("""
         The `podman` scope controls how [Podman](https://podman.io/) containers are executed by Nextflow.
@@ -179,11 +180,6 @@ public class RootConfig implements ConfigScope {
     """)
     public PodmanConfig podman;
 
-    @Description("""
-        The `process` scope allows you to specify default directives for processes in your pipeline.
-    
-        [Read more](https://nextflow.io/docs/latest/config.html#process-configuration)
-    """)
     public ProcessConfig process;
 
     @Description("""

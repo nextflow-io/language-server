@@ -27,6 +27,8 @@ public interface ConfigVisitor extends GroovyCodeVisitor {
 
     void visitConfigBlock(ConfigBlockNode node);
 
+    void visitConfigApplyBlock(ConfigApplyBlockNode node);
+
     void visitConfigInclude(ConfigIncludeNode node);
 
     void visitConfigIncomplete(ConfigIncompleteNode node);

@@ -13,19 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.config.scopes;
+package nextflow.config.ast;
 
-import nextflow.config.dsl.ConfigOption;
-import nextflow.config.dsl.ConfigScope;
-import nextflow.script.dsl.Description;
+import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.expr.MethodCallExpression;
+import org.codehaus.groovy.ast.expr.VariableExpression;
 
-public class PluginsConfig implements ConfigScope {
-
-    @ConfigOption
-    @Description("""
-        The plugin id, can be a name (e.g. `nf-hello`) or a name with a version (e.g. `nf-hello@0.5.0`).
-    """)
-    public void id(String value) {
+/**
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public class ConfigApplyNode extends MethodCallExpression {
+    public ConfigApplyNode(Expression name, Expression arguments) {
+        super(VariableExpression.THIS_EXPRESSION, name, arguments);
     }
-
 }

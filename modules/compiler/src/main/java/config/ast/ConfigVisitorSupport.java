@@ -36,6 +36,16 @@ public abstract class ConfigVisitorSupport extends ClassCodeVisitorSupport imple
     }
 
     @Override
+    public void visitConfigApplyBlock(ConfigApplyBlockNode node) {
+        for( var statement : node.statements ) {
+            visitConfigApply(statement);
+        }
+    }
+
+    public void visitConfigApply(ConfigApplyNode node) {
+    }
+
+    @Override
     public void visitConfigAssign(ConfigAssignNode node) {
         visit(node.value);
     }

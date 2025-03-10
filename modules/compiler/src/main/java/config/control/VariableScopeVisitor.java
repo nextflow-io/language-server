@@ -19,12 +19,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 
+import nextflow.config.ast.ConfigApplyBlockNode;
+import nextflow.config.ast.ConfigApplyNode;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncludeNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.dsl.ConfigDsl;
+import nextflow.config.schema.SchemaNode;
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.control.VariableScopeChecker;
 import nextflow.script.dsl.ProcessDsl;
 import nextflow.script.dsl.ScriptDsl;
@@ -80,11 +84,34 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
     }
 
     @Override
+    public void visitConfigApplyBlock(ConfigApplyBlockNode node) {
+        configScopes.add(node.name);
+        var names = currentConfigScopes();
+        var option = SchemaNode.ROOT.getDslOption(names);
+        if( option != null ) {
+            vsc.pushScope(option.dsl());
+            super.visitConfigApplyBlock(node);
+            vsc.popScope();
+        }
+        else {
+            addError("Unrecognized config block '" + node.name + "'", node);
+        }
+        configScopes.pop();
+    }
+
+    @Override
+    public void visitConfigApply(ConfigApplyNode node) {
+        checkMethodCall(node);
+    }
+
+    @Override
     public void visitConfigAssign(ConfigAssignNode node) {
         for( int i = 0; i < node.names.size() - 1; i++ )
             configScopes.add(node.names.get(i));
 
-        var inProcess = "process".equals(currentConfigScope());
+        var names = currentConfigScopes();
+        var scope = !names.isEmpty() ? names.get(0) : null;
+        var inProcess = "process".equals(scope);
         var inClosure = node.value instanceof ClosureExpression;
         if( !inProcess && inClosure )
             vsc.addError("Dynamic config options are only allowed in the `process` scope", node);
@@ -198,15 +225,19 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
 
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
-        if( node.isImplicitThis() && node.getMethod() instanceof ConstantExpression ) {
-            var name = node.getMethodAsString();
-            var variable = vsc.findVariableDeclaration(name, node);
-            if( variable == null ) {
-                if( !KEYWORDS.contains(name) )
-                    vsc.addError("`" + name + "` is not defined", node.getMethod());
-            }
-        }
+        checkMethodCall(node);
         super.visitMethodCallExpression(node);
+    }
+
+    private void checkMethodCall(MethodCallExpression node) {
+        if( !node.isImplicitThis() )
+            return;
+        var name = node.getMethodAsString();
+        var defNode = vsc.findDslFunction(name, node);
+        if( defNode != null )
+            node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, defNode);
+        else if( !KEYWORDS.contains(name) )
+            vsc.addError("`" + name + "` is not defined", node.getMethod());
     }
 
     @Override
@@ -264,15 +295,13 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
         return vsc.getCurrentScope();
     }
 
-    private String currentConfigScope() {
-        if( configScopes.isEmpty() )
-            return null;
+    private List<String> currentConfigScopes() {
         var names = new ArrayList<>(configScopes);
-        if( "profiles".equals(names.get(0)) ) {
+        if( !names.isEmpty() && "profiles".equals(names.get(0)) ) {
             if( !names.isEmpty() ) names.remove(0);
             if( !names.isEmpty() ) names.remove(0);
         }
-        return !names.isEmpty() ? names.get(0) : null;
+        return names;
     }
 
 }
