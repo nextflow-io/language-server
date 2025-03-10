@@ -23,6 +23,7 @@ import java.util.Set;
 
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.dsl.Constant;
+import nextflow.script.dsl.Operator;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
@@ -182,10 +183,9 @@ public class VariableScopeChecker {
     private Variable findDslVariable(ClassNode cn, String name, ASTNode node) {
         while( cn != null ) {
             for( var mn : cn.getMethods() ) {
-                // processes/workflows can be accessed as variables, e.g. `PROC.out`
-                if( mn instanceof ProcessNode || mn instanceof WorkflowNode ) {
-                    if( name.equals(mn.getName()) )
-                        return wrapMethodAsVariable(mn, name);
+                // processes, workflows, and operators can be accessed as variables, e.g. with pipes
+                if( isCallableVariable(mn) && name.equals(mn.getName()) ) {
+                    return wrapMethodAsVariable(mn, name);
                 }
                 // built-in variables are methods annotated as @Constant
                 var an = findAnnotation(mn, Constant.class);
@@ -207,6 +207,14 @@ public class VariableScopeChecker {
             return wrapMethodAsVariable(includes.get(name), name);
 
         return null;
+    }
+
+    private boolean isCallableVariable(MethodNode mn) {
+        if( mn instanceof ProcessNode || mn instanceof WorkflowNode )
+            return true;
+        if( findAnnotation(mn, Operator.class).isPresent() )
+            return true;
+        return false;
     }
 
     private PropertyNode wrapMethodAsVariable(MethodNode mn, String name) {
