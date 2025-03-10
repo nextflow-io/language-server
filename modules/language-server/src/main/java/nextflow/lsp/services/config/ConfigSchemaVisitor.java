@@ -78,7 +78,6 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
             return;
         }
         if( "params".equals(scope) ) {
-            // TODO: validate params against schema
             return;
         }
 

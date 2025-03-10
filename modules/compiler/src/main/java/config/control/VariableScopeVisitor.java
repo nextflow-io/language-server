@@ -94,7 +94,8 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
             vsc.popScope();
         }
         else {
-            addError("Unrecognized config block '" + node.name + "'", node);
+            // invalid config apply block is handled by ScriptAstBuilder
+            // addError("Unrecognized config block '" + node.name + "'", node);
         }
         configScopes.pop();
     }
@@ -109,26 +110,34 @@ class VariableScopeVisitor extends ConfigVisitorSupport {
         for( int i = 0; i < node.names.size() - 1; i++ )
             configScopes.add(node.names.get(i));
 
-        var names = currentConfigScopes();
-        var scope = !names.isEmpty() ? names.get(0) : null;
-        var inProcess = "process".equals(scope);
+        var scopes = currentConfigScopes();
+        var inProcess = !scopes.isEmpty() && "process".equals(scopes.get(0));
         var inClosure = node.value instanceof ClosureExpression;
-        if( !inProcess && inClosure )
+        if( inClosure && !inProcess && !isWorkflowHandler(scopes, node) )
             vsc.addError("Dynamic config options are only allowed in the `process` scope", node);
-        if( inProcess && inClosure ) {
+        if( inClosure ) {
             vsc.pushScope(ScriptDsl.class);
-            vsc.pushScope(ProcessDsl.class);
+            if( inProcess )
+                vsc.pushScope(ProcessDsl.class);
         }
 
         super.visitConfigAssign(node);
 
-        if( inProcess && inClosure ) {
-            vsc.popScope();
+        if( inClosure ) {
+            if( inProcess )
+                vsc.popScope();
             vsc.popScope();
         }
 
         for( int i = 0; i < node.names.size() - 1; i++ )
             configScopes.pop();
+    }
+
+    private static boolean isWorkflowHandler(List<String> scopes, ConfigAssignNode node) {
+        var option = node.names.get(node.names.size() - 1);
+        return scopes.size() == 1
+            && "workflow".equals(scopes.get(0))
+            && List.of("onComplete", "onError").contains(option);
     }
 
     @Override
