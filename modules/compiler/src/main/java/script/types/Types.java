@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 import nextflow.script.ast.ASTNodeMarker;
+import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ClassNode;
 
 public class Types {
@@ -70,21 +71,18 @@ public class Types {
 
         var builder = new StringBuilder();
 
+        // type name
         var placeholder = type.isGenericsPlaceHolder();
-        if( placeholder ) {
+        if( placeholder )
             builder.append(type.getUnresolvedName());
-        }
-        else if( !type.isPrimaryClassNode() ) {
+        else if( type.getNodeMetaData(ASTNodeMarker.FULLY_QUALIFIED) != null )
+            builder.append(type.getName());
+        else if( hasTypeClass(type) )
             builder.append(getName(type.getTypeClass()));
-        }
-        else {
-            var fullyQualified = type.getNodeMetaData(ASTNodeMarker.FULLY_QUALIFIED) != null;
-            var name = fullyQualified
-                ? type.getName()
-                : type.getNameWithoutPackage();
-            builder.append(getName(name));
-        }
+        else
+            builder.append(getName(type.getNameWithoutPackage()));
 
+        // type arguments (if applicable)
         var genericsTypes = type.getGenericsTypes();
         if( !placeholder && genericsTypes != null ) {
             builder.append('<');
@@ -95,7 +93,18 @@ public class Types {
             }
             builder.append('>');
         }
+
         return builder.toString();
+    }
+
+    private static boolean hasTypeClass(ClassNode type) {
+        try {
+            type.getTypeClass();
+            return true;
+        }
+        catch( GroovyBugError e ) {
+            return false;
+        }
     }
 
     public static String getName(Class type) {
