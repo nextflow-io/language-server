@@ -108,6 +108,8 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
 
     private void declareInclude(IncludeNode node) {
         for( var module : node.modules ) {
+            if( module.getTarget() == null )
+                continue;
             var name = module.getNameOrAlias();
             var otherInclude = vsc.getInclude(name);
             if( otherInclude != null )
@@ -312,9 +314,9 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
             return null;
         }
         var name = call.getMethodAsString();
-        var defNode = vsc.findDslFunction(name, call.getMethod());
-        if( defNode != null )
-            call.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, defNode);
+        var mn = vsc.findDslFunction(name, call.getMethod());
+        if( mn != null )
+            call.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, mn);
         else
             vsc.addError("Invalid " + typeLabel + " `" + name + "`", node);
         return call;
@@ -459,8 +461,6 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         if( variable != null ) {
             if( isDslVariable(variable) )
                 vsc.addError("Built-in variable cannot be re-assigned", ve);
-            else
-                checkExternalWriteInAsyncClosure(ve, variable);
             ve.setAccessedVariable(variable);
             return false;
         }
@@ -523,9 +523,8 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
             return;
         var scope = currentClosure.getVariableScope();
         var name = variable.getName();
-        // TODO: should apply only to operator closures
-        if( scope.isReferencedLocalVariable(name) && scope.getDeclaredVariable(name) == null )
-            vsc.addParanoidWarning("Mutating an external variable in an operator closure may lead to a race condition", target, "External variable declared here", (ASTNode) variable);
+        if( inOperatorCall && scope.isReferencedLocalVariable(name) && scope.getDeclaredVariable(name) == null )
+            sourceUnit.addWarning("Mutating an external variable in an operator closure can lead to a race condition", target);
     }
 
     // expressions
@@ -537,6 +536,8 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         "while"
     );
 
+    private boolean inOperatorCall;
+
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
         var target = checkSetAssignment(node);
@@ -546,7 +547,15 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
             return;
         }
         checkMethodCall(node);
+        var ioc = inOperatorCall;
+        inOperatorCall = isOperatorCall(node);
         super.visitMethodCallExpression(node);
+        inOperatorCall = ioc;
+    }
+
+    private static boolean isOperatorCall(MethodCallExpression node) {
+        return node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET) instanceof MethodNode mn
+            && VariableScopeChecker.isOperator(mn);
     }
 
     /**
@@ -568,28 +577,36 @@ class VariableScopeVisitor extends ScriptVisitorSupport {
         if( !node.isImplicitThis() )
             return;
         var name = node.getMethodAsString();
-        var defNode = vsc.findDslFunction(name, node);
-        if( defNode != null ) {
-            if( defNode instanceof ProcessNode || defNode instanceof WorkflowNode )
-                checkProcessOrWorkflowCall(node, defNode);
-            node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, defNode);
+        var mn = vsc.findDslFunction(name, node);
+        if( mn != null ) {
+            if( VariableScopeChecker.isDataflowMethod(mn) )
+                checkDataflowMethod(node, mn);
+            node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, mn);
         }
         else if( !KEYWORDS.contains(name) ) {
             vsc.addError("`" + name + "` is not defined", node.getMethod());
         }
     }
 
-    private void checkProcessOrWorkflowCall(MethodCallExpression node, MethodNode defNode) {
+    private void checkDataflowMethod(MethodCallExpression node, MethodNode mn) {
         if( !(currentDefinition instanceof WorkflowNode) ) {
-            var type = defNode instanceof ProcessNode ? "Processes" : "Workflows";
+            var type = dataflowMethodType(mn);
             vsc.addError(type + " can only be called from a workflow", node);
             return;
         }
         if( currentClosure != null ) {
-            var type = defNode instanceof ProcessNode ? "Processes" : "Workflows";
+            var type = dataflowMethodType(mn);
             vsc.addError(type + " cannot be called from within a closure", node);
             return;
         }
+    }
+
+    private static String dataflowMethodType(MethodNode mn) {
+        if( mn instanceof ProcessNode )
+            return "Processes";
+        if( mn instanceof WorkflowNode )
+            return "Workflows";
+        return "Operators";
     }
 
     @Override

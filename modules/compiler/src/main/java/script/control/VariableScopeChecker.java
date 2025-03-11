@@ -184,7 +184,7 @@ public class VariableScopeChecker {
         while( cn != null ) {
             for( var mn : cn.getMethods() ) {
                 // processes, workflows, and operators can be accessed as variables, e.g. with pipes
-                if( isCallableVariable(mn) && name.equals(mn.getName()) ) {
+                if( isDataflowMethod(mn) && name.equals(mn.getName()) ) {
                     return wrapMethodAsVariable(mn, name);
                 }
                 // built-in variables are methods annotated as @Constant
@@ -209,15 +209,15 @@ public class VariableScopeChecker {
         return null;
     }
 
-    private boolean isCallableVariable(MethodNode mn) {
-        if( mn instanceof ProcessNode || mn instanceof WorkflowNode )
-            return true;
-        if( findAnnotation(mn, Operator.class).isPresent() )
-            return true;
-        return false;
+    public static boolean isDataflowMethod(MethodNode mn) {
+        return mn instanceof ProcessNode || mn instanceof WorkflowNode || isOperator(mn);
     }
 
-    private PropertyNode wrapMethodAsVariable(MethodNode mn, String name) {
+    public static boolean isOperator(MethodNode mn) {
+        return findAnnotation(mn, Operator.class).isPresent();
+    }
+
+    private static PropertyNode wrapMethodAsVariable(MethodNode mn, String name) {
         var cn = mn.getDeclaringClass();
         var fn = new FieldNode(name, mn.getModifiers() & 0xF, mn.getReturnType(), cn, null);
         fn.setHasNoRealSourcePosition(true);
