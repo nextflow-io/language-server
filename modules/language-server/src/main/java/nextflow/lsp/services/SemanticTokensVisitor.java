@@ -21,6 +21,7 @@ import java.util.stream.Stream;
 
 import nextflow.lsp.util.Positions;
 import nextflow.lsp.util.LanguageServerUtils;
+import nextflow.script.dsl.Constant;
 import nextflow.script.parser.TokenPosition;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.CodeVisitorSupport;
@@ -165,7 +166,11 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
 
     @Override
     public void visitVariableExpression(VariableExpression node) {
-        if( !(node.getAccessedVariable() instanceof DynamicVariable) )
+        var variable = node.getAccessedVariable();
+        var mn = asMethodVariable(variable);
+        if( mn != null && !findAnnotation(mn, Constant.class).isPresent() )
+            append(node, SemanticTokenTypes.Function);
+        else if( !(variable instanceof DynamicVariable) )
             append(node, SemanticTokenTypes.Variable);
     }
 
