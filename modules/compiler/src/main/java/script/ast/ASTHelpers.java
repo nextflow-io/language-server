@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
@@ -56,6 +57,14 @@ public class ASTHelpers {
 
     public static Expression createX(Class type, Expression... expressions) {
         return ctorX(new ClassNode(type), args(expressions));
+    }
+
+    public static Expression createX(String name, TupleExpression args) {
+        return ctorX(ClassHelper.makeWithoutCaching(name), args);
+    }
+
+    public static Expression createX(String name, Expression... expressions) {
+        return ctorX(ClassHelper.makeWithoutCaching(name), args(expressions));
     }
 
     public static List<Statement> asBlockStatements(Statement statement) {
