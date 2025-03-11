@@ -15,17 +15,22 @@
  */
 package nextflow.script.types;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import groovy.lang.Tuple2;
 import nextflow.script.ast.ASTNodeMarker;
+import nextflow.script.types.shim.ShimType;
 import org.codehaus.groovy.GroovyBugError;
+import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.GenericsType;
+import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.tools.GenericsUtils;
 
 public class Types {
 
@@ -35,6 +40,18 @@ public class Types {
         new ClassNode(MemoryUnit.class),
         new ClassNode(Path.class)
     );
+
+    /**
+     * Determine whether a method has a non-void return type.
+     *
+     * @param node
+     */
+    public static boolean hasReturnType(MethodNode node) {
+        var returnType = node.getReturnType();
+        if( returnType.isGenericsPlaceHolder() )
+            return true;
+        return !ClassHelper.OBJECT_TYPE.equals(returnType) && !ClassHelper.VOID_TYPE.equals(returnType);
+    }
 
     /**
      * Determine whether a source type can be assigned to a target type.
@@ -69,9 +86,59 @@ public class Types {
         if( type.isArray() )
             return getName(type.getComponentType());
 
+        if( ClassHelper.isFunctionalInterface(type) )
+            return closureName(type);
+
+        if( type.isDerivedFrom(ClassHelper.TUPLE_TYPE) )
+            return tupleName(type);
+
+        return typeName(type);
+    }
+
+    private static String closureName(ClassNode type) {
+        var mn = ClassHelper.findSAM(type);
+        var spec = GenericsUtils.extractPlaceholders(type);
         var builder = new StringBuilder();
 
-        // type name
+        var params = mn.getParameters();
+        builder.append('(');
+        for( int i = 0; i < params.length; i++ ) {
+            if( i > 0 )
+                builder.append(", ");
+            var paramType = specificType(params[i].getType(), spec);
+            builder.append(getName(paramType));
+        }
+        builder.append(')');
+
+        var returnType = specificType(mn.getReturnType(), spec);
+        builder.append(" -> ");
+        builder.append(
+            ClassHelper.VOID_TYPE.equals(returnType)
+                ? "()"
+                : getName(returnType)
+        );
+
+        return builder.toString();
+    }
+
+    private static ClassNode specificType(ClassNode type, Map<GenericsType.GenericsTypeName, GenericsType> spec) {
+        if( !type.isGenericsPlaceHolder() )
+            return type;
+        var name = type.getUnresolvedName();
+        return spec.get(new GenericsType.GenericsTypeName(name)).getType();
+    }
+
+    private static String tupleName(ClassNode type) {
+        var builder = new StringBuilder();
+        builder.append('(');
+        genericsTypeNames(type.getGenericsTypes(), builder);
+        builder.append(')');
+        return builder.toString();
+    }
+
+    private static String typeName(ClassNode type) {
+        var builder = new StringBuilder();
+
         var placeholder = type.isGenericsPlaceHolder();
         if( placeholder )
             builder.append(type.getUnresolvedName());
@@ -82,19 +149,21 @@ public class Types {
         else
             builder.append(getName(type.getNameWithoutPackage()));
 
-        // type arguments (if applicable)
-        var genericsTypes = type.getGenericsTypes();
-        if( !placeholder && genericsTypes != null ) {
+        if( !placeholder && type.isUsingGenerics() ) {
             builder.append('<');
-            for( int i = 0; i < genericsTypes.length; i++ ) {
-                if( i > 0 )
-                    builder.append(", ");
-                builder.append(getName(genericsTypes[i].getType()));
-            }
+            genericsTypeNames(type.getGenericsTypes(), builder);
             builder.append('>');
         }
 
         return builder.toString();
+    }
+
+    private static void genericsTypeNames(GenericsType[] genericsTypes, StringBuilder builder) {
+        for( int i = 0; i < genericsTypes.length; i++ ) {
+            if( i > 0 )
+                builder.append(", ");
+            builder.append(getName(genericsTypes[i].getType()));
+        }
     }
 
     private static boolean hasTypeClass(ClassNode type) {
@@ -127,7 +196,8 @@ public class Types {
         Number.class,
         Path.class,
         Set.class,
-        String.class
+        String.class,
+        Tuple2.class
     );
 
     private static final Map<Class,Class> PRIMITIVE_TYPES = Map.ofEntries(
@@ -159,6 +229,30 @@ public class Types {
                 queue.add(ic);
         }
         return type;
+    }
+
+    /**
+     * Mapping of Java standard types to "shim" types which
+     * provide method signatures and documentation.
+     */
+    public static final Map<ClassNode,ClassNode> SHIM_TYPES = shimTypes();
+
+    private static Map<ClassNode,ClassNode> shimTypes() {
+        var types = List.of(
+            nextflow.script.types.shim.Bag.class,
+            nextflow.script.types.shim.List.class,
+            nextflow.script.types.shim.Map.class,
+            nextflow.script.types.shim.Path.class,
+            nextflow.script.types.shim.Set.class,
+            nextflow.script.types.shim.String.class
+        );
+        return types.stream().collect(Collectors.toMap(
+            (clazz) -> {
+                var shim = clazz.getAnnotation(ShimType.class).value();
+                return ClassHelper.makeCached(shim);
+            },
+            (clazz) -> ClassHelper.makeCached(clazz)
+        ));
     }
 
 }

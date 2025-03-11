@@ -31,6 +31,7 @@ import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.types.Channel;
 import nextflow.script.types.NamedTuple;
+import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -139,6 +140,13 @@ public class ASTUtils {
      * @param ast
      */
     public static ClassNode getType(ASTNode node, ASTNodeCache ast) {
+        var inferredType = inferredType(node, ast);
+        return Types.SHIM_TYPES.containsKey(inferredType)
+            ? Types.SHIM_TYPES.get(inferredType)
+            : inferredType;
+    }
+
+    private static ClassNode inferredType(ASTNode node, ASTNodeCache ast) {
         if( node instanceof ClassExpression ce ) {
             return ce.getType();
         }
@@ -314,7 +322,7 @@ public class ASTUtils {
             else {
                 var leftType = getType(mce.getObjectExpression(), ast);
                 if( leftType != null )
-                    return leftType.getMethods(mce.getMethodAsString());
+                    return methodsForType(leftType, mce.getMethodAsString());
             }
         }
 
@@ -328,6 +336,18 @@ public class ASTUtils {
         }
 
         return Collections.emptyList();
+    }
+
+    private static List<MethodNode> methodsForType(ClassNode cn, String name) {
+        try {
+            return cn.getAllDeclaredMethods().stream()
+                .filter(mn -> mn.getName().equals(name))
+                .filter(mn -> !ClassHelper.isObjectType(mn.getDeclaringClass()))
+                .toList();
+        }
+        catch( NullPointerException e ) {
+            return Collections.emptyList();
+        }
     }
 
     private static int getArgumentsScore(Parameter[] parameters, ArgumentListExpression arguments, int argIndex) {

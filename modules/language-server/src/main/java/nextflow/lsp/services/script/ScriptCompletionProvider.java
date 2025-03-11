@@ -195,7 +195,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
                     break;
             }
 
-            cn = cn.getSuperClass();
+            cn = superClassOrInterface(cn);
         }
     }
 
@@ -213,8 +213,16 @@ public class ScriptCompletionProvider implements CompletionProvider {
                     break;
             }
 
-            cn = cn.getSuperClass();
+            cn = superClassOrInterface(cn);
         }
+    }
+
+    private static ClassNode superClassOrInterface(ClassNode cn) {
+        if( cn.getSuperClass() != null )
+            return cn.getSuperClass();
+        if( cn.getInterfaces().length == 1 )
+            return cn.getInterfaces()[0];
+        return null;
     }
 
     private boolean addItemForField(FieldNode fn, String namePrefix, List<CompletionItem> items) {
@@ -460,10 +468,8 @@ public class ScriptCompletionProvider implements CompletionProvider {
         }
         else if( node instanceof MethodNode mn ) {
             result.setDetail("(" + ASTNodeStringUtils.parametersToLabel(mn.getParameters()) + ")");
-
-            var returnType = mn.getReturnType();
-            if( !ClassHelper.OBJECT_TYPE.equals(returnType) && !ClassHelper.VOID_TYPE.equals(returnType) )
-                result.setDescription(Types.getName(returnType));
+            if( Types.hasReturnType(mn) )
+                result.setDescription(Types.getName(mn.getReturnType()));
         }
         else if( node instanceof Variable variable ) {
             result.setDescription(Types.getName(variable.getType()));

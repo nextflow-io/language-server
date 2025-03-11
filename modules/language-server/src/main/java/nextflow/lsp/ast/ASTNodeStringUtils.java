@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import groovy.lang.groovydoc.Groovydoc;
+import nextflow.lsp.util.Logger;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
@@ -26,6 +27,7 @@ import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
+import nextflow.script.dsl.DslScope;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.Operator;
 import nextflow.script.dsl.OutputDsl;
@@ -194,20 +196,27 @@ public class ASTNodeStringUtils {
         if( node instanceof FunctionNode ) {
             builder.append("def ");
         }
-        if( node.isStatic() ) {
+        else if( node.isStatic() ) {
             builder.append(Types.getName(node.getDeclaringClass()));
             builder.append('.');
+        }
+        else if( Logger.isDebugEnabled() || !isDslFunction(node) ) {
+            builder.append(Types.getName(node.getDeclaringClass()));
+            builder.append(' ');
         }
         builder.append(node.getName());
         builder.append('(');
         builder.append(parametersToLabel(node.getParameters()));
         builder.append(')');
-        var returnType = node.getReturnType();
-        if( !ClassHelper.OBJECT_TYPE.equals(returnType) && !ClassHelper.VOID_TYPE.equals(returnType) ) {
+        if( Types.hasReturnType(node) ) {
             builder.append(" -> ");
-            builder.append(Types.getName(returnType));
+            builder.append(Types.getName(node.getReturnType()));
         }
         return builder.toString();
+    }
+
+    private static boolean isDslFunction(MethodNode mn) {
+        return mn.getDeclaringClass().implementsInterface(ClassHelper.makeCached(DslScope.class));
     }
 
     private static String methodTypeLabel(MethodNode mn) {
