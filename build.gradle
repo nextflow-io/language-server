@@ -1,10 +1,51 @@
-
-task copyJar(type: Copy) {
-  dependsOn ':language-server:build'
-  from "$projectDir/modules/language-server/build/libs/language-server-all.jar"
-  into "$buildDir/libs"
+plugins {
+  id 'com.gradleup.shadow' version '8.3.5'
+  id 'application'
+  id 'groovy'
+  id 'java'
 }
 
-task build {
-  dependsOn copyJar
+repositories {
+  mavenLocal()
+  mavenCentral()
+}
+
+java {
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(21)
+  }
+  sourceCompatibility = JavaVersion.VERSION_17
+  targetCompatibility = JavaVersion.VERSION_17
+}
+
+compileJava {
+  options.release.set(17)
+}
+
+test {
+  useJUnitPlatform()
+}
+
+dependencies {
+  implementation 'io.nextflow:nf-lang:25.02.1-edge'
+  implementation 'org.apache.groovy:groovy:4.0.26'
+  implementation 'org.apache.groovy:groovy-json:4.0.26'
+  implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
+  implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.23.0'
+
+  // runtime dependencies for Nextflow scripts
+  runtimeOnly 'org.apache.groovy:groovy-templates:4.0.26'
+  runtimeOnly 'org.yaml:snakeyaml:2.2'
+
+  testImplementation ('org.objenesis:objenesis:3.4')
+  testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
+  testImplementation ('org.spockframework:spock-core:2.3-groovy-4.0') { exclude group: 'org.apache.groovy' }
+}
+
+application {
+  mainClass = 'nextflow.lsp.NextflowLanguageServer'
+}
+
+shadowJar {
+  archiveVersion = ''
 }
