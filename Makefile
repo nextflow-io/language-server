@@ -1,4 +1,5 @@
 compile:
+	(cd ../nextflow ; ./gradlew :nf-lang:publishToMavenLocal)
 	./gradlew build
 
 test:

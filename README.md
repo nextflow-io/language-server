@@ -26,13 +26,10 @@ The language server exposes a set of configuration settings that can be controll
 To build from the command line:
 
 ```sh
-# build nf-lang module from Nextflow
+# clone Nextflow repository
 git clone https://github.com/nextflow-io/nextflow ../nextflow
-cd ../nextflow
-./gradlew publishToMavenLocal
-cd -
 
-# build language server
+# build language server (with nf-lang module)
 make
 ```
 

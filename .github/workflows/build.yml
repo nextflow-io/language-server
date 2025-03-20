@@ -21,4 +21,6 @@ jobs:
           fetch-depth: 1
 
       - name: Compile
-        run: ./gradlew build
+        run: |
+          git clone --depth 1 https://github.com/nextflow-io/nextflow ../nextflow
+          make
