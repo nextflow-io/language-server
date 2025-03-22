@@ -269,8 +269,10 @@ public class ScriptCompletionProvider implements CompletionProvider {
         }
         populateTypes(namePrefix, items);
 
-        if( !extendedCompletion )
+        if( !extendedCompletion ) {
+            populateIncludes(namePrefix, items);
             return;
+        }
         if( declarationNode instanceof FunctionNode || declarationNode instanceof ProcessNode || declarationNode instanceof OutputNode ) {
             populateExternalFunctions(namePrefix, items);
         }
@@ -313,6 +315,32 @@ public class ScriptCompletionProvider implements CompletionProvider {
             cn = cn.getInterfaces().length > 0
                 ? cn.getInterfaces()[0]
                 : null;
+        }
+    }
+
+    private void populateIncludes(String namePrefix, List<CompletionItem> items) {
+        for( var includeNode : ast.getIncludeNodes(uri) ) {
+            for( var module : includeNode.modules ) {
+                var node = module.getTarget();
+                if( node == null )
+                    continue;
+
+                var name = module.getNameOrAlias();
+                if( !name.startsWith(namePrefix) )
+                    continue;
+
+                var labelDetails = new CompletionItemLabelDetails();
+                labelDetails.setDescription(getIncludeSource(node));
+
+                var item = new CompletionItem(name);
+                item.setKind(CompletionItemKind.Function);
+                item.setLabelDetails(labelDetails);
+                item.setDetail(astNodeToItemDetail(node));
+                item.setDocumentation(astNodeToItemDocumentation(node));
+
+                if( !addItem(item, items) )
+                    break;
+            }
         }
     }
 
