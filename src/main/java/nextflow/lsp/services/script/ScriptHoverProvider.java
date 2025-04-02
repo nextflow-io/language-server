@@ -24,9 +24,12 @@ import nextflow.lsp.util.Logger;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.types.TypeChecker;
+import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
@@ -65,9 +68,7 @@ public class ScriptHoverProvider implements HoverProvider {
             return null;
 
         var offsetNode = nodeStack.get(0);
-        var defNode = LanguageServerASTUtils.getDefinition(offsetNode, ast);
-        if( defNode instanceof VariableExpression ve && ve.isDynamicTyped() )
-            ve.setType(LanguageServerASTUtils.getType(ve, ast));
+        var defNode = LanguageServerASTUtils.getDefinition(offsetNode);
 
         var builder = new StringBuilder();
 
@@ -100,6 +101,10 @@ public class ScriptHoverProvider implements HoverProvider {
                     builder.append(" [");
                     builder.append(scope.getClassScope().getNameWithoutPackage());
                     builder.append(']');
+                }
+                if( node instanceof Expression exp ) {
+                    builder.append(": ");
+                    builder.append(Types.getName(TypeChecker.getType(exp)));
                 }
                 builder.append('\n');
             }

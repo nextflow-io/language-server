@@ -39,6 +39,7 @@ import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
+import nextflow.script.types.TypeChecker;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
@@ -168,7 +169,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateItemsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
-        ClassNode cn = LanguageServerASTUtils.getType(object, ast);
+        ClassNode cn = TypeChecker.getType(object);
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var isStatic = object instanceof ClassExpression;
 
@@ -200,7 +201,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
     }
 
     private void populateMethodsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
-        ClassNode cn = LanguageServerASTUtils.getType(object, ast);
+        ClassNode cn = TypeChecker.getType(object);
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var isStatic = object instanceof ClassExpression;
 
@@ -374,7 +375,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
             var labelDetails = new CompletionItemLabelDetails();
             labelDetails.setDescription(getIncludeSource(node));
-        
+
             var item = new CompletionItem(name);
             item.setKind(CompletionItemKind.Function);
             item.setLabelDetails(labelDetails);
@@ -567,7 +568,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
             ```nextflow
             process HELLO {
-                input: 
+                input:
                 val message
 
                 output:

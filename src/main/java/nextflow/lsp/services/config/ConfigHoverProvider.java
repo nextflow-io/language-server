@@ -129,7 +129,7 @@ public class ConfigHoverProvider implements HoverProvider {
             }
         }
 
-        var defNode = LanguageServerASTUtils.getDefinition(offsetNode, ast);
+        var defNode = LanguageServerASTUtils.getDefinition(offsetNode);
         if( defNode != null ) {
             var builder = new StringBuilder();
 

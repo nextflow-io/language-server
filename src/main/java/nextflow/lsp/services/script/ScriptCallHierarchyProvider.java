@@ -182,7 +182,7 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
         if( offsetNode == null )
             return Collections.emptyList();
 
-        var fromNode = LanguageServerASTUtils.getDefinition(offsetNode, ast);
+        var fromNode = LanguageServerASTUtils.getDefinition(offsetNode);
         if( !(fromNode instanceof MethodNode) )
             return Collections.emptyList();
 

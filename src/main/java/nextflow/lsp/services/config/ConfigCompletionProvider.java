@@ -52,7 +52,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
  */
 public class ConfigCompletionProvider implements CompletionProvider {
 
-    private static final List<CompletionItem> TOPLEVEL_ITEMS = getTopLevelItems();
+    private static final List<CompletionItem> TOPLEVEL_ITEMS = topLevelItems();
 
     private static Logger log = Logger.getInstance();
 
@@ -77,17 +77,14 @@ public class ConfigCompletionProvider implements CompletionProvider {
         if( nodeStack.isEmpty() )
             return Either.forLeft(TOPLEVEL_ITEMS);
 
-        var names = getCurrentScope(nodeStack);
+        var names = getCurrentConfigScope(nodeStack);
         if( names == null )
             return Either.forLeft(Collections.emptyList());
 
-        var items = names.isEmpty()
-            ? TOPLEVEL_ITEMS
-            : getConfigOptions(names);
-        return Either.forLeft(items);
+        return Either.forLeft(getConfigOptions(names));
     }
 
-    private List<String> getCurrentScope(List<ASTNode> nodeStack) {
+    private List<String> getCurrentConfigScope(List<ASTNode> nodeStack) {
         var names = new ArrayList<String>();
         for( var node : DefaultGroovyMethods.asReversed(nodeStack) ) {
             if( node instanceof Expression )
@@ -112,6 +109,8 @@ public class ConfigCompletionProvider implements CompletionProvider {
     }
 
     private List<CompletionItem> getConfigOptions(List<String> names) {
+        if( names.isEmpty() )
+            return TOPLEVEL_ITEMS;
         var scope = SchemaNode.ROOT.getScope(names);
         if( scope == null )
             return Collections.emptyList();
@@ -125,7 +124,7 @@ public class ConfigCompletionProvider implements CompletionProvider {
         return result;
     }
 
-    private static List<CompletionItem> getTopLevelItems() {
+    private static List<CompletionItem> topLevelItems() {
         var result = new ArrayList<CompletionItem>();
         SchemaNode.ROOT.children().forEach((name, child) -> {
             if( child instanceof SchemaNode.Option option ) {

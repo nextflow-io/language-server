@@ -34,6 +34,7 @@ import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDsl;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.script.formatter.Formatter;
+import nextflow.script.types.TypeChecker;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
@@ -250,12 +251,12 @@ public class ASTNodeStringUtils {
     private static String variableToLabel(Variable variable) {
         var builder = new StringBuilder();
         builder.append(variable.getName());
-        var type = !ClassHelper.isDynamicTyped(variable.getOriginType())
-            ? variable.getOriginType()
-            : variable.getType();
+        var type = variable instanceof ASTNode node
+            ? TypeChecker.getType(node)
+            : variable.getOriginType();
         if( type.isArray() )
             builder.append("...");
-        if( !ClassHelper.OBJECT_TYPE.equals(type) ) {
+        if( !ClassHelper.isObjectType(type) ) {
             builder.append(": ");
             builder.append(Types.getName(type));
         }

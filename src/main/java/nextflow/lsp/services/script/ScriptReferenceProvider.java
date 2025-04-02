@@ -70,7 +70,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
         if( symbolName == null )
             return Collections.emptyList();
 
-        var defNode = LanguageServerASTUtils.getDefinition(offsetNode, ast);
+        var defNode = LanguageServerASTUtils.getDefinition(offsetNode);
         var isAlias = !symbolName.equals(getSymbolName(defNode, null));
         var references = LanguageServerASTUtils.getReferences(defNode, ast, includeDeclaration);
         var result = new ArrayList<Location>();
@@ -105,7 +105,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
             return null;
 
         // built-in names can't be renamed
-        var defNode = LanguageServerASTUtils.getDefinition(offsetNode, ast);
+        var defNode = LanguageServerASTUtils.getDefinition(offsetNode);
         if( defNode == null || ast.getURI(defNode) == null )
             return null;
 
