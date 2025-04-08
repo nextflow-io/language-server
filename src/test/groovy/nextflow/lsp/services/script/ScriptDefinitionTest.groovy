@@ -70,13 +70,18 @@ class ScriptDefinitionTest extends Specification {
         when:
         open(service, moduleUri, '''\
             workflow HELLO {
+                take:
+                target
+
+                main:
+                println "Hello, ${target}!"
             }
             ''')
         open(service, mainUri, '''\
             include { HELLO } from './module.nf'
 
             workflow {
-                HELLO()
+                HELLO('World')
             }
             ''')
         awaitUpdate()
@@ -85,7 +90,7 @@ class ScriptDefinitionTest extends Specification {
         location != null
         location.getUri() == moduleUri
         location.getRange().getStart() == new Position(0, 0)
-        location.getRange().getEnd() == new Position(1, 1)
+        location.getRange().getEnd() == new Position(6, 1)
     }
 
 }
