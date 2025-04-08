@@ -52,7 +52,7 @@ public class ScriptDefinitionProvider implements DefinitionProvider {
         }
 
         var uri = URI.create(textDocument.getUri());
-        var offsetNode = ast.getNodeAtLineAndColumn(uri, position.getLine(), position.getCharacter());
+        var offsetNode = ast.getNodeAtPosition(uri, position);
         if( offsetNode == null )
             return Either.forLeft(Collections.emptyList());
 

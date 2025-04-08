@@ -63,7 +63,7 @@ public class ScriptHoverProvider implements HoverProvider {
         }
 
         var uri = URI.create(textDocument.getUri());
-        var nodeStack = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter());
+        var nodeStack = ast.getNodesAtPosition(uri, position);
         if( nodeStack.isEmpty() )
             return null;
 

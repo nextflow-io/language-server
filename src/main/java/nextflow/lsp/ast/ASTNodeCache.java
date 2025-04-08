@@ -274,14 +274,12 @@ public abstract class ASTNodeCache {
     }
 
     /**
-     * Get the most specific ast node at a given location in a file.
+     * Get the most specific ast node at a given position in a file.
      *
      * @param uri
-     * @param line
-     * @param column
+     * @param position
      */
-    public ASTNode getNodeAtLineAndColumn(URI uri, int line, int column) {
-        var position = new Position(line, column);
+    public ASTNode getNodeAtPosition(URI uri, Position position) {
         var nodeToRange = new HashMap<ASTNode, Range>();
         var nodes = nodesByURI.get(uri);
         if( nodes == null )
@@ -321,14 +319,13 @@ public abstract class ASTNodeCache {
     }
 
     /**
-     * Get the tree of nodes at a given location in a file.
+     * Get the tree of nodes at a given position in a file.
      *
      * @param uri
-     * @param line
-     * @param column
+     * @param position
      */
-    public List<ASTNode> getNodesAtLineAndColumn(URI uri, int line, int column) {
-        var offsetNode = getNodeAtLineAndColumn(uri, line, column);
+    public List<ASTNode> getNodesAtPosition(URI uri, Position position) {
+        var offsetNode = getNodeAtPosition(uri, position);
         var result = new ArrayList<ASTNode>();
         ASTNode current = offsetNode;
         while( current != null ) {

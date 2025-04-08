@@ -62,7 +62,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
         }
 
         var uri = URI.create(textDocument.getUri());
-        var offsetNode = ast.getNodeAtLineAndColumn(uri, position.getLine(), position.getCharacter());
+        var offsetNode = ast.getNodeAtPosition(uri, position);
         if( offsetNode == null )
             return Collections.emptyList();
 
@@ -96,7 +96,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
         }
 
         var uri = URI.create(textDocument.getUri());
-        var offsetNode = ast.getNodeAtLineAndColumn(uri, position.getLine(), position.getCharacter());
+        var offsetNode = ast.getNodeAtPosition(uri, position);
         if( offsetNode == null )
             return null;
 

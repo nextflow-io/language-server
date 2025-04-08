@@ -74,7 +74,7 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
         }
 
         var uri = URI.create(textDocument.getUri());
-        var offsetNode = asMethodOrCallX(ast.getNodeAtLineAndColumn(uri, position.getLine(), position.getCharacter()));
+        var offsetNode = asMethodOrCallX(ast.getNodeAtPosition(uri, position));
         if( offsetNode == null )
             return Collections.emptyList();
 
@@ -120,7 +120,7 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
 
         var uri = URI.create(item.getUri());
         var position = item.getRange().getStart();
-        var offsetNode = ast.getNodeAtLineAndColumn(uri, position.getLine(), position.getCharacter());
+        var offsetNode = ast.getNodeAtPosition(uri, position);
         if( offsetNode == null )
             return Collections.emptyList();
 
@@ -178,7 +178,7 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
 
         var uri = URI.create(item.getUri());
         var position = item.getRange().getStart();
-        var offsetNode = ast.getNodeAtLineAndColumn(uri, position.getLine(), position.getCharacter());
+        var offsetNode = ast.getNodeAtPosition(uri, position);
         if( offsetNode == null )
             return Collections.emptyList();
 

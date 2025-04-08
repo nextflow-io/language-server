@@ -73,7 +73,7 @@ public class ConfigCompletionProvider implements CompletionProvider {
         if( !ast.hasAST(uri) )
             return Either.forLeft(Collections.emptyList());
 
-        var nodeStack = ast.getNodesAtLineAndColumn(uri, position.getLine(), position.getCharacter());
+        var nodeStack = ast.getNodesAtPosition(uri, position);
         if( nodeStack.isEmpty() )
             return Either.forLeft(TOPLEVEL_ITEMS);
 
