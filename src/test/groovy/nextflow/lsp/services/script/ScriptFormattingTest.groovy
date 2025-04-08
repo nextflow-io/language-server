@@ -16,16 +16,10 @@
 
 package nextflow.lsp.services.script
 
-import java.nio.file.Files
-import java.nio.file.Path
-
-import nextflow.lsp.TestLanguageClient
-import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.script.formatter.FormattingOptions
-import org.eclipse.lsp4j.DidOpenTextDocumentParams
-import org.eclipse.lsp4j.Position
-import org.eclipse.lsp4j.TextDocumentItem
 import spock.lang.Specification
+
+import static nextflow.lsp.TestUtils.*
 
 /**
  *
@@ -33,88 +27,69 @@ import spock.lang.Specification
  */
 class ScriptFormattingTest extends Specification {
 
-    Path getWorkspaceRoot() {
-        def workspaceRoot = Path.of(System.getProperty('user.dir')).resolve('build/test_workspace/')
-        if( !Files.exists(workspaceRoot) )
-            workspaceRoot.toFile().mkdirs()
-        return workspaceRoot
-    }
-
-    ScriptService getService(Path workspaceRoot) {
-        def service = new ScriptService()
-        def configuration = LanguageServerConfiguration.defaults()
-        service.connect(new TestLanguageClient())
-        service.initialize(workspaceRoot.toUri().toString(), configuration)
-        return service
-    }
-
-    String openAndFormat(ScriptService service, Path filePath, String contents) {
-        def uri = filePath.toUri()
-        def textDocumentItem = new TextDocumentItem(uri.toString(), 'nextflow', 1, contents)
-        service.didOpen(new DidOpenTextDocumentParams(textDocumentItem))
-        def textEdits = service.formatting(uri, new FormattingOptions(4, true))
-        return textEdits.first().getNewText()
+    boolean checkFormat(ScriptService service, String uri, String before, String after) {
+        open(service, uri, before)
+        def textEdits = service.formatting(URI.create(uri), new FormattingOptions(4, true))
+        return textEdits.first().getNewText() == after.stripIndent()
     }
 
     def 'should format a script' () {
         given:
-        def workspaceRoot = getWorkspaceRoot()
-        def service = getService(workspaceRoot)
-        def filePath = workspaceRoot.resolve('main.nf')
+        def service = getScriptService()
+        def uri = getUri('main.nf')
 
-        when:
-        def contents = '''\
+        expect:
+        checkFormat(service, uri,
+            '''\
             workflow { println 'Hello!' }
-            '''.stripIndent()
-        then:
-        openAndFormat(service, filePath, contents) == '''\
+            ''',
+            '''\
             workflow {
                 println('Hello!')
             }
-            '''.stripIndent()
-
-        when:
-        contents = '''\
+            '''
+        )
+        checkFormat(service, uri, 
+            '''\
             workflow {
                 println('Hello!')
             }
-            '''.stripIndent()
-        then:
-        openAndFormat(service, filePath, contents) == '''\
+            ''',
+            '''\
             workflow {
                 println('Hello!')
             }
-            '''.stripIndent()
+            '''
+        )
     }
 
     def 'should format an include declaration' () {
         given:
-        def workspaceRoot = getWorkspaceRoot()
-        def service = getService(workspaceRoot)
-        def filePath = workspaceRoot.resolve('main.nf')
+        def service = getScriptService()
+        def uri = getUri('main.nf')
 
-        when:
-        def contents = '''\
+        expect:
+        checkFormat(service, uri,
+            '''\
             include{foo;bar}from'./foobar.nf'
-            '''.stripIndent()
-        then:
-        openAndFormat(service, filePath, contents) == '''\
+            ''',
+            '''\
             include { foo ; bar } from './foobar.nf'
-            '''.stripIndent()
-
-        when:
-        contents = '''\
+            '''
+        )
+        checkFormat(service, uri,
+            '''\
             include{
             foo;bar
             }from'./foobar.nf'
-            '''.stripIndent()
-        then:
-        openAndFormat(service, filePath, contents) == '''\
+            ''',
+            '''\
             include {
                 foo ;
                 bar
             } from './foobar.nf'
-            '''.stripIndent()
+            '''
+        )
     }
 
 }
