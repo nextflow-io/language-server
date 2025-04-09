@@ -76,7 +76,7 @@ public class GroovyLibCache {
         var cachedClasses = new ArrayList<ClassNode>();
         var config = new CompilerConfiguration();
         config.getOptimizationOptions().put(CompilerConfiguration.GROOVYDOC, true);
-        var classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true);
+        var classLoader = new GroovyClassLoader();
         var compilationUnit = new CompilationUnit(config, null, classLoader);
         for( var uri : uris ) {
             var lastModified = getLastModified(uri);

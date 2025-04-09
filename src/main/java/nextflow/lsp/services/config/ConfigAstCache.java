@@ -49,7 +49,7 @@ public class ConfigAstCache extends ASTNodeCache {
 
     private static LanguageServerCompiler createCompiler() {
         var config = createConfiguration();
-        var classLoader = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), config, true);
+        var classLoader = new GroovyClassLoader();
         return new LanguageServerCompiler(config, classLoader);
     }
 
