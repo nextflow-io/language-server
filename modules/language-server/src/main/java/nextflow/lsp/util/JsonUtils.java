@@ -68,6 +68,18 @@ public class JsonUtils {
         }
     }
 
+    public static String getString(Object json, String path) {
+        var value = getObjectPath(json, path);
+        if( value == null )
+            return null;
+        try {
+            return value.getAsString();
+        }
+        catch( ClassCastException e ) {
+            return null;
+        }
+    }
+
     public static String getString(Object json) {
         return json instanceof JsonPrimitive jp ? jp.getAsString() : null;
     }

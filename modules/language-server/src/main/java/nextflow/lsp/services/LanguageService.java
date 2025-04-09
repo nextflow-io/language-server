@@ -41,7 +41,6 @@ import nextflow.lsp.util.DebouncingExecutor;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
-import nextflow.script.control.FutureWarning;
 import nextflow.script.control.RelatedInformationAware;
 import nextflow.script.formatter.FormattingOptions;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
@@ -382,6 +381,9 @@ public abstract class LanguageService {
         changedUris.forEach((uri) -> {
             var diagnostics = new ArrayList<Diagnostic>();
             for( var error : astCache.getErrors(uri) ) {
+                if( !configuration.errorReportingMode().isRelevant(error) )
+                    continue;
+
                 var message = error.getOriginalMessage();
                 var range = LanguageServerUtils.errorToRange(error);
                 if( range == null ) {
@@ -396,7 +398,7 @@ public abstract class LanguageService {
             }
 
             for( var warning : astCache.getWarnings(uri) ) {
-                if( !configuration.paranoidWarnings() && warning instanceof FutureWarning )
+                if( !configuration.errorReportingMode().isRelevant(warning) )
                     continue;
 
                 var message = warning.getMessage();

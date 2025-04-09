@@ -15,26 +15,23 @@
  */
 package nextflow.lsp.services;
 
-import java.util.Collections;
-import java.util.List;
+import nextflow.script.control.FutureWarning;
+import org.codehaus.groovy.control.messages.WarningMessage;
+import org.codehaus.groovy.syntax.SyntaxException;
 
-public record LanguageServerConfiguration(
-    ErrorReportingMode errorReportingMode,
-    List<String> excludePatterns,
-    boolean extendedCompletion,
-    boolean harshilAlignment,
-    boolean maheshForm,
-    int maxCompletionItems
-) {
+public enum ErrorReportingMode {
+    OFF,
+    ERRORS,
+    WARNINGS,
+    PARANOID;
 
-    public static LanguageServerConfiguration defaults() {
-        return new LanguageServerConfiguration(
-            ErrorReportingMode.WARNINGS,
-            Collections.emptyList(),
-            false,
-            false,
-            false,
-            100
-        );
+    public boolean isRelevant(SyntaxException error) {
+        return this != OFF;
+    }
+
+    public boolean isRelevant(WarningMessage warning) {
+        if( warning instanceof FutureWarning )
+            return this == PARANOID;
+        return compareTo(WARNINGS) >= 0;
     }
 }

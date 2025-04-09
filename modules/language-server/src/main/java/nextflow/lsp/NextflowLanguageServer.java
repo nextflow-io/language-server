@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.JsonUtils;
 import nextflow.lsp.util.Logger;
+import nextflow.lsp.services.ErrorReportingMode;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.SemanticTokensVisitor;
@@ -444,6 +445,9 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         if( debug != null )
             Logger.setDebugEnabled(debug);
 
+        var errorReportingMode = errorReportingMode(params);
+        if( errorReportingMode != null && configuration.errorReportingMode() != errorReportingMode )
+            shouldInitialize = true;
         var excludePatterns = JsonUtils.getStringArray(params.getSettings(), "nextflow.files.exclude");
         if( !DefaultGroovyMethods.equals(configuration.excludePatterns(), excludePatterns) )
             shouldInitialize = true;
@@ -451,17 +455,14 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var harshilAlignment = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
         var maheshForm = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
         var maxCompletionItems = JsonUtils.getInteger(params.getSettings(), "nextflow.completion.maxItems");
-        var paranoidWarnings = JsonUtils.getBoolean(params.getSettings(), "nextflow.paranoidWarnings");
-        if( paranoidWarnings != null && configuration.paranoidWarnings() != paranoidWarnings )
-            shouldInitialize = true;
 
         configuration = new LanguageServerConfiguration(
+            errorReportingMode != null ? errorReportingMode : configuration.errorReportingMode(),
             excludePatterns,
             extendedCompletion != null ? extendedCompletion : configuration.extendedCompletion(),
             harshilAlignment != null ? harshilAlignment : configuration.harshilAlignment(),
             maheshForm != null ? maheshForm : configuration.maheshForm(),
-            maxCompletionItems != null ? maxCompletionItems : configuration.maxCompletionItems(),
-            paranoidWarnings != null ? paranoidWarnings : configuration.paranoidWarnings()
+            maxCompletionItems != null ? maxCompletionItems : configuration.maxCompletionItems()
         );
 
         if( shouldInitialize ) {
@@ -485,6 +486,13 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
             progressEnd(progressToken);
         }
+    }
+
+    private ErrorReportingMode errorReportingMode(DidChangeConfigurationParams params) {
+        var string = JsonUtils.getString(params.getSettings(), "nextflow.errorReportingMode");
+        if( string == null )
+            return null;
+        return ErrorReportingMode.valueOf(string.toUpperCase());
     }
 
     private void progressCreate(String token) {
