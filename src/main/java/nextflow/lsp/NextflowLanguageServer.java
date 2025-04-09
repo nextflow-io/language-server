@@ -451,10 +451,10 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var excludePatterns = JsonUtils.getStringArray(params.getSettings(), "nextflow.files.exclude");
         if( !DefaultGroovyMethods.equals(configuration.excludePatterns(), excludePatterns) )
             shouldInitialize = true;
-        var extendedCompletion = JsonUtils.getBoolean(params.getSettings(), "nextflow.extendedCompletion");
+        var extendedCompletion = JsonUtils.getBoolean(params.getSettings(), "nextflow.completion.extended");
         var harshilAlignment = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
         var maheshForm = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
-        var maxCompletionItems = JsonUtils.getInteger(params.getSettings(), "nextflow.maxCompletionItems");
+        var maxCompletionItems = JsonUtils.getInteger(params.getSettings(), "nextflow.completion.maxItems");
         var typeChecking = JsonUtils.getBoolean(params.getSettings(), "nextflow.typeChecking");
         if( typeChecking != null && configuration.typeChecking() != typeChecking )
             shouldInitialize = true;
