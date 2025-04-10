@@ -24,7 +24,8 @@ public record LanguageServerConfiguration(
     boolean extendedCompletion,
     boolean harshilAlignment,
     boolean maheshForm,
-    int maxCompletionItems
+    int maxCompletionItems,
+    boolean sortDeclarations
 ) {
 
     public static LanguageServerConfiguration defaults() {
@@ -34,7 +35,8 @@ public record LanguageServerConfiguration(
             false,
             false,
             false,
-            100
+            100,
+            false
         );
     }
 }

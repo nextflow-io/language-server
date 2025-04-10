@@ -42,4 +42,8 @@ public class WorkflowNode extends MethodNode {
     public boolean isEntry() {
         return getName() == null;
     }
+
+    public boolean isCodeSnippet() {
+        return getLineNumber() == -1;
+    }
 }

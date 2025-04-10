@@ -370,7 +370,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 params.getOptions().getTabSize(),
                 params.getOptions().isInsertSpaces(),
                 configuration.harshilAlignment(),
-                configuration.maheshForm()
+                configuration.maheshForm(),
+                configuration.sortDeclarations()
             );
             log.debug(String.format("textDocument/formatting %s %s %d", relativePath(uri), options.insertSpaces() ? "spaces" : "tabs", options.tabSize()));
             var service = getLanguageService(uri);
@@ -455,6 +456,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var harshilAlignment = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
         var maheshForm = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
         var maxCompletionItems = JsonUtils.getInteger(params.getSettings(), "nextflow.completion.maxItems");
+        var sortDeclarations = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.sortDeclarations");
 
         configuration = new LanguageServerConfiguration(
             errorReportingMode != null ? errorReportingMode : configuration.errorReportingMode(),
@@ -462,7 +464,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             extendedCompletion != null ? extendedCompletion : configuration.extendedCompletion(),
             harshilAlignment != null ? harshilAlignment : configuration.harshilAlignment(),
             maheshForm != null ? maheshForm : configuration.maheshForm(),
-            maxCompletionItems != null ? maxCompletionItems : configuration.maxCompletionItems()
+            maxCompletionItems != null ? maxCompletionItems : configuration.maxCompletionItems(),
+            sortDeclarations != null ? sortDeclarations : configuration.sortDeclarations()
         );
 
         if( shouldInitialize ) {
