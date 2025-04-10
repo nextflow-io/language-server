@@ -438,37 +438,25 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public void didChangeConfiguration(DidChangeConfigurationParams params) {
-        log.debug("workspace/didChangeConfiguration " + params.getSettings());
+        var settings = params.getSettings();
+        log.debug("workspace/didChangeConfiguration " + settings);
 
-        var shouldInitialize = false;
-
-        var debug = JsonUtils.getBoolean(params.getSettings(), "nextflow.debug");
+        var debug = JsonUtils.getBoolean(settings, "nextflow.debug");
         if( debug != null )
             Logger.setDebugEnabled(debug);
 
-        var errorReportingMode = errorReportingMode(params);
-        if( errorReportingMode != null && configuration.errorReportingMode() != errorReportingMode )
-            shouldInitialize = true;
-        var excludePatterns = JsonUtils.getStringArray(params.getSettings(), "nextflow.files.exclude");
-        if( !DefaultGroovyMethods.equals(configuration.excludePatterns(), excludePatterns) )
-            shouldInitialize = true;
-        var extendedCompletion = JsonUtils.getBoolean(params.getSettings(), "nextflow.completion.extended");
-        var harshilAlignment = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.harshilAlignment");
-        var maheshForm = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.maheshForm");
-        var maxCompletionItems = JsonUtils.getInteger(params.getSettings(), "nextflow.completion.maxItems");
-        var sortDeclarations = JsonUtils.getBoolean(params.getSettings(), "nextflow.formatting.sortDeclarations");
-
+        var oldConfiguration = configuration;
         configuration = new LanguageServerConfiguration(
-            errorReportingMode != null ? errorReportingMode : configuration.errorReportingMode(),
-            excludePatterns,
-            extendedCompletion != null ? extendedCompletion : configuration.extendedCompletion(),
-            harshilAlignment != null ? harshilAlignment : configuration.harshilAlignment(),
-            maheshForm != null ? maheshForm : configuration.maheshForm(),
-            maxCompletionItems != null ? maxCompletionItems : configuration.maxCompletionItems(),
-            sortDeclarations != null ? sortDeclarations : configuration.sortDeclarations()
+            withDefault(errorReportingMode(settings), configuration.errorReportingMode()),
+            withDefault(JsonUtils.getStringArray(settings, "nextflow.files.exclude"), configuration.excludePatterns()),
+            withDefault(JsonUtils.getBoolean(settings, "nextflow.completion.extended"), configuration.extendedCompletion()),
+            withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.harshilAlignment"), configuration.harshilAlignment()),
+            withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.maheshForm"), configuration.maheshForm()),
+            withDefault(JsonUtils.getInteger(settings, "nextflow.completion.maxItems"), configuration.maxCompletionItems()),
+            withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), configuration.sortDeclarations())
         );
 
-        if( shouldInitialize ) {
+        if( shouldInitialize(oldConfiguration, configuration) ) {
             var progressToken = "initialize";
             progressCreate(progressToken);
             progressBegin(progressToken, "Initializing workspace...");
@@ -491,11 +479,20 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         }
     }
 
-    private ErrorReportingMode errorReportingMode(DidChangeConfigurationParams params) {
-        var string = JsonUtils.getString(params.getSettings(), "nextflow.errorReportingMode");
+    private ErrorReportingMode errorReportingMode(Object settings) {
+        var string = JsonUtils.getString(settings, "nextflow.errorReportingMode");
         if( string == null )
             return null;
         return ErrorReportingMode.valueOf(string.toUpperCase());
+    }
+
+    private <T> T withDefault(T value, T defaultValue) {
+        return value != null ? value : defaultValue;
+    }
+
+    private boolean shouldInitialize(LanguageServerConfiguration previous, LanguageServerConfiguration current) {
+        return previous.errorReportingMode() != current.errorReportingMode()
+            || !DefaultGroovyMethods.equals(previous.excludePatterns(), current.excludePatterns());
     }
 
     private void progressCreate(String token) {
