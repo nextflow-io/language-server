@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.services;
 
+import java.util.Collections;
 import java.util.List;
 
 public record LanguageServerConfiguration(
@@ -23,4 +24,13 @@ public record LanguageServerConfiguration(
     boolean maheshForm,
     boolean paranoidWarnings
 ) {
+
+    public static LanguageServerConfiguration defaults() {
+        return new LanguageServerConfiguration(
+            Collections.emptyList(),
+            false,
+            false,
+            false
+        );
+    }
 }
