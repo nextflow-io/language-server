@@ -43,7 +43,7 @@ public class ConfigService extends LanguageService {
     }
 
     @Override
-    protected CompletionProvider getCompletionProvider(int maxCompletionItems, boolean extendedCompletion) {
+    protected CompletionProvider getCompletionProvider(int maxItems, boolean extended) {
         return new ConfigCompletionProvider(astCache);
     }
 
