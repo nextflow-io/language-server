@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.JsonUtils;
 import nextflow.lsp.util.Logger;
+import nextflow.lsp.util.ProgressNotification;
 import nextflow.lsp.services.ErrorReportingMode;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.services.LanguageService;
@@ -74,7 +75,6 @@ import org.eclipse.lsp4j.RenameFilesParams;
 import org.eclipse.lsp4j.InitializeResult;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
-import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.ReferenceParams;
 import org.eclipse.lsp4j.RenameParams;
 import org.eclipse.lsp4j.SemanticTokens;
@@ -86,10 +86,6 @@ import org.eclipse.lsp4j.SetTraceParams;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.TextEdit;
-import org.eclipse.lsp4j.WorkDoneProgressBegin;
-import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
-import org.eclipse.lsp4j.WorkDoneProgressEnd;
-import org.eclipse.lsp4j.WorkDoneProgressReport;
 import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.WorkspaceFoldersOptions;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
@@ -457,9 +453,9 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         );
 
         if( shouldInitialize(oldConfiguration, configuration) ) {
-            var progressToken = "initialize";
-            progressCreate(progressToken);
-            progressBegin(progressToken, "Initializing workspace...");
+            var progress = new ProgressNotification(client, "initialize");
+            progress.create();
+            progress.begin("Initializing workspace...");
 
             var count = 0;
             var total = workspaceRoots.keySet().size() - 1;
@@ -467,7 +463,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 if( DEFAULT_WORKSPACE_FOLDER_NAME.equals(name) )
                     continue;
                 var progressMessage = String.format("Initializing workspace: %s (%d / %d)", name, count + 1, total);
-                progressUpdate(progressToken, progressMessage, count * 100 / total);
+                progress.update(progressMessage, count * 100 / total);
                 count++;
 
                 var uri = workspaceRoots.get(name);
@@ -475,7 +471,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 configServices.get(name).initialize(uri, configuration);
             }
 
-            progressEnd(progressToken);
+            progress.end();
         }
     }
 
@@ -493,29 +489,6 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private boolean shouldInitialize(LanguageServerConfiguration previous, LanguageServerConfiguration current) {
         return previous.errorReportingMode() != current.errorReportingMode()
             || !DefaultGroovyMethods.equals(previous.excludePatterns(), current.excludePatterns());
-    }
-
-    private void progressCreate(String token) {
-        client.createProgress(new WorkDoneProgressCreateParams(Either.forLeft(token)));
-    }
-
-    private void progressBegin(String token, String message) {
-        var progress = new WorkDoneProgressBegin();
-        progress.setMessage(message);
-        progress.setPercentage(0);
-        client.notifyProgress(new ProgressParams(Either.forLeft(token), Either.forLeft(progress)));
-    }
-
-    private void progressUpdate(String token, String message, int percentage) {
-        var progress = new WorkDoneProgressReport();
-        progress.setMessage(message);
-        progress.setPercentage(percentage);
-        client.notifyProgress(new ProgressParams(Either.forLeft(token), Either.forLeft(progress)));
-    }
-
-    private void progressEnd(String token) {
-        var progress = new WorkDoneProgressEnd();
-        client.notifyProgress(new ProgressParams(Either.forLeft(token), Either.forLeft(progress)));
     }
 
     @Override
