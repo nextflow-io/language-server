@@ -33,7 +33,7 @@ public record LanguageServerConfiguration(
         return new LanguageServerConfiguration(
             ErrorReportingMode.WARNINGS,
             Collections.emptyList(),
-            true,
+            false,
             false,
             false,
             100,
