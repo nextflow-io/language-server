@@ -140,29 +140,34 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             }
         }
 
-        var serverCapabilities = new ServerCapabilities();
-        serverCapabilities.setTextDocumentSync(TextDocumentSyncKind.Incremental);
+        var initializeResult = new InitializeResult(serverCapabilities());
+        return CompletableFuture.completedFuture(initializeResult);
+    }
+
+    private static ServerCapabilities serverCapabilities() {
+        var result = new ServerCapabilities();
+        result.setTextDocumentSync(TextDocumentSyncKind.Incremental);
 
         var workspaceFoldersOptions = new WorkspaceFoldersOptions();
         workspaceFoldersOptions.setSupported(true);
         workspaceFoldersOptions.setChangeNotifications(true);
         var workspaceCapabilities = new WorkspaceServerCapabilities(workspaceFoldersOptions);
-        serverCapabilities.setWorkspace(workspaceCapabilities);
+        result.setWorkspace(workspaceCapabilities);
 
-        serverCapabilities.setCallHierarchyProvider(true);
+        result.setCallHierarchyProvider(true);
         var codeLensOptions = new CodeLensOptions(false);
-        serverCapabilities.setCodeLensProvider(codeLensOptions);
+        result.setCodeLensProvider(codeLensOptions);
         var completionOptions = new CompletionOptions(false, List.of("."));
-        serverCapabilities.setCompletionProvider(completionOptions);
-        serverCapabilities.setDefinitionProvider(true);
-        serverCapabilities.setDocumentFormattingProvider(true);
+        result.setCompletionProvider(completionOptions);
+        result.setDefinitionProvider(true);
+        result.setDocumentFormattingProvider(true);
         var documentLinkOptions = new DocumentLinkOptions(false);
-        serverCapabilities.setDocumentLinkProvider(documentLinkOptions);
-        serverCapabilities.setDocumentSymbolProvider(true);
+        result.setDocumentLinkProvider(documentLinkOptions);
+        result.setDocumentSymbolProvider(true);
         var executeCommandOptions = new ExecuteCommandOptions(List.of("nextflow.server.previewDag"));
-        serverCapabilities.setExecuteCommandProvider(executeCommandOptions);
-        serverCapabilities.setHoverProvider(true);
-        serverCapabilities.setReferencesProvider(true);
+        result.setExecuteCommandProvider(executeCommandOptions);
+        result.setHoverProvider(true);
+        result.setReferencesProvider(true);
         var semanticTokensOptions = new SemanticTokensWithRegistrationOptions(
             new SemanticTokensLegend(
                 SemanticTokensVisitor.TOKEN_TYPES,
@@ -170,12 +175,10 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             ),
             true,
             false);
-        serverCapabilities.setSemanticTokensProvider(semanticTokensOptions);
-        serverCapabilities.setRenameProvider(true);
-        serverCapabilities.setWorkspaceSymbolProvider(true);
-
-        var initializeResult = new InitializeResult(serverCapabilities);
-        return CompletableFuture.completedFuture(initializeResult);
+        result.setSemanticTokensProvider(semanticTokensOptions);
+        result.setRenameProvider(true);
+        result.setWorkspaceSymbolProvider(true);
+        return result;
     }
 
     @Override
@@ -452,27 +455,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), configuration.sortDeclarations())
         );
 
-        if( shouldInitialize(oldConfiguration, configuration) ) {
-            var progress = new ProgressNotification(client, "initialize");
-            progress.create();
-            progress.begin("Initializing workspace...");
-
-            var count = 0;
-            var total = workspaceRoots.keySet().size() - 1;
-            for( var name : workspaceRoots.keySet() ) {
-                if( DEFAULT_WORKSPACE_FOLDER_NAME.equals(name) )
-                    continue;
-                var progressMessage = String.format("Initializing workspace: %s (%d / %d)", name, count + 1, total);
-                progress.update(progressMessage, count * 100 / total);
-                count++;
-
-                var uri = workspaceRoots.get(name);
-                scriptServices.get(name).initialize(uri, configuration);
-                configServices.get(name).initialize(uri, configuration);
-            }
-
-            progress.end();
-        }
+        if( shouldInitialize(oldConfiguration, configuration) )
+            initializeWorkspaces();
     }
 
     private ErrorReportingMode errorReportingMode(Object settings) {
@@ -489,6 +473,28 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private boolean shouldInitialize(LanguageServerConfiguration previous, LanguageServerConfiguration current) {
         return previous.errorReportingMode() != current.errorReportingMode()
             || !DefaultGroovyMethods.equals(previous.excludePatterns(), current.excludePatterns());
+    }
+
+    private void initializeWorkspaces() {
+        var progress = new ProgressNotification(client, "initialize");
+        progress.create();
+        progress.begin("Initializing workspace...");
+
+        var count = 0;
+        var total = workspaceRoots.keySet().size() - 1;
+        for( var name : workspaceRoots.keySet() ) {
+            if( DEFAULT_WORKSPACE_FOLDER_NAME.equals(name) )
+                continue;
+            var progressMessage = String.format("Initializing workspace: %s (%d / %d)", name, count + 1, total);
+            progress.update(progressMessage, count * 100 / total);
+            count++;
+
+            var uri = workspaceRoots.get(name);
+            scriptServices.get(name).initialize(uri, configuration);
+            configServices.get(name).initialize(uri, configuration);
+        }
+
+        progress.end();
     }
 
     @Override
