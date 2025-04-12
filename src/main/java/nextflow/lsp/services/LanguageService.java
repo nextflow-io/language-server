@@ -35,13 +35,13 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.file.FileCache;
-import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.DebouncingExecutor;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
 import nextflow.script.control.RelatedInformationAware;
 import nextflow.script.formatter.FormattingOptions;
+import nextflow.util.PathUtils;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyItem;
@@ -143,23 +143,11 @@ public abstract class LanguageService {
 
     protected Set<URI> getWorkspaceFiles(String rootUri) {
         try {
-            var root = Path.of(URI.create(rootUri));
             var result = new HashSet<URI>();
-            Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
-                @Override
-                public FileVisitResult preVisitDirectory(Path path, BasicFileAttributes attrs) {
-                    return PathUtils.isPathExcluded(path, configuration.excludePatterns())
-                        ? FileVisitResult.SKIP_SUBTREE
-                        : FileVisitResult.CONTINUE;
-                }
-                @Override
-                public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
-                    if( matchesFile(path.toString()) && !PathUtils.isPathExcluded(path, configuration.excludePatterns()) )
-                        result.add(path.toUri());
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-
+            PathUtils.visitFiles(
+                Path.of(URI.create(rootUri)),
+                (path) -> (Files.isDirectory(path) || matchesFile(path.toString())) && !PathUtils.isExcluded(path, configuration.excludePatterns()),
+                (path) -> result.add(path.toUri()));
             return result;
         }
         catch( IOException e ) {

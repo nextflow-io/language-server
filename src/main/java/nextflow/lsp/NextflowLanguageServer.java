@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-import nextflow.lsp.file.PathUtils;
 import nextflow.lsp.util.JsonUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.ProgressNotification;
@@ -36,6 +35,7 @@ import nextflow.lsp.services.SemanticTokensVisitor;
 import nextflow.lsp.services.config.ConfigService;
 import nextflow.lsp.services.script.ScriptService;
 import nextflow.script.formatter.FormattingOptions;
+import nextflow.util.PathUtils;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams;
@@ -602,7 +602,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             return null;
         }
         var path = Path.of(URI.create(uri));
-        if( PathUtils.isPathExcluded(path, configuration.excludePatterns()) )
+        if( PathUtils.isExcluded(path, configuration.excludePatterns()) )
             return null;
         return service;
     }
