@@ -87,7 +87,9 @@ public class LanguageServerCompiler extends Compiler {
             super.compile(sourceUnit);
         }
         catch( GroovyBugError | Exception e ) {
-            System.err.println("Unexpected exception while compiling source files: " + e.toString());
+            var uri = sourceUnit.getSource().getURI();
+            System.err.println("Unexpected exception while compiling " + uri.getPath() + ": " + e.toString());
+            e.printStackTrace();
         }
     }
 
