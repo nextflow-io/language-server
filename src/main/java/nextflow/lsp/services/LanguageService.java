@@ -146,8 +146,11 @@ public abstract class LanguageService {
             var result = new HashSet<URI>();
             PathUtils.visitFiles(
                 Path.of(URI.create(rootUri)),
-                (path) -> (Files.isDirectory(path) || matchesFile(path.toString())) && !PathUtils.isExcluded(path, configuration.excludePatterns()),
-                (path) -> result.add(path.toUri()));
+                (path) -> !PathUtils.isExcluded(path, configuration.excludePatterns()),
+                (path) -> {
+                    if( matchesFile(path.toString()) )
+                        result.add(path.toUri());
+                });
             return result;
         }
         catch( IOException e ) {
