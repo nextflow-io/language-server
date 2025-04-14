@@ -144,14 +144,13 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private void visitWorkflowPublishers(WorkflowNode node, Map<String,Node> result) {
         for( var stmt : asBlockStatements(node.publishers) ) {
-            var publisher = (BinaryExpression) ((ExpressionStatement) stmt).getExpression();
-            var target = publisher.getRightExpression();
-            if( target instanceof ConstantExpression ce ) {
-                var name = ce.getText();
-                var source = publisher.getLeftExpression();
-                visit(new AssignmentExpression(varX(name), source));
-                result.put(name, current.getSymbol(name));
-            }
+            var es = (ExpressionStatement) stmt;
+            var publisher = (BinaryExpression) es.getExpression();
+            var target = asVarX(publisher.getLeftExpression());
+            var source = publisher.getRightExpression();
+            visit(new AssignmentExpression(target, source));
+            var name = target.getName();
+            result.put(name, current.getSymbol(name));
         }
     }
 
