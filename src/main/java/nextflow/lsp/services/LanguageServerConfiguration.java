@@ -25,6 +25,7 @@ public record LanguageServerConfiguration(
     boolean harshilAlignment,
     boolean maheshForm,
     int maxCompletionItems,
+    boolean scanWorkspace,
     boolean sortDeclarations,
     boolean typeChecking
 ) {
@@ -37,6 +38,7 @@ public record LanguageServerConfiguration(
             false,
             false,
             100,
+            false,
             false,
             false
         );

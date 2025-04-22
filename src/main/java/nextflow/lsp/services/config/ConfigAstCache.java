@@ -27,6 +27,7 @@ import nextflow.config.parser.ConfigParserPluginFactory;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
+import nextflow.lsp.file.FileCache;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
@@ -65,7 +66,7 @@ public class ConfigAstCache extends ASTNodeCache {
     }
 
     @Override
-    protected Set<URI> analyze(Set<URI> uris) {
+    protected Set<URI> analyze(Set<URI> uris, FileCache fileCache) {
         // phase 2: include checking
         var changedUris = new HashSet<>(uris);
 

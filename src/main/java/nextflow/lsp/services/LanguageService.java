@@ -128,20 +128,27 @@ public abstract class LanguageService {
             this.initialized = false;
             this.configuration = configuration;
 
-            var uris = rootUri != null
-                ? getWorkspaceFiles(rootUri)
-                : fileCache.getOpenFiles();
-
             var astCache = getAstCache();
-            astCache.clear();
-            var changedUris = astCache.update(uris, fileCache);
-            publishDiagnostics(changedUris);
+
+            if( configuration.scanWorkspace() ) {
+                var uris = getWorkspaceFiles(rootUri);
+                astCache.clear();
+                var changedUris = astCache.update(uris, fileCache);
+                publishDiagnostics(changedUris);
+            }
+            else {
+                clearDiagnostics();
+                astCache.clear();
+            }
 
             this.initialized = true;
         }
     }
 
     protected Set<URI> getWorkspaceFiles(String rootUri) {
+        if( rootUri == null ) {
+            return fileCache.getOpenFiles();
+        }
         try {
             var result = new HashSet<URI>();
             PathUtils.visitFiles(
