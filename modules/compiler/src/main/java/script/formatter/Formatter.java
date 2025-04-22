@@ -221,7 +221,7 @@ public class Formatter extends CodeVisitorSupport {
         append("assert ");
         visit(node.getBooleanExpression());
         if( !(node.getMessageExpression() instanceof ConstantExpression ce && ce.isNullExpression()) ) {
-            append(", ");
+            append(": ");
             visit(node.getMessageExpression());
         }
         appendNewLine();
