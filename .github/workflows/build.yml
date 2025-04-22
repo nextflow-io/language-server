@@ -24,3 +24,7 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/nextflow-io/nextflow ../nextflow
           make
+
+      - name: Test
+        run: |
+          make test
