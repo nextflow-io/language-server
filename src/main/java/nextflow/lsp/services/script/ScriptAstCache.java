@@ -27,12 +27,14 @@ import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
+import nextflow.lsp.file.FileCache;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.control.ModuleResolver;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ResolveIncludeVisitor;
@@ -86,7 +88,13 @@ public class ScriptAstCache extends ASTNodeCache {
     }
 
     @Override
-    protected Set<URI> analyze(Set<URI> uris) {
+    protected Set<URI> analyze(Set<URI> uris, FileCache fileCache) {
+        // recursively load included modules
+        for( var uri : uris ) {
+            var source = compiler().getSource(uri);
+            new ModuleResolver(compiler()).resolve(source, (includeUri) -> compiler().newSourceUnit(includeUri, fileCache));
+        }
+
         // phase 2: include checking
         var changedUris = new HashSet<>(uris);
 

@@ -102,7 +102,7 @@ public abstract class ASTNodeCache {
 
         // parse source files
         var sources = uris.parallelStream()
-            .map(uri -> compiler.getSource(uri, fileCache))
+            .map(uri -> compiler.newSourceUnit(uri, fileCache))
             .filter(sourceUnit -> sourceUnit != null)
             .map(sourceUnit -> {
                 compiler.addSource(sourceUnit);
@@ -113,7 +113,7 @@ public abstract class ASTNodeCache {
             .collect(Collectors.toSet());
 
         // perform additional ast analysis
-        var changedUris = analyze(uris);
+        var changedUris = analyze(uris, fileCache);
 
         // update ast parents cache
         for( var sourceUnit : sources ) {
@@ -164,8 +164,9 @@ public abstract class ASTNodeCache {
      * Return the set of files whose errors have changed.
      *
      * @param uris
+     * @param fileCache
      */
-    protected abstract Set<URI> analyze(Set<URI> uris);
+    protected abstract Set<URI> analyze(Set<URI> uris, FileCache fileCache);
 
     /**
      * Visit the AST of a source file and retrieve the set of relevant

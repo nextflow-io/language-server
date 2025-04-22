@@ -50,7 +50,7 @@ public class LanguageServerCompiler extends Compiler {
      *
      * @param uri
      */
-    public SourceUnit getSource(URI uri, FileCache fileCache) {
+    public SourceUnit newSourceUnit(URI uri, FileCache fileCache) {
         if( fileCache.isOpen(uri) ) {
             var contents = fileCache.getContents(uri);
             return new SourceUnit(
@@ -60,18 +60,14 @@ public class LanguageServerCompiler extends Compiler {
                     classLoader(),
                     newErrorCollector());
         }
-        else if( Files.exists(Path.of(uri)) ) {
-            return new SourceUnit(
-                    new File(uri),
-                    configuration(),
-                    classLoader(),
-                    newErrorCollector());
+        if( Files.exists(Path.of(uri)) ) {
+            return super.newSourceUnit(new File(uri));
         }
-        else
-            return null;
+        return null;
     }
 
-    private ErrorCollector newErrorCollector() {
+    @Override
+    protected ErrorCollector newErrorCollector() {
         return new LanguageServerErrorCollector(configuration());
     }
 
