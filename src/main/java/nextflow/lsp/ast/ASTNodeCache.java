@@ -102,7 +102,7 @@ public abstract class ASTNodeCache {
 
         // parse source files
         var sources = uris.parallelStream()
-            .map(uri -> compiler.newSourceUnit(uri, fileCache))
+            .map(uri -> compiler.createSourceUnit(uri, fileCache))
             .filter(sourceUnit -> sourceUnit != null)
             .map(sourceUnit -> {
                 compiler.addSource(sourceUnit);

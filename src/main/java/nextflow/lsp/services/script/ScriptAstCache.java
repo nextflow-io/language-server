@@ -92,7 +92,7 @@ public class ScriptAstCache extends ASTNodeCache {
         // recursively load included modules
         for( var uri : uris ) {
             var source = compiler().getSource(uri);
-            new ModuleResolver(compiler()).resolve(source, (includeUri) -> compiler().newSourceUnit(includeUri, fileCache));
+            new ModuleResolver(compiler()).resolve(source, (includeUri) -> compiler().createSourceUnit(includeUri, fileCache));
         }
 
         // phase 2: include checking
