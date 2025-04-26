@@ -92,22 +92,17 @@ public class FileCache {
         }
         else {
             // update file contents with incremental changes
-            var sortedChanges = new ArrayList<>(params.getContentChanges());
-            sortedChanges.sort((a, b) -> {
-                return Positions.COMPARATOR.compare( a.getRange().getStart(), b.getRange().getStart() );
-            });
-            var builder = new StringBuilder();
-            int previousEnd = 0;
-            for( var change : sortedChanges ) {
+            for( var change : params.getContentChanges() ) {
                 var range = change.getRange();
                 var offsetStart = Positions.getOffset(oldText, range.getStart());
                 var offsetEnd = Positions.getOffset(oldText, range.getEnd());
-                builder.append(oldText.substring(previousEnd, offsetStart));
+                var builder = new StringBuilder();
+                builder.append(oldText.substring(0, offsetStart));
                 builder.append(change.getText());
-                previousEnd = offsetEnd;
+                builder.append(oldText.substring(offsetEnd));
+                oldText = builder.toString();
             }
-            builder.append(oldText.substring(previousEnd));
-            openFiles.put(uri, builder.toString());
+            openFiles.put(uri, oldText);
         }
         changedFiles.add(uri);
     }
