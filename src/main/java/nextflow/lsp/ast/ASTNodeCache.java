@@ -115,9 +115,12 @@ public abstract class ASTNodeCache {
         // perform additional ast analysis
         var changedUris = analyze(uris, fileCache);
 
-        // update ast parents cache
-        for( var sourceUnit : sources ) {
-            var uri = sourceUnit.getSource().getURI();
+        // update ast lookup, diagnostics cache
+        for( var uri : changedUris ) {
+            var sourceUnit = sourcesByUri().get(uri);
+            if( sourceUnit == null )
+                continue;
+
             var parents = visitParents(sourceUnit);
             nodesByURI.put(uri, parents.keySet());
 
@@ -125,13 +128,6 @@ public abstract class ASTNodeCache {
                 var parent = parents.get(node);
                 lookup.put(node, new LookupData(uri, parent));
             }
-        }
-
-        // update diagnostics cache
-        for( var uri : changedUris ) {
-            var sourceUnit = sourcesByUri().get(uri);
-            if( sourceUnit == null )
-                continue;
 
             var errors = new ArrayList<SyntaxException>();
             var errorMessages = sourceUnit.getErrorCollector().getErrors();

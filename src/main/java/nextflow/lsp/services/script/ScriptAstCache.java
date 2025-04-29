@@ -90,14 +90,17 @@ public class ScriptAstCache extends ASTNodeCache {
     @Override
     protected Set<URI> analyze(Set<URI> uris, FileCache fileCache) {
         // recursively load included modules
+        var changedUris = new HashSet<>(uris);
+
         for( var uri : uris ) {
             var source = compiler().getSource(uri);
-            new ModuleResolver(compiler()).resolve(source, (includeUri) -> compiler().createSourceUnit(includeUri, fileCache));
+            new ModuleResolver(compiler()).resolve(source, (newUri) -> {
+                changedUris.add(newUri);
+                return compiler().createSourceUnit(newUri, fileCache);
+            });
         }
 
         // phase 2: include checking
-        var changedUris = new HashSet<>(uris);
-
         for( var sourceUnit : getSourceUnits() ) {
             var visitor = new ResolveIncludeVisitor(sourceUnit, compiler(), uris);
             visitor.visit();
