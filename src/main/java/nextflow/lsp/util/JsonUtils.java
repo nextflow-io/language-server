@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 
@@ -27,6 +28,18 @@ import com.google.gson.JsonPrimitive;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class JsonUtils {
+
+    public static Object asJson(Object value) {
+        if( value == null )
+            return JsonNull.INSTANCE;
+        if( value instanceof Boolean b )
+            return new JsonPrimitive(b);
+        if( value instanceof Number n )
+            return new JsonPrimitive(n);
+        if( value instanceof String s )
+            return new JsonPrimitive(s);
+        return value;
+    }
 
     public static List<String> getStringArray(Object json, String path) {
         var value = getObjectPath(json, path);

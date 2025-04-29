@@ -164,7 +164,11 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var documentLinkOptions = new DocumentLinkOptions(false);
         result.setDocumentLinkProvider(documentLinkOptions);
         result.setDocumentSymbolProvider(true);
-        var executeCommandOptions = new ExecuteCommandOptions(List.of("nextflow.server.previewDag"));
+        var commands = List.of(
+            "nextflow.server.previewDag",
+            "nextflow.server.previewWorkspace"
+        );
+        var executeCommandOptions = new ExecuteCommandOptions(commands);
         result.setExecuteCommandProvider(executeCommandOptions);
         result.setHoverProvider(true);
         result.setReferencesProvider(true);
@@ -546,14 +550,21 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             cancelChecker.checkCanceled();
             var command = params.getCommand();
             var arguments = params.getArguments();
-            if( !"nextflow.server.previewDag".equals(command) || arguments.size() != 2 )
-                return null;
-            var uri = JsonUtils.getString(arguments.get(0));
-            log.debug(String.format("textDocument/executeCommand %s %s", command, arguments.toString()));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return null;
-            return service.executeCommand(command, arguments);
+            if( "nextflow.server.previewDag".equals(command) && arguments.size() == 2 ) {
+                log.debug(String.format("textDocument/previewDag %s", arguments.toString()));
+                var uri = JsonUtils.getString(arguments.get(0));
+                var service = getLanguageService(uri);
+                if( service != null )
+                    return service.executeCommand(command, arguments);
+            }
+            if( "nextflow.server.previewWorkspace".equals(command) && arguments.size() == 1 ) {
+                log.debug(String.format("textDocument/previewWorkspace %s", arguments.toString()));
+                var name = JsonUtils.getString(arguments.get(0));
+                var service = scriptServices.get(name);
+                if( service != null )
+                    return service.executeCommand(command, arguments);
+            }
+            return null;
         });
     }
 
