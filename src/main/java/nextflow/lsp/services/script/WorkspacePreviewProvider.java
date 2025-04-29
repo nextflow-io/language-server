@@ -37,7 +37,6 @@ public class WorkspacePreviewProvider {
     }
 
     public Map<String,Object> preview() {
-        System.err.println("uris: " + ast.getUris());
         var result = ast.getUris().stream()
             .flatMap(uri -> definitions(uri))
             .toList();
