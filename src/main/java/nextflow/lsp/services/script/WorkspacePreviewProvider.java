@@ -67,6 +67,7 @@ public class WorkspacePreviewProvider {
         return new OutgoingCallsVisitor().apply(node).stream()
             .map(call -> TypeChecker.inferMethodTarget(call))
             .filter(mn -> mn instanceof ProcessNode || mn instanceof WorkflowNode)
+            .distinct()
             .map(mn -> Map.of(
                 "name", mn.getName(),
                 "path", ast.getURI(mn).getPath()
