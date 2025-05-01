@@ -42,7 +42,6 @@ import nextflow.lsp.util.Positions;
 import nextflow.script.control.RelatedInformationAware;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.util.PathUtils;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyItem;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCall;
@@ -121,48 +120,23 @@ public abstract class LanguageService {
 
     private volatile boolean initialized;
 
+    private volatile boolean scanned;
+
+    private volatile String rootUri;
+
     private volatile LanguageServerConfiguration configuration;
 
     public void initialize(String rootUri, LanguageServerConfiguration configuration) {
         synchronized (this) {
             this.initialized = false;
+            this.scanned = false;
+            this.rootUri = rootUri;
             this.configuration = configuration;
 
-            var astCache = getAstCache();
-
-            if( configuration.scanWorkspace() ) {
-                var uris = getWorkspaceFiles(rootUri);
-                astCache.clear();
-                var changedUris = astCache.update(uris, fileCache);
-                publishDiagnostics(changedUris);
-            }
-            else {
-                clearDiagnostics();
-                astCache.clear();
-            }
+            clearDiagnostics();
+            getAstCache().clear();
 
             this.initialized = true;
-        }
-    }
-
-    protected Set<URI> getWorkspaceFiles(String rootUri) {
-        if( rootUri == null ) {
-            return fileCache.getOpenFiles();
-        }
-        try {
-            var result = new HashSet<URI>();
-            PathUtils.visitFiles(
-                Path.of(URI.create(rootUri)),
-                (path) -> !PathUtils.isExcluded(path, configuration.excludePatterns()),
-                (path) -> {
-                    if( matchesFile(path.toString()) )
-                        result.add(path.toUri());
-                });
-            return result;
-        }
-        catch( IOException e ) {
-            log.error("Failed to query workspace files: " + rootUri + " -- cause: " + e.toString());
-            return Collections.emptySet();
         }
     }
 
@@ -348,14 +322,7 @@ public abstract class LanguageService {
      */
     protected void update() {
         synchronized (this) {
-            if( initialized ) {
-                var uris = fileCache.removeChangedFiles();
-
-                log.debug("update " + DefaultGroovyMethods.join(uris, " , "));
-                var astCache = getAstCache();
-                var changedUris = astCache.update(uris, fileCache);
-                publishDiagnostics(changedUris);
-            }
+            update0();
         }
 
         updateLock.lock();
@@ -365,6 +332,65 @@ public abstract class LanguageService {
         }
         finally {
             updateLock.unlock();
+        }
+    }
+
+    private void update0() {
+        if( !initialized )
+            return;
+
+        var astCache = getAstCache();
+        var uris = fileCache.removeChangedFiles();
+
+        if( !scanned ) {
+            if( uris.isEmpty() ) {
+                uris = getWorkspaceFiles();
+                astCache.clear();
+                this.scanned = true;
+            }
+            else {
+                updateLater();
+            }
+        }
+
+        if( log.isDebugEnabled() ) {
+            var builder = new StringBuilder();
+            builder.append("update\n");
+            uris.forEach((uri) -> {
+                builder.append("- ");
+                builder.append(uri.toString().replace(rootUri, "."));
+                builder.append('\n');
+            });
+            log.debug(builder.toString());
+        }
+
+        var changedUris = astCache.update(uris, fileCache);
+        publishDiagnostics(changedUris);
+    }
+
+    /**
+     * Scan the workspace for files that can be managed by the language service.
+     *
+     * If there is no workspace root, use the set of open files instead.
+     */
+    protected Set<URI> getWorkspaceFiles() {
+        if( rootUri == null ) {
+            return fileCache.getOpenFiles();
+        }
+        try {
+            var result = new HashSet<URI>();
+            PathUtils.visitFiles(
+                Path.of(URI.create(rootUri)),
+                (path) -> !PathUtils.isExcluded(path, configuration.excludePatterns()),
+                (path) -> {
+                    if( matchesFile(path.toString()) )
+                        result.add(path.toUri());
+                });
+            return result;
+        }
+        catch( IOException e ) {
+            log.error("Failed to query workspace files: " + rootUri + " -- cause: " + e.toString());
+            return Collections.emptySet();
         }
     }
 
@@ -390,7 +416,7 @@ public abstract class LanguageService {
 
                 var diagnostic = new Diagnostic(range, message, DiagnosticSeverity.Error, "nextflow");
                 if( error instanceof RelatedInformationAware ria )
-                    diagnostic.setRelatedInformation(getRelatedInformation(ria, uri));
+                    diagnostic.setRelatedInformation(relatedInformation(ria, uri));
                 diagnostics.add(diagnostic);
             }
 
@@ -407,7 +433,7 @@ public abstract class LanguageService {
 
                 var diagnostic = new Diagnostic(range, message, DiagnosticSeverity.Warning, "nextflow");
                 if( warning instanceof RelatedInformationAware ria )
-                    diagnostic.setRelatedInformation(getRelatedInformation(ria, uri));
+                    diagnostic.setRelatedInformation(relatedInformation(ria, uri));
                 diagnostics.add(diagnostic);
             }
 
@@ -416,7 +442,7 @@ public abstract class LanguageService {
         });
     }
 
-    private List<DiagnosticRelatedInformation> getRelatedInformation(RelatedInformationAware ria, URI uri) {
+    private static List<DiagnosticRelatedInformation> relatedInformation(RelatedInformationAware ria, URI uri) {
         var otherNode = ria.getOtherNode();
         if( otherNode != null ) {
             var result = new ArrayList<DiagnosticRelatedInformation>();
