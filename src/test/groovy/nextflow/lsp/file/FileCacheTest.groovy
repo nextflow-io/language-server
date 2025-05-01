@@ -61,7 +61,7 @@ class FileCacheTest extends Specification {
                     'hello'
                 ),
                 new TextDocumentContentChangeEvent(
-                    new Range(new Position(0, 8), new Position(0, 8)),
+                    new Range(new Position(0, 11), new Position(0, 11)),
                     ', friend'
                 )
             )

@@ -96,11 +96,11 @@ public class FileCache {
                 var range = change.getRange();
                 var offsetStart = Positions.getOffset(oldText, range.getStart());
                 var offsetEnd = Positions.getOffset(oldText, range.getEnd());
-                var builder = new StringBuilder();
-                builder.append(oldText.substring(0, offsetStart));
-                builder.append(change.getText());
-                builder.append(oldText.substring(offsetEnd));
-                oldText = builder.toString();
+                oldText = new StringBuilder()
+                    .append(oldText.substring(0, offsetStart))
+                    .append(change.getText())
+                    .append(oldText.substring(offsetEnd))
+                    .toString();
             }
             openFiles.put(uri, oldText);
         }
