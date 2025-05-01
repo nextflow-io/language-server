@@ -48,14 +48,14 @@ public class WorkspacePreviewProvider {
             .map(pn -> Map.of(
                 "name", pn.getName(),
                 "type", "process",
-                "uri", uri.toString(),
+                "path", uri.getPath(),
                 "line", pn.getLineNumber() - 1
             ));
         var workflows = ast.getWorkflowNodes(uri).stream()
             .map(wn -> Map.of(
                 "name", wn.isEntry() ? "<entry>" : wn.getName(),
                 "type", "workflow",
-                "uri", uri.toString(),
+                "path", uri.getPath(),
                 "line", wn.getLineNumber() - 1,
                 "children", children(wn)
             ));
@@ -68,7 +68,7 @@ public class WorkspacePreviewProvider {
             .filter(mn -> mn instanceof ProcessNode || mn instanceof WorkflowNode)
             .map(mn -> Map.of(
                 "name", mn.getName(),
-                "uri", ast.getURI(mn)
+                "path", ast.getURI(mn).getPath()
             ))
             .toList();
     }
