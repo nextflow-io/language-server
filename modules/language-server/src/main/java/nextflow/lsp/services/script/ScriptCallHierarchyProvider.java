@@ -25,10 +25,7 @@ import nextflow.lsp.ast.ASTUtils;
 import nextflow.lsp.services.CallHierarchyProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
-import nextflow.script.ast.ProcessNode;
-import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
@@ -188,12 +185,11 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
             return Collections.emptyList();
 
         var sourceUnit = ast.getSourceUnit(uri);
-        var visitor = new OutgoingCallsVisitor(sourceUnit);
-        visitor.visit((MethodNode) fromNode);
+        var calls = new OutgoingCallsVisitor().apply((MethodNode) fromNode);
 
         var callsMap = new HashMap<String, MethodCallExpression>();
         var rangesMap = new HashMap<String, List<Range>>();
-        for( var call : visitor.getOutgoingCalls() ) {
+        for( var call : calls ) {
             var name = call.getMethodAsString();
             callsMap.put(name, call);
             if( !rangesMap.containsKey(name) )
@@ -219,44 +215,6 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
         }
 
         return result;
-    }
-
-    private static class OutgoingCallsVisitor extends ClassCodeVisitorSupport {
-
-        private SourceUnit sourceUnit;
-
-        private List<MethodCallExpression> outgoingCalls = new ArrayList<>();
-
-        public OutgoingCallsVisitor(SourceUnit sourceUnit) {
-            this.sourceUnit = sourceUnit;
-        }
-
-        @Override
-        protected SourceUnit getSourceUnit() {
-            return sourceUnit;
-        }
-
-        public void visit(MethodNode node) {
-            if( node instanceof ProcessNode pn )
-                visit(pn.exec);
-            else if( node instanceof WorkflowNode wn )
-                visit(wn.main);
-            else
-                visit(node.getCode());
-        }
-
-        @Override
-        public void visitMethodCallExpression(MethodCallExpression node) {
-            visit(node.getObjectExpression());
-            visit(node.getArguments());
-
-            if( node.isImplicitThis() )
-                outgoingCalls.add(node);
-        }
-
-        public List<MethodCallExpression> getOutgoingCalls() {
-            return outgoingCalls;
-        }
     }
 
 }

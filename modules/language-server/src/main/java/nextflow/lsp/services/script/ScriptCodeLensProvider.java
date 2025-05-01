@@ -21,8 +21,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gson.JsonNull;
-import com.google.gson.JsonPrimitive;
 import nextflow.lsp.services.CodeLensProvider;
 import nextflow.lsp.services.script.dag.DataflowVisitor;
 import nextflow.lsp.services.script.dag.MermaidRenderer;
@@ -31,6 +29,8 @@ import nextflow.lsp.util.LanguageServerUtils;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
+
+import static nextflow.lsp.util.JsonUtils.asJson;
 
 /**
  *
@@ -62,8 +62,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             var range = LanguageServerUtils.astNodeToRange(wn);
             if( range == null )
                 continue;
-            var name = wn.isEntry() ? JsonNull.INSTANCE : new JsonPrimitive(wn.getName());
-            var arguments = List.of(new JsonPrimitive(uri.toString()), (Object) name);
+            var arguments = List.of(asJson(uri.toString()), asJson(wn.getName()));
             var command = new Command("Preview DAG", "nextflow.previewDag", arguments);
             result.add(new CodeLens(range, command, null));
         }
