@@ -38,6 +38,7 @@ public class WorkspacePreviewProvider {
 
     public Map<String,Object> preview() {
         var result = ast.getUris().stream()
+            .filter(uri -> !ast.hasSyntaxErrors(uri))
             .flatMap(uri -> definitions(uri))
             .toList();
         return Map.of("result", result);
