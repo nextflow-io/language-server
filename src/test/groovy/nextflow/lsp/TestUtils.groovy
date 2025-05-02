@@ -41,13 +41,6 @@ class TestUtils {
     }
 
     /**
-     * Approximate the language service waiting for a debounced update.
-     */
-    static void awaitUpdate() {
-        sleep(1200)
-    }
-
-    /**
      * Get a language service instance for Nextflow scripts.
      */
     static ScriptService getScriptService() {
@@ -55,6 +48,9 @@ class TestUtils {
         def configuration = LanguageServerConfiguration.defaults()
         service.connect(new TestLanguageClient())
         service.initialize(workspaceRoot.toUri().toString(), configuration)
+        // skip workspace scan
+        open(service, getUri('main.nf'), '')
+        service.updateNow()
         return service
     }
 

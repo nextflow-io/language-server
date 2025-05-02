@@ -60,7 +60,7 @@ class ScriptReferencesTest extends Specification {
             }
             '''
         open(service, uri, contents)
-        awaitUpdate()
+        service.updateNow()
         def references = getReferences(service, uri, new Position(0, 9))
         then:
         references[uri].size() == 2
@@ -88,7 +88,7 @@ class ScriptReferencesTest extends Specification {
                 HELLO()
             }
             ''')
-        awaitUpdate()
+        service.updateNow()
         def references = getReferences(service, moduleUri, new Position(0, 9))
         then:
         references[moduleUri].size() == 1

@@ -52,7 +52,7 @@ class ScriptDefinitionTest extends Specification {
             }
             '''
         open(service, uri, contents)
-        awaitUpdate()
+        service.updateNow()
         def location = getDefinition(service, uri, new Position(4, 4))
         then:
         location != null
@@ -84,7 +84,7 @@ class ScriptDefinitionTest extends Specification {
                 HELLO('World')
             }
             ''')
-        awaitUpdate()
+        service.updateNow()
         def location = getDefinition(service, mainUri, new Position(3, 4))
         then:
         location != null
