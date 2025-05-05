@@ -88,9 +88,7 @@ import org.eclipse.lsp4j.services.LanguageClient;
  */
 public abstract class LanguageService {
 
-    private static final int DEBOUNCE_MILLIS = 1_000;
-
-    private static final Object DEBOUNCE_KEY = new Object();
+    private static final long DEBOUNCE_MILLIS = 1_000;
 
     private static Logger log = Logger.getInstance();
 
@@ -101,7 +99,7 @@ public abstract class LanguageService {
     private DebouncingExecutor updateExecutor;
 
     public LanguageService() {
-        this.updateExecutor = new DebouncingExecutor(DEBOUNCE_MILLIS, (key) -> update());
+        this.updateExecutor = new DebouncingExecutor(DEBOUNCE_MILLIS, this::update);
     }
 
     public abstract boolean matchesFile(String uri);
@@ -295,11 +293,11 @@ public abstract class LanguageService {
 
     protected void updateLater() {
         awaitingUpdate = true;
-        updateExecutor.submit(DEBOUNCE_KEY);
+        updateExecutor.executeLater();
     }
 
     protected void updateNow() {
-        updateExecutor.executeNow(DEBOUNCE_KEY);
+        updateExecutor.executeNow();
     }
 
     protected void awaitUpdate() {

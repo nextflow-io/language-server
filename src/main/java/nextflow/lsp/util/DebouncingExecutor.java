@@ -15,104 +15,64 @@
  */
 package nextflow.lsp.util;
 
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Executor service that debounces incoming tasks, so
  * that a task is executed only after not being triggered
- * for a given time period.
- *
- * see: https://stackoverflow.com/questions/4742210/implementing-debounce-in-java/20978973
+ * for a given delay.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class DebouncingExecutor<T> {
-    private int delayMillis;
-    private Consumer<T> action;
-    private ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-    private ConcurrentHashMap<T, DelayedTask> delayedTasks = new ConcurrentHashMap<>();
+public class DebouncingExecutor {
+    private final long delayMillis;
+    private final Runnable action;
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final AtomicReference<ScheduledFuture<?>> futureRef = new AtomicReference<>();
 
-    public DebouncingExecutor(int delayMillis, Consumer<T> action) {
+    public DebouncingExecutor(long delayMillis, Runnable action) {
         this.delayMillis = delayMillis;
         this.action = action;
     }
 
-    public void submit(T key) {
-        var newTask = new DelayedTask(key);
+    /**
+     * Schedule the action after the configured delay, cancelling
+     * the currently scheduled task if present.
+     */
+    public synchronized void executeLater() {
+        cancelExisting();
 
-        // try until new task was added, or existing task was extended
-        DelayedTask oldTask;
-        do {
-            oldTask = delayedTasks.putIfAbsent(key, newTask);
-            if( oldTask == null )
-                executor.schedule(newTask, delayMillis, TimeUnit.MILLISECONDS);
-        } while( oldTask != null && !oldTask.extend() );
+        var future = scheduler.schedule(() -> {
+            action.run();
+            futureRef.set(null);
+        }, delayMillis, TimeUnit.MILLISECONDS);
+
+        futureRef.set(future);
     }
 
-    public void executeNow(T key) {
-        var task = delayedTasks.get(key);
-        if( task != null )
-            task.cancel();
-        action.accept(key);
+    /**
+     * Execute the action immediately, cancelling the currently
+     * scheduled task if present.
+     */
+    public synchronized void executeNow() {
+        cancelExisting();
+        action.run();
     }
 
-    public void shutdownNow() {
-        executor.shutdownNow();
+    private void cancelExisting() {
+        var existing = futureRef.getAndSet(null);
+        if( existing != null && !existing.isDone() )
+            existing.cancel(false);
     }
 
-    private class DelayedTask implements Runnable {
-        private T key;
-        private long dueTime;
-        private Object lock = new Object();
-
-        public DelayedTask(T key) {
-            this.key = key;
-            extend();
-        }
-
-        public boolean extend() {
-            synchronized (lock) {
-                if( dueTime < 0 )
-                    return false;
-                dueTime = System.currentTimeMillis() + delayMillis;
-                return true;
-            }
-        }
-
-        public void cancel() {
-            synchronized (lock) {
-                dueTime = -1;
-                delayedTasks.remove(key);
-            }
-        }
-
-        public void run() {
-            synchronized (lock) {
-                var remaining = dueTime - System.currentTimeMillis();
-                if( remaining > 0 ) {
-                    // re-schedule task
-                    executor.schedule(this, remaining, TimeUnit.MILLISECONDS);
-                }
-                else if( dueTime != -1 ) {
-                    // mark task as terminated and invoke callback
-                    dueTime = -1;
-                    try {
-                        action.accept(key);
-                    }
-                    catch( Exception e ) {
-                        System.err.println("exception while invoking debounce callback: " + e.toString());
-                        e.printStackTrace(System.err);
-                    }
-                    finally {
-                        delayedTasks.remove(key);
-                    }
-                }
-            }
-        }
+    /**
+     * Call this method to shut down the executor when no longer needed.
+     */
+    public void shutdown() {
+        scheduler.shutdownNow();
     }
-
 }
