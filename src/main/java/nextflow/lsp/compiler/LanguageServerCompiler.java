@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import groovy.lang.GroovyClassLoader;
+import nextflow.config.control.StringReaderSourceWithURI;
 import nextflow.lsp.file.FileCache;
 import nextflow.script.control.Compiler;
 import org.codehaus.groovy.GroovyBugError;

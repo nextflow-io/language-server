@@ -31,6 +31,7 @@ import nextflow.lsp.file.FileCache;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
+import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
@@ -71,7 +72,7 @@ public class ConfigAstCache extends ASTNodeCache {
         var changedUris = new HashSet<>(uris);
 
         for( var sourceUnit : getSourceUnits() ) {
-            var visitor = new ResolveIncludeVisitor(sourceUnit, compiler(), uris);
+            var visitor = new CachingResolveIncludeVisitor(sourceUnit, changedUris);
             visitor.visit();
 
             var uri = sourceUnit.getSource().getURI();
@@ -87,7 +88,7 @@ public class ConfigAstCache extends ASTNodeCache {
             if( sourceUnit == null )
                 continue;
             // phase 3: name checking
-            new ConfigResolveVisitor(sourceUnit, compiler().compilationUnit()).visit();
+            new ConfigResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_CONFIG_IMPORTS).visit();
             new ConfigSchemaVisitor(sourceUnit, configuration.typeChecking()).visit();
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;
