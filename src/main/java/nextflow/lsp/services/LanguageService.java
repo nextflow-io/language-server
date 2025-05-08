@@ -39,6 +39,7 @@ import nextflow.lsp.util.DebouncingExecutor;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
+import nextflow.script.control.ParanoidWarning;
 import nextflow.script.control.RelatedInformationAware;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.util.PathUtils;
@@ -429,7 +430,10 @@ public abstract class LanguageService {
                     continue;
                 }
 
-                var diagnostic = new Diagnostic(range, message, DiagnosticSeverity.Warning, "nextflow");
+                var severity = warning instanceof ParanoidWarning
+                    ? DiagnosticSeverity.Information
+                    : DiagnosticSeverity.Warning;
+                var diagnostic = new Diagnostic(range, message, severity, "nextflow");
                 if( warning instanceof RelatedInformationAware ria )
                     diagnostic.setRelatedInformation(relatedInformation(ria, uri));
                 diagnostics.add(diagnostic);
