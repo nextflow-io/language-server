@@ -92,13 +92,16 @@ public abstract class LanguageService {
 
     private static Logger log = Logger.getInstance();
 
+    private String rootUri;
+
     private LanguageClient client;
 
     private FileCache fileCache = new FileCache();
 
     private DebouncingExecutor updateExecutor;
 
-    public LanguageService() {
+    public LanguageService(String rootUri) {
+        this.rootUri = rootUri;
         this.updateExecutor = new DebouncingExecutor(DEBOUNCE_MILLIS, this::update);
     }
 
@@ -120,15 +123,12 @@ public abstract class LanguageService {
 
     private volatile boolean scanned;
 
-    private volatile String rootUri;
-
     private volatile LanguageServerConfiguration configuration;
 
-    public void initialize(String rootUri, LanguageServerConfiguration configuration) {
+    public void initialize(LanguageServerConfiguration configuration) {
         synchronized (this) {
             this.initialized = false;
             this.scanned = false;
-            this.rootUri = rootUri;
             this.configuration = configuration;
 
             clearDiagnostics();

@@ -36,6 +36,7 @@ import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.Phases;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 
@@ -46,50 +47,67 @@ import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
  */
 public class GroovyLibCache {
 
+    private Path libDir;
+
     private Map<URI,Entry> cache = new HashMap<>();
 
-    List<ClassNode> load(String rootUri) {
-        if( rootUri == null )
-            return Collections.emptyList();
+    public GroovyLibCache(Path libDir) {
+        this.libDir = libDir;
+    }
 
+    public List<ClassNode> refresh() {
         // collect Groovy files in lib directory
-        var libDir = Path.of(URI.create(rootUri)).resolve("lib");
-        if( !Files.isDirectory(libDir) )
+        if( libDir == null || !Files.isDirectory(libDir) )
             return Collections.emptyList();
 
-        Set<URI> uris;
-        try {
-            uris = Files.walk(libDir)
-                .filter(path -> path.toString().endsWith(".groovy"))
-                .map(path -> path.toUri())
-                .collect(Collectors.toSet());
-        }
-        catch( IOException e ) {
-            System.err.println("Failed to read Groovy source files in lib directory: " + e.toString());
-            return Collections.emptyList();
-        }
+        var uris = groovyFiles(libDir);
 
         if( uris.isEmpty() )
             return Collections.emptyList();
 
         // compile source files
-        var cachedClasses = new ArrayList<ClassNode>();
+        var result = new ArrayList<ClassNode>();
+        var compilationUnit = compile(uris, result);
+
+        // collect compiled class nodes
+        collectClasses(compilationUnit, result);
+
+        return result;
+    }
+
+    private static Set<URI> groovyFiles(Path libDir) {
+        try {
+            return Files.walk(libDir)
+                .filter(path -> path.toString().endsWith(".groovy"))
+                .map(path -> path.toUri())
+                .collect(Collectors.toSet());
+        }
+        catch( IOException e ) {
+            System.err.println(String.format("Failed to read Groovy source files in lib directory: %s -- %s", libDir, e));
+            return Collections.emptySet();
+        }
+    }
+
+    private CompilationUnit compile(Set<URI> uris, List<ClassNode> classes) {
+        // create compilation unit
         var config = new CompilerConfiguration();
         config.getOptimizationOptions().put(CompilerConfiguration.GROOVYDOC, true);
         var classLoader = new GroovyClassLoader();
         var compilationUnit = new CompilationUnit(config, null, classLoader);
+
+        // create source units (or restore from cache)
         for( var uri : uris ) {
-            var lastModified = getLastModified(uri);
+            var lastModified = lastModified(uri);
             if( cache.containsKey(uri) ) {
                 var entry = cache.get(uri);
                 if( lastModified != null && lastModified.equals(entry.lastModified) ) {
                     if( entry.classes != null )
-                        cachedClasses.addAll(entry.classes);
+                        classes.addAll(entry.classes);
                     continue;
                 }
             }
 
-            System.err.println("compile " + uri.toString());
+            System.err.println("compile " + uri.getPath());
             var sourceUnit = new SourceUnit(
                     new File(uri),
                     config,
@@ -99,21 +117,35 @@ public class GroovyLibCache {
             cache.put(uri, new Entry(lastModified));
         }
 
+        // compile source files
         try {
-            compilationUnit.compile(org.codehaus.groovy.control.Phases.CANONICALIZATION);
+            compilationUnit.compile(Phases.CANONICALIZATION);
         }
         catch( CompilationFailedException e ) {
             // ignore
         }
         catch( GroovyBugError | Exception e ) {
-            System.err.println("Failed to compile Groovy source files in lib directory -- " + e.toString());
+            System.err.println(String.format("Failed to compile Groovy source files in lib directory -- %s", e));
         }
 
-        // collect class nodes and report errors
-        var result = new ArrayList<ClassNode>();
-        result.addAll(cachedClasses);
+        return compilationUnit;
+    }
+
+    private static FileTime lastModified(URI uri) {
+        try {
+            return Files.getLastModifiedTime(Path.of(uri));
+        }
+        catch( IOException e ) {
+            System.err.println(String.format("Failed to get last modified time for %s -- %s", uri.getPath(), e));
+            return null;
+        }
+    }
+
+    private void collectClasses(CompilationUnit compilationUnit, List<ClassNode> classes) {
         compilationUnit.iterator().forEachRemaining((sourceUnit) -> {
             var uri = sourceUnit.getSource().getURI();
+
+            // report syntax errors
             var errors = sourceUnit.getErrorCollector().getErrors();
             if( errors != null ) {
                 for( var error : errors ) {
@@ -121,10 +153,11 @@ public class GroovyLibCache {
                         continue;
                     var sem = (SyntaxErrorMessage) error;
                     var cause = sem.getCause();
-                    System.err.println(String.format("Groovy syntax error in %s -- %s: %s", uri, cause, cause.getMessage()));
+                    System.err.println(String.format("Groovy syntax error in %s -- %s: %s", uri.getPath(), cause, cause.getMessage()));
                 }
             }
 
+            // collect compiled classes
             var moduleNode = sourceUnit.getAST();
             if( moduleNode == null )
                 return;
@@ -139,22 +172,12 @@ public class GroovyLibCache {
                     : packageName + "." + cn.getNameWithoutPackage();
                 cn.setName(className);
             }
-            result.addAll(moduleNode.getClasses());
+            classes.addAll(moduleNode.getClasses());
 
+            // update cache
             var entry = cache.get(uri);
             entry.classes = moduleNode.getClasses();
         });
-        return result;
-    }
-
-    private FileTime getLastModified(URI uri) {
-        try {
-            return Files.getLastModifiedTime(Path.of(uri));
-        }
-        catch( IOException e ) {
-            System.err.println(String.format("Failed to get last modified time for %s -- %s", uri, e));
-            return null;
-        }
     }
 
     private static class Entry {

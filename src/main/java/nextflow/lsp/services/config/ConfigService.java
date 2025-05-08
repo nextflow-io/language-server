@@ -31,7 +31,12 @@ import nextflow.lsp.services.SemanticTokensProvider;
  */
 public class ConfigService extends LanguageService {
 
-    private ConfigAstCache astCache = new ConfigAstCache();
+    private ConfigAstCache astCache;
+
+    public ConfigService(String rootUri) {
+        super(rootUri);
+        astCache = new ConfigAstCache();
+    }
 
     @Override
     public boolean matchesFile(String uri) {
@@ -39,11 +44,11 @@ public class ConfigService extends LanguageService {
     }
 
     @Override
-    public void initialize(String rootUri, LanguageServerConfiguration configuration) {
+    public void initialize(LanguageServerConfiguration configuration) {
         synchronized (this) {
             astCache.initialize(configuration);
         }
-        super.initialize(rootUri, configuration);
+        super.initialize(configuration);
     }
 
     @Override

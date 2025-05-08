@@ -495,9 +495,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             progress.update(progressMessage, count * 100 / total);
             count++;
 
-            var uri = workspaceRoots.get(name);
-            scriptServices.get(name).initialize(uri, configuration);
-            configServices.get(name).initialize(uri, configuration);
+            scriptServices.get(name).initialize(configuration);
+            configServices.get(name).initialize(configuration);
         }
 
         progress.end();
@@ -523,8 +522,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var uri = workspaceFolder.getUri();
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
             addWorkspaceFolder(name, uri);
-            scriptServices.get(name).initialize(uri, configuration);
-            configServices.get(name).initialize(uri, configuration);
+            scriptServices.get(name).initialize(configuration);
+            configServices.get(name).initialize(configuration);
         }
     }
 
@@ -584,11 +583,11 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private void addWorkspaceFolder(String name, String uri) {
         workspaceRoots.put(name, uri);
 
-        var scriptService = new ScriptService();
+        var scriptService = new ScriptService(uri);
         scriptService.connect(client);
         scriptServices.put(name, scriptService);
 
-        var configService = new ConfigService();
+        var configService = new ConfigService(uri);
         configService.connect(client);
         configServices.put(name, configService);
     }

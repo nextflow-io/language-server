@@ -40,7 +40,12 @@ import nextflow.lsp.services.SymbolProvider;
  */
 public class ScriptService extends LanguageService {
 
-    private ScriptAstCache astCache = new ScriptAstCache();
+    private ScriptAstCache astCache;
+
+    public ScriptService(String rootUri) {
+        super(rootUri);
+        astCache = new ScriptAstCache(rootUri);
+    }
 
     @Override
     public boolean matchesFile(String uri) {
@@ -48,11 +53,11 @@ public class ScriptService extends LanguageService {
     }
 
     @Override
-    public void initialize(String rootUri, LanguageServerConfiguration configuration) {
+    public void initialize(LanguageServerConfiguration configuration) {
         synchronized (this) {
-            astCache.initialize(rootUri, configuration);
+            astCache.initialize(configuration);
         }
-        super.initialize(rootUri, configuration);
+        super.initialize(configuration);
     }
 
     @Override

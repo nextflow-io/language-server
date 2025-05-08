@@ -16,6 +16,7 @@
 package nextflow.lsp.services.script;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -55,14 +56,20 @@ import org.codehaus.groovy.control.messages.WarningMessage;
  */
 public class ScriptAstCache extends ASTNodeCache {
 
-    private String rootUri;
+    private GroovyLibCache libCache;
 
     private LanguageServerConfiguration configuration;
 
-    private GroovyLibCache libCache = new GroovyLibCache();
-
-    public ScriptAstCache() {
+    public ScriptAstCache(String rootUri) {
         super(createCompiler());
+        this.libCache = createLibCache(rootUri);
+    }
+
+    private static GroovyLibCache createLibCache(String rootUri) {
+        if( rootUri == null )
+            return null;
+        var libDir = Path.of(URI.create(rootUri)).resolve("lib");
+        return new GroovyLibCache(libDir);
     }
 
     private static LanguageServerCompiler createCompiler() {
@@ -82,8 +89,7 @@ public class ScriptAstCache extends ASTNodeCache {
         return config;
     }
 
-    public void initialize(String rootUri, LanguageServerConfiguration configuration) {
-        this.rootUri = rootUri;
+    public void initialize(LanguageServerConfiguration configuration) {
         this.configuration = configuration;
     }
 
@@ -113,7 +119,7 @@ public class ScriptAstCache extends ASTNodeCache {
             }
         }
 
-        var libImports = libCache.load(rootUri);
+        var libImports = libImports();
 
         for( var uri : changedUris ) {
             var sourceUnit = getSourceUnit(uri);
@@ -129,6 +135,10 @@ public class ScriptAstCache extends ASTNodeCache {
         }
 
         return changedUris;
+    }
+
+    private List<ClassNode> libImports() {
+        return libCache != null ? libCache.refresh() : Collections.emptyList();
     }
 
     @Override
