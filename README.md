@@ -1,6 +1,6 @@
 # Nextflow Language Server
 
-A [language server](https://microsoft.github.io/language-server-protocol/) for [Nextflow](https://nextflow.io/) scripts and config files.
+The official [language server](https://microsoft.github.io/language-server-protocol/) for [Nextflow](https://nextflow.io/) scripts and config files.
 
 The following language features are currently supported:
 
