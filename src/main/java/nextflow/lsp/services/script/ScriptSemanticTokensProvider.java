@@ -194,11 +194,8 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
                 if( call == null )
                     return;
 
-                var code = asDslBlock(call, 1);
-                if( code != null ) {
-                    tok.append(call.getMethod(), SemanticTokenTypes.Parameter);
-                    tok.visit(code);
-                }
+                tok.append(call.getMethod(), SemanticTokenTypes.Function);
+                tok.visit(call.getArguments());
             });
         }
 
