@@ -47,10 +47,10 @@ class ConfigFormattingTest extends Specification {
         if( !Files.exists(workspaceRoot) )
             workspaceRoot.toFile().mkdirs()
 
-        def service = new ConfigService()
+        def service = new ConfigService(workspaceRoot.toUri().toString())
         def configuration = LanguageServerConfiguration.defaults()
         service.connect(new TestLanguageClient())
-        service.initialize(workspaceRoot.toUri().toString(), configuration)
+        service.initialize(configuration)
 
         when:
         def filePath = workspaceRoot.resolve('nextflow.config')

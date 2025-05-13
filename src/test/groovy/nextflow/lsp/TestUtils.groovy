@@ -44,10 +44,10 @@ class TestUtils {
      * Get a language service instance for Nextflow scripts.
      */
     static ScriptService getScriptService() {
-        def service = new ScriptService()
+        def service = new ScriptService(workspaceRoot.toUri().toString())
         def configuration = LanguageServerConfiguration.defaults()
         service.connect(new TestLanguageClient())
-        service.initialize(workspaceRoot.toUri().toString(), configuration)
+        service.initialize(configuration)
         // skip workspace scan
         open(service, getUri('main.nf'), '')
         service.updateNow()
