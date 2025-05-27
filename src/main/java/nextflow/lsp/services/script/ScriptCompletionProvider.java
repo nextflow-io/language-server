@@ -323,7 +323,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         for( var includeNode : ast.getIncludeNodes(uri) ) {
             for( var module : includeNode.modules ) {
                 var node = module.getTarget();
-                if( node == null )
+                if( node == null || ast.getURI(node) == null )
                     continue;
 
                 var name = module.getNameOrAlias();
