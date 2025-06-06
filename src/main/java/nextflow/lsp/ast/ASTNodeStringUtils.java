@@ -179,6 +179,8 @@ public class ASTNodeStringUtils {
         var an = findAnnotation(node, Constant.class);
         if( an.isPresent() ) {
             var name = an.get().getMember("value").getText();
+            if( Types.isNamespace(node) )
+                return "(namespace) " + name;
             var fn = new FieldNode(name, 0xF, node.getReturnType(), node.getDeclaringClass(), null);
             return variableToLabel(fn);
         }

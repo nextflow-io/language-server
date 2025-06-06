@@ -238,6 +238,17 @@ public class ScriptCompletionProvider implements CompletionProvider {
         return addItem(item, items);
     }
 
+    private boolean addItemForNamespace(String name, MethodNode mn, String namePrefix, List<CompletionItem> items) {
+        if( !name.startsWith(namePrefix) )
+            return true;
+        var item = new CompletionItem(name);
+        item.setKind(CompletionItemKind.Module);
+        item.setLabelDetails(astNodeToItemLabelDetails(mn));
+        item.setDetail(astNodeToItemDetail(mn));
+        item.setDocumentation(astNodeToItemDocumentation(mn));
+        return addItem(item, items);
+    }
+
     private boolean addItemForConstant(String name, MethodNode mn, String namePrefix, List<CompletionItem> items) {
         if( !name.startsWith(namePrefix) )
             return true;
@@ -305,7 +316,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 boolean result;
                 if( an.isPresent() ) {
                     var name = an.get().getMember("value").getText();
-                    result = addItemForConstant(name, mn, namePrefix, items);
+                    result = Types.isNamespace(mn)
+                        ? addItemForNamespace(name, mn, namePrefix, items)
+                        : addItemForConstant(name, mn, namePrefix, items);
                 }
                 else {
                     result = addItemForMethod(mn, namePrefix, items);
@@ -435,9 +448,6 @@ public class ScriptCompletionProvider implements CompletionProvider {
     private void populateTypes(String namePrefix, List<CompletionItem> items) {
         // add user-defined types
         populateTypes0(ast.getEnumNodes(uri), namePrefix, items);
-
-        // add built-in types
-        populateTypes0(Types.DEFAULT_SCRIPT_IMPORTS, namePrefix, items);
     }
 
     private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, List<CompletionItem> items) {
@@ -494,6 +504,9 @@ public class ScriptCompletionProvider implements CompletionProvider {
         }
         else if( node instanceof WorkflowNode pn ) {
             result.setDescription("workflow");
+        }
+        else if( node instanceof MethodNode mn && Types.isNamespace(mn) ) {
+            result.setDescription("namespace");
         }
         else if( node instanceof MethodNode mn ) {
             result.setDetail("(" + ASTNodeStringUtils.parametersToLabel(mn.getParameters()) + ")");
