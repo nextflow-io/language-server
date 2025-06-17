@@ -27,14 +27,14 @@ test {
 }
 
 dependencies {
-  implementation 'io.nextflow:nf-lang:25.04.2'
-  implementation 'org.apache.groovy:groovy:4.0.26'
-  implementation 'org.apache.groovy:groovy-json:4.0.26'
+  implementation 'io.nextflow:nf-lang:25.04.4'
+  implementation 'org.apache.groovy:groovy:4.0.27'
+  implementation 'org.apache.groovy:groovy-json:4.0.27'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.23.0'
 
   // runtime dependencies for Nextflow scripts
-  runtimeOnly 'org.apache.groovy:groovy-templates:4.0.26'
+  runtimeOnly 'org.apache.groovy:groovy-templates:4.0.27'
   runtimeOnly 'org.yaml:snakeyaml:2.2'
 
   testImplementation ('org.objenesis:objenesis:3.4')
