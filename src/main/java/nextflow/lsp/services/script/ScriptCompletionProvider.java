@@ -334,12 +334,12 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
     private void populateIncludes(String namePrefix, List<CompletionItem> items) {
         for( var includeNode : ast.getIncludeNodes(uri) ) {
-            for( var module : includeNode.modules ) {
-                var node = module.getTarget();
+            for( var entry : includeNode.entries ) {
+                var node = entry.getTarget();
                 if( node == null || ast.getURI(node) == null )
                     continue;
 
-                var name = module.getNameOrAlias();
+                var name = entry.getNameOrAlias();
                 if( !name.startsWith(namePrefix) )
                     continue;
 
@@ -407,8 +407,8 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
     private boolean isIncluded(MethodNode node) {
         for( var includeNode : ast.getIncludeNodes(uri) ) {
-            for( var module : includeNode.modules ) {
-                if( module.getTarget() == node )
+            for( var entry : includeNode.entries ) {
+                if( entry.getTarget() == node )
                     return true;
             }
         }

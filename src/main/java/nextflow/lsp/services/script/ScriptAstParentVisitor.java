@@ -20,7 +20,7 @@ import java.util.Map;
 import nextflow.lsp.ast.ASTParentVisitor;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
-import nextflow.script.ast.IncludeModuleNode;
+import nextflow.script.ast.IncludeEntryNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.OutputNode;
 import nextflow.script.ast.ParamNode;
@@ -78,15 +78,15 @@ class ScriptAstParentVisitor extends ScriptVisitorSupport {
         lookup.push(node);
         try {
             lookup.visit(node.source);
-            for( var module : node.modules )
-                visitIncludeVariable(module);
+            for( var entry : node.entries )
+                visitIncludeEntry(entry);
         }
         finally {
             lookup.pop();
         }
     }
 
-    protected void visitIncludeVariable(IncludeModuleNode node) {
+    protected void visitIncludeEntry(IncludeEntryNode node) {
         lookup.push(node);
         try {
         }

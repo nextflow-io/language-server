@@ -19,7 +19,7 @@ import java.util.Collections;
 import java.util.Iterator;
 
 import nextflow.script.ast.FeatureFlagNode;
-import nextflow.script.ast.IncludeModuleNode;
+import nextflow.script.ast.IncludeEntryNode;
 import nextflow.script.types.TypeChecker;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
@@ -66,8 +66,8 @@ public class LanguageServerASTUtils {
         if( node instanceof FeatureFlagNode ffn )
             return ffn.target != null ? ffn : null;
 
-        if( node instanceof IncludeModuleNode im )
-            return im.getTarget();
+        if( node instanceof IncludeEntryNode entry )
+            return entry.getTarget();
 
         if( node instanceof ClassNode cn )
             return node;

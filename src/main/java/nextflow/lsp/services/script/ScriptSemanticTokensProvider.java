@@ -107,10 +107,10 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
 
         @Override
         public void visitInclude(IncludeNode node) {
-            for( var module : node.modules ) {
-                tok.append(module.getNodeMetaData("_START_NAME"), module.name, SemanticTokenTypes.Function);
-                if( module.alias != null )
-                    tok.append(module.getNodeMetaData("_START_ALIAS"), module.alias, SemanticTokenTypes.Function);
+            for( var entry : node.entries ) {
+                tok.append(entry.getNodeMetaData("_START_NAME"), entry.name, SemanticTokenTypes.Function);
+                if( entry.alias != null )
+                    tok.append(entry.getNodeMetaData("_START_ALIAS"), entry.alias, SemanticTokenTypes.Function);
             }
         }
 

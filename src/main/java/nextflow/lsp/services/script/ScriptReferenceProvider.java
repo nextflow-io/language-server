@@ -26,7 +26,7 @@ import nextflow.lsp.services.ReferenceProvider;
 import nextflow.lsp.services.RenameProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
-import nextflow.script.ast.IncludeModuleNode;
+import nextflow.script.ast.IncludeEntryNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
@@ -136,8 +136,8 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
         if( node instanceof MethodNode mn )
             return mn.getName();
 
-        if( node instanceof IncludeModuleNode im && position != null )
-            return getIncludeNameOrAlias(im, position);
+        if( node instanceof IncludeEntryNode entry && position != null )
+            return getIncludeNameOrAlias(entry, position);
 
         if( node instanceof Variable v )
             return v.getName();
@@ -149,14 +149,14 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
     }
 
     /**
-     * Since IncludeModuleNode doesn't have source mappings for the
+     * Since IncludeEntryNode doesn't have source mappings for the
      * name and alias symbols, use the request position to determine
      * whether the name or alias was selected.
      *
      * @param node
      * @param position
      */
-    private String getIncludeNameOrAlias(IncludeModuleNode node, Position position) {
+    private String getIncludeNameOrAlias(IncludeEntryNode node, Position position) {
         if( node.alias == null )
             return node.name;
 
@@ -167,8 +167,8 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
     }
 
     private boolean isSameAlias(ASTNode node, String alias) {
-        var symbolName = node instanceof IncludeModuleNode im
-            ? im.alias
+        var symbolName = node instanceof IncludeEntryNode entry
+            ? entry.alias
             : getSymbolName(node, null);
         return alias.equals(symbolName);
     }
@@ -206,9 +206,9 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
             return new TextEdit(range, newName);
         }
 
-        if( node instanceof IncludeModuleNode im ) {
-            String name = im.name;
-            String alias = im.alias;
+        if( node instanceof IncludeEntryNode entry ) {
+            String name = entry.name;
+            String alias = entry.alias;
 
             if( oldName.equals(name) )
                 name = newName;
