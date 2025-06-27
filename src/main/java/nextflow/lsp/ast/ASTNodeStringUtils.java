@@ -57,7 +57,7 @@ import static nextflow.script.ast.ASTUtils.*;
 public class ASTNodeStringUtils {
 
     public static String getLabel(ASTNode node) {
-        if( node instanceof ClassNode cn )
+        if( node instanceof ClassNode cn && cn.isResolved() )
             return classToLabel(cn);
 
         if( node instanceof FeatureFlagNode ffn )
