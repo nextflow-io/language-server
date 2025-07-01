@@ -23,13 +23,21 @@ import java.util.List;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncompleteNode;
+import nextflow.config.dsl.ConfigDsl;
 import nextflow.config.schema.SchemaNode;
 import nextflow.lsp.ast.ASTNodeCache;
+import nextflow.lsp.ast.CompletionHelper;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.VariableScope;
+import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
 import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.expr.MethodCallExpression;
+import org.codehaus.groovy.ast.expr.PropertyExpression;
+import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 import org.eclipse.lsp4j.CompletionItem;
@@ -42,6 +50,8 @@ import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+
+import static nextflow.lsp.ast.CompletionUtils.*;
 
 /**
  * Provide suggestions for an incomplete expression or statement
@@ -57,9 +67,11 @@ public class ConfigCompletionProvider implements CompletionProvider {
     private static Logger log = Logger.getInstance();
 
     private ASTNodeCache ast;
+    private CompletionHelper ch;
 
-    public ConfigCompletionProvider(ASTNodeCache ast) {
+    public ConfigCompletionProvider(ASTNodeCache ast, int maxItems) {
         this.ast = ast;
+        this.ch = new CompletionHelper(maxItems);
     }
 
     @Override
@@ -77,14 +89,73 @@ public class ConfigCompletionProvider implements CompletionProvider {
         if( nodeStack.isEmpty() )
             return Either.forLeft(TOPLEVEL_ITEMS);
 
-        var names = getCurrentConfigScope(nodeStack);
-        if( names == null )
-            return Either.forLeft(Collections.emptyList());
+        if( isConfigExpression(nodeStack) ) {
+            addCompletionItems(nodeStack);
+        }
+        else {
+            var names = currentConfigScope(nodeStack);
+            if( names.isEmpty() )
+                return Either.forLeft(TOPLEVEL_ITEMS);
+            addConfigOptions(names);
+        }
 
-        return Either.forLeft(getConfigOptions(names));
+        return ch.isIncomplete()
+            ? Either.forRight(new CompletionList(true, ch.getItems()))
+            : Either.forLeft(ch.getItems());
     }
 
-    private List<String> getCurrentConfigScope(List<ASTNode> nodeStack) {
+    private boolean isConfigExpression(List<ASTNode> nodeStack) {
+        for( var node : DefaultGroovyMethods.asReversed(nodeStack) ) {
+            if( node instanceof Expression )
+                return true;
+        }
+        return false;
+    }
+
+    private void addCompletionItems(List<ASTNode> nodeStack) {
+        var offsetNode = nodeStack.get(0);
+
+        if( offsetNode instanceof VariableExpression ve ) {
+            // e.g. "foo "
+            //          ^
+            var namePrefix = ve.getName();
+            log.debug("completion variable -- '" + namePrefix + "'");
+            ch.addItemsFromScope(variableScope(nodeStack), namePrefix);
+        }
+        else if( offsetNode instanceof MethodCallExpression mce ) {
+            var namePrefix = mce.getMethodAsString();
+            log.debug("completion method call -- '" + namePrefix + "'");
+            if( mce.isImplicitThis() ) {
+                // e.g. "foo ()"
+                //          ^
+                ch.addItemsFromScope(variableScope(nodeStack), namePrefix);
+            }
+            else {
+                // e.g. "foo.bar ()"
+                //              ^
+                ch.addMethodsFromObjectScope(mce.getObjectExpression(), namePrefix);
+            }
+        }
+        else if( offsetNode instanceof PropertyExpression pe ) {
+            // e.g. "foo.bar "
+            //              ^
+            var namePrefix = pe.getPropertyAsString();
+            log.debug("completion property -- '" + namePrefix + "'");
+            ch.addItemsFromObjectScope(pe.getObjectExpression(), namePrefix);
+        }
+        else if( offsetNode instanceof ConstructorCallExpression cce ) {
+            // e.g. "new Foo ()"
+            //              ^
+            var namePrefix = cce.getType().getNameWithoutPackage();
+            log.debug("completion constructor call -- '" + namePrefix + "'");
+        }
+        else {
+            log.debug("completion " + offsetNode.getClass().getSimpleName() + " -- '" + offsetNode.getText() + "'");
+            ch.addItemsFromScope(variableScope(nodeStack), "");
+        }
+    }
+
+    private static List<String> currentConfigScope(List<ASTNode> nodeStack) {
         var names = new ArrayList<String>();
         for( var node : DefaultGroovyMethods.asReversed(nodeStack) ) {
             if( node instanceof Expression )
@@ -108,44 +179,40 @@ public class ConfigCompletionProvider implements CompletionProvider {
         return names;
     }
 
-    private List<CompletionItem> getConfigOptions(List<String> names) {
-        if( names.isEmpty() )
-            return TOPLEVEL_ITEMS;
+    private void addConfigOptions(List<String> names) {
         var scope = SchemaNode.ROOT.getScope(names);
         if( scope == null )
-            return Collections.emptyList();
-        var result = new ArrayList<CompletionItem>(scope.children().size());
+            return;
         scope.children().forEach((name, child) -> {
             if( child instanceof SchemaNode.Option option )
-                result.add(getConfigOption(name, option.description(), option.type()));
+                ch.addItem(configOption(name, option.description(), option.type()));
             else
-                result.add(getConfigScope(name, child.description()));
+                ch.addItem(configScope(name, child.description()));
         });
-        return result;
     }
 
     private static List<CompletionItem> topLevelItems() {
         var result = new ArrayList<CompletionItem>();
         SchemaNode.ROOT.children().forEach((name, child) -> {
             if( child instanceof SchemaNode.Option option ) {
-                result.add(getConfigOption(name, option.description(), option.type()));
+                result.add(configOption(name, option.description(), option.type()));
             }
             else {
-                result.add(getConfigScope(name, child.description()));
-                result.add(getConfigScopeBlock(name, child.description()));
+                result.add(configScope(name, child.description()));
+                result.add(configScopeBlock(name, child.description()));
             }
         });
         return result;
     }
 
-    private static CompletionItem getConfigScope(String name, String description) {
+    private static CompletionItem configScope(String name, String description) {
         var item = new CompletionItem(name);
         item.setKind(CompletionItemKind.Property);
         item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, StringGroovyMethods.stripIndent(description, true).trim()));
         return item;
     }
 
-    private static CompletionItem getConfigScopeBlock(String name, String description) {
+    private static CompletionItem configScopeBlock(String name, String description) {
         var insertText = String.format(
             """
             %s {
@@ -162,7 +229,7 @@ public class ConfigCompletionProvider implements CompletionProvider {
         return item;
     }
 
-    private static CompletionItem getConfigOption(String name, String description, Class type) {
+    private static CompletionItem configOption(String name, String description, Class type) {
         var documentation = StringGroovyMethods.stripIndent(description, true).trim();
         var item = new CompletionItem(name);
         item.setKind(CompletionItemKind.Property);
@@ -172,6 +239,15 @@ public class ConfigCompletionProvider implements CompletionProvider {
         item.setInsertTextFormat(InsertTextFormat.Snippet);
         item.setInsertTextMode(InsertTextMode.AdjustIndentation);
         return item;
+    }
+
+    private static VariableScope variableScope(List<ASTNode> nodeStack) {
+        var scope = getVariableScope(nodeStack);
+        if( scope != null )
+            return scope;
+        scope = new VariableScope();
+        scope.setClassScope(new ClassNode(ConfigDsl.class));
+        return scope;
     }
 
 }

@@ -18,15 +18,10 @@ package nextflow.lsp.services.script;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
-import nextflow.lsp.ast.ASTNodeStringUtils;
-import nextflow.lsp.ast.LanguageServerASTUtils;
+import nextflow.lsp.ast.CompletionHelper;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
@@ -35,27 +30,16 @@ import nextflow.script.ast.InvalidDeclaration;
 import nextflow.script.ast.OutputNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.FeatureFlagDsl;
-import nextflow.script.types.TypeChecker;
-import nextflow.script.types.Types;
-import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.ast.ClassHelper;
-import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.VariableScope;
-import org.codehaus.groovy.ast.expr.ClassExpression;
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
-import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
-import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
@@ -71,7 +55,7 @@ import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
-import static nextflow.script.ast.ASTUtils.*;
+import static nextflow.lsp.ast.CompletionUtils.*;
 
 /**
  * Provide suggestions for an incomplete expression or statement
@@ -89,14 +73,13 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
     private ScriptAstCache ast;
     private boolean extended;
-    private int maxItems;
     private URI uri;
-    private boolean isIncomplete = false;
+    private CompletionHelper ch;
 
     public ScriptCompletionProvider(ScriptAstCache ast, int maxItems, boolean extended) {
         this.ast = ast;
         this.extended = extended;
-        this.maxItems = maxItems;
+        this.ch = new CompletionHelper(maxItems);
     }
 
     @Override
@@ -117,15 +100,12 @@ public class ScriptCompletionProvider implements CompletionProvider {
         var offsetNode = nodeStack.get(0);
         var declarationNode = nodeStack.get(nodeStack.size() - 1);
 
-        isIncomplete = false;
-        var items = new ArrayList<CompletionItem>();
-
         if( offsetNode instanceof VariableExpression ve ) {
             // e.g. "foo "
             //          ^
             var namePrefix = ve.getName();
             log.debug("completion variable -- '" + namePrefix + "'");
-            populateItemsFromScope(variableScope(nodeStack), namePrefix, declarationNode, items);
+            addItemsFromScope(getVariableScope(nodeStack), namePrefix, declarationNode);
         }
         else if( offsetNode instanceof MethodCallExpression mce ) {
             var namePrefix = mce.getMethodAsString();
@@ -133,12 +113,12 @@ public class ScriptCompletionProvider implements CompletionProvider {
             if( mce.isImplicitThis() ) {
                 // e.g. "foo ()"
                 //          ^
-                populateItemsFromScope(variableScope(nodeStack), namePrefix, declarationNode, items);
+                addItemsFromScope(getVariableScope(nodeStack), namePrefix, declarationNode);
             }
             else {
                 // e.g. "foo.bar ()"
                 //              ^
-                populateMethodsFromObjectScope(mce.getObjectExpression(), namePrefix, items);
+                ch.addMethodsFromObjectScope(mce.getObjectExpression(), namePrefix);
             }
         }
         else if( offsetNode instanceof PropertyExpression pe ) {
@@ -146,193 +126,46 @@ public class ScriptCompletionProvider implements CompletionProvider {
             //              ^
             var namePrefix = pe.getPropertyAsString();
             log.debug("completion property -- '" + namePrefix + "'");
-            populateItemsFromObjectScope(pe.getObjectExpression(), namePrefix, items);
+            ch.addItemsFromObjectScope(pe.getObjectExpression(), namePrefix);
         }
         else if( offsetNode instanceof ConstructorCallExpression cce ) {
             // e.g. "new Foo ()"
             //              ^
             var namePrefix = cce.getType().getNameWithoutPackage();
             log.debug("completion constructor call -- '" + namePrefix + "'");
-            populateTypes(namePrefix, items);
         }
         else if( offsetNode instanceof InvalidDeclaration ) {
             return Either.forLeft(Collections.emptyList());
         }
         else {
             log.debug("completion " + offsetNode.getClass().getSimpleName() + " -- '" + offsetNode.getText() + "'");
-            populateItemsFromScope(variableScope(nodeStack), "", declarationNode, items);
+            addItemsFromScope(getVariableScope(nodeStack), "", declarationNode);
         }
 
-        return isIncomplete
-            ? Either.forRight(new CompletionList(true, items))
-            : Either.forLeft(items);
+        return ch.isIncomplete()
+            ? Either.forRight(new CompletionList(true, ch.getItems()))
+            : Either.forLeft(ch.getItems());
     }
 
-    private void populateItemsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
-        ClassNode cn = TypeChecker.getType(object);
-        while( cn != null && !ClassHelper.isObjectType(cn) ) {
-            var isStatic = object instanceof ClassExpression;
-
-            for( var fn : cn.getFields() ) {
-                if( !fn.isPublic() || isStatic != fn.isStatic() )
-                    continue;
-                if( !addItemForField(fn, namePrefix, items) )
-                    break;
-            }
-
-            for( var mn : cn.getMethods() ) {
-                if( !mn.isPublic() || isStatic != mn.isStatic() )
-                    continue;
-                var an = findAnnotation(mn, Constant.class);
-                boolean result;
-                if( an.isPresent() ) {
-                    var name = an.get().getMember("value").getText();
-                    result = addItemForConstant(name, mn, namePrefix, items);
-                }
-                else {
-                    result = addItemForMethod(mn, namePrefix, items);
-                }
-                if( !result )
-                    break;
-            }
-
-            cn = superClassOrInterface(cn);
-        }
-    }
-
-    private void populateMethodsFromObjectScope(Expression object, String namePrefix, List<CompletionItem> items) {
-        ClassNode cn = TypeChecker.getType(object);
-        while( cn != null && !ClassHelper.isObjectType(cn) ) {
-            var isStatic = object instanceof ClassExpression;
-
-            for( var mn : cn.getMethods() ) {
-                if( !mn.isPublic() || isStatic != mn.isStatic() )
-                    continue;
-                if( findAnnotation(mn, Constant.class).isPresent() )
-                    continue;
-                if( !addItemForMethod(mn, namePrefix, items) )
-                    break;
-            }
-
-            cn = superClassOrInterface(cn);
-        }
-    }
-
-    private static ClassNode superClassOrInterface(ClassNode cn) {
-        if( cn.getSuperClass() != null )
-            return cn.getSuperClass();
-        if( cn.getInterfaces().length == 1 )
-            return cn.getInterfaces()[0];
-        return null;
-    }
-
-    private boolean addItemForField(FieldNode fn, String namePrefix, List<CompletionItem> items) {
-        var name = fn.getName();
-        if( !name.startsWith(namePrefix) )
-            return true;
-        var item = new CompletionItem(name);
-        item.setKind(CompletionItemKind.Field);
-        item.setLabelDetails(astNodeToItemLabelDetails(fn));
-        item.setDetail(astNodeToItemDetail(fn));
-        item.setDocumentation(astNodeToItemDocumentation(fn));
-        return addItem(item, items);
-    }
-
-    private boolean addItemForNamespace(String name, MethodNode mn, String namePrefix, List<CompletionItem> items) {
-        if( !name.startsWith(namePrefix) )
-            return true;
-        var item = new CompletionItem(name);
-        item.setKind(CompletionItemKind.Module);
-        item.setLabelDetails(astNodeToItemLabelDetails(mn));
-        item.setDetail(astNodeToItemDetail(mn));
-        item.setDocumentation(astNodeToItemDocumentation(mn));
-        return addItem(item, items);
-    }
-
-    private boolean addItemForConstant(String name, MethodNode mn, String namePrefix, List<CompletionItem> items) {
-        if( !name.startsWith(namePrefix) )
-            return true;
-        var fn = new FieldNode(name, 0xF, mn.getReturnType(), mn.getDeclaringClass(), null);
-        var item = new CompletionItem(name);
-        item.setKind(CompletionItemKind.Constant);
-        item.setLabelDetails(astNodeToItemLabelDetails(fn));
-        item.setDetail(astNodeToItemDetail(fn));
-        item.setDocumentation(astNodeToItemDocumentation(mn));
-        return addItem(item, items);
-    }
-
-    private boolean addItemForMethod(MethodNode mn, String namePrefix, List<CompletionItem> items) {
-        var name = mn.getName();
-        if( !name.startsWith(namePrefix) )
-            return true;
-        var item = new CompletionItem(mn.getName());
-        item.setKind(CompletionItemKind.Function);
-        item.setLabelDetails(astNodeToItemLabelDetails(mn));
-        item.setDetail(astNodeToItemDetail(mn));
-        item.setDocumentation(astNodeToItemDocumentation(mn));
-        return addItem(item, items);
-    }
-
-    private void populateItemsFromScope(VariableScope scope, String namePrefix, ASTNode declarationNode, List<CompletionItem> items) {
-        while( scope != null ) {
-            populateLocalVariables(scope, namePrefix, items);
-            populateItemsFromDslScope(scope.getClassScope(), namePrefix, items);
-            scope = scope.getParent();
-        }
-        populateTypes(namePrefix, items);
+    private void addItemsFromScope(VariableScope scope, String namePrefix, ASTNode declarationNode) {
+        ch.addItemsFromScope(scope, namePrefix);
+        ch.addTypes(ast.getEnumNodes(uri), namePrefix);
 
         if( !extended ) {
-            populateIncludes(namePrefix, items);
+            addIncludes(namePrefix);
             return;
         }
         if( declarationNode instanceof FunctionNode || declarationNode instanceof ProcessNode || declarationNode instanceof OutputNode ) {
-            populateExternalFunctions(namePrefix, items);
+            addExternalFunctions(namePrefix);
         }
         if( declarationNode instanceof WorkflowNode ) {
-            populateExternalFunctions(namePrefix, items);
-            populateExternalProcesses(namePrefix, items);
-            populateExternalWorkflows(namePrefix, items);
+            addExternalFunctions(namePrefix);
+            addExternalProcesses(namePrefix);
+            addExternalWorkflows(namePrefix);
         }
     }
 
-    private void populateLocalVariables(VariableScope scope, String namePrefix, List<CompletionItem> items) {
-        for( var it = scope.getDeclaredVariablesIterator(); it.hasNext(); ) {
-            var variable = it.next();
-            var name = variable.getName();
-            if( !name.startsWith(namePrefix) )
-                continue;
-            var item = new CompletionItem(name);
-            item.setKind(CompletionItemKind.Variable);
-            item.setLabelDetails(astNodeToItemLabelDetails(variable));
-            if( !addItem(item, items) )
-                break;
-        }
-    }
-
-    private void populateItemsFromDslScope(ClassNode cn, String namePrefix, List<CompletionItem> items) {
-        while( cn != null ) {
-            for( var mn : cn.getMethods() ) {
-                var an = findAnnotation(mn, Constant.class);
-                boolean result;
-                if( an.isPresent() ) {
-                    var name = an.get().getMember("value").getText();
-                    result = Types.isNamespace(mn)
-                        ? addItemForNamespace(name, mn, namePrefix, items)
-                        : addItemForConstant(name, mn, namePrefix, items);
-                }
-                else {
-                    result = addItemForMethod(mn, namePrefix, items);
-                }
-                if( !result )
-                    break;
-            }
-            cn = cn.getInterfaces().length > 0
-                ? cn.getInterfaces()[0]
-                : null;
-        }
-    }
-
-    private void populateIncludes(String namePrefix, List<CompletionItem> items) {
+    private void addIncludes(String namePrefix) {
         for( var includeNode : ast.getIncludeNodes(uri) ) {
             for( var entry : includeNode.entries ) {
                 var node = entry.getTarget();
@@ -352,31 +185,31 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 item.setDetail(astNodeToItemDetail(node));
                 item.setDocumentation(astNodeToItemDocumentation(node));
 
-                if( !addItem(item, items) )
+                if( !ch.addItem(item) )
                     break;
             }
         }
     }
 
-    private void populateExternalFunctions(String namePrefix, List<CompletionItem> items) {
+    private void addExternalFunctions(String namePrefix) {
         var localNodes = ast.getFunctionNodes(uri);
         var allNodes = ast.getFunctionNodes();
-        populateExternalMethods(namePrefix, localNodes, allNodes, items);
+        addExternalMethods(namePrefix, localNodes, allNodes);
     }
 
-    private void populateExternalProcesses(String namePrefix, List<CompletionItem> items) {
+    private void addExternalProcesses(String namePrefix) {
         var localNodes = ast.getProcessNodes(uri);
         var allNodes = ast.getProcessNodes();
-        populateExternalMethods(namePrefix, localNodes, allNodes, items);
+        addExternalMethods(namePrefix, localNodes, allNodes);
     }
 
-    private void populateExternalWorkflows(String namePrefix, List<CompletionItem> items) {
+    private void addExternalWorkflows(String namePrefix) {
         var localNodes = ast.getWorkflowNodes(uri);
         var allNodes = ast.getWorkflowNodes();
-        populateExternalMethods(namePrefix, localNodes, allNodes, items);
+        addExternalMethods(namePrefix, localNodes, allNodes);
     }
 
-    private void populateExternalMethods(String namePrefix, List<? extends MethodNode> localNodes, List<? extends MethodNode> allNodes, List<CompletionItem> items) {
+    private void addExternalMethods(String namePrefix, List<? extends MethodNode> localNodes, List<? extends MethodNode> allNodes) {
         var addIncludeRange = getAddIncludeRange();
 
         for( var node : allNodes ) {
@@ -400,7 +233,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
                 item.setAdditionalTextEdits( List.of(textEdit) );
             }
 
-            if( !addItem(item, items) )
+            if( !ch.addItem(item) )
                 break;
         }
     }
@@ -443,89 +276,6 @@ public class ScriptCompletionProvider implements CompletionProvider {
         return source.startsWith(".")
             ? source
             : "./" + source;
-    }
-
-    private void populateTypes(String namePrefix, List<CompletionItem> items) {
-        // add user-defined types
-        populateTypes0(ast.getEnumNodes(uri), namePrefix, items);
-    }
-
-    private void populateTypes0(Collection<ClassNode> classNodes, String namePrefix, List<CompletionItem> items) {
-        for( var cn : classNodes ) {
-            var item = new CompletionItem(cn.getNameWithoutPackage());
-            item.setKind(astNodeToItemKind(cn));
-            item.setDocumentation(astNodeToItemDocumentation(cn));
-
-            if( !addItem(item, items) )
-                break;
-        }
-    }
-
-    private static VariableScope variableScope(List<ASTNode> nodeStack) {
-        for( var node : nodeStack ) {
-            if( node instanceof BlockStatement block )
-                return block.getVariableScope();
-        }
-        return null;
-    }
-
-    private static String astNodeToItemDetail(ASTNode node) {
-        return ASTNodeStringUtils.getLabel(node);
-    }
-
-    private static MarkupContent astNodeToItemDocumentation(ASTNode node) {
-        var documentation = ASTNodeStringUtils.getDocumentation(node);
-        return documentation != null
-            ? new MarkupContent(MarkupKind.MARKDOWN, documentation)
-            : null;
-    }
-
-    private static CompletionItemKind astNodeToItemKind(ASTNode node) {
-        if( node instanceof ClassNode cn ) {
-            return cn.isEnum()
-                ? CompletionItemKind.Enum
-                : CompletionItemKind.Class;
-        }
-        if( node instanceof MethodNode ) {
-            return CompletionItemKind.Method;
-        }
-        if( node instanceof Variable ) {
-            return node instanceof FieldNode
-                ? CompletionItemKind.Field
-                : CompletionItemKind.Variable;
-        }
-        return CompletionItemKind.Property;
-    }
-
-    private static CompletionItemLabelDetails astNodeToItemLabelDetails(Object node) {
-        var result = new CompletionItemLabelDetails();
-        if( node instanceof ProcessNode pn ) {
-            result.setDescription("process");
-        }
-        else if( node instanceof WorkflowNode pn ) {
-            result.setDescription("workflow");
-        }
-        else if( node instanceof MethodNode mn && Types.isNamespace(mn) ) {
-            result.setDescription("namespace");
-        }
-        else if( node instanceof MethodNode mn ) {
-            result.setDetail("(" + ASTNodeStringUtils.parametersToLabel(mn.getParameters()) + ")");
-            if( Types.hasReturnType(mn) )
-                result.setDescription(Types.getName(mn.getReturnType()));
-        }
-        else if( node instanceof Variable variable ) {
-            result.setDescription(Types.getName(variable.getType()));
-        }
-        return result;
-    }
-
-    private boolean addItem(CompletionItem item, List<CompletionItem> items) {
-        if( items.size() >= maxItems ) {
-            isIncomplete = true;
-            return false;
-        }
-        items.add(item);
-        return true;
     }
 
     private static List<CompletionItem> scriptDeclarationSnippets() {
