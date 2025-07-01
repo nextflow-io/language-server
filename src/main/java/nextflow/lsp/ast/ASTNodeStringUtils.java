@@ -29,6 +29,7 @@ import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
 import nextflow.script.dsl.DslScope;
 import nextflow.script.dsl.FeatureFlag;
+import nextflow.script.dsl.Namespace;
 import nextflow.script.dsl.Operator;
 import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDsl;
@@ -199,11 +200,7 @@ public class ASTNodeStringUtils {
         if( node instanceof FunctionNode ) {
             builder.append("def ");
         }
-        else if( node.isStatic() ) {
-            builder.append(Types.getName(node.getDeclaringClass()));
-            builder.append('.');
-        }
-        else if( Logger.isDebugEnabled() || !isDslFunction(node) ) {
+        else if( Logger.isDebugEnabled() || (!isDslFunction(node) && !isNamespaceFunction(node)) ) {
             builder.append(Types.getName(node.getDeclaringClass()));
             builder.append(' ');
         }
@@ -220,6 +217,10 @@ public class ASTNodeStringUtils {
 
     private static boolean isDslFunction(MethodNode mn) {
         return mn.getDeclaringClass().implementsInterface(ClassHelper.makeCached(DslScope.class));
+    }
+
+    private static boolean isNamespaceFunction(MethodNode mn) {
+        return mn.getDeclaringClass().implementsInterface(ClassHelper.makeCached(Namespace.class));
     }
 
     private static String methodTypeLabel(MethodNode mn) {
