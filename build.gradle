@@ -27,7 +27,7 @@ test {
 }
 
 dependencies {
-  implementation 'io.nextflow:nf-lang:25.05.0-edge'
+  implementation 'io.nextflow:nf-lang:25.06.0-edge'
   implementation 'org.apache.groovy:groovy:4.0.27'
   implementation 'org.apache.groovy:groovy-json:4.0.27'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
