@@ -169,7 +169,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         for( var includeNode : ast.getIncludeNodes(uri) ) {
             for( var entry : includeNode.entries ) {
                 var node = entry.getTarget();
-                if( node == null || ast.getURI(node) == null )
+                if( !(node instanceof MethodNode) || ast.getURI(node) == null )
                     continue;
 
                 var name = entry.getNameOrAlias();

@@ -618,7 +618,7 @@ public class TypeCheckingUtils {
             else if( !newValue.isPlaceholder() || newValue != resolvedPlaceholders.get(name) ) {
                 entry.setValue(newValue);
 
-                // TOOD: is this needed?
+                // TODO: is this needed?
                 // // GROOVY-6787: Don't override the original if the replacement doesn't respect the bounds otherwise
                 // // the original bounds are lost, which can result in accepting an incompatible type as an argument!
                 // var replacementType = extractType(newValue);

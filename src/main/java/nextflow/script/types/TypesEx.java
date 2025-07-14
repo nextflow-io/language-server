@@ -23,10 +23,12 @@ import java.util.List;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import groovy.lang.GString;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.dsl.Namespace;
+import nextflow.script.types.Record;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
@@ -188,6 +190,10 @@ public class TypesEx {
             return getName(samTypeInfo.getV1(), samTypeInfo.getV2());
         }
 
+        if( type.isResolved() && type.getTypeClass() == Record.class ) {
+            return recordName(type);
+        }
+
         return typeName(type);
     }
 
@@ -209,6 +215,25 @@ public class TypesEx {
         builder.append(')');
         builder.append(" -> ");
         builder.append(ClassHelper.VOID_TYPE.equals(returnType) ? "()" : getName(returnType));
+
+        return builder.toString();
+    }
+
+    private static String recordName(ClassNode type) {
+        if( type.getFields().isEmpty() )
+            return "Record";
+
+        var builder = new StringBuilder();
+
+        builder.append("Record(\n");
+        for( var fn : type.getFields() ) {
+            builder.append("    ");
+            builder.append(fn.getName());
+            builder.append(": ");
+            builder.append(typeName(fn.getType()));
+            builder.append('\n');
+        }
+        builder.append(")");
 
         return builder.toString();
     }
@@ -275,6 +300,7 @@ public class TypesEx {
     public static final Class MemoryUnit_TYPE   = nextflow.script.types.shim.MemoryUnit.class;
     public static final Class Path_TYPE         = nextflow.script.types.shim.Path.class;
     public static final Class Set_TYPE          = nextflow.script.types.shim.Set.class;
+    public static final Class Record_TYPE       = Record.class;
     public static final Class String_TYPE       = nextflow.script.types.shim.String.class;
 
     private static final List<Class> STANDARD_TYPES = List.of(
@@ -289,6 +315,7 @@ public class TypesEx {
         MapEntry_TYPE,
         MemoryUnit_TYPE,
         Path_TYPE,
+        Record_TYPE,
         Set_TYPE,
         String_TYPE
     );

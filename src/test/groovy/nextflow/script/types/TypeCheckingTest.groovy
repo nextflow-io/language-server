@@ -434,6 +434,52 @@ class TypeCheckingTest extends Specification {
         "'8 GB' as MemoryUnit"  | null
     }
 
+    def 'should check a record cast' () {
+        expect:
+        check(
+            '''\
+            workflow {
+                record(id: '1', fastq_1: file('1_1.fastq'), fastq_2: file('1_2.fastq')) as FastqPair
+            }
+
+            record FastqPair {
+                id: String
+                fastq_1: Path
+                fastq_2: Path
+            }
+            ''',
+            null
+        )
+        check(
+            '''\
+            workflow {
+                record(id: '1', fastq_1: file('1_1.fastq')) as FastqPair
+            }
+
+            record FastqPair {
+                id: String
+                fastq_1: Path
+                fastq_2: Path
+            }
+            ''',
+            'Record mismatch -- source record is missing field `fastq_2` required by FastqPair'
+        )
+        check(
+            '''\
+            workflow {
+                record(id: '1', fastq_1: file('1_1.fastq'), fastq_2: '1_2.fastq') as FastqPair
+            }
+
+            record FastqPair {
+                id: String
+                fastq_1: Path
+                fastq_2: Path
+            }
+            ''',
+            'Record mismatch -- field `fastq_2` of FastqPair expects a Path but received a String'
+        )
+    }
+
     @Unroll
     def 'should check a property expression' () {
         expect:
@@ -668,6 +714,30 @@ class TypeCheckingTest extends Specification {
         type = getType(exp)
         then:
         TypesEx.getName(type) == 'Value<Tuple<String, String>>'
+    }
+
+    def 'should resolve record type' () {
+        when:
+        def exp = parseExpression(
+            '''\
+            record(id: '1', count: 42)
+            '''
+        )
+        def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Record(\n    id: String\n    count: Integer\n)'
+        type.getField('id') != null
+        type.getField('count') != null
+
+        when:
+        exp = parseExpression(
+            '''\
+            record(id: '1', count: 42).id
+            '''
+        )
+        type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'String'
     }
 
     def 'should resolve tuple type' () {

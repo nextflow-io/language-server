@@ -28,6 +28,7 @@ import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
+import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.TupleParameter;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
@@ -93,7 +94,9 @@ public class ASTNodeStringUtils {
 
     private static String classToLabel(ClassNode node) {
         var builder = new StringBuilder();
-        if( node.isEnum() )
+        if( node instanceof RecordNode )
+            builder.append("record ");
+        else if( node.isEnum() )
             builder.append("enum ");
         else
             builder.append("class ");
@@ -158,11 +161,11 @@ public class ASTNodeStringUtils {
             var type = getType(target);
             if( fmt.hasType(type) ) {
                 fmt.append(": ");
-                fmt.visitTypeAnnotation(type);
+                fmt.append(TypesEx.getName(type));
             }
         }
         else {
-            fmt.visitTypeAnnotation(getType(output));
+            fmt.append(TypesEx.getName(getType(output)));
         }
     }
 
@@ -181,13 +184,31 @@ public class ASTNodeStringUtils {
         for( var input : node.inputs ) {
             fmt.appendIndent();
             if( input instanceof TupleParameter tp ) {
-                fmt.append('(');
-                fmt.append(
-                    Arrays.stream(tp.components)
+                if( tp.isRecord() ) {
+                    fmt.append('(');
+                    fmt.appendNewLine();
+                    fmt.incIndent();
+                    for( var p : tp.components ) {
+                        fmt.appendIndent();
+                        fmt.append(p.getName());
+                        if( fmt.hasType(p) ) {
+                            fmt.append(": ");
+                            fmt.append(TypesEx.getName(p.getType()));
+                        }
+                        fmt.appendNewLine();
+                    }
+                    fmt.decIndent();
+                    fmt.appendIndent();
+                    fmt.append(')');
+                }
+                else {
+                    var components = Arrays.stream(tp.components)
                         .map(p -> p.getName())
-                        .collect(Collectors.joining(", "))
-                );
-                fmt.append(')');
+                        .collect(Collectors.joining(", "));
+                    fmt.append('(');
+                    fmt.append(components);
+                    fmt.append(')');
+                }
             }
             else {
                 fmt.append(input.getName());

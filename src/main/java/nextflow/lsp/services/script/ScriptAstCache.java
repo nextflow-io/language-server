@@ -34,6 +34,7 @@ import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.control.ModuleResolver;
@@ -45,8 +46,8 @@ import nextflow.script.control.TypeCheckingVisitorEx;
 import nextflow.script.parser.ScriptParserPluginFactory;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -186,19 +187,21 @@ public class ScriptAstCache extends ASTNodeCache {
         return scriptNode.getIncludes();
     }
 
-    public List<MethodNode> getDefinitions() {
-        var result = new ArrayList<MethodNode>();
+    public List<AnnotatedNode> getDefinitions() {
+        var result = new ArrayList<AnnotatedNode>();
         result.addAll(getFunctionNodes());
         result.addAll(getProcessNodes());
         result.addAll(getWorkflowNodes());
+        result.addAll(getTypeNodes());
         return result;
     }
 
-    public List<MethodNode> getDefinitions(URI uri) {
-        var result = new ArrayList<MethodNode>();
+    public List<AnnotatedNode> getDefinitions(URI uri) {
+        var result = new ArrayList<AnnotatedNode>();
         result.addAll(getFunctionNodes(uri));
         result.addAll(getProcessNodes(uri));
         result.addAll(getWorkflowNodes(uri));
+        result.addAll(getTypeNodes(uri));
         return result;
     }
 
