@@ -69,6 +69,10 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
         append(node.getLineNumber() - 1, node.getColumnNumber() - 1, length, type);
     }
 
+    public void append(ASTNode node, int length, String type) {
+        append(node.getLineNumber() - 1, node.getColumnNumber() - 1, length, type);
+    }
+
     public void append(TokenPosition start, String text, String type) {
         append(start.line(), start.character(), text.length(), type);
     }
@@ -143,7 +147,7 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
             if( param.getNodeMetaData("_START_NAME") instanceof TokenPosition start )
                 append(start, param.getName(), SemanticTokenTypes.Parameter);
             else
-                append(param.getLineNumber() - 1, param.getColumnNumber() - 1, param.getName().length(), SemanticTokenTypes.Parameter);
+                append(param, param.getName().length(), SemanticTokenTypes.Parameter);
             if( param.hasInitialExpression() )
                 visit(param.getInitialExpression());
         }
@@ -184,7 +188,7 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
         else if( mn != null && !findAnnotation(mn, Constant.class).isPresent() )
             append(node, SemanticTokenTypes.Function);
         else if( !(variable instanceof DynamicVariable) )
-            append(node, SemanticTokenTypes.Variable);
+            append(node, node.getName().length(), SemanticTokenTypes.Variable);
     }
 
     @Override

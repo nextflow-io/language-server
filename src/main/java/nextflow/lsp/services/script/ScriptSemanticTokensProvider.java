@@ -137,14 +137,14 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
                 var emit = es.getExpression();
                 if( emit instanceof AssignmentExpression assign ) {
                     var ve = (VariableExpression)assign.getLeftExpression();
-                    tok.append(ve, SemanticTokenTypes.Parameter);
+                    tok.append(ve, ve.getName().length(), SemanticTokenTypes.Parameter);
                     tok.visit(assign.getRightExpression());
                 }
                 else if( emit instanceof VariableExpression ve ) {
                     if( emits.size() == 1 )
                         tok.visit(emit);
                     else
-                        tok.append(ve, SemanticTokenTypes.Parameter);
+                        tok.append(ve, ve.getName().length(), SemanticTokenTypes.Parameter);
                 }
                 else {
                     tok.visit(stmt);

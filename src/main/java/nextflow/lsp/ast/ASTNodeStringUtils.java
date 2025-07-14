@@ -114,6 +114,10 @@ public class ASTNodeStringUtils {
         for( var take : takes ) {
             fmt.appendIndent();
             fmt.append(take.getName());
+            if( fmt.hasType(take) ) {
+                fmt.append(": ");
+                fmt.visitTypeAnnotation(take.getType());
+            }
             fmt.appendNewLine();
         }
         fmt.appendNewLine();
