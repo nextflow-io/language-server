@@ -32,6 +32,7 @@ import nextflow.script.ast.OutputNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
+import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
@@ -461,6 +462,10 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( checkProcessCall(node) )
             return;
 
+        // resolve record return type for record() calls
+        if( checkRecordCall(node) )
+            return;
+
         // resolve tuple return type for tuple() calls
         if( checkTupleCall(node) )
             return;
@@ -743,6 +748,36 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         return receiverType != null && receiverType.implementsInterface(ClassHelper.makeCached(Namespace.class))
             ? "namespace `" + node.getText() + "`"
             : "type " + TypesEx.getName(receiverType);
+    }
+
+    /**
+     * Resolve record() calls by creating a custom Record type
+     * with fields corresponding to the call arguments.
+     *
+     * For example, the return type of `record(id: '1', count: 42)`
+     * should be Record<id: String, count: Integer>.
+     *
+     * @param node
+     */
+    private boolean checkRecordCall(MethodCallExpression node) {
+        if( !node.isImplicitThis() || !"record".equals(node.getMethodAsString()) )
+            return false;
+
+        var mn = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
+        if( mn == null || !RECORD_TYPE.equals(mn.getReturnType()) )
+            return false;
+
+        var returnType = new ClassNode(Record.class);
+        for( var entry : asNamedArgs(node) ) {
+            var name = entry.getKeyExpression().getText();
+            var type = getType(entry.getValueExpression());
+            var fn = new FieldNode(name, Modifier.PUBLIC, type, returnType, null);
+            fn.setDeclaringClass(returnType);
+            returnType.addField(fn);
+        }
+
+        node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, returnType);
+        return true;
     }
 
     /**
@@ -1101,9 +1136,30 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var targetType = node.getType();
         if( ClassHelper.isObjectType(sourceType) || TypesEx.isAssignableFrom(targetType, sourceType) )
             return;
+        if( checkRecordCast(targetType, sourceType, node) )
+            return;
         var opsType = resolveOpsType(targetType);
         if( resolveOpResultType(sourceType, opsType, "ofType") == null )
             addError(String.format("Value of type %s cannot be cast to %s", TypesEx.getName(sourceType), TypesEx.getName(targetType)), node);
+    }
+
+    private boolean checkRecordCast(ClassNode targetType, ClassNode sourceType, ASTNode node) {
+        if( !(targetType.redirect() instanceof RecordNode) )
+            return false;
+        if( !RECORD_TYPE.equals(sourceType) )
+            return false;
+        for( var target : targetType.getFields() ) {
+            var source = sourceType.getDeclaredField(target.getName());
+            if( source == null ) {
+                addError(String.format("Record mismatch -- source record is missing field `%s` required by %s", target.getName(), TypesEx.getName(targetType)), node);
+                continue;
+            }
+            if( !TypesEx.isAssignableFrom(target.getType(), source.getType()) ) {
+                addError(String.format("Record mismatch -- field `%s` of %s expects a %s but received a %s", target.getName(), TypesEx.getName(targetType), TypesEx.getName(target.getType()), TypesEx.getName(source.getType())), node);
+                continue;
+            }
+        }
+        return true;
     }
 
     @Override

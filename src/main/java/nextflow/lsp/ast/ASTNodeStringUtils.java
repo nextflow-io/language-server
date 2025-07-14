@@ -28,6 +28,7 @@ import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
+import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.TupleParameter;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
@@ -93,7 +94,9 @@ public class ASTNodeStringUtils {
 
     private static String classToLabel(ClassNode node) {
         var builder = new StringBuilder();
-        if( node.isEnum() )
+        if( node instanceof RecordNode )
+            builder.append("record ");
+        else if( node.isEnum() )
             builder.append("enum ");
         else
             builder.append("class ");
@@ -181,12 +184,13 @@ public class ASTNodeStringUtils {
         for( var input : node.inputs ) {
             fmt.appendIndent();
             if( input instanceof TupleParameter tp ) {
+                var components = Arrays.stream(tp.components)
+                    .map(p -> (
+                        tp.isRecord() ? p.getName() + ": " + TypesEx.getName(p.getType()) : p.getName()
+                    ))
+                    .collect(Collectors.joining(", "));
                 fmt.append('(');
-                fmt.append(
-                    Arrays.stream(tp.components)
-                        .map(p -> p.getName())
-                        .collect(Collectors.joining(", "))
-                );
+                fmt.append(components);
                 fmt.append(')');
             }
             else {

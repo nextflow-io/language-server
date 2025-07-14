@@ -223,6 +223,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
             return new TextEdit(range, newText);
         }
 
+        // TODO: preserve type annotation
         if( node instanceof Variable v ) {
             if( oldName.equals(v.getName()) )
                 return new TextEdit(range, newName);
