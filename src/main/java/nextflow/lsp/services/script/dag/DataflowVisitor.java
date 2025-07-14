@@ -1,17 +1,15 @@
 /*
  * Copyright 2024-2025, Seqera Labs
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 package nextflow.lsp.services.script.dag;
 
@@ -28,6 +26,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.stream.Collectors;
 
+import groovy.lang.Tuple2;
 import groovy.lang.Tuple3;
 import nextflow.lsp.ast.LanguageServerASTUtils;
 import nextflow.lsp.services.script.ScriptAstCache;
@@ -47,26 +46,70 @@ import org.codehaus.groovy.syntax.Types;
 import static nextflow.script.ast.ASTUtils.*;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
-
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+
+class Variable {
+    private int defintionDepth;
+    private Set<Node> activeInstances;
+
+    public Variable(Node activeInstance, int defintionDepth) {
+        this.activeInstances = new HashSet<>();
+        activeInstances.add(activeInstance);
+        this.defintionDepth = defintionDepth;
+    }
+
+    private Variable(Set<Node> activeInstances, int defintionDepth) {
+        this.activeInstances = new HashSet<>(activeInstances);
+        this.defintionDepth = defintionDepth;
+    }
+
+    public Variable shallowCopy() {
+        return new Variable(activeInstances, defintionDepth);
+    }
+
+    public boolean isLocal(int currDepth) {
+        return defintionDepth == currDepth;
+    }
+
+    public Set<Node> getActiveInstances() {
+        return activeInstances;
+    }
+
+    public void setActiveInstance(Node dn) {
+        activeInstances.clear();
+        activeInstances.add(dn);
+    }
+
+    public Variable union(Variable other) {
+        var unionInstances = new HashSet<>(activeInstances);
+        unionInstances.addAll(other.getActiveInstances());
+        return new Variable(unionInstances, defintionDepth);
+    }
+}
+
 public class DataflowVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
     private ScriptAstCache ast;
 
-    private Map<String,Graph> graphs = new HashMap<>();
+    private Map<String, Graph> graphs = new HashMap<>();
 
     private Stack<Set<Node>> stackPreds = new Stack<>();
+
+    private Stack<Map<String, Variable>> conditionalScopes = new Stack<>();
+
+    private int currentDepth = 0;
 
     public DataflowVisitor(SourceUnit sourceUnit, ScriptAstCache ast) {
         this.sourceUnit = sourceUnit;
         this.ast = ast;
 
         stackPreds.add(new HashSet<>());
+        conditionalScopes.push(new HashMap<>());
     }
 
     @Override
@@ -94,6 +137,80 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private boolean inEntry;
 
+    public Set<Node> getSymbolConditionalScope(String name) {
+        // get a variable node from the name table
+        var scope = conditionalScopes.peek();
+        if( scope.containsKey(name) ) {
+            return scope.get(name).getActiveInstances();
+        } else {
+            return null;
+        }
+    }
+
+    public void putSymbolConditionalScope(String name, Node dn) {
+        // Put a symbol into the currently active symbol table
+        var scope = conditionalScopes.peek();
+        if( scope.containsKey(name) ) {
+            // We have reassinged the variable, which means that all previous
+            // definitions of it (in this scope) are dead. We can reuse the set
+            // though
+            Variable variable = scope.get(name);
+            variable.setActiveInstance(dn);
+        } else {
+            // The symbols in not present from before so create an empty set
+            Variable variable = new Variable(dn, currentDepth);
+            scope.put(name, variable);
+        }
+    }
+
+    public void pushConditionalScope(Map<String, Variable> previousSymbols) {
+        // We want to add all symbols in the current scope
+        // since they always enter both branches
+        var newScope = new HashMap<String, Variable>();
+        for( Map.Entry<String, Variable> entry : previousSymbols.entrySet() ) {
+            newScope.put(entry.getKey(), entry.getValue().shallowCopy());
+        }
+        conditionalScopes.push(newScope);
+        currentDepth += 1;
+    }
+
+    public Map<String, Variable> mergeConditionalScopes(Map<String, Variable> ifSymbols,
+            Map<String, Variable> elseSymbols) {
+        // Merge the set nodes corresponding to active symbols for the two
+        // scopes
+        // NOTE: Since we can define local variables with `def` we should have a
+        // flag
+        // which tells us
+        // if this symbol is locally defined in this scope or defined outside
+        // the scope.
+        var merged = new HashMap<String, Variable>();
+        // Add all keys from ifSymbols
+        for( Map.Entry<String, Variable> entry : ifSymbols.entrySet() ) {
+            String key = entry.getKey();
+            Variable ifVariable = entry.getValue();
+            if( elseSymbols.containsKey(key) ) {
+                merged.put(key, ifVariable.union(elseSymbols.get(key)));
+            } else {
+                merged.put(key, ifVariable.shallowCopy());
+            }
+        }
+
+        // Add remaining keys from elseSymbols (already handled common ones)
+        for( Map.Entry<String, Variable> entry : elseSymbols.entrySet() ) {
+            String key = entry.getKey();
+            if( !merged.containsKey(key) ) {
+                merged.put(key, entry.getValue().shallowCopy());
+            }
+        }
+
+        return merged;
+    }
+
+    public Map<String, Variable> popConditionalScope() {
+        currentDepth -= 1;
+        return conditionalScopes.pop();
+    }
+
     @Override
     public void visitWorkflow(WorkflowNode node) {
         current = new Graph();
@@ -110,39 +227,42 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         current = null;
     }
 
-    private void visitWorkflowTakes(WorkflowNode node, Map<String,Node> result) {
+    private void visitWorkflowTakes(WorkflowNode node, Map<String, Node> result) {
         for( var stmt : asBlockStatements(node.takes) ) {
             var name = asVarX(stmt).getName();
             var dn = addNode(name, Node.Type.NAME, stmt);
-            current.putSymbol(name, dn);
+            putSymbolConditionalScope(name, dn);
             result.put(name, dn);
         }
     }
 
-    private void visitWorkflowEmits(WorkflowNode node, Map<String,Node> result) {
+    private void visitWorkflowEmits(WorkflowNode node, Map<String, Node> result) {
         for( var stmt : asBlockStatements(node.emits) ) {
             var emit = ((ExpressionStatement) stmt).getExpression();
             String name;
             if( emit instanceof VariableExpression ve ) {
                 name = ve.getName();
-            }
-            else if( emit instanceof AssignmentExpression assign ) {
+            } else if( emit instanceof AssignmentExpression assign ) {
                 var target = (VariableExpression) assign.getLeftExpression();
                 name = target.getName();
                 visit(emit);
-            }
-            else {
+            } else {
                 name = "$out";
                 visit(new AssignmentExpression(varX(name), emit));
             }
-            var dn = current.getSymbol(name);
-            if( dn == null )
+            var dns = getSymbolConditionalScope(name);
+            if( dns == null ) {
                 System.err.println("missing emit: " + name);
-            result.put(name, dn);
+                result.put(name, null);
+            } else if( dns.size() > 1 ) {
+                System.err.println("two many emits: " + name);
+            } else {
+                result.put(name, dns.iterator().next());
+            }
         }
     }
 
-    private void visitWorkflowPublishers(WorkflowNode node, Map<String,Node> result) {
+    private void visitWorkflowPublishers(WorkflowNode node, Map<String, Node> result) {
         for( var stmt : asBlockStatements(node.publishers) ) {
             var es = (ExpressionStatement) stmt;
             var publisher = (BinaryExpression) es.getExpression();
@@ -150,7 +270,10 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             var source = publisher.getRightExpression();
             visit(new AssignmentExpression(target, source));
             var name = target.getName();
-            result.put(name, current.getSymbol(name));
+            var dns = getSymbolConditionalScope(name);
+            if( dns.size() == 1 ) {
+                result.put(name, dns.iterator().next());
+            }
         }
     }
 
@@ -173,7 +296,8 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         var defNode = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
         if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
             var preds = visitWithPreds(node.getArguments());
-            current.putSymbol(name, addNode(name, Node.Type.OPERATOR, defNode, preds));
+            var dn = addNode(name, Node.Type.OPERATOR, defNode, preds);
+            putSymbolConditionalScope(name, dn);
             return;
         }
 
@@ -194,25 +318,80 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         super.visitBinaryExpression(node);
     }
 
-    private void visitAssignment(BinaryExpression node) {
-        var preds = visitWithPreds(node.getRightExpression());
-        var targets = getAssignmentTargets(node.getLeftExpression());
-        for( var name : targets ) {
-            var dn = addNode(name, Node.Type.NAME, null, preds);
-            current.putSymbol(name, dn);
+    @Override
+    public void visitIfElse(IfStatement node) {
+        // First visit the conditional
+        var preds = visitWithPreds(node.getBooleanExpression());
+        var conditionalDn = addNode("<conditional>", Node.Type.CONDITIONAL, node, preds);
+
+        // Then construct new symbol tables for each of the branches
+        // Get the symbol table associated with the currently available global
+        // variables
+        var precedingScope = popConditionalScope();
+        // Construct the scope for the if branch
+        pushConditionalScope(precedingScope);
+        // Push a new subgraph to keep track of the if branch
+        current.pushSubgraph();
+        current.putSubgraphPred(conditionalDn);
+        visitWithPreds(node.getIfBlock());
+        var ifScope = popConditionalScope();
+        current.popSubgraph();
+        if( !node.getElseBlock().isEmpty() ) {
+            // We push a new symbol table to keep track of the
+            // symbols in the else branch.
+            pushConditionalScope(precedingScope);
+            // Push a new subgraph to keep track of the else branch
+            current.pushSubgraph();
+            current.putSubgraphPred(conditionalDn);
+            Set<Node> elsePreds = visitWithPreds(node.getElseBlock());
+            elsePreds.add(conditionalDn);
+            var elseScope = popConditionalScope();
+            current.popSubgraph();
+            var succedingScope = mergeConditionalScopes(ifScope, elseScope);
+            pushConditionalScope(succedingScope);
+        } else {
+            // If there is only an if branch then the active symbols after the
+            // statement
+            // is the union of the active symbols from before the if and the
+            // active symbols
+            // in the if
+            var succedingScope = mergeConditionalScopes(ifScope, precedingScope);
+            pushConditionalScope(succedingScope);
         }
     }
 
-    private Set<String> getAssignmentTargets(Expression node) {
-        // e.g. (x, y, z) = [1, 2, 3]
-        if( node instanceof TupleExpression te ) {
-            return te.getExpressions().stream()
-                .map(el -> getAssignmentTarget(el).getName())
-                .collect(Collectors.toSet());
+    private void visitAssignment(BinaryExpression node) {
+        var targetExpr = node.getLeftExpression();
+        var sourceExpr = node.getRightExpression();
+        if( targetExpr instanceof TupleExpression tupleExpr && sourceExpr instanceof ListExpression listExpr ) {
+            // e.g. (x, y, z) = [1, 2, 3].
+            // We need to keep track how what variable is assigned where
+            List<Expression> targetExprList = tupleExpr.getExpressions();
+            List<Expression> sourceExprList = listExpr.getExpressions();
+            List<Tuple2<String, Set<Node>>> namesAndPreds = new ArrayList<>();
+            // We need to wait with adding the nodes, so that we do not overwrite live
+            // variable names in the source expression
+            for( int i = 0; i < Math.min(targetExprList.size(), sourceExprList.size()); i++ ) {
+                String name = getAssignmentTarget(targetExprList.get(i)).getName();
+                var preds = visitWithPreds(sourceExprList.get(i));
+                namesAndPreds.add(new Tuple2<>(name, preds));
+            }
+            for( var namePreds : namesAndPreds ) {
+                var name = namePreds.getV1();
+                var preds = namePreds.getV2();
+                var dn = addNode(name, Node.Type.NAME, null, preds);
+                putSymbolConditionalScope(name, dn);
+            }
+        } else {
+            processAssignment(targetExpr, sourceExpr);
         }
-        else {
-            return Set.of(getAssignmentTarget(node).getName());
-        }
+    }
+
+    private void processAssignment(Expression target, Expression source) {
+        String name = getAssignmentTarget(target).getName();
+        var preds = visitWithPreds(source);
+        var dn = addNode(name, Node.Type.NAME, null, preds);
+        putSymbolConditionalScope(name, dn);
     }
 
     private VariableExpression getAssignmentTarget(Expression node) {
@@ -238,7 +417,8 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
                 var label = defNode.getName();
                 var preds = visitWithPreds(lhs);
-                current.putSymbol(label, addNode(label, Node.Type.OPERATOR, defNode, preds));
+                var dn = addNode(label, Node.Type.OPERATOR, defNode, preds);
+                putSymbolConditionalScope(label, dn);
                 return;
             }
         }
@@ -288,20 +468,21 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return inEntry && node.getObjectExpression() instanceof VariableExpression ve && "params".equals(ve.getName());
     }
 
-    private Tuple3<MethodNode,String,String> asMethodOutput(PropertyExpression node) {
+    private Tuple3<MethodNode, String, String> asMethodOutput(PropertyExpression node) {
         // named output e.g. PROC.out.foo
         if( node.getObjectExpression() instanceof PropertyExpression pe ) {
             if( pe.getObjectExpression() instanceof VariableExpression ve && "out".equals(pe.getPropertyAsString()) ) {
                 var mn = asMethodVariable(ve.getAccessedVariable());
                 if( mn != null )
-                    return new Tuple3(mn, ve.getName(), node.getPropertyAsString());
+                    return new Tuple3<MethodNode, String, String>(mn, ve.getName(), node.getPropertyAsString());
             }
         }
         // single output e.g. PROC.out
-        else if( node.getObjectExpression() instanceof VariableExpression ve && "out".equals(node.getPropertyAsString()) ) {
+        else if( node.getObjectExpression() instanceof VariableExpression ve
+                && "out".equals(node.getPropertyAsString()) ) {
             var mn = asMethodVariable(ve.getAccessedVariable());
             if( mn != null )
-                return new Tuple3(mn, ve.getName(), null);
+                return new Tuple3<MethodNode, String, String>(mn, ve.getName(), null);
         }
         return null;
     }
@@ -311,29 +492,21 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             addOperatorPred(label, process);
             return;
         }
-        asDirectives(process.outputs)
-            .filter((call) -> {
-                var emitName = getProcessEmitName(call);
-                return propName.equals(emitName);
-            })
-            .findFirst()
-            .ifPresent((call) -> {
-                addOperatorPred(label, process);
-            });
+        asDirectives(process.outputs).filter((call) -> {
+            var emitName = getProcessEmitName(call);
+            return propName.equals(emitName);
+        }).findFirst().ifPresent((call) -> {
+            addOperatorPred(label, process);
+        });
     }
 
     private String getProcessEmitName(MethodCallExpression output) {
-        return Optional.of(output)
-            .flatMap(call -> Optional.ofNullable(asNamedArgs(call)))
-            .flatMap(namedArgs ->
-                namedArgs.stream()
-                    .filter(entry -> "emit".equals(entry.getKeyExpression().getText()))
-                    .findFirst()
-            )
-            .flatMap(entry -> Optional.ofNullable(
-                entry.getValueExpression() instanceof VariableExpression ve ? ve.getName() : null
-            ))
-            .orElse(null);
+        return Optional.of(output).flatMap(call -> Optional.ofNullable(asNamedArgs(call)))
+                .flatMap(namedArgs -> namedArgs.stream()
+                        .filter(entry -> "emit".equals(entry.getKeyExpression().getText())).findFirst())
+                .flatMap(entry -> Optional
+                        .ofNullable(entry.getValueExpression() instanceof VariableExpression ve ? ve.getName() : null))
+                .orElse(null);
     }
 
     private void visitWorkflowOut(WorkflowNode workflow, String label, String propName) {
@@ -341,23 +514,19 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             addOperatorPred(label, workflow);
             return;
         }
-        asBlockStatements(workflow.emits).stream()
-            .map(stmt -> ((ExpressionStatement) stmt).getExpression())
-            .filter((emit) -> {
-                var emitName = getWorkflowEmitName(emit);
-                return propName.equals(emitName);
-            })
-            .findFirst()
-            .ifPresent((call) -> {
-                addOperatorPred(label, workflow);
-            });
+        asBlockStatements(workflow.emits).stream().map(stmt -> ((ExpressionStatement) stmt).getExpression())
+                .filter((emit) -> {
+                    var emitName = getWorkflowEmitName(emit);
+                    return propName.equals(emitName);
+                }).findFirst().ifPresent((call) -> {
+                    addOperatorPred(label, workflow);
+                });
     }
 
     private String getWorkflowEmitName(Expression emit) {
         if( emit instanceof VariableExpression ve ) {
             return ve.getName();
-        }
-        else if( emit instanceof AssignmentExpression assign ) {
+        } else if( emit instanceof AssignmentExpression assign ) {
             var target = (VariableExpression) assign.getLeftExpression();
             return target.getName();
         }
@@ -365,25 +534,31 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     }
 
     private void addOperatorPred(String label, ASTNode an) {
-        var dn = current.getSymbol(label);
-        if( dn != null )
-            currentPreds().add(dn);
-        else
-            current.putSymbol(label, addNode(label, Node.Type.OPERATOR, an));
+        Set<Node> dns = getSymbolConditionalScope(label);
+        if( dns != null ) {
+            for( var dn : dns ) {
+                currentPreds().add(dn);
+            }
+        } else {
+            var dn = addNode(label, Node.Type.OPERATOR, an);
+            putSymbolConditionalScope(label, dn);
+        }
     }
 
     @Override
     public void visitVariableExpression(VariableExpression node) {
         var name = node.getName();
-        var dn = current.getSymbol(name);
-        if( dn != null )
-            currentPreds().add(dn);
+        Set<Node> dns = getSymbolConditionalScope(name);
+        if( dns != null )
+            for( Node dn : dns ) {
+                currentPreds().add(dn);
+            }
     }
 
     // helpers
 
     private Set<Node> currentPreds() {
-        return stackPreds.lastElement();
+        return stackPreds.peek();
     }
 
     private Set<Node> visitWithPreds(ASTNode... nodes) {
@@ -392,7 +567,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private Set<Node> visitWithPreds(Collection<? extends ASTNode> nodes) {
         // traverse a set of nodes and extract predecessor nodes
-        stackPreds.add(new HashSet<>());
+        stackPreds.push(new HashSet<>());
 
         for( var node : nodes ) {
             if( node != null )
@@ -402,9 +577,9 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return stackPreds.pop();
     }
 
-    private Node visitWithPred(ASTNode node) {
-        return visitWithPreds(node).stream().findFirst().orElse(null);
-    }
+    // private Node visitWithPred(ASTNode node) {
+    // return visitWithPreds(node).stream().findFirst().orElse(null);
+    // }
 
     private Node addNode(String label, Node.Type type, ASTNode an, Set<Node> preds) {
         var uri = ast.getURI(an);
@@ -414,24 +589,72 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     }
 
     private Node addNode(String label, Node.Type type, ASTNode an) {
-        return addNode(label, type, an, new HashSet<>());
+        var dn = addNode(label, type, an, new HashSet<>());
+        return dn;
     }
 
 }
 
+class Subgraph {
+
+    private int id;
+
+    private List<Subgraph> children = new ArrayList<>();
+
+    private Set<Node> members = new HashSet<>();
+
+    private Set<Node> preds = new HashSet<>();
+
+    public Subgraph(int id) {
+        this.id = id;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void addMember(Node n) {
+        members.add(n);
+    }
+
+    public Set<Node> getMembers() {
+        return members;
+    }
+
+    public void addChild(Subgraph s) {
+        children.add(s);
+    }
+
+    public List<Subgraph> getChildren() {
+        return children;
+    }
+
+    public Set<Node> getPreds() {
+        return preds;
+    }
+
+    public void addPred(Node n) {
+        preds.add(n);
+    }
+}
 
 class Graph {
 
-    public final Map<String,Node> inputs = new HashMap<>();
+    public final Map<String, Node> inputs = new HashMap<>();
 
-    public final Map<Integer,Node> nodes = new HashMap<>();
+    public final Map<Integer, Node> nodes = new HashMap<>();
 
-    public final Map<String,Node> outputs = new HashMap<>();
+    public final Map<String, Node> outputs = new HashMap<>();
 
-    private List<Map<String,Node>> scopes = new ArrayList<>();
+    private Stack<Map<String, Node>> scopes = new Stack<>();
+
+    public Stack<Subgraph> activeSubgraphs = new Stack<>();
+
+    private int currSubgraphId = 0;
 
     public Graph() {
         pushScope();
+        pushSubgraph();
     }
 
     public void pushScope() {
@@ -442,40 +665,44 @@ class Graph {
         scopes.remove(0);
     }
 
-    public Node getSymbol(String name) {
-        // get a variable node from the name table
-        for( var scope : scopes )
-            if( scope.containsKey(name) )
-                return scope.get(name);
-
-        return null;
+    public void pushSubgraph() {
+        activeSubgraphs.push(new Subgraph(currSubgraphId));
+        currSubgraphId += 1;
     }
 
-    public void putSymbol(String name, Node dn) {
-        // put a variable node into the name table
-        for( var scope : scopes ) {
-            if( scope.containsKey(name) ) {
-                scope.put(name, dn);
-                return;
-            }
-        }
-
-        scopes.get(0).put(name, dn);
+    public void popSubgraph() {
+        var prevSubgraph = activeSubgraphs.pop();
+        var currSubgraph = activeSubgraphs.peek();
+        currSubgraph.addChild(prevSubgraph);
     }
 
-    public Node addNode(String label, Node.Type type, URI uri, Set preds) {
+    public void putToSubgraph(Node n) {
+        activeSubgraphs.peek().addMember(n);
+    }
+
+    public void putSubgraphPred(Node n) {
+        activeSubgraphs.peek().addPred(n);
+    }
+
+    public Node addNode(String label, Node.Type type, URI uri, Set<Node> preds) {
+        // Check if the node already exists
+        // var prevSymbol = getSymbol(label);
+        // if( prevSymbol != null ) {
+        // // If it exists, add the predecessors to the existing node
+        // prevSymbol.addPredecessors(preds);
+        // return prevSymbol;
+        // }
         var id = nodes.size();
         var dn = new Node(id, label, type, uri, preds);
         nodes.put(id, dn);
+        putToSubgraph(dn);
         return dn;
     }
 }
 
-
 class Node {
     public enum Type {
-        NAME,
-        OPERATOR
+        NAME, OPERATOR, CONDITIONAL, IF, ELSE
     }
 
     public final int id;

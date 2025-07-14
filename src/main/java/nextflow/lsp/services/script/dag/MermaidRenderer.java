@@ -15,10 +15,19 @@
  */
 package nextflow.lsp.services.script.dag;
 
+import static org.codehaus.groovy.ast.tools.GeneralUtils.inSamePackage;
+
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.eclipse.lsp4j.jsonrpc.messages.Tuple;
+
+import groovy.lang.Tuple2;
 
 /**
  *
@@ -26,49 +35,56 @@ import java.util.stream.Stream;
  */
 public class MermaidRenderer {
 
+    private static boolean hideVariables = true;
+    private static boolean uniqueNames = false;
+    private Collection<Node> inputs = null;
+    private Collection<Node> outputs = null;
+
     public String render(String name, Graph graph) {
         var isEntry = name == null;
         var lines = new ArrayList<String>();
         lines.add("flowchart TB");
-        lines.add(String.format("    subgraph %s", isEntry ? "\" \"" : name));
+        lines.add(String.format("subgraph %s", isEntry ? "\" \"" : name));
 
         // prepare inputs and outputs
-        var inputs = graph.inputs.values();
+        inputs = graph.inputs.values();
         var nodes = graph.nodes.values();
-        var outputs = graph.outputs.values();
+        outputs = graph.outputs.values();
 
         // render inputs
         if( inputs.size() > 0 ) {
-            lines.add(String.format("    subgraph %s", isEntry ? "params" : "take"));
+            lines.add(String.format("  subgraph %s", isEntry ? "params" : "take"));
             for( var dn : inputs ) {
                 if( dn == null )
                     continue;
                 lines.add("    " + renderNode(dn.id, dn.label, dn.type));
             }
-            lines.add("    end");
+            lines.add("  end");
         }
 
         // render nodes
-        for( var dn : nodes ) {
-            if( dn.type == Node.Type.NAME )
-                continue;
+        // for (var dn : nodes) {
+        // if (isHidden(dn, inputs, outputs))
+        // continue;
 
-            var label = dn.label
-                .replaceAll("\n", "\\\\\n")
-                .replaceAll("\"", "\\\\\"");
+        // var label = dn.label
+        // .replaceAll("\n", "\\\\\n")
+        // .replaceAll("\"", "\\\\\"");
 
-            lines.add("    " + renderNode(dn.id, label, dn.type));
+        // lines.add(" " + renderNode(dn.id, label, dn.type));
 
-            if( dn.uri != null )
-                lines.add(String.format("    click v%d href \"%s\" _blank", dn.id, dn.uri.toString()));
-        }
+        // if (dn.uri != null)
+        // lines.add(String.format(" click v%d href \"%s\" _blank", dn.id,
+        // dn.uri.toString()));
+        // }
+        var subgraphEdges = renderSubgraphs(graph.activeSubgraphs.peek(), lines, 0);
 
         // render outputs
         if( outputs.size() > 0 ) {
-            lines.add(String.format("    subgraph %s", isEntry ? "publish" : "emit"));
+            lines.add(String.format("  subgraph %s", isEntry ? "publish" : "emit"));
             for( var dn : outputs )
                 lines.add("    " + renderNode(dn.id, dn.label, dn.type));
-            lines.add("    end");
+            lines.add("  end");
         }
 
         // render edges
@@ -81,22 +97,54 @@ public class MermaidRenderer {
                 var done = preds.stream().allMatch(p -> !isHidden(p, inputs, outputs));
                 if( done )
                     break;
-                preds = preds.stream()
-                    .flatMap(p ->
-                        isHidden(p, inputs, outputs)
-                            ? p.preds.stream()
-                            : Stream.of(p)
-                    )
-                    .collect(Collectors.toSet());
+                preds = preds.stream().flatMap(p -> isHidden(p, inputs, outputs) ? p.preds.stream() : Stream.of(p))
+                        .collect(Collectors.toSet());
             }
 
             for( var dnPred : preds )
                 lines.add(String.format("    v%d --> v%d", dnPred.id, dn.id));
         }
 
-        lines.add("    end");
+        for( var e : subgraphEdges ) {
+            lines.add(String.format("    v%d --> s%d", e.getV2(), e.getV1()));
+        }
+
+        lines.add("end");
 
         return String.join("\n", lines);
+    }
+
+    // Write the subgraphs and fetch the list of subgraph edges
+    private Set<Tuple2<Integer, Integer>> renderSubgraphs(Subgraph s, ArrayList<String> lines, int depth) {
+
+        if( depth > 0 ) {
+            lines.add("  ".repeat(depth) + String.format("subgraph s%d[\" \"]", s.getId()));
+        }
+        for( var dn : s.getMembers() ) {
+            if( isHidden(dn, inputs, outputs) ) {
+                continue;
+            }
+
+            var label = dn.label.replaceAll("\n", "\\\\\n").replaceAll("\"", "\\\\\"");
+
+            lines.add("  ".repeat(depth + 1) + renderNode(dn.id, label, dn.type));
+            if( dn.uri != null ) {
+                lines.add(String.format("    click v%d href \"%s\" _blank", dn.id, dn.uri.toString()));
+            }
+        }
+        // Get incoming edges
+        Set<Tuple2<Integer, Integer>> incidentEdges = new HashSet<>();
+        for( var p : s.getPreds() ) {
+            incidentEdges.add(new Tuple2<Integer, Integer>(s.getId(), p.id));
+        }
+        for( var child : s.getChildren() ) {
+            var moreEdges = renderSubgraphs(child, lines, depth + 1);
+            incidentEdges.addAll(moreEdges);
+        }
+        if( depth > 0 ) {
+            lines.add("  ".repeat(depth) + "end");
+        }
+        return incidentEdges;
     }
 
     /**
@@ -107,13 +155,22 @@ public class MermaidRenderer {
      * @param outputs
      */
     private static boolean isHidden(Node dn, Collection<Node> inputs, Collection<Node> outputs) {
-        return dn.type == Node.Type.NAME && !inputs.contains(dn) && !outputs.contains(dn);
+        return hideVariables && dn.type == Node.Type.NAME && !inputs.contains(dn) && !outputs.contains(dn);
     }
 
     private static String renderNode(int id, String label, Node.Type type) {
-        return switch( type ) {
-            case NAME     -> String.format("v%d[\"%s\"]", id, label);
-            case OPERATOR -> String.format("v%d([%s])", id, label);
+        String name;
+        if( uniqueNames ) {
+            name = String.format("%s<%d>", label, id);
+        } else {
+            name = String.format("%s", label);
+        }
+        return switch (type) {
+        case NAME -> String.format("v%d[\"%s\"]", id, name);
+        case OPERATOR -> String.format("v%d([%s])", id, name);
+        case CONDITIONAL -> String.format("v%d([conditional])", id);
+        case IF -> String.format("v%d([if])", id);
+        case ELSE -> String.format("v%d([else])", id);
         };
     }
 
