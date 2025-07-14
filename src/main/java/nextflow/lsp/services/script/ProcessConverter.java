@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +35,7 @@ import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
 import nextflow.script.ast.TupleParameter;
+import nextflow.script.types.Record;
 import nextflow.script.types.Tuple;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -171,11 +173,7 @@ class ProcessConverter {
                 .filter(mce -> mce != null)
                 .map(mce -> typedInput(mce, stagers))
                 .toArray(Parameter[]::new);
-            var type = new ClassNode(Tuple.class);
-            var genericsTypes = Arrays.stream(components)
-                .map(p -> new GenericsType(p.getType()))
-                .toArray(GenericsType[]::new);
-            type.setGenericsTypes(genericsTypes);
+            var type = new ClassNode(Record.class);
             return new TupleParameter(type, components);
         }
 
@@ -248,8 +246,10 @@ class ProcessConverter {
             .map(call -> typedOutput(call, topics))
             .filter(call -> call != null)
             .toList();
-        checkExpressionOutput(statements);
-        return block(null, statements);
+        var fatRecord = fatRecord(statements);
+        if( fatRecord == null )
+            checkExpressionOutput(statements);
+        return block(null, fatRecord != null ? List.of(stmt(fatRecord)) : statements);
     }
 
     private void checkExpressionOutput(List<Statement> statements) {
@@ -263,6 +263,63 @@ class ProcessConverter {
             var source = ae.getRightExpression();
             es.setExpression(source);
         }
+    }
+
+    /**
+     * Convert one or more "skinny tuple" outputs into a
+     * single "fat record" output.
+     *
+     * For example, the following snippet:
+     *
+     *   output:
+     *   bam = tuple(meta, file('*.bam'))
+     *   bai = tuple(meta, file('*.bai'))
+     *
+     * Is converted to:
+     *
+     *   output:
+     *   record(
+     *     meta: meta,
+     *     bam: file('*.bam'),
+     *     bai: file('*.bai')
+     *   )
+     *
+     * If the outputs do not conform to the expected structure,
+     * the function returns null.
+     *
+     * @param statements
+     */
+    private Expression fatRecord(List<Statement> statements) {
+        if( statements.isEmpty() )
+            return null;
+        var entries = new ArrayList<MapEntryExpression>();
+        var names = new HashSet<String>();
+        for( var output : statements ) {
+            if( !isSkinnyTupleOutput(output) )
+                return null;
+            var es = (ExpressionStatement) output;
+            var ae = (AssignmentExpression) es.getExpression();
+            var target = (VariableExpression) ae.getLeftExpression();
+            var source = (MethodCallExpression) ae.getRightExpression();
+            var args = (ArgumentListExpression) source.getArguments();
+            var first = (VariableExpression) args.getExpression(0);
+            if( !names.contains(first.getName()) ) {
+                entries.add(mapEntryX(first.getName(), first));
+                names.add(first.getName());
+            }
+            entries.add(mapEntryX(target.getName(), args.getExpression(1)));
+        }
+        return callThisX("record", args(new NamedArgumentListExpression(entries)));
+    }
+
+    private boolean isSkinnyTupleOutput(Statement output) {
+        return output instanceof ExpressionStatement es
+            && es.getExpression() instanceof AssignmentExpression ae
+            && ae.getRightExpression() instanceof MethodCallExpression mce
+            && "tuple".equals(mce.getMethodAsString())
+            && mce.getArguments() instanceof ArgumentListExpression args
+            && args.getExpressions().size() == 2
+            && args.getExpression(0) instanceof VariableExpression;
     }
 
     private static final Token RIGHT_SHIFT = Token.newSymbol(Types.RIGHT_SHIFT, -1, -1);
