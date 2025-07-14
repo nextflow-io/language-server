@@ -26,7 +26,7 @@ import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.OutputNode;
-import nextflow.script.ast.ParamNode;
+import nextflow.script.ast.ParamBlockNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
@@ -115,15 +115,13 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
         }
 
         @Override
-        public void visitParam(ParamNode node) {
-            tok.visit(node.target);
-            tok.visit(node.value);
+        public void visitParams(ParamBlockNode node) {
+            tok.visitParameters(node.declarations);
         }
 
         @Override
         public void visitWorkflow(WorkflowNode node) {
-            if( node.takes instanceof BlockStatement block )
-                visitWorkflowTakes(block.getStatements());
+            tok.visitParameters(node.getParameters());
 
             tok.visit(node.main);
 
@@ -131,13 +129,6 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
                 visitWorkflowEmits(block.getStatements());
 
             tok.visit(node.publishers);
-        }
-
-        protected void visitWorkflowTakes(List<Statement> takes) {
-            for( var stmt : takes ) {
-                var ve = (VariableExpression) asVarX(stmt);
-                tok.append(ve, SemanticTokenTypes.Parameter);
-            }
         }
 
         protected void visitWorkflowEmits(List<Statement> emits) {

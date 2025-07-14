@@ -275,10 +275,8 @@ public class ASTParentVisitor extends CodeVisitorSupport {
         push(node);
         try {
             var parameters = node.getParameters();
-            if( parameters != null ) {
-                for( var parameter : parameters )
-                    visitParameter(parameter);
-            }
+            if( parameters != null )
+                visitParameters(parameters);
             super.visitClosureExpression(node);
         }
         finally {
@@ -286,9 +284,15 @@ public class ASTParentVisitor extends CodeVisitorSupport {
         }
     }
 
-    public void visitParameter(Parameter node) {
+    public void visitParameters(Parameter[] parameters) {
+        for( var parameter : parameters )
+            visitParameter(parameter);
+    }
+
+    private void visitParameter(Parameter node) {
         push(node);
         try {
+            super.visit(node.getInitialExpression());
         }
         finally {
             pop();

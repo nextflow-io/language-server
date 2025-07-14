@@ -88,7 +88,7 @@ class ASTNodeStringUtilsTest extends Specification {
         def node = Mock(WorkflowNode) {
             isEntry() >> false
             getName() >> 'FOO'
-            takes >> EmptyStatement.INSTANCE
+            getParameters() >> Parameter.EMPTY_ARRAY
             emits >> EmptyStatement.INSTANCE
             getGroovydoc() >> Mock(Groovydoc) {
                 isPresent() >> true

@@ -139,9 +139,11 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
     }
 
     public void visitParameters(Parameter[] parameters) {
-        for( int i = 0; i < parameters.length; i++ ) {
-            var param = parameters[i];
-            append((TokenPosition) param.getNodeMetaData("_START_NAME"), param.getName(), SemanticTokenTypes.Parameter);
+        for( var param : parameters ) {
+            if( param.getNodeMetaData("_START_NAME") instanceof TokenPosition start )
+                append(start, param.getName(), SemanticTokenTypes.Parameter);
+            else
+                append(param.getLineNumber() - 1, param.getColumnNumber() - 1, param.getName().length(), SemanticTokenTypes.Parameter);
             if( param.hasInitialExpression() )
                 visit(param.getInitialExpression());
         }

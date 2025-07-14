@@ -106,16 +106,16 @@ public class ASTNodeStringUtils {
         fmt.incIndent();
         fmt.appendIndent();
         fmt.append("take:\n");
-        var takes = asBlockStatements(node.takes);
-        if( takes.isEmpty() ) {
+        var takes = node.getParameters();
+        if( takes.length == 0 ) {
             fmt.appendIndent();
             fmt.append("<none>\n");
         }
-        takes.stream().forEach((take) -> {
+        for( var take : takes ) {
             fmt.appendIndent();
-            fmt.append(asVarX(take).getName());
+            fmt.append(take.getName());
             fmt.appendNewLine();
-        });
+        }
         fmt.appendNewLine();
         fmt.appendIndent();
         fmt.append("emit:\n");
@@ -304,6 +304,9 @@ public class ASTNodeStringUtils {
                 result = annotationValueToMarkdown(mn);
             return result;
         }
+
+        if( node instanceof Parameter param )
+            return groovydocToMarkdown(param.getGroovydoc());
 
         return null;
     }

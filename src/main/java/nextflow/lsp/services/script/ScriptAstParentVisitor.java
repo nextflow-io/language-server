@@ -23,7 +23,7 @@ import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeEntryNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.OutputNode;
-import nextflow.script.ast.ParamNode;
+import nextflow.script.ast.ParamBlockNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
@@ -96,10 +96,10 @@ class ScriptAstParentVisitor extends ScriptVisitorSupport {
     }
 
     @Override
-    public void visitParam(ParamNode node) {
+    public void visitParams(ParamBlockNode node) {
         lookup.push(node);
         try {
-            lookup.visit(node.value);
+            lookup.visitParameters(node.declarations);
         }
         finally {
             lookup.pop();
@@ -110,7 +110,7 @@ class ScriptAstParentVisitor extends ScriptVisitorSupport {
     public void visitWorkflow(WorkflowNode node) {
         lookup.push(node);
         try {
-            lookup.visit(node.takes);
+            lookup.visitParameters(node.getParameters());
             lookup.visit(node.main);
             lookup.visit(node.emits);
             lookup.visit(node.publishers);
@@ -140,8 +140,7 @@ class ScriptAstParentVisitor extends ScriptVisitorSupport {
     public void visitFunction(FunctionNode node) {
         lookup.push(node);
         try {
-            for( var parameter : node.getParameters() )
-                lookup.visitParameter(parameter);
+            lookup.visitParameters(node.getParameters());
             lookup.visit(node.getCode());
         }
         finally {

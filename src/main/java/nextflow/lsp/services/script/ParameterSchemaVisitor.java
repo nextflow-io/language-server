@@ -26,6 +26,8 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import groovy.json.JsonSlurper;
+import nextflow.lsp.ast.ASTNodeStringUtils;
+import nextflow.script.ast.ParamBlockNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
@@ -71,30 +73,55 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
     public void visit() {
         var moduleNode = sourceUnit.getAST();
         if( moduleNode instanceof ScriptNode sn ) {
-            if( sn.getEntry() != null )
-                visitWorkflow(sn.getEntry());
+            if( sn.getEntry() != null ) {
+                paramsType = sn.getParams() != null
+                    ? declareParamsFromScript(sn.getParams())
+                    : declareParamsFromSchema(sn.getEntry());
+                if( paramsType != null )
+                    visitWorkflow(sn.getEntry());
+            }
         }
     }
 
-    @Override
-    public void visitWorkflow(WorkflowNode node) {
+    private ClassNode declareParamsFromScript(ParamBlockNode node) {
+        var cn = new ClassNode(ParamsMap.class);
+
+        for( var param : node.declarations ) {
+            var name = param.getName();
+            var type = param.getType();
+            var fn = new FieldNode(name, Modifier.PUBLIC, type, cn, null);
+            fn.setHasNoRealSourcePosition(true);
+            fn.setDeclaringClass(cn);
+            fn.setSynthetic(true);
+            var description = ASTNodeStringUtils.getDocumentation(param);
+            if( description != null ) {
+                var an = new AnnotationNode(ClassHelper.makeCached(Description.class));
+                an.addMember("value", new ConstantExpression(description));
+                fn.addAnnotation(an);
+            }
+            cn.addField(fn);
+        }
+
+        return cn;
+    }
+
+    private ClassNode declareParamsFromSchema(WorkflowNode entry) {
         try {
-            declareParameters();
+            return declareParamsFromSchema0();
         }
         catch( Exception e ) {
             System.err.println("Failed to parse parameter schema (nextflow_schema.json): " + e.toString());
-            addError("Failed to parse parameter schema -- check nextflow_schema.json for possible errors", node);
-            return;
+            addError("Failed to parse parameter schema -- check nextflow_schema.json for possible errors", entry);
+            return null;
         }
-        super.visitWorkflow(node);
     }
 
-    private void declareParameters() {
+    private ClassNode declareParamsFromSchema0() {
         // load parameter schema
         var uri = sourceUnit.getSource().getURI();
         var schemaPath = Path.of(uri).getParent().resolve("nextflow_schema.json");
         if( !Files.exists(schemaPath) )
-            return;
+            return null;
         var schemaJson = getParameterSchema(schemaPath);
 
         var schema = asMap(schemaJson).orElse(Collections.emptyMap());
@@ -124,7 +151,7 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
             .toList();
 
         if( entries.isEmpty() )
-            return;
+            return null;
 
         // create synthetic params type
         var cn = new ClassNode(ParamsMap.class);
@@ -146,7 +173,7 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
             cn.addField(fn);
         }
 
-        this.paramsType = cn;
+        return cn;
     }
 
     private Object getParameterSchema(Path schemaPath) {

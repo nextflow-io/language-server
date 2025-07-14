@@ -120,9 +120,9 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     }
 
     private void visitWorkflowTakes(WorkflowNode node, Map<String,Node> result) {
-        for( var stmt : asBlockStatements(node.takes) ) {
-            var name = asVarX(stmt).getName();
-            var dn = addNode(name, Node.Type.NAME, stmt);
+        for( var take : node.getParameters() ) {
+            var name = take.getName();
+            var dn = addNode(name, Node.Type.NAME, take);
             dn.verbose = false;
             vc.putSymbol(name, dn);
             result.put(name, dn);
