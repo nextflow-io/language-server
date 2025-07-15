@@ -24,12 +24,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
-import java.util.stream.Collectors;
 import java.util.function.Function;
 
 import groovy.lang.Tuple2;
 import groovy.lang.Tuple3;
-import nextflow.lsp.ast.LanguageServerASTUtils;
 import nextflow.lsp.services.script.ScriptAstCache;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
@@ -50,6 +48,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
+ * @author Erik Danielsson <danielsson.erik.0@gmail.com>
  */
 
 class Variable {
@@ -638,10 +637,6 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return stackPreds.pop();
     }
 
-    // private Node visitWithPred(ASTNode node) {
-    // return visitWithPreds(node).stream().findFirst().orElse(null);
-    // }
-
     private Node addNode(String label, Node.Type type, ASTNode an, Set<Node> preds) {
         var uri = ast.getURI(an);
         var dn = current.addNode(label, type, uri, preds);
@@ -662,49 +657,6 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return new Tuple2<>(nullNode, uninitalizedNode);
     }
 
-}
-
-class Subgraph {
-
-    private int id;
-
-    private List<Subgraph> children = new ArrayList<>();
-
-    private Set<Node> members = new HashSet<>();
-
-    private Set<Node> preds = new HashSet<>();
-
-    public Subgraph(int id) {
-        this.id = id;
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public void addMember(Node n) {
-        members.add(n);
-    }
-
-    public Set<Node> getMembers() {
-        return members;
-    }
-
-    public void addChild(Subgraph s) {
-        children.add(s);
-    }
-
-    public List<Subgraph> getChildren() {
-        return children;
-    }
-
-    public Set<Node> getPreds() {
-        return preds;
-    }
-
-    public void addPred(Node n) {
-        preds.add(n);
-    }
 }
 
 class Graph {
@@ -777,6 +729,7 @@ class Graph {
             Node node = idNode.getValue();
             if (!hide.apply(node)) {
                 if (!hideIfDisconnected.apply(node)) {
+                    // We have found a node that should always be connected, start searching from here
                     findTrueAncestors(node, hide, visited);
                     visited.add(id);
                 } else {
@@ -815,7 +768,48 @@ class Graph {
     }
     
 }
+class Subgraph {
 
+    private int id;
+
+    private List<Subgraph> children = new ArrayList<>();
+
+    private Set<Node> members = new HashSet<>();
+
+    private Set<Node> preds = new HashSet<>();
+
+    public Subgraph(int id) {
+        this.id = id;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void addMember(Node n) {
+        members.add(n);
+    }
+
+    public Set<Node> getMembers() {
+        return members;
+    }
+
+    public void addChild(Subgraph s) {
+        children.add(s);
+    }
+
+    public List<Subgraph> getChildren() {
+        return children;
+    }
+
+    public Set<Node> getPreds() {
+        return preds;
+    }
+
+    public void addPred(Node n) {
+        preds.add(n);
+    }
+}
 class Node {
     public enum Type {
         NAME, OPERATOR, CONDITIONAL, NULL

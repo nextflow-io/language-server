@@ -15,24 +15,20 @@
  */
 package nextflow.lsp.services.script.dag;
 
-import static org.codehaus.groovy.ast.tools.GeneralUtils.inSamePackage;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.function.Function;
 
-import org.eclipse.lsp4j.jsonrpc.messages.Tuple;
 
 import groovy.lang.Tuple2;
 
 /**
  *
  * @author Ben Sherman <bentshermann@gmail.com>
+ * @author Erik Danielsson <danielsson.erik.0@gmail.com>
  */
 public class MermaidRenderer {
 
@@ -57,7 +53,7 @@ public class MermaidRenderer {
         var nodes = graph.nodes.values();
         outputs = graph.outputs.values();
 
-        // Collapse graph
+        // Collapse graph i.e. remove nodes that shouldn't be part of the layout
         graph.collapseGraph(isHidden(inputs, outputs), isHiddenIfDisconnected());
 
         // render inputs
@@ -154,7 +150,7 @@ public class MermaidRenderer {
         case NAME -> String.format("v%d[\"%s\"]", id, name);
         case OPERATOR -> String.format("v%d([%s])", id, name);
         case CONDITIONAL -> String.format("v%d([conditional])", id);
-        case NULL -> String.format("v%d([null])", id);
+        case NULL -> String.format("v%d{null}", id);
         };
     }
 
