@@ -71,8 +71,8 @@ public class ScriptService extends LanguageService {
     }
 
     @Override
-    protected CodeLensProvider getCodeLensProvider() {
-        return new ScriptCodeLensProvider(astCache);
+    protected CodeLensProvider getCodeLensProvider(boolean showVariablesInDAG) {
+        return new ScriptCodeLensProvider(astCache, showVariablesInDAG);
     }
 
     @Override
@@ -123,10 +123,11 @@ public class ScriptService extends LanguageService {
     @Override
     public Object executeCommand(String command, List<Object> arguments) {
         updateNow();
-        if( "nextflow.server.previewDag".equals(command) && arguments.size() == 2 ) {
+        if( "nextflow.server.previewDag".equals(command) && arguments.size() == 3 ) {
             var uri = getJsonString(arguments.get(0));
             var name = getJsonString(arguments.get(1));
-            var provider = new ScriptCodeLensProvider(astCache);
+            boolean showVariablesInDAG = (boolean)arguments.get(2);
+            var provider = new ScriptCodeLensProvider(astCache, showVariablesInDAG);
             return provider.previewDag(uri, name);
         }
         if( "nextflow.server.previewWorkspace".equals(command) ) {

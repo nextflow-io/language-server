@@ -35,13 +35,14 @@ import groovy.lang.Tuple2;
  */
 public class MermaidRenderer {
 
-    private static boolean hideVariables = true;
-    private static boolean uniqueNames = false;
+    private final boolean hideVariables;
+    private final boolean uniqueNames;
     private Collection<Node> inputs = null;
     private Collection<Node> outputs = null;
 
-    public void toggleVariableHiding() {
-        hideVariables = !hideVariables;
+    public MermaidRenderer(boolean hideVariables) {
+        this.hideVariables = hideVariables;
+        this.uniqueNames = false;
     }
 
     public String render(String name, Graph graph) {
@@ -143,11 +144,11 @@ public class MermaidRenderer {
      * @param inputs
      * @param outputs
      */
-    private static boolean isHidden(Node dn, Collection<Node> inputs, Collection<Node> outputs) {
+    private boolean isHidden(Node dn, Collection<Node> inputs, Collection<Node> outputs) {
         return hideVariables && dn.type == Node.Type.NAME && !inputs.contains(dn) && !outputs.contains(dn);
     }
 
-    private static String renderNode(int id, String label, Node.Type type) {
+    private String renderNode(int id, String label, Node.Type type) {
         String name;
         if( uniqueNames ) {
             name = String.format("%s<%d>", label, id);
