@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
 import java.util.stream.Collectors;
+import java.util.function.Function;
 
 import groovy.lang.Tuple2;
 import groovy.lang.Tuple3;
@@ -655,7 +656,9 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private Tuple2<Node, Node> addUninitalizedNode(String label, ASTNode an) {
         var nullNode = addNode("null", Node.Type.NULL, an);
-        var uninitalizedNode = current.addNode(label, Node.Type.NAME, null, Set.of(nullNode));
+        var preds = new HashSet<Node>();
+        preds.add(nullNode);
+        var uninitalizedNode = current.addNode(label, Node.Type.NAME, null, preds);
         return new Tuple2<>(nullNode, uninitalizedNode);
     }
 
@@ -763,6 +766,54 @@ class Graph {
         return dn;
     }
 
+    public void collapseGraph(Function<Node, Boolean> hide, Function<Node, Boolean> hideIfDisconnected) {
+        // We want to collapse the graph by removing all nodes satisfying the predicate `isHidden`
+        // and then look for disconnected nodes which should be hidden if they satisfy `hideIfDisconnected`
+        Set<Integer> visited = new HashSet<>();
+        Set<Integer> remove = new HashSet<>();
+        Set<Integer> maybeRemove = new HashSet<>();
+        for (Map.Entry<Integer, Node> idNode : nodes.entrySet()) {
+            int id = idNode.getKey();
+            Node node = idNode.getValue();
+            if (!hide.apply(node)) {
+                if (!hideIfDisconnected.apply(node)) {
+                    findTrueAncestors(node, hide, visited);
+                    visited.add(id);
+                } else {
+                    maybeRemove.add(id);
+                }
+            } else {
+                remove.add(id);
+            }
+        }
+        // If a node was visited then it is necessarily connected to a node we are keeping
+        maybeRemove.removeAll(visited); 
+        remove.addAll(maybeRemove);
+
+        for (int id : remove) 
+            nodes.remove(id);
+        
+    }
+
+    private Set<Node> findTrueAncestors(Node node, Function<Node, Boolean> hide, Set<Integer> visited) {
+        Set<Node> truePreds = new HashSet<>();
+        for (Node pred : node.preds) {
+            if (!hide.apply(pred)) {
+                truePreds.add(pred);
+            } else if (!visited.contains(pred.id)) {
+                var predAncestors = findTrueAncestors(pred, hide, visited);
+                truePreds.addAll(predAncestors);
+            } else {
+                // We have already visited the node and have found its ancestors
+                truePreds.addAll(pred.preds);
+            }
+            visited.add(pred.id);
+        }
+        node.preds.clear();
+        node.preds.addAll(truePreds);
+        return truePreds;
+    }
+    
 }
 
 class Node {

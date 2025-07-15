@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.function.Function;
 
 import org.eclipse.lsp4j.jsonrpc.messages.Tuple;
 
@@ -50,11 +51,14 @@ public class MermaidRenderer {
         var lines = new ArrayList<String>();
         lines.add("flowchart TB");
         lines.add(String.format("subgraph %s", isEntry ? "\" \"" : name));
-
+        
         // prepare inputs and outputs
         inputs = graph.inputs.values();
         var nodes = graph.nodes.values();
         outputs = graph.outputs.values();
+
+        // Collapse graph
+        graph.collapseGraph(isHidden(inputs, outputs), isHiddenIfDisconnected());
 
         // render inputs
         if( inputs.size() > 0 ) {
@@ -67,7 +71,7 @@ public class MermaidRenderer {
             lines.add("  end");
         }
 
-        var subgraphEdges = renderSubgraphs(graph.activeSubgraphs.peek(), lines, 0);
+        var subgraphEdges = renderSubgraphs(graph.activeSubgraphs.peek(), graph, lines, 0);
 
         // render outputs
         if( outputs.size() > 0 ) {
@@ -78,22 +82,9 @@ public class MermaidRenderer {
         }
 
         // render edges
-        for( var dn : nodes ) {
-            if( isHidden(dn, inputs, outputs) )
-                continue;
-
-            var preds = dn.preds;
-            while( true ) {
-                var done = preds.stream().allMatch(p -> !isHidden(p, inputs, outputs));
-                if( done )
-                    break;
-                preds = preds.stream().flatMap(p -> isHidden(p, inputs, outputs) ? p.preds.stream() : Stream.of(p))
-                        .collect(Collectors.toSet());
-            }
-
-            for( var dnPred : preds )
+        for( var dn : nodes )
+            for( var dnPred : dn.preds )
                 lines.add(String.format("    v%d --> v%d", dnPred.id, dn.id));
-        }
 
         for( var e : subgraphEdges ) {
             lines.add(String.format("    v%d --> s%d", e.getV2(), e.getV1()));
@@ -105,21 +96,21 @@ public class MermaidRenderer {
     }
 
     // Write the subgraphs and fetch the list of subgraph edges
-    private Set<Tuple2<Integer, Integer>> renderSubgraphs(Subgraph s, ArrayList<String> lines, int depth) {
+    private Set<Tuple2<Integer, Integer>> renderSubgraphs(Subgraph s, Graph g, ArrayList<String> lines, int depth) {
 
         if( depth > 0 ) {
             lines.add("  ".repeat(depth) + String.format("subgraph s%d[\" \"]", s.getId()));
         }
         for( var dn : s.getMembers() ) {
-            if( isHidden(dn, inputs, outputs) ) {
-                continue;
-            }
+            if (g.nodes.containsKey(dn.id)) {
 
-            var label = dn.label.replaceAll("\n", "\\\\\n").replaceAll("\"", "\\\\\"");
+                var label = dn.label.replaceAll("\n", "\\\\\n").replaceAll("\"", "\\\\\"");
 
-            lines.add("  ".repeat(depth + 1) + renderNode(dn.id, label, dn.type));
-            if( dn.uri != null ) {
-                lines.add(String.format("    click v%d href \"%s\" _blank", dn.id, dn.uri.toString()));
+                lines.add("  ".repeat(depth + 1) + renderNode(dn.id, label, dn.type));
+                if( dn.uri != null ) {
+                    lines.add(String.format("    click v%d href \"%s\" _blank", dn.id, dn.uri.toString()));
+                }
+
             }
         }
         // Get incoming edges
@@ -128,7 +119,7 @@ public class MermaidRenderer {
             incidentEdges.add(new Tuple2<Integer, Integer>(s.getId(), p.id));
         }
         for( var child : s.getChildren() ) {
-            var moreEdges = renderSubgraphs(child, lines, depth + 1);
+            var moreEdges = renderSubgraphs(child, g, lines, depth + 1);
             incidentEdges.addAll(moreEdges);
         }
         if( depth > 0 ) {
@@ -144,8 +135,12 @@ public class MermaidRenderer {
      * @param inputs
      * @param outputs
      */
-    private boolean isHidden(Node dn, Collection<Node> inputs, Collection<Node> outputs) {
-        return hideVariables && dn.type == Node.Type.NAME && !inputs.contains(dn) && !outputs.contains(dn);
+    private Function<Node, Boolean> isHidden(Collection<Node> inputs, Collection<Node> outputs) {
+        return (dn -> hideVariables && dn.type == Node.Type.NAME && !inputs.contains(dn) && !outputs.contains(dn));
+    }
+
+    private Function<Node, Boolean> isHiddenIfDisconnected() {
+        return (dn -> hideVariables && dn.type == Node.Type.NULL);
     }
 
     private String renderNode(int id, String label, Node.Type type) {
