@@ -40,6 +40,10 @@ public class MermaidRenderer {
     private Collection<Node> inputs = null;
     private Collection<Node> outputs = null;
 
+    public void toggleVariableHiding() {
+        hideVariables = !hideVariables;
+    }
+
     public String render(String name, Graph graph) {
         var isEntry = name == null;
         var lines = new ArrayList<String>();
@@ -62,21 +66,6 @@ public class MermaidRenderer {
             lines.add("  end");
         }
 
-        // render nodes
-        // for (var dn : nodes) {
-        // if (isHidden(dn, inputs, outputs))
-        // continue;
-
-        // var label = dn.label
-        // .replaceAll("\n", "\\\\\n")
-        // .replaceAll("\"", "\\\\\"");
-
-        // lines.add(" " + renderNode(dn.id, label, dn.type));
-
-        // if (dn.uri != null)
-        // lines.add(String.format(" click v%d href \"%s\" _blank", dn.id,
-        // dn.uri.toString()));
-        // }
         var subgraphEdges = renderSubgraphs(graph.activeSubgraphs.peek(), lines, 0);
 
         // render outputs
@@ -169,8 +158,7 @@ public class MermaidRenderer {
         case NAME -> String.format("v%d[\"%s\"]", id, name);
         case OPERATOR -> String.format("v%d([%s])", id, name);
         case CONDITIONAL -> String.format("v%d([conditional])", id);
-        case IF -> String.format("v%d([if])", id);
-        case ELSE -> String.format("v%d([else])", id);
+        case NULL -> String.format("v%d([null])", id);
         };
     }
 

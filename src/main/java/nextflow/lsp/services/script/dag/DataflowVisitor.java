@@ -52,26 +52,36 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
  */
 
 class Variable {
-    private int defintionDepth;
+    private int definitionDepth;
     private Set<Node> activeInstances;
+    private Node.Type type;
 
-    public Variable(Node activeInstance, int defintionDepth) {
+    public Variable(Node activeInstance, int definitionDepth) {
         this.activeInstances = new HashSet<>();
         activeInstances.add(activeInstance);
-        this.defintionDepth = defintionDepth;
+        this.definitionDepth = definitionDepth;
+        type = activeInstance.type;
     }
 
-    private Variable(Set<Node> activeInstances, int defintionDepth) {
+    private Variable(Set<Node> activeInstances, int definitionDepth) {
         this.activeInstances = new HashSet<>(activeInstances);
-        this.defintionDepth = defintionDepth;
+        this.definitionDepth = definitionDepth;
+    }
+
+    public Node.Type getType() {
+        return type;
     }
 
     public Variable shallowCopy() {
-        return new Variable(activeInstances, defintionDepth);
+        return new Variable(activeInstances, definitionDepth);
     }
 
     public boolean isLocal(int currDepth) {
-        return defintionDepth == currDepth;
+        return definitionDepth == currDepth;
+    }
+
+    public int getDefinitionDepth() {
+        return definitionDepth;
     }
 
     public Set<Node> getActiveInstances() {
@@ -86,7 +96,7 @@ class Variable {
     public Variable union(Variable other) {
         var unionInstances = new HashSet<>(activeInstances);
         unionInstances.addAll(other.getActiveInstances());
-        return new Variable(unionInstances, defintionDepth);
+        return new Variable(unionInstances, definitionDepth);
     }
 }
 
@@ -147,68 +157,95 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         }
     }
 
-    public void putSymbolConditionalScope(String name, Node dn) {
+    public void putSymbolConditionalScope(String name, Node dn, boolean isLocal) {
+
         // Put a symbol into the currently active symbol table
         var scope = conditionalScopes.peek();
+
         if( scope.containsKey(name) ) {
+
             // We have reassinged the variable, which means that all previous
             // definitions of it (in this scope) are dead. We can reuse the set
             // though
             Variable variable = scope.get(name);
             variable.setActiveInstance(dn);
+
         } else {
+
             // The symbols in not present from before so create an empty set
-            Variable variable = new Variable(dn, currentDepth);
+            Variable variable = new Variable(dn, isLocal ? currentDepth : 0);
             scope.put(name, variable);
+
         }
     }
 
     public void pushConditionalScope(Map<String, Variable> previousSymbols) {
+
         // We want to add all symbols in the current scope
         // since they always enter both branches
         var newScope = new HashMap<String, Variable>();
+
         for( Map.Entry<String, Variable> entry : previousSymbols.entrySet() ) {
             newScope.put(entry.getKey(), entry.getValue().shallowCopy());
         }
+
         conditionalScopes.push(newScope);
-        currentDepth += 1;
+    }
+
+    public Map<String, Variable> popConditionalScope() {
+        return conditionalScopes.pop();
     }
 
     public Map<String, Variable> mergeConditionalScopes(Map<String, Variable> ifSymbols,
-            Map<String, Variable> elseSymbols) {
-        // Merge the set nodes corresponding to active symbols for the two
-        // scopes
-        // NOTE: Since we can define local variables with `def` we should have a
-        // flag
-        // which tells us
-        // if this symbol is locally defined in this scope or defined outside
-        // the scope.
+            Map<String, Variable> elseSymbols, Subgraph ifSubgraph, Subgraph elseSubgraph) {
+        // Merge the set nodes corresponding to active symbols for the two scopes
         var merged = new HashMap<String, Variable>();
         // Add all keys from ifSymbols
         for( Map.Entry<String, Variable> entry : ifSymbols.entrySet() ) {
             String key = entry.getKey();
             Variable ifVariable = entry.getValue();
-            if( elseSymbols.containsKey(key) ) {
-                merged.put(key, ifVariable.union(elseSymbols.get(key)));
-            } else {
-                merged.put(key, ifVariable.shallowCopy());
+            if( ifVariable.getDefinitionDepth() <= currentDepth ) {
+                if( elseSymbols.containsKey(key) ) {
+                    merged.put(key, ifVariable.union(elseSymbols.get(key)));
+                } else {
+                    // The variable is only found in the else branch, so we should add a null
+                    // initializer to it
+                    if( ifVariable.getType() == Node.Type.NAME ) {
+                        Node uninitNode = fixUninitNodeSubgraph(key, elseSubgraph);
+                        merged.put(key, ifVariable.union(new Variable(uninitNode, 0)));
+                    } else {
+                        merged.put(key, ifVariable.shallowCopy());
+                    }
+                }
             }
         }
 
         // Add remaining keys from elseSymbols (already handled common ones)
         for( Map.Entry<String, Variable> entry : elseSymbols.entrySet() ) {
             String key = entry.getKey();
-            if( !merged.containsKey(key) ) {
-                merged.put(key, entry.getValue().shallowCopy());
+            Variable elseVariable = entry.getValue();
+            if( !merged.containsKey(key) && elseVariable.getDefinitionDepth() <= currentDepth ) {
+                // The variable is only found in the if branch, so we should add a null
+                // initializer to it
+                if( elseVariable.getType() == Node.Type.NAME ) {
+                    Node uninitNode = fixUninitNodeSubgraph(key, ifSubgraph);
+                    merged.put(key, elseVariable.union(new Variable(uninitNode, 0)));
+                } else {
+                    merged.put(key, elseVariable.shallowCopy());
+                }
             }
         }
 
         return merged;
     }
 
-    public Map<String, Variable> popConditionalScope() {
-        currentDepth -= 1;
-        return conditionalScopes.pop();
+    private Node fixUninitNodeSubgraph(String label, Subgraph subgraph) {
+        var nullAndUninitNode = addUninitalizedNode(label, null);
+        var nullNode = nullAndUninitNode.getV1();
+        var uninitNode = nullAndUninitNode.getV2();
+        subgraph.addMember(nullNode);
+        subgraph.addMember(uninitNode);
+        return uninitNode;
     }
 
     @Override
@@ -231,7 +268,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         for( var stmt : asBlockStatements(node.takes) ) {
             var name = asVarX(stmt).getName();
             var dn = addNode(name, Node.Type.NAME, stmt);
-            putSymbolConditionalScope(name, dn);
+            putSymbolConditionalScope(name, dn, false);
             result.put(name, dn);
         }
     }
@@ -297,7 +334,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
             var preds = visitWithPreds(node.getArguments());
             var dn = addNode(name, Node.Type.OPERATOR, defNode, preds);
-            putSymbolConditionalScope(name, dn);
+            putSymbolConditionalScope(name, dn, false);
             return;
         }
 
@@ -307,7 +344,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     @Override
     public void visitBinaryExpression(BinaryExpression node) {
         if( node instanceof AssignmentExpression ) {
-            visitAssignment(node);
+            visitAssignment(node, false);
             return;
         }
         if( node.getOperation().getType() == Types.PIPE ) {
@@ -320,6 +357,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitIfElse(IfStatement node) {
+
         // First visit the conditional
         var preds = visitWithPreds(node.getBooleanExpression());
         var conditionalDn = addNode("<conditional>", Node.Type.CONDITIONAL, node, preds);
@@ -328,70 +366,92 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         // Get the symbol table associated with the currently available global
         // variables
         var precedingScope = popConditionalScope();
+
         // Construct the scope for the if branch
         pushConditionalScope(precedingScope);
-        // Push a new subgraph to keep track of the if branch
+        currentDepth += 1;
+
         current.pushSubgraph();
         current.putSubgraphPred(conditionalDn);
+
         visitWithPreds(node.getIfBlock());
+
         var ifScope = popConditionalScope();
-        current.popSubgraph();
+        var ifSubgraph = current.popSubgraph();
+
+        Map<String, Variable> elseScope;
+        Subgraph elseSubgraph;
         if( !node.getElseBlock().isEmpty() ) {
+
             // We push a new symbol table to keep track of the
             // symbols in the else branch.
             pushConditionalScope(precedingScope);
+
             // Push a new subgraph to keep track of the else branch
             current.pushSubgraph();
             current.putSubgraphPred(conditionalDn);
-            Set<Node> elsePreds = visitWithPreds(node.getElseBlock());
-            elsePreds.add(conditionalDn);
-            var elseScope = popConditionalScope();
-            current.popSubgraph();
-            var succedingScope = mergeConditionalScopes(ifScope, elseScope);
-            pushConditionalScope(succedingScope);
+            visitWithPreds(node.getElseBlock());
+
+            // Exit the else branch
+            elseScope = popConditionalScope();
+            elseSubgraph = current.popSubgraph();
+
         } else {
-            // If there is only an if branch then the active symbols after the
-            // statement
-            // is the union of the active symbols from before the if and the
-            // active symbols
+
+            // If there is only an if branch then the active symbols after the statement
+            // is the union of the active symbols from before the if and the active symbols
             // in the if
-            var succedingScope = mergeConditionalScopes(ifScope, precedingScope);
-            pushConditionalScope(succedingScope);
+            elseScope = precedingScope;
+            elseSubgraph = current.peekSubgraph();
+
         }
+
+        currentDepth -= 1;
+        var succedingScope = mergeConditionalScopes(ifScope, elseScope, ifSubgraph, elseSubgraph);
+        pushConditionalScope(succedingScope);
+
     }
 
-    private void visitAssignment(BinaryExpression node) {
+    private void visitAssignment(BinaryExpression node, boolean isDef) {
+
         var targetExpr = node.getLeftExpression();
         var sourceExpr = node.getRightExpression();
+
         if( targetExpr instanceof TupleExpression tupleExpr && sourceExpr instanceof ListExpression listExpr ) {
+
             // e.g. (x, y, z) = [1, 2, 3].
-            // We need to keep track how what variable is assigned where
+            // We need to keep track what variable is assigned where
             List<Expression> targetExprList = tupleExpr.getExpressions();
             List<Expression> sourceExprList = listExpr.getExpressions();
-            List<Tuple2<String, Set<Node>>> namesAndPreds = new ArrayList<>();
+
             // We need to wait with adding the nodes, so that we do not overwrite live
             // variable names in the source expression
+            List<Tuple2<String, Set<Node>>> namesAndPreds = new ArrayList<>();
+
             for( int i = 0; i < Math.min(targetExprList.size(), sourceExprList.size()); i++ ) {
                 String name = getAssignmentTarget(targetExprList.get(i)).getName();
                 var preds = visitWithPreds(sourceExprList.get(i));
                 namesAndPreds.add(new Tuple2<>(name, preds));
             }
+
             for( var namePreds : namesAndPreds ) {
                 var name = namePreds.getV1();
                 var preds = namePreds.getV2();
                 var dn = addNode(name, Node.Type.NAME, null, preds);
-                putSymbolConditionalScope(name, dn);
+                putSymbolConditionalScope(name, dn, isDef);
             }
         } else {
-            processAssignment(targetExpr, sourceExpr);
+
+            processAssignment(targetExpr, sourceExpr, isDef);
+
         }
     }
 
-    private void processAssignment(Expression target, Expression source) {
+    private void processAssignment(Expression target, Expression source, boolean isDef) {
         String name = getAssignmentTarget(target).getName();
         var preds = visitWithPreds(source);
         var dn = addNode(name, Node.Type.NAME, null, preds);
-        putSymbolConditionalScope(name, dn);
+        putSymbolConditionalScope(name, dn, isDef);
     }
 
     private VariableExpression getAssignmentTarget(Expression node) {
@@ -418,7 +478,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
                 var label = defNode.getName();
                 var preds = visitWithPreds(lhs);
                 var dn = addNode(label, Node.Type.OPERATOR, defNode, preds);
-                putSymbolConditionalScope(label, dn);
+                putSymbolConditionalScope(label, dn, false);
                 return;
             }
         }
@@ -428,7 +488,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitDeclarationExpression(DeclarationExpression node) {
-        visitAssignment(node);
+        visitAssignment(node, true);
     }
 
     @Override
@@ -541,7 +601,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             }
         } else {
             var dn = addNode(label, Node.Type.OPERATOR, an);
-            putSymbolConditionalScope(label, dn);
+            putSymbolConditionalScope(label, dn, false);
         }
     }
 
@@ -591,6 +651,12 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     private Node addNode(String label, Node.Type type, ASTNode an) {
         var dn = addNode(label, type, an, new HashSet<>());
         return dn;
+    }
+
+    private Tuple2<Node, Node> addUninitalizedNode(String label, ASTNode an) {
+        var nullNode = addNode("null", Node.Type.NULL, an);
+        var uninitalizedNode = current.addNode(label, Node.Type.NAME, null, Set.of(nullNode));
+        return new Tuple2<>(nullNode, uninitalizedNode);
     }
 
 }
@@ -670,10 +736,15 @@ class Graph {
         currSubgraphId += 1;
     }
 
-    public void popSubgraph() {
+    public Subgraph popSubgraph() {
         var prevSubgraph = activeSubgraphs.pop();
         var currSubgraph = activeSubgraphs.peek();
         currSubgraph.addChild(prevSubgraph);
+        return prevSubgraph;
+    }
+
+    public Subgraph peekSubgraph() {
+        return activeSubgraphs.peek();
     }
 
     public void putToSubgraph(Node n) {
@@ -685,24 +756,18 @@ class Graph {
     }
 
     public Node addNode(String label, Node.Type type, URI uri, Set<Node> preds) {
-        // Check if the node already exists
-        // var prevSymbol = getSymbol(label);
-        // if( prevSymbol != null ) {
-        // // If it exists, add the predecessors to the existing node
-        // prevSymbol.addPredecessors(preds);
-        // return prevSymbol;
-        // }
         var id = nodes.size();
         var dn = new Node(id, label, type, uri, preds);
         nodes.put(id, dn);
         putToSubgraph(dn);
         return dn;
     }
+
 }
 
 class Node {
     public enum Type {
-        NAME, OPERATOR, CONDITIONAL, IF, ELSE
+        NAME, OPERATOR, CONDITIONAL, NULL
     }
 
     public final int id;
