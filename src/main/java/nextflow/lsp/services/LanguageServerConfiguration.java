@@ -26,8 +26,7 @@ public record LanguageServerConfiguration(
     boolean maheshForm,
     int maxCompletionItems,
     boolean sortDeclarations,
-    boolean typeChecking,
-    boolean showVariablesInDAG
+    boolean typeChecking
 ) {
 
     public static LanguageServerConfiguration defaults() {
@@ -38,7 +37,6 @@ public record LanguageServerConfiguration(
             false,
             false,
             100,
-            false,
             false,
             false
         );

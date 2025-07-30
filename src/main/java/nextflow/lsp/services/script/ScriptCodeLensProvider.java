@@ -41,11 +41,9 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
     private static Logger log = Logger.getInstance();
 
     private ScriptAstCache ast;
-    private boolean showVariablesInDAG;
 
-    public ScriptCodeLensProvider(ScriptAstCache ast, boolean showVariablesInDAG) {
+    public ScriptCodeLensProvider(ScriptAstCache ast) {
         this.ast = ast;
-        this.showVariablesInDAG = showVariablesInDAG;
     }
 
     @Override
@@ -75,7 +73,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
     public Map<String,String> previewDag(String documentUri, String name) {
         var uri = URI.create(documentUri);
         if( !ast.hasAST(uri) || ast.hasErrors(uri) )
-            return Map.ofEntries(Map.entry("error", "DAG preview cannot be shown because the script has errors."));
+            return Map.of("error", "DAG preview cannot be shown because the script has errors.");
 
         var sourceUnit = ast.getSourceUnit(uri);
         return ast.getWorkflowNodes(uri).stream()
@@ -86,9 +84,9 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
                 visitor.visit();
 
                 var graph = visitor.getGraph(wn.isEntry() ? "<entry>" : wn.getName());
-                var result = new MermaidRenderer(!showVariablesInDAG).render(wn.getName(), graph);
+                var result = new MermaidRenderer().render(wn.getName(), graph);
                 log.debug(result);
-                return Map.ofEntries(Map.entry("result", result));
+                return Map.of("result", result);
             })
             .orElse(null);
     }

@@ -15,15 +15,11 @@
  */
 package nextflow.lsp.services.script.dag;
 
-
-import java.util.ArrayList;
-import java.util.Set;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.function.Function;
-
-
-import groovy.lang.Tuple2;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  *
@@ -32,95 +28,144 @@ import groovy.lang.Tuple2;
  */
 public class MermaidRenderer {
 
-    private final boolean hideVariables;
-    private final boolean uniqueNames;
-    private Collection<Node> inputs = null;
-    private Collection<Node> outputs = null;
+    private final boolean showVariables = false;
 
-    public MermaidRenderer(boolean hideVariables) {
-        this.hideVariables = hideVariables;
-        this.uniqueNames = false;
+    private StringBuilder builder;
+
+    private int indent;
+
+    private void append(String format, Object... args) {
+        builder.append("  ".repeat(indent));
+        builder.append(String.format(format, args));
+        builder.append('\n');
+    }
+
+    public void incIndent() {
+        indent++;
+    }
+
+    public void decIndent() {
+        indent--;
     }
 
     public String render(String name, Graph graph) {
-        var isEntry = name == null;
-        var lines = new ArrayList<String>();
-        lines.add("flowchart TB");
-        lines.add(String.format("subgraph %s", isEntry ? "\" \"" : name));
-        
         // prepare inputs and outputs
-        inputs = graph.inputs.values();
+        var isEntry = name == null;
+        var inputs = graph.inputs.values();
         var nodes = graph.nodes.values();
-        outputs = graph.outputs.values();
+        var outputs = graph.outputs.values();
 
-        // Collapse graph i.e. remove nodes that shouldn't be part of the layout
-        graph.collapseGraph(isHidden(inputs, outputs), isHiddenIfDisconnected());
+        // render graph
+        builder = new StringBuilder();
+        indent = 0;
+
+        append("flowchart TB");
+        incIndent();
+        append("subgraph %s", isEntry ? "\" \"" : name);
+        incIndent();
 
         // render inputs
         if( inputs.size() > 0 ) {
-            lines.add(String.format("  subgraph %s", isEntry ? "params" : "take"));
+            append("subgraph %s", isEntry ? "params" : "take");
+            incIndent();
             for( var dn : inputs ) {
                 if( dn == null )
                     continue;
-                lines.add("    " + renderNode(dn.id, dn.label, dn.type));
+                append(renderNode(dn.id, dn.label, dn.type));
             }
-            lines.add("  end");
+            decIndent();
+            append("end");
         }
 
-        var subgraphEdges = renderSubgraphs(graph.activeSubgraphs.peek(), graph, lines, 0);
+        // render nodes
+        var subgraphEdges = renderSubgraph(graph.peekSubgraph());
 
         // render outputs
         if( outputs.size() > 0 ) {
-            lines.add(String.format("  subgraph %s", isEntry ? "publish" : "emit"));
+            append("subgraph %s", isEntry ? "publish" : "emit");
+            incIndent();
             for( var dn : outputs )
-                lines.add("    " + renderNode(dn.id, dn.label, dn.type));
-            lines.add("  end");
+                append(renderNode(dn.id, dn.label, dn.type));
+            decIndent();
+            append("end");
         }
 
         // render edges
-        for( var dn : nodes )
-            for( var dnPred : dn.preds )
-                lines.add(String.format("    v%d --> v%d", dnPred.id, dn.id));
+        for( var dn : nodes ) {
+            if( isHidden(dn, inputs, outputs) )
+                continue;
 
-        for( var e : subgraphEdges ) {
-            lines.add(String.format("    v%d --> s%d", e.getV2(), e.getV1()));
+            var preds = dn.preds;
+            var visited = new HashSet<Node>();
+            while( true ) {
+                var done = preds.stream().allMatch(p -> !isHidden(p, inputs, outputs));
+                if( done )
+                    break;
+                visited.addAll(preds);
+                preds = preds.stream()
+                    .flatMap(pred -> (
+                        isHidden(pred, inputs, outputs)
+                            ? pred.preds.stream().filter(p -> !visited.contains(p))
+                            : Stream.of(pred)
+                    ))
+                    .collect(Collectors.toSet());
+            }
+
+            for( var dnPred : preds )
+                append("v%d --> v%d", dnPred.id, dn.id);
         }
 
-        lines.add("end");
+        for( var edge : subgraphEdges ) {
+            append("v%d --> s%d", edge.source(), edge.target());
+        }
 
-        return String.join("\n", lines);
+        decIndent();
+        append("end");
+
+        return builder.toString();
     }
 
-    // Write the subgraphs and fetch the list of subgraph edges
-    private Set<Tuple2<Integer, Integer>> renderSubgraphs(Subgraph s, Graph g, ArrayList<String> lines, int depth) {
+    /**
+     * Render a subgraph and collect all incident edges.
+     *
+     * @param subgraph
+     */
+    private Set<Edge> renderSubgraph(Subgraph subgraph) {
+        if( subgraph.id > 0 ) {
+            append("subgraph s%d[\" \"]", subgraph.id);
+            incIndent();
+        }
 
-        if( depth > 0 ) {
-            lines.add("  ".repeat(depth) + String.format("subgraph s%d[\" \"]", s.getId()));
-        }
-        for( var dn : s.getMembers() ) {
-            if (g.nodes.containsKey(dn.id)) {
+        // render nodes
+        for( var dn : subgraph.nodes ) {
+            if( dn.type == Node.Type.NAME )
+                continue;
 
-                var label = dn.label.replaceAll("\n", "\\\\\n").replaceAll("\"", "\\\\\"");
+            var label = dn.label
+                .replaceAll("\n", "\\\\\n")
+                .replaceAll("\"", "\\\\\"");
 
-                lines.add("  ".repeat(depth + 1) + renderNode(dn.id, label, dn.type));
-                if( dn.uri != null ) {
-                    lines.add(String.format("    click v%d href \"%s\" _blank", dn.id, dn.uri.toString()));
-                }
+            append(renderNode(dn.id, label, dn.type));
+            if( dn.uri != null )
+                append("click v%d href \"%s\" _blank", dn.id, dn.uri.toString());
+        }
 
-            }
+        // render subgraphs and collect incident edges
+        var incidentEdges = new HashSet<Edge>();
+        for( var dnPred : subgraph.preds ) {
+            incidentEdges.add(new Edge(dnPred.id, subgraph.id));
         }
-        // Get incoming edges
-        Set<Tuple2<Integer, Integer>> incidentEdges = new HashSet<>();
-        for( var p : s.getPreds() ) {
-            incidentEdges.add(new Tuple2<Integer, Integer>(s.getId(), p.id));
+
+        for( var s : subgraph.subgraphs ) {
+            var edges = renderSubgraph(s);
+            incidentEdges.addAll(edges);
         }
-        for( var child : s.getChildren() ) {
-            var moreEdges = renderSubgraphs(child, g, lines, depth + 1);
-            incidentEdges.addAll(moreEdges);
+
+        if( subgraph.id > 0 ) {
+            decIndent();
+            append("end");
         }
-        if( depth > 0 ) {
-            lines.add("  ".repeat(depth) + "end");
-        }
+
         return incidentEdges;
     }
 
@@ -131,27 +176,25 @@ public class MermaidRenderer {
      * @param inputs
      * @param outputs
      */
-    private Function<Node, Boolean> isHidden(Collection<Node> inputs, Collection<Node> outputs) {
-        return (dn -> hideVariables && dn.type == Node.Type.NAME && !inputs.contains(dn) && !outputs.contains(dn));
+    private boolean isHidden(Node dn, Collection<Node> inputs, Collection<Node> outputs) {
+        return isHidden(dn) && !inputs.contains(dn) && !outputs.contains(dn);
     }
 
-    private Function<Node, Boolean> isHiddenIfDisconnected() {
-        return (dn -> hideVariables && dn.type == Node.Type.NULL);
+    private boolean isHidden(Node dn) {
+        return !showVariables && dn.type == Node.Type.NAME;
     }
 
-    private String renderNode(int id, String label, Node.Type type) {
-        String name;
-        if( uniqueNames ) {
-            name = String.format("%s<%d>", label, id);
-        } else {
-            name = String.format("%s", label);
-        }
-        return switch (type) {
-        case NAME -> String.format("v%d[\"%s\"]", id, name);
-        case OPERATOR -> String.format("v%d([%s])", id, name);
-        case CONDITIONAL -> String.format("v%d([conditional])", id);
-        case NULL -> String.format("v%d{null}", id);
+    private static String renderNode(int id, String label, Node.Type type) {
+        return switch( type ) {
+            case NAME     -> String.format("v%d[\"%s\"]", id, label);
+            case OPERATOR -> String.format("v%d([%s])", id, label);
+            case CONTROL  -> String.format("v%d{ }", id);
         };
     }
+
+    private static record Edge(
+        int source,
+        int target
+    ) {}
 
 }

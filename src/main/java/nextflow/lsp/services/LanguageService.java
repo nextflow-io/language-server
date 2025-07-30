@@ -109,7 +109,7 @@ public abstract class LanguageService {
     public abstract boolean matchesFile(String uri);
     protected abstract ASTNodeCache getAstCache();
     protected CallHierarchyProvider getCallHierarchyProvider() { return null; }
-    protected CodeLensProvider getCodeLensProvider(boolean showVariablesInDAG) { return null; }
+    protected CodeLensProvider getCodeLensProvider() { return null; }
     protected CompletionProvider getCompletionProvider(int maxItems, boolean extended) { return null; }
     protected DefinitionProvider getDefinitionProvider() { return null; }
     protected FormattingProvider getFormattingProvider() { return null; }
@@ -186,8 +186,8 @@ public abstract class LanguageService {
         return provider.outgoingCalls(item);
     }
 
-    public List<CodeLens> codeLens(CodeLensParams params, boolean showVariablesInDAG) {
-        var provider = getCodeLensProvider(showVariablesInDAG);
+    public List<CodeLens> codeLens(CodeLensParams params) {
+        var provider = getCodeLensProvider();
         if( provider == null )
             return Collections.emptyList();
 

@@ -306,7 +306,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var service = getLanguageService(uri);
             if( service == null )
                 return Collections.emptyList();
-            return service.codeLens(params, configuration.showVariablesInDAG());
+            return service.codeLens(params);
         });
     }
 
@@ -457,8 +457,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.maheshForm"), configuration.maheshForm()),
             withDefault(JsonUtils.getInteger(settings, "nextflow.completion.maxItems"), configuration.maxCompletionItems()),
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), configuration.sortDeclarations()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.typeChecking"), configuration.typeChecking()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.dag.showVariables"), configuration.showVariablesInDAG())
+            withDefault(JsonUtils.getBoolean(settings, "nextflow.typeChecking"), configuration.typeChecking())
         );
 
         if( shouldInitialize(oldConfiguration, configuration) )
@@ -548,9 +547,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         return CompletableFutures.computeAsync((cancelChecker) -> {
             cancelChecker.checkCanceled();
             var command = params.getCommand();
-            List<Object> arguments = params.getArguments();
+            var arguments = params.getArguments();
             if( "nextflow.server.previewDag".equals(command) && arguments.size() == 2 ) {
-                arguments.add(configuration.showVariablesInDAG());
                 log.debug(String.format("textDocument/previewDag %s", arguments.toString()));
                 var uri = JsonUtils.getString(arguments.get(0));
                 var service = getLanguageService(uri);
