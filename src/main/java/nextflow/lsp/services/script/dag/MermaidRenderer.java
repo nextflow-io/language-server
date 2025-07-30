@@ -15,8 +15,10 @@
  */
 package nextflow.lsp.services.script.dag;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -28,7 +30,7 @@ import java.util.stream.Stream;
  */
 public class MermaidRenderer {
 
-    private final boolean showVariables = false;
+    private static final boolean SHOW_VARIABLES = false;
 
     private StringBuilder builder;
 
@@ -81,7 +83,7 @@ public class MermaidRenderer {
         }
 
         // render nodes
-        var allSubgraphs = new HashSet<Subgraph>();
+        var allSubgraphs = new ArrayList<Subgraph>();
         renderSubgraph(graph.peekSubgraph(), allSubgraphs);
 
         // render outputs
@@ -121,8 +123,8 @@ public class MermaidRenderer {
 
         // render subgraph edges
         for( var subgraph : allSubgraphs ) {
-            for( var dnPred : subgraph.preds )
-                append("v%d --> s%d", dnPred.id, subgraph.id);
+            if( subgraph.pred != null )
+                append("v%d --> s%d", subgraph.pred.id, subgraph.id);
         }
 
         decIndent();
@@ -137,7 +139,7 @@ public class MermaidRenderer {
      * @param subgraph
      * @param allSubgraphs
      */
-    private void renderSubgraph(Subgraph subgraph, Set<Subgraph> allSubgraphs) {
+    private void renderSubgraph(Subgraph subgraph, List<Subgraph> allSubgraphs) {
         allSubgraphs.add(subgraph);
 
         if( subgraph.id > 0 ) {
@@ -181,7 +183,7 @@ public class MermaidRenderer {
     }
 
     private boolean isHidden(Node dn) {
-        return !showVariables && dn.type == Node.Type.NAME;
+        return !SHOW_VARIABLES && dn.type == Node.Type.NAME;
     }
 
     private static String renderNode(int id, String label, Node.Type type) {
@@ -191,10 +193,5 @@ public class MermaidRenderer {
             case CONTROL  -> String.format("v%d{ }", id);
         };
     }
-
-    private static record Edge(
-        int source,
-        int target
-    ) {}
 
 }

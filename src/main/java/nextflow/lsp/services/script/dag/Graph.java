@@ -51,12 +51,12 @@ class Graph {
     }
 
     public void pushSubgraph() {
-        subgraphs.push(new Subgraph(nextSubgraphId, Collections.emptySet()));
+        subgraphs.push(new Subgraph(nextSubgraphId, null));
         nextSubgraphId += 1;
     }
 
     public void pushSubgraph(Node dn) {
-        subgraphs.push(new Subgraph(nextSubgraphId, Set.of(dn)));
+        subgraphs.push(new Subgraph(nextSubgraphId, dn));
         nextSubgraphId += 1;
     }
 
@@ -80,15 +80,15 @@ class Subgraph {
 
     public final int id;
 
-    public final Set<Node> preds;
+    public final Node pred;
 
     public final List<Subgraph> subgraphs = new ArrayList<>();
 
     public final Set<Node> nodes = new HashSet<>();
 
-    public Subgraph(int id, Set<Node> preds) {
+    public Subgraph(int id, Node pred) {
         this.id = id;
-        this.preds = preds;
+        this.pred = pred;
     }
 }
 

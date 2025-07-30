@@ -306,12 +306,11 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         current.pushSubgraph(controlDn);
         var truePreds = visitWithPreds(node.getTrueExpression());
         current.popSubgraph();
+        currentPreds().addAll(truePreds);
 
         current.pushSubgraph(controlDn);
         var falsePreds = visitWithPreds(node.getFalseExpression());
         current.popSubgraph();
-
-        currentPreds().addAll(truePreds);
         currentPreds().addAll(falsePreds);
     }
 
