@@ -34,17 +34,22 @@ public class MermaidRenderer {
 
     private int indent;
 
+    private void reset() {
+        builder = new StringBuilder();
+        indent = 0;
+    }
+
     private void append(String format, Object... args) {
         builder.append("  ".repeat(indent));
         builder.append(String.format(format, args));
         builder.append('\n');
     }
 
-    public void incIndent() {
+    private void incIndent() {
         indent++;
     }
 
-    public void decIndent() {
+    private void decIndent() {
         indent--;
     }
 
@@ -56,9 +61,7 @@ public class MermaidRenderer {
         var outputs = graph.outputs.values();
 
         // render graph
-        builder = new StringBuilder();
-        indent = 0;
-
+        reset();
         append("flowchart TB");
         incIndent();
         append("subgraph %s", isEntry ? "\" \"" : name);
