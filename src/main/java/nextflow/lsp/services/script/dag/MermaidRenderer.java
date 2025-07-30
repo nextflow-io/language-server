@@ -81,7 +81,8 @@ public class MermaidRenderer {
         }
 
         // render nodes
-        var subgraphEdges = renderSubgraph(graph.peekSubgraph());
+        var allSubgraphs = new HashSet<Subgraph>();
+        renderSubgraph(graph.peekSubgraph(), allSubgraphs);
 
         // render outputs
         if( outputs.size() > 0 ) {
@@ -118,8 +119,10 @@ public class MermaidRenderer {
                 append("v%d --> v%d", dnPred.id, dn.id);
         }
 
-        for( var edge : subgraphEdges ) {
-            append("v%d --> s%d", edge.source(), edge.target());
+        // render subgraph edges
+        for( var subgraph : allSubgraphs ) {
+            for( var dnPred : subgraph.preds )
+                append("v%d --> s%d", dnPred.id, subgraph.id);
         }
 
         decIndent();
@@ -129,11 +132,14 @@ public class MermaidRenderer {
     }
 
     /**
-     * Render a subgraph and collect all incident edges.
+     * Render a subgraph and collect all child subgraphs.
      *
      * @param subgraph
+     * @param allSubgraphs
      */
-    private Set<Edge> renderSubgraph(Subgraph subgraph) {
+    private void renderSubgraph(Subgraph subgraph, Set<Subgraph> allSubgraphs) {
+        allSubgraphs.add(subgraph);
+
         if( subgraph.id > 0 ) {
             append("subgraph s%d[\" \"]", subgraph.id);
             incIndent();
@@ -153,23 +159,14 @@ public class MermaidRenderer {
                 append("click v%d href \"%s\" _blank", dn.id, dn.uri.toString());
         }
 
-        // render subgraphs and collect incident edges
-        var incidentEdges = new HashSet<Edge>();
-        for( var dnPred : subgraph.preds ) {
-            incidentEdges.add(new Edge(dnPred.id, subgraph.id));
-        }
-
-        for( var s : subgraph.subgraphs ) {
-            var edges = renderSubgraph(s);
-            incidentEdges.addAll(edges);
-        }
+        // render subgraphs
+        for( var s : subgraph.subgraphs )
+            renderSubgraph(s, allSubgraphs);
 
         if( subgraph.id > 0 ) {
             decIndent();
             append("end");
         }
-
-        return incidentEdges;
     }
 
     /**

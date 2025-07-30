@@ -35,7 +35,7 @@ class PreviewDagTest extends Specification {
         return true
     }
 
-    def 'should render the DAG preview for a workflow' () {
+    def 'should handle an if-else statement' () {
         given:
         def service = getScriptService()
         def uri = getUri('main.nf')
@@ -93,6 +93,69 @@ class PreviewDagTest extends Specification {
                 v0 --> v2
                 v2 --> v7
                 v4 --> v7
+                v1 --> s1
+                v1 --> s2
+              end
+            """
+        )
+    }
+
+    def 'should handle a ternary expression' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+
+        expect:
+        checkDagPreview(service, uri,
+            '''\
+            workflow {
+                echo = params.echo
+                    ? TOUCH(params.echo)
+                    : DEFAULT()
+                APPEND(echo)
+            }
+
+            process TOUCH {
+                input:
+                val x
+
+                script:
+                true
+            }
+
+            process DEFAULT {
+                true
+            }
+
+            process APPEND {
+                input:
+                val x
+
+                script:
+                true
+            }
+            ''',
+            """\
+            flowchart TB
+              subgraph " "
+                subgraph params
+                  v0["echo"]
+                end
+                v1{ }
+                v5([APPEND])
+                click v5 href "$uri" _blank
+                subgraph s1[" "]
+                  v2([TOUCH])
+                  click v2 href "$uri" _blank
+                end
+                subgraph s2[" "]
+                  v3([DEFAULT])
+                  click v3 href "$uri" _blank
+                end
+                v0 --> v1
+                v0 --> v2
+                v2 --> v5
+                v3 --> v5
                 v1 --> s1
                 v1 --> s2
               end

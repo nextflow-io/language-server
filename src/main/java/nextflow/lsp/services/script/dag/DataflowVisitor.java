@@ -35,8 +35,17 @@ import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.expr.*;
-import org.codehaus.groovy.ast.stmt.*;
+import org.codehaus.groovy.ast.expr.BinaryExpression;
+import org.codehaus.groovy.ast.expr.ClosureExpression;
+import org.codehaus.groovy.ast.expr.DeclarationExpression;
+import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.expr.MethodCallExpression;
+import org.codehaus.groovy.ast.expr.PropertyExpression;
+import org.codehaus.groovy.ast.expr.TernaryExpression;
+import org.codehaus.groovy.ast.expr.TupleExpression;
+import org.codehaus.groovy.ast.expr.VariableExpression;
+import org.codehaus.groovy.ast.stmt.ExpressionStatement;
+import org.codehaus.groovy.ast.stmt.IfStatement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.syntax.Types;
 
@@ -64,7 +73,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         this.sourceUnit = sourceUnit;
         this.ast = ast;
 
-        stackPreds.add(new HashSet<>());
+        stackPreds.push(new HashSet<>());
     }
 
     @Override
@@ -160,16 +169,15 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     @Override
     public void visitIfElse(IfStatement node) {
         // visit the conditional expression
-        var preds = visitWithPreds(node.getBooleanExpression());
-        var controlDn = addNode("", Node.Type.CONTROL, null, preds);
+        var controlPreds = visitWithPreds(node.getBooleanExpression());
+        var controlDn = current.addNode("", Node.Type.CONTROL, null, controlPreds);
 
         // visit the if branch
         vc.pushScope();
         current.pushSubgraph(controlDn);
         visitWithPreds(node.getIfBlock());
-
+        current.popSubgraph();
         var ifScope = vc.popScope();
-        var ifSubgraph = current.popSubgraph();
 
         // visit the else branch
         Map<String,Variable> elseScope;
@@ -178,9 +186,8 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             vc.pushScope();
             current.pushSubgraph(controlDn);
             visitWithPreds(node.getElseBlock());
-
-            elseScope = vc.popScope();
             current.popSubgraph();
+            elseScope = vc.popScope();
         }
         else {
             // if there is no else branch, then the set of active symbols
@@ -289,6 +296,23 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     @Override
     public void visitDeclarationExpression(DeclarationExpression node) {
         visitAssignment(node, true);
+    }
+
+    @Override
+    public void visitTernaryExpression(TernaryExpression node) {
+        var controlPreds = visitWithPreds(node.getBooleanExpression());
+        var controlDn = current.addNode("", Node.Type.CONTROL, null, controlPreds);
+
+        current.pushSubgraph(controlDn);
+        var truePreds = visitWithPreds(node.getTrueExpression());
+        current.popSubgraph();
+
+        current.pushSubgraph(controlDn);
+        var falsePreds = visitWithPreds(node.getFalseExpression());
+        current.popSubgraph();
+
+        currentPreds().addAll(truePreds);
+        currentPreds().addAll(falsePreds);
     }
 
     @Override
@@ -429,7 +453,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             return null;
         if( preds.size() == 1 )
             return preds.iterator().next();
-        return addNode(name, Node.Type.NAME, null, preds);
+        return current.addNode(name, Node.Type.NAME, null, preds);
     }
 
     private Set<Node> currentPreds() {
