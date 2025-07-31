@@ -48,9 +48,6 @@ class VariableContext {
      */
     public void pushScope() {
         var newScope = new HashMap<String,Variable>();
-        scopes.peek().forEach((name, variable) -> {
-            newScope.put(name, variable.shallowCopy());
-        });
         scopes.push(newScope);
     }
 
@@ -62,14 +59,27 @@ class VariableContext {
     }
 
     /**
-     * Get the current predecessors for a given symbol.
+     * Get the active instance of a given symbol.
      *
      * @param name
      */
-    public Set<Node> getSymbol(String name) {
-        var scope = scopes.peek();
-        return scope.containsKey(name)
-            ? scope.get(name).preds
+    public Variable getSymbol(String name) {
+        for( var scope : scopes ) {
+            if( scope.containsKey(name) )
+                return scope.get(name);
+        }
+        return null;
+    }
+
+    /**
+     * Get the current predecessors of a given symbol.
+     *
+     * @param name
+     */
+    public Set<Node> getSymbolPreds(String name) {
+        var variable = getSymbol(name);
+        return variable != null
+            ? variable.preds
             : Collections.emptySet();
     }
 
@@ -81,20 +91,12 @@ class VariableContext {
      * @param isLocal
      */
     public void putSymbol(String name, Node dn, boolean isLocal) {
-        var scope = scopes.peek();
-        if( scope.containsKey(name) ) {
-            // reassign variable if it is already defined
-            var variable = scope.get(name);
-            variable.preds.clear();
-            variable.preds.add(dn);
-        }
-        else {
-            var depth = isLocal ? currentDepth() : 1;
-            var preds = new HashSet<Node>();
-            preds.add(dn);
-            var variable = new Variable(depth, preds);
-            scope.put(name, variable);
-        }
+        var variable = getSymbol(name);
+        var depth = variable != null
+            ? variable.depth
+            : isLocal ? currentDepth() : 1;
+        var preds = Set.of(dn);
+        scopes.peek().put(name, new Variable(depth, preds));
     }
 
     public void putSymbol(String name, Node dn) {
@@ -107,35 +109,27 @@ class VariableContext {
      * @param ifScope
      * @param elseScope
      */
-    public void mergeConditionalScopes(Map<String,Variable> ifScope, Map<String,Variable> elseScope) {
+    public Set<String> mergeConditionalScopes(Map<String,Variable> ifScope, Map<String,Variable> elseScope) {
         var allSymbols = new HashMap<String,Variable>();
 
-        // add symbols from if branch
+        // add symbols from if scope
         ifScope.forEach((name, variable) -> {
             if( variable.depth > currentDepth() )
                 return;
 
+            // merge symbols from else scope where applicable
             var other = elseScope.get(name);
             if( other != null )
                 variable = variable.union(other);
 
-            if( allSymbols.containsKey(name) )
-                allSymbols.put(name, allSymbols.get(name).union(variable));
-            else
-                allSymbols.put(name, variable.shallowCopy());
-        });
-
-        // add remaining symbols from else branch
-        elseScope.forEach((name, variable) -> {
-            if( variable.depth > currentDepth() )
-                return;
-
-            if( !allSymbols.containsKey(name) )
-                allSymbols.put(name, variable.shallowCopy());
+            allSymbols.put(name, variable);
         });
 
         // add merged symbols to current scope
         scopes.peek().putAll(allSymbols);
+
+        // return the set of merged symbols
+        return allSymbols.keySet();
     }
 
     private int currentDepth() {
@@ -154,10 +148,6 @@ class Variable {
     Variable(int depth, Set<Node> preds) {
         this.depth = depth;
         this.preds = preds;
-    }
-
-    public Variable shallowCopy() {
-        return new Variable(depth, new HashSet<Node>(preds));
     }
 
     public Variable union(Variable other) {

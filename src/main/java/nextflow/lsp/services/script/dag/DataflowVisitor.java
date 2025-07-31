@@ -46,6 +46,7 @@ import org.codehaus.groovy.ast.expr.TupleExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.IfStatement;
+import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.syntax.Types;
 
@@ -108,10 +109,8 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         var name = node.isEntry() ? "<entry>" : node.getName();
         visitWorkflowTakes(node, current.inputs);
         visit(node.main);
-        if( node.isEntry() )
-            visitWorkflowPublishers(node, current.outputs);
-        else
-            visitWorkflowEmits(node, current.outputs);
+        var outputs = node.isEntry() ? node.publishers : node.emits;
+        visitWorkflowOutputs(outputs, current.outputs);
         graphs.put(name, current);
         inEntry = false;
         current = null;
@@ -121,13 +120,14 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         for( var stmt : asBlockStatements(node.takes) ) {
             var name = asVarX(stmt).getName();
             var dn = addNode(name, Node.Type.NAME, stmt);
+            dn.verbose = false;
             vc.putSymbol(name, dn);
             result.put(name, dn);
         }
     }
 
-    private void visitWorkflowEmits(WorkflowNode node, Map<String,Node> result) {
-        for( var stmt : asBlockStatements(node.emits) ) {
+    private void visitWorkflowOutputs(Statement outputs, Map<String,Node> result) {
+        for( var stmt : asBlockStatements(outputs) ) {
             var emit = ((ExpressionStatement) stmt).getExpression();
             String name;
             if( emit instanceof VariableExpression ve ) {
@@ -143,23 +143,10 @@ public class DataflowVisitor extends ScriptVisitorSupport {
                 visit(new AssignmentExpression(varX(name), emit));
             }
             var dn = getSymbol(name);
-            if( dn == null )
-                System.err.println("missing emit: " + name);
-            result.put(name, dn);
-        }
-    }
-
-    private void visitWorkflowPublishers(WorkflowNode node, Map<String,Node> result) {
-        for( var stmt : asBlockStatements(node.publishers) ) {
-            var es = (ExpressionStatement) stmt;
-            var publisher = (BinaryExpression) es.getExpression();
-            var target = asVarX(publisher.getLeftExpression());
-            var source = publisher.getRightExpression();
-            visit(new AssignmentExpression(target, source));
-            var name = target.getName();
-            var dn = getSymbol(name);
-            if( dn == null )
-                System.err.println("missing publisher: " + name);
+            if( dn != null )
+                dn.verbose = false;
+            else
+                System.err.println("missing output: " + name);
             result.put(name, dn);
         }
     }
@@ -176,27 +163,45 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         vc.pushScope();
         current.pushSubgraph(controlDn);
         visitWithPreds(node.getIfBlock());
-        current.popSubgraph();
+        var ifSubgraph = current.popSubgraph();
         var ifScope = vc.popScope();
 
         // visit the else branch
+        Subgraph elseSubgraph;
         Map<String,Variable> elseScope;
 
         if( !node.getElseBlock().isEmpty() ) {
             vc.pushScope();
             current.pushSubgraph(controlDn);
             visitWithPreds(node.getElseBlock());
-            current.popSubgraph();
+            elseSubgraph = current.popSubgraph();
             elseScope = vc.popScope();
         }
         else {
             // if there is no else branch, then the set of active symbols
             // after the if statement is the union of the active symbols
             // from before the if and the active symbols in the if
+            elseSubgraph = null;
             elseScope = vc.peekScope();
         }
 
-        vc.mergeConditionalScopes(ifScope, elseScope);
+        // apply variables from if and else scopes to current scope
+        var outputs = vc.mergeConditionalScopes(ifScope, elseScope);
+
+        for( var name : outputs ) {
+            var preds = vc.getSymbolPreds(name);
+            if( preds.size() > 1 ) {
+                var dn = current.addNode(name, Node.Type.NAME, null, preds);
+                vc.putSymbol(name, dn);
+            }
+        }
+
+        // hide if-else statement if both subgraphs are empty
+        if( ifSubgraph.isVerbose() && (elseSubgraph == null || elseSubgraph.isVerbose()) ) {
+            controlDn.verbose = true;
+            for( var name : outputs )
+                getSymbol(name).preds.addAll(controlPreds);
+        }
     }
 
     // expressions
@@ -305,13 +310,19 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
         current.pushSubgraph(controlDn);
         var truePreds = visitWithPreds(node.getTrueExpression());
-        current.popSubgraph();
+        var trueSubgraph = current.popSubgraph();
         currentPreds().addAll(truePreds);
 
         current.pushSubgraph(controlDn);
         var falsePreds = visitWithPreds(node.getFalseExpression());
-        current.popSubgraph();
+        var falseSubgraph = current.popSubgraph();
         currentPreds().addAll(falsePreds);
+
+        // hide ternary expression if both subgraphs are empty
+        if( trueSubgraph.isVerbose() && falseSubgraph.isVerbose() ) {
+            controlDn.verbose = true;
+            currentPreds().addAll(controlPreds);
+        }
     }
 
     @Override
@@ -326,6 +337,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             if( !current.inputs.containsKey(name) )
                 current.inputs.put(name, addNode(name, Node.Type.NAME, null));
             var dn = current.inputs.get(name);
+            dn.verbose = false;
             currentPreds().add(dn);
             return;
         }
@@ -447,12 +459,12 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     // helpers
 
     private Node getSymbol(String name) {
-        var preds = vc.getSymbol(name);
+        var preds = vc.getSymbolPreds(name);
         if( preds.isEmpty() )
             return null;
-        if( preds.size() == 1 )
-            return preds.iterator().next();
-        return current.addNode(name, Node.Type.NAME, null, preds);
+        if( preds.size() > 1 )
+            System.err.println("unmerged symbol " + name + " " + preds);
+        return preds.iterator().next();
     }
 
     private Set<Node> currentPreds() {

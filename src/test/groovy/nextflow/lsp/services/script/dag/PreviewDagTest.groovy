@@ -29,9 +29,9 @@ import static nextflow.lsp.util.JsonUtils.*
  */
 class PreviewDagTest extends Specification {
 
-    boolean checkDagPreview(ScriptService service, String uri, String source, String mmd) {
+    boolean checkDagPreview(ScriptService service, String uri, String name, String source, String mmd) {
         open(service, uri, source.stripIndent())
-        def response = service.executeCommand('nextflow.server.previewDag', [asJson(uri), asJson(null)], LanguageServerConfiguration.defaults())
+        def response = service.executeCommand('nextflow.server.previewDag', [asJson(uri), asJson(name)], LanguageServerConfiguration.defaults())
         assert response.result == mmd.stripIndent()
         return true
     }
@@ -42,7 +42,7 @@ class PreviewDagTest extends Specification {
         def uri = getUri('main.nf')
 
         expect:
-        checkDagPreview(service, uri,
+        checkDagPreview(service, uri, null,
             '''\
             workflow {
                 if (params.echo) {
@@ -101,13 +101,77 @@ class PreviewDagTest extends Specification {
         )
     }
 
+    def 'should collapse empty if-else statement' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+
+        expect:
+        checkDagPreview(service, uri, null,
+            '''\
+            workflow {
+                main:
+                if( params.echo )
+                  echo = 1
+                else
+                  echo = 0
+
+                publish:
+                echo = echo
+            }
+            ''',
+            """\
+            flowchart TB
+              subgraph " "
+                subgraph params
+                  v0["echo"]
+                end
+                subgraph publish
+                  v5["echo"]
+                end
+                v0 --> v5
+              end
+            """
+        )
+
+        checkDagPreview(service, uri, 'ECHO',
+            '''\
+            workflow ECHO {
+                take:
+                debug
+
+                main:
+                if( debug )
+                    echo = 1
+                else
+                    echo = 0
+
+                emit:
+                echo = echo
+            }
+            ''',
+            """\
+            flowchart TB
+              subgraph ECHO
+                subgraph take
+                  v0["debug"]
+                end
+                subgraph emit
+                  v5["echo"]
+                end
+                v0 --> v5
+              end
+            """
+        )
+    }
+
     def 'should handle a ternary expression' () {
         given:
         def service = getScriptService()
         def uri = getUri('main.nf')
 
         expect:
-        checkDagPreview(service, uri,
+        checkDagPreview(service, uri, null,
             '''\
             workflow {
                 echo = params.echo
@@ -164,13 +228,44 @@ class PreviewDagTest extends Specification {
         )
     }
 
+    def 'should collapse empty ternary expression' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+
+        expect:
+        checkDagPreview(service, uri, null,
+            '''\
+            workflow {
+                main:
+                echo = params.echo ? 1 : 0
+
+                publish:
+                echo = echo
+            }
+            ''',
+            """\
+            flowchart TB
+              subgraph " "
+                subgraph params
+                  v0["echo"]
+                end
+                subgraph publish
+                  v3["echo"]
+                end
+                v0 --> v3
+              end
+            """
+        )
+    }
+
     def 'should handle variable reassignment in an if statement' () {
         given:
         def service = getScriptService()
         def uri = getUri('main.nf')
 
         expect:
-        checkDagPreview(service, uri,
+        checkDagPreview(service, uri, null,
             '''\
             workflow {
                 main:

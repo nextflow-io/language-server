@@ -90,6 +90,20 @@ class Subgraph {
         this.id = id;
         this.pred = pred;
     }
+
+    public boolean isVerbose() {
+        return nodes.stream().allMatch(n -> n.verbose);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof Subgraph s && this.id == s.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return id;
+    }
 }
 
 
@@ -106,12 +120,15 @@ class Node {
     public final URI uri;
     public final Set<Node> preds;
 
+    public boolean verbose;
+
     public Node(int id, String label, Type type, URI uri, Set<Node> preds) {
         this.id = id;
         this.label = label;
         this.type = type;
         this.uri = uri;
         this.preds = preds;
+        this.verbose = (type == Type.NAME);
     }
 
     public void addPredecessors(Set<Node> preds) {
@@ -130,6 +147,7 @@ class Node {
 
     @Override
     public String toString() {
-        return String.format("id=%s,label='%s',type=%s", id, label, type);
+        var predIds = preds.stream().map(p -> p.id).toList();
+        return String.format("id=%s,label='%s',type=%s,preds=%s", id, label, type, predIds);
     }
 }

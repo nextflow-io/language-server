@@ -17,8 +17,10 @@ package nextflow.lsp.services.script.dag;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -91,9 +93,17 @@ public class MermaidRenderer {
             append("end");
         }
 
-        // render nodes
+        // render nodes and subgraphs
+        var root = graph.peekSubgraph();
+
+        root.nodes.stream()
+            .filter(n -> !inputs.contains(n))
+            .filter(n -> !outputs.contains(n))
+            .forEach(this::renderNode);
+
         var allSubgraphs = new ArrayList<Subgraph>();
-        renderSubgraph(graph.peekSubgraph(), allSubgraphs);
+        for( var s : root.subgraphs )
+            renderSubgraph(s, allSubgraphs);
 
         // render outputs
         if( outputs.size() > 0 ) {
@@ -106,27 +116,13 @@ public class MermaidRenderer {
         }
 
         // render edges
+        var visited = new HashMap<Node,Set<Node>>();
+
         for( var dn : nodes ) {
-            if( isHidden(dn, inputs, outputs) )
+            if( isHidden(dn) )
                 continue;
 
-            var preds = dn.preds;
-            var visited = new HashSet<Node>();
-            while( true ) {
-                var done = preds.stream().allMatch(p -> !isHidden(p, inputs, outputs));
-                if( done )
-                    break;
-                visited.addAll(preds);
-                preds = preds.stream()
-                    .flatMap(pred -> (
-                        isHidden(pred, inputs, outputs)
-                            ? pred.preds.stream().filter(p -> !visited.contains(p))
-                            : Stream.of(pred)
-                    ))
-                    .collect(Collectors.toSet());
-            }
-
-            for( var dnPred : preds )
+            for( var dnPred : visiblePreds(dn, visited) )
                 append("v%d --> v%d", dnPred.id, dn.id);
         }
 
@@ -149,50 +145,40 @@ public class MermaidRenderer {
      * @param allSubgraphs
      */
     private void renderSubgraph(Subgraph subgraph, List<Subgraph> allSubgraphs) {
+        if( isHidden(subgraph) )
+            return;
+
         allSubgraphs.add(subgraph);
 
-        if( subgraph.id > 0 ) {
-            append("subgraph s%d[\" \"]", subgraph.id);
-            incIndent();
-        }
+        append("subgraph s%d[\" \"]", subgraph.id);
+        incIndent();
 
-        // render nodes
-        for( var dn : subgraph.nodes ) {
-            if( isHidden(dn) )
-                continue;
+        for( var dn : subgraph.nodes )
+            renderNode(dn);
 
-            var label = dn.label
-                .replaceAll("\n", "\\\\\n")
-                .replaceAll("\"", "\\\\\"");
-
-            append(renderNode(dn.id, label, dn.type));
-            if( dn.uri != null )
-                append("click v%d href \"%s\" _blank", dn.id, dn.uri.toString());
-        }
-
-        // render subgraphs
         for( var s : subgraph.subgraphs )
             renderSubgraph(s, allSubgraphs);
 
-        if( subgraph.id > 0 ) {
-            decIndent();
-            append("end");
-        }
+        decIndent();
+        append("end");
     }
 
     /**
-     * Only inputs, outputs, and processes/workflows are currently shown.
+     * Render a node.
      *
      * @param dn
-     * @param inputs
-     * @param outputs
      */
-    private boolean isHidden(Node dn, Collection<Node> inputs, Collection<Node> outputs) {
-        return isHidden(dn) && !inputs.contains(dn) && !outputs.contains(dn);
-    }
+    private void renderNode(Node dn) {
+        if( isHidden(dn) )
+            return;
 
-    private boolean isHidden(Node dn) {
-        return !verbose && dn.type == Node.Type.NAME;
+        var label = dn.label
+            .replaceAll("\n", "\\\\\n")
+            .replaceAll("\"", "\\\\\"");
+
+        append(renderNode(dn.id, label, dn.type));
+        if( dn.uri != null )
+            append("click v%d href \"%s\" _blank", dn.id, dn.uri.toString());
     }
 
     private static String renderNode(int id, String label, Node.Type type) {
@@ -201,6 +187,55 @@ public class MermaidRenderer {
             case OPERATOR -> String.format("v%d([%s])", id, label);
             case CONTROL  -> String.format("v%d{ }", id);
         };
+    }
+
+    /**
+     * Get the set of visible predecessors for a node.
+     *
+     * @param dn
+     * @param visited
+     */
+    private Set<Node> visiblePreds(Node dn, Map<Node,Set<Node>> visited) {
+        if( visited.containsKey(dn) )
+            return visited.get(dn);
+
+        var result = dn.preds.stream()
+            .flatMap(pred -> (
+                isHidden(pred)
+                    ? visiblePreds(pred, visited).stream()
+                    : Stream.of(pred)
+            ))
+            .collect(Collectors.toSet());
+        visited.put(dn, result);
+        return result;
+    }
+
+    /**
+     * When verbose mode is disabled, all nodes marked as verbose are hidden.
+     * Otherwise, only control nodes marked as verbose are hidden (because they
+     * are disconnected).
+     *
+     * @param dn
+     */
+    private boolean isHidden(Node dn) {
+        if( verbose )
+            return dn.verbose && dn.type == Node.Type.CONTROL;
+        else
+            return dn.verbose;
+    }
+
+    /**
+     * When verbose mode is disabled, subgraphs with no visible nodes
+     * are hidden. Otherwise, only subgraphs with no nodes are hidden
+     * (because they are disconnected).
+     *
+     * @param dn
+     */
+    private boolean isHidden(Subgraph s) {
+        if( verbose )
+            return s.nodes.isEmpty();
+        else
+            return s.isVerbose();
     }
 
 }
