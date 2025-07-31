@@ -70,7 +70,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
         return result;
     }
 
-    public Map<String,String> previewDag(String documentUri, String name) {
+    public Map<String,String> previewDag(String documentUri, String name, String direction, boolean verbose) {
         var uri = URI.create(documentUri);
         if( !ast.hasAST(uri) || ast.hasErrors(uri) )
             return Map.of("error", "DAG preview cannot be shown because the script has errors.");
@@ -84,7 +84,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
                 visitor.visit();
 
                 var graph = visitor.getGraph(wn.isEntry() ? "<entry>" : wn.getName());
-                var result = new MermaidRenderer().render(wn.getName(), graph);
+                var result = new MermaidRenderer(direction, verbose).render(wn.getName(), graph);
                 log.debug(result);
                 return Map.of("result", result);
             })

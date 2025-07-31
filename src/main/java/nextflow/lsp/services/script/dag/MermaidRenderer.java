@@ -30,11 +30,20 @@ import java.util.stream.Stream;
  */
 public class MermaidRenderer {
 
-    private static final boolean SHOW_VARIABLES = false;
+    private static final List<String> VALID_DIRECTIONS = List.of("LR", "TB", "TD");
+
+    private final String direction;
+
+    private final boolean verbose;
 
     private StringBuilder builder;
 
     private int indent;
+
+    public MermaidRenderer(String direction, boolean verbose) {
+        this.direction = VALID_DIRECTIONS.contains(direction) ? direction : "TB";
+        this.verbose = verbose;
+    }
 
     private void reset() {
         builder = new StringBuilder();
@@ -64,7 +73,7 @@ public class MermaidRenderer {
 
         // render graph
         reset();
-        append("flowchart TB");
+        append("flowchart %s", direction);
         incIndent();
         append("subgraph %s", isEntry ? "\" \"" : name);
         incIndent();
@@ -183,7 +192,7 @@ public class MermaidRenderer {
     }
 
     private boolean isHidden(Node dn) {
-        return !SHOW_VARIABLES && dn.type == Node.Type.NAME;
+        return !verbose && dn.type == Node.Type.NAME;
     }
 
     private static String renderNode(int id, String label, Node.Type type) {

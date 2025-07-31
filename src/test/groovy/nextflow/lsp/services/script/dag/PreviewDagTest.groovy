@@ -16,6 +16,7 @@
 
 package nextflow.lsp.services.script.dag
 
+import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.lsp.services.script.ScriptService
 import spock.lang.Specification
 
@@ -30,7 +31,7 @@ class PreviewDagTest extends Specification {
 
     boolean checkDagPreview(ScriptService service, String uri, String source, String mmd) {
         open(service, uri, source.stripIndent())
-        def response = service.executeCommand('nextflow.server.previewDag', [asJson(uri), asJson(null)])
+        def response = service.executeCommand('nextflow.server.previewDag', [asJson(uri), asJson(null)], LanguageServerConfiguration.defaults())
         assert response.result == mmd.stripIndent()
         return true
     }
