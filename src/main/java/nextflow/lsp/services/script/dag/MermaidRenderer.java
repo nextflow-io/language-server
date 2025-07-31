@@ -149,7 +149,7 @@ public class MermaidRenderer {
 
         // render nodes
         for( var dn : subgraph.nodes ) {
-            if( dn.type == Node.Type.NAME )
+            if( isHidden(dn) )
                 continue;
 
             var label = dn.label
