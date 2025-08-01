@@ -122,7 +122,19 @@ class VariableContext {
             if( other != null )
                 variable = variable.union(other);
 
+            // NOTE (Erik 2025-08-01): if `other == null` then we should issue a compilation error
+            // since the variable is not declared in the else branch or preceding outside scope
+
             allSymbols.put(name, variable);
+        });
+
+        // Add variables defined in the else branch but not in the if branch
+        // It is here we check that all variables declared in the else branch are declared in the if branch
+        elseScope.forEach((name, variable) -> {
+            if( variable.depth > currentDepth() || ifScope.containsKey(name) )
+                return; // The variable is local or declared in the if branch
+
+            allSymbols.put(name, variable); // NOTE (Erik 2025-08-01): replace this line an appropriate compilation error
         });
 
         // add merged symbols to current scope
