@@ -8,6 +8,7 @@ plugins {
 repositories {
   mavenLocal()
   mavenCentral()
+  maven { url = "https://s3-eu-west-1.amazonaws.com/maven.seqera.io/releases" }
 }
 
 java {
@@ -26,6 +27,11 @@ test {
   useJUnitPlatform()
 }
 
+configurations {
+  nextflowRuntime
+  schemaImplementation.extendsFrom(nextflowRuntime)
+}
+
 dependencies {
   implementation 'io.nextflow:nf-lang:25.06.0-edge'
   implementation 'org.apache.groovy:groovy:4.0.27'
@@ -37,9 +43,58 @@ dependencies {
   runtimeOnly 'org.apache.groovy:groovy-templates:4.0.27'
   runtimeOnly 'org.yaml:snakeyaml:2.2'
 
+  // include Nextflow runtime at build-time to extract language definitions
+  nextflowRuntime 'io.nextflow:nextflow:25.06.0-edge'
+  nextflowRuntime 'io.nextflow:nf-amazon:3.0.0'
+  nextflowRuntime 'io.nextflow:nf-azure:1.18.0'
+  nextflowRuntime 'io.nextflow:nf-google:1.22.1'
+  nextflowRuntime 'io.nextflow:nf-k8s:1.1.0'
+  nextflowRuntime 'io.nextflow:nf-tower:1.13.0'
+  nextflowRuntime 'io.nextflow:nf-wave:1.14.0'
+
   testImplementation ('org.objenesis:objenesis:3.4')
   testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
   testImplementation ('org.spockframework:spock-core:2.3-groovy-4.0') { exclude group: 'org.apache.groovy' }
+}
+
+sourceSets {
+  schema {
+    groovy.srcDir 'src/schema/groovy'
+    compileClasspath += configurations.nextflowRuntime
+    runtimeClasspath += configurations.nextflowRuntime
+  }
+}
+
+task buildSchema(type: JavaExec) {
+  description = 'Build JSON schema of Nextflow configuration'
+  group = 'build'
+
+  dependsOn compileSchemaGroovy
+  classpath = sourceSets.schema.runtimeClasspath
+  mainClass.set('nextflow.SchemaRenderer')
+  args "$buildDir/generated/index.json"
+
+  outputs.file("$buildDir/generated/index.json")
+  outputs.cacheIf { true }
+
+  doFirst {
+    file("$buildDir/generated").mkdirs()
+  }
+}
+
+processResources {
+  dependsOn buildSchema
+  from(buildSchema.outputs.files) {
+    into 'schema'
+  }
+}
+
+jar {
+  dependsOn buildSchema
+  from("$buildDir/generated") {
+    include 'index.json'
+    into 'schema'
+  }
 }
 
 application {

@@ -24,6 +24,7 @@ import groovy.lang.GroovyClassLoader;
 import nextflow.config.control.ConfigResolveVisitor;
 import nextflow.config.control.ResolveIncludeVisitor;
 import nextflow.config.parser.ConfigParserPluginFactory;
+import nextflow.config.schema.SchemaNode;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
@@ -44,6 +45,8 @@ import org.codehaus.groovy.control.messages.WarningMessage;
 public class ConfigAstCache extends ASTNodeCache {
 
     private LanguageServerConfiguration configuration;
+
+    private SchemaNode.Scope schema = ConfigSchemaFactory.load();
 
     public ConfigAstCache() {
         super(createCompiler());
@@ -89,7 +92,7 @@ public class ConfigAstCache extends ASTNodeCache {
                 continue;
             // phase 3: name checking
             new ConfigResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_CONFIG_IMPORTS).visit();
-            new ConfigSchemaVisitor(sourceUnit, configuration.typeChecking()).visit();
+            new ConfigSchemaVisitor(sourceUnit, schema, configuration.typeChecking()).visit();
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;
             // phase 4: type checking

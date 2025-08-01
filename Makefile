@@ -1,5 +1,5 @@
 compile:
-	(cd ../nextflow ; ./gradlew :nf-lang:publishToMavenLocal)
+	(cd ../nextflow ; ./gradlew publishToMavenLocal)
 	./gradlew shadowJar
 
 test:

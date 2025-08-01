@@ -42,12 +42,15 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit;
 
+    private SchemaNode.Scope schema;
+
     private boolean typeChecking;
 
     private Stack<String> scopes = new Stack<>();
 
-    public ConfigSchemaVisitor(SourceUnit sourceUnit, boolean typeChecking) {
+    public ConfigSchemaVisitor(SourceUnit sourceUnit, SchemaNode.Scope schema, boolean typeChecking) {
         this.sourceUnit = sourceUnit;
+        this.schema = schema;
         this.typeChecking = typeChecking;
     }
 
@@ -85,7 +88,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
         var fqName = String.join(".", names);
         if( fqName.startsWith("process.ext.") )
             return;
-        var option = SchemaNode.ROOT.getOption(names);
+        var option = schema.getOption(names);
         if( option == null ) {
             var message = "Unrecognized config option '" + fqName + "'";
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
