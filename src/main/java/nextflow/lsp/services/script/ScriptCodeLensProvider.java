@@ -70,23 +70,23 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
         return result;
     }
 
-    public Map<String,String> previewDag(String documentUri, String name) {
+    public Map<String,String> previewDag(String documentUri, String name, String direction, boolean verbose) {
         var uri = URI.create(documentUri);
         if( !ast.hasAST(uri) || ast.hasErrors(uri) )
-            return Map.ofEntries(Map.entry("error", "DAG preview cannot be shown because the script has errors."));
+            return Map.of("error", "DAG preview cannot be shown because the script has errors.");
 
         var sourceUnit = ast.getSourceUnit(uri);
         return ast.getWorkflowNodes(uri).stream()
             .filter(wn -> wn.isEntry() ? name == null : wn.getName().equals(name))
             .findFirst()
             .map((wn) -> {
-                var visitor = new DataflowVisitor(sourceUnit, ast);
+                var visitor = new DataflowVisitor(sourceUnit, ast, verbose);
                 visitor.visit();
 
                 var graph = visitor.getGraph(wn.isEntry() ? "<entry>" : wn.getName());
-                var result = new MermaidRenderer().render(wn.getName(), graph);
+                var result = new MermaidRenderer(direction, verbose).render(wn.getName(), graph);
                 log.debug(result);
-                return Map.ofEntries(Map.entry("result", result));
+                return Map.of("result", result);
             })
             .orElse(null);
     }

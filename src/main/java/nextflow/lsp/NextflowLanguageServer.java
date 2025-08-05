@@ -450,6 +450,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
         var oldConfiguration = configuration;
         configuration = new LanguageServerConfiguration(
+            withDefault(JsonUtils.getString(settings, "nextflow.dag.direction"), configuration.dagDirection()),
+            withDefault(JsonUtils.getBoolean(settings, "nextflow.dag.verbose"), configuration.dagVerbose()),
             withDefault(errorReportingMode(settings), configuration.errorReportingMode()),
             withDefault(JsonUtils.getStringArray(settings, "nextflow.files.exclude"), configuration.excludePatterns()),
             withDefault(JsonUtils.getBoolean(settings, "nextflow.completion.extended"), configuration.extendedCompletion()),
@@ -553,14 +555,14 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 var uri = JsonUtils.getString(arguments.get(0));
                 var service = getLanguageService(uri);
                 if( service != null )
-                    return service.executeCommand(command, arguments);
+                    return service.executeCommand(command, arguments, configuration);
             }
             if( "nextflow.server.previewWorkspace".equals(command) && arguments.size() == 1 ) {
                 log.debug(String.format("textDocument/previewWorkspace %s", arguments.toString()));
                 var name = JsonUtils.getString(arguments.get(0));
                 var service = scriptServices.get(name);
                 if( service != null )
-                    return service.executeCommand(command, arguments);
+                    return service.executeCommand(command, arguments, configuration);
             }
             return null;
         });

@@ -121,13 +121,13 @@ public class ScriptService extends LanguageService {
     }
 
     @Override
-    public Object executeCommand(String command, List<Object> arguments) {
+    public Object executeCommand(String command, List<Object> arguments, LanguageServerConfiguration configuration) {
         updateNow();
         if( "nextflow.server.previewDag".equals(command) && arguments.size() == 2 ) {
             var uri = getJsonString(arguments.get(0));
             var name = getJsonString(arguments.get(1));
             var provider = new ScriptCodeLensProvider(astCache);
-            return provider.previewDag(uri, name);
+            return provider.previewDag(uri, name, configuration.dagDirection(), configuration.dagVerbose());
         }
         if( "nextflow.server.previewWorkspace".equals(command) ) {
             var provider = new WorkspacePreviewProvider(astCache);

@@ -230,7 +230,7 @@ public abstract class LanguageService {
         return provider.documentSymbol(params.getTextDocument());
     }
 
-    public Object executeCommand(String command, List<Object> arguments) {
+    public Object executeCommand(String command, List<Object> arguments, LanguageServerConfiguration configuration) {
         return null;
     }
 

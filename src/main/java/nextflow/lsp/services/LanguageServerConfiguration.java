@@ -19,6 +19,8 @@ import java.util.Collections;
 import java.util.List;
 
 public record LanguageServerConfiguration(
+    String dagDirection,
+    boolean dagVerbose,
     ErrorReportingMode errorReportingMode,
     List<String> excludePatterns,
     boolean extendedCompletion,
@@ -31,6 +33,8 @@ public record LanguageServerConfiguration(
 
     public static LanguageServerConfiguration defaults() {
         return new LanguageServerConfiguration(
+            "TB",
+            false,
             ErrorReportingMode.WARNINGS,
             Collections.emptyList(),
             false,
