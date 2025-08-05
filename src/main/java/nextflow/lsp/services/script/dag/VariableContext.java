@@ -117,25 +117,15 @@ class VariableContext {
             if( variable.depth > currentDepth() )
                 return;
 
-            // merge symbols from else scope where applicable
+            // propagate symbols that are definitely assigned
             var other = elseScope.get(name);
             if( other != null )
-                variable = variable.union(other);
+                allSymbols.put(name, variable.union(other));
 
-            // NOTE (Erik 2025-08-01): if `other == null` then we should issue a compilation error
-            // since the variable is not declared in the else branch or preceding outside scope
-
-            allSymbols.put(name, variable);
+            // TODO: variables assigned in if but not else (or outside scope) are not definitely assigned
         });
 
-        // Add variables defined in the else branch but not in the if branch
-        // It is here we check that all variables declared in the else branch are declared in the if branch
-        elseScope.forEach((name, variable) -> {
-            if( variable.depth > currentDepth() || ifScope.containsKey(name) )
-                return; // The variable is local or declared in the if branch
-
-            allSymbols.put(name, variable); // NOTE (Erik 2025-08-01): replace this line an appropriate compilation error
-        });
+        // TODO: variables assigned in else but not if are not definitely assigned
 
         // add merged symbols to current scope
         scopes.peek().putAll(allSymbols);

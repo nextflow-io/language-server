@@ -64,15 +64,18 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private ScriptAstCache ast;
 
+    private boolean verbose;
+
     private Map<String,Graph> graphs = new HashMap<>();
 
     private Stack<Set<Node>> stackPreds = new Stack<>();
 
     private VariableContext vc = new VariableContext();
 
-    public DataflowVisitor(SourceUnit sourceUnit, ScriptAstCache ast) {
+    public DataflowVisitor(SourceUnit sourceUnit, ScriptAstCache ast, boolean verbose) {
         this.sourceUnit = sourceUnit;
         this.ast = ast;
+        this.verbose = verbose;
 
         stackPreds.push(new HashSet<>());
     }
@@ -197,7 +200,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         }
 
         // hide if-else statement if both subgraphs are empty
-        if( ifSubgraph.isVerbose() && (elseSubgraph == null || elseSubgraph.isVerbose()) ) {
+        if( !verbose && ifSubgraph.isVerbose() && (elseSubgraph == null || elseSubgraph.isVerbose()) ) {
             controlDn.verbose = true;
             for( var name : outputs )
                 getSymbol(name).preds.addAll(controlPreds);

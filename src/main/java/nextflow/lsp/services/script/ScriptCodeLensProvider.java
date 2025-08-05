@@ -80,7 +80,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             .filter(wn -> wn.isEntry() ? name == null : wn.getName().equals(name))
             .findFirst()
             .map((wn) -> {
-                var visitor = new DataflowVisitor(sourceUnit, ast);
+                var visitor = new DataflowVisitor(sourceUnit, ast, verbose);
                 visitor.visit();
 
                 var graph = visitor.getGraph(wn.isEntry() ? "<entry>" : wn.getName());

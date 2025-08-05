@@ -99,6 +99,55 @@ class PreviewDagTest extends Specification {
               end
             """
         )
+
+        checkDagPreview(service, uri, null,
+            '''\
+            workflow {
+                main:
+                if (TEST(params.input)) {
+                    intermed = 1
+                } else {
+                    intermed = 2
+                }
+                publish:
+                result = APPLY(intermed)
+            }
+
+            process TEST {
+                input:
+                val x
+
+                script:
+                true
+            }
+
+            process APPLY {
+                input:
+                val x
+
+                script:
+                true
+            }
+            ''',
+            """\
+            flowchart TB
+              subgraph " "
+                subgraph params
+                  v0["input"]
+                end
+                v1([TEST])
+                click v1 href "$uri" _blank
+                v6([APPLY])
+                click v6 href "$uri" _blank
+                subgraph publish
+                  v7["result"]
+                end
+                v0 --> v1
+                v1 --> v6
+                v6 --> v7
+              end
+            """
+        )
     }
 
     def 'should collapse empty if-else statement' () {
