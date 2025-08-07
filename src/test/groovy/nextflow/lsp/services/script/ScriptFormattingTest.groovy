@@ -27,16 +27,12 @@ import static nextflow.lsp.TestUtils.*
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-
-
-
 class ScriptFormattingTest extends Specification {
 
     enum Color {
         RESET("\033[0m"),       // Reset
         RED("\033[1;31m"),      // Red
         GREEN("\033[1;32m"),    // Green
-
         BLACK("\033[1;30m");   // BLACK
 
         private final String code;
@@ -62,14 +58,9 @@ class ScriptFormattingTest extends Specification {
         }
         def expectedText = after.stripIndent()
         System.err.println("Input text:\n" + before)
+
         // Create a configured DiffRowGenerator
-        DiffRowGenerator generator = DiffRowGenerator.create()
-                        //  .showInlineDiffs(true)
-                        // // .mergeOriginalRevised(true)
-                        //  .inlineDiffByWord(true)
-                        // .oldTag(f -> Color.RED.toString())      //introduce markdown style for strikethrough
-                        // .newTag(f -> Color.GREEN.toString())     //introduce markdown style for bold
-                        .build();
+        DiffRowGenerator generator = DiffRowGenerator.create().build();
 
         // Compute the differences for two test texts.
         List<DiffRow> rows = generator.generateDiffRows(
@@ -100,7 +91,7 @@ class ScriptFormattingTest extends Specification {
         return actualText == expectedText
     }
 
-    def 'should format leading comment' () {
+    def 'should format a script' () {
         given:
         def service = getScriptService()
         def uri = getUri('main.nf')
