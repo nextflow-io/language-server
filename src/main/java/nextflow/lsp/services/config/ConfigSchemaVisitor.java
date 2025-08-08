@@ -25,7 +25,7 @@ import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.schema.SchemaNode;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
-import nextflow.script.types.Types;
+import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
@@ -95,8 +95,8 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
         if( typeChecking ) {
             var expectedType = option.type();
             var actualType = node.value.getType().getTypeClass();
-            if( expectedType != null && !Types.isAssignableFrom(expectedType, actualType) ) {
-                var message = "Type mismatch for config option '" + fqName + "' -- expected a " + Types.getName(expectedType) + " but received a " + Types.getName(actualType);
+            if( expectedType != null && !TypesEx.isAssignableFrom(expectedType, actualType) ) {
+                var message = "Type mismatch for config option '" + fqName + "' -- expected a " + TypesEx.getName(expectedType) + " but received a " + TypesEx.getName(actualType);
                 addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
             }
         }

@@ -21,7 +21,7 @@ import java.util.List;
 
 import nextflow.script.dsl.Constant;
 import nextflow.script.types.TypeChecker;
-import nextflow.script.types.Types;
+import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -89,7 +89,9 @@ public class CompletionHelper {
                 boolean result;
                 if( an.isPresent() ) {
                     var name = an.get().getMember("value").getText();
-                    result = addItemForConstant(name, mn, namePrefix);
+                    result = TypesEx.isNamespace(mn)
+                        ? addItemForNamespace(name, mn, namePrefix)
+                        : addItemForConstant(name, mn, namePrefix);
                 }
                 else {
                     result = addItemForMethod(mn, namePrefix);
@@ -204,7 +206,7 @@ public class CompletionHelper {
                 boolean result;
                 if( an.isPresent() ) {
                     var name = an.get().getMember("value").getText();
-                    result = Types.isNamespace(mn)
+                    result = TypesEx.isNamespace(mn)
                         ? addItemForNamespace(name, mn, namePrefix)
                         : addItemForConstant(name, mn, namePrefix);
                 }

@@ -40,7 +40,7 @@ import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.control.ScriptResolveVisitor;
-import nextflow.script.control.TypeCheckingVisitor;
+import nextflow.script.control.TypeCheckingVisitorEx;
 import nextflow.script.parser.ScriptParserPluginFactory;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
@@ -131,7 +131,7 @@ public class ScriptAstCache extends ASTNodeCache {
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;
             // phase 4: type checking
-            new TypeCheckingVisitor(sourceUnit, configuration.typeChecking()).visit();
+            new TypeCheckingVisitorEx(sourceUnit, configuration.typeChecking()).visit();
         }
 
         return changedUris;
@@ -238,23 +238,18 @@ public class ScriptAstCache extends ASTNodeCache {
         return scriptNode.getFunctions();
     }
 
-    public List<ClassNode> getEnumNodes() {
+    public List<ClassNode> getTypeNodes() {
         var result = new ArrayList<ClassNode>();
         for( var uri : getUris() )
-            result.addAll(getEnumNodes(uri));
+            result.addAll(getTypeNodes(uri));
         return result;
     }
 
-    public List<ClassNode> getEnumNodes(URI uri) {
+    public List<ClassNode> getTypeNodes(URI uri) {
         var scriptNode = getScriptNode(uri);
         if( scriptNode == null )
             return Collections.emptyList();
-        var result = new ArrayList<ClassNode>();
-        for( var cn : scriptNode.getClasses() ) {
-            if( cn.isEnum() )
-                result.add(cn);
-        }
-        return result;
+        return scriptNode.getTypes();
     }
 
 }

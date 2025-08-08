@@ -149,7 +149,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
     private void addItemsFromScope(VariableScope scope, String namePrefix, ASTNode declarationNode) {
         ch.addItemsFromScope(scope, namePrefix);
-        ch.addTypes(ast.getEnumNodes(uri), namePrefix);
+        ch.addTypes(ast.getTypeNodes(uri), namePrefix);
 
         if( !extended ) {
             addIncludes(namePrefix);

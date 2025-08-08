@@ -23,13 +23,14 @@ import nextflow.lsp.util.Positions;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.script.dsl.Constant;
 import nextflow.script.parser.TokenPosition;
-import nextflow.script.types.Types;
+import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.CodeVisitorSupport;
 import org.codehaus.groovy.ast.DynamicVariable;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
+import org.codehaus.groovy.ast.expr.ElvisOperatorExpression;
 import org.codehaus.groovy.ast.expr.GStringExpression;
 import org.codehaus.groovy.ast.expr.MapEntryExpression;
 import org.codehaus.groovy.ast.expr.MapExpression;
@@ -125,6 +126,12 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
     }
 
     @Override
+    public void visitShortTernaryExpression(ElvisOperatorExpression node) {
+        visit(node.getTrueExpression());
+        visit(node.getFalseExpression());
+    }
+
+    @Override
     public void visitClosureExpression(ClosureExpression node) {
         if( node.getParameters() != null )
             visitParameters(node.getParameters());
@@ -170,7 +177,7 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
     public void visitVariableExpression(VariableExpression node) {
         var variable = node.getAccessedVariable();
         var mn = asMethodVariable(variable);
-        if( mn != null && findAnnotation(mn, Constant.class).isPresent() && Types.isNamespace(mn) )
+        if( mn != null && findAnnotation(mn, Constant.class).isPresent() && TypesEx.isNamespace(mn) )
             append(node, SemanticTokenTypes.Namespace);
         else if( mn != null && !findAnnotation(mn, Constant.class).isPresent() )
             append(node, SemanticTokenTypes.Function);

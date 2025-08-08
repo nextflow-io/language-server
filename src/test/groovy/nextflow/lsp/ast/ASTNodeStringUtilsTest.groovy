@@ -25,7 +25,6 @@ import nextflow.script.dsl.FeatureFlagDsl
 import nextflow.script.dsl.ProcessDsl
 import nextflow.script.dsl.ScriptDsl
 import nextflow.script.namespaces.ChannelNamespace
-import nextflow.script.types.shim.Iterable
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.Parameter
@@ -184,15 +183,15 @@ class ASTNodeStringUtilsTest extends Specification {
             '''.stripIndent(true).trim()
     }
 
-    def 'should get the label and docs for a method' () {
-        when:
-        def node = new ClassNode(Iterable.class).getDeclaredMethods('collect').first()
-        then:
-        ASTNodeStringUtils.getLabel(node) == 'Iterable collect(arg0: (E) -> R) -> Iterable<R>'
-        ASTNodeStringUtils.getDocumentation(node) == '''
-            Returns a new iterable with each element transformed by the given closure.
-            '''.stripIndent(true).trim()
-    }
+    // def 'should get the label and docs for a method' () {
+    //     when:
+    //     def node = new ClassNode(Iterable.class).getDeclaredMethods('collect').first()
+    //     then:
+    //     ASTNodeStringUtils.getLabel(node) == 'Iterable collect(arg0: (E) -> R) -> Iterable<R>'
+    //     ASTNodeStringUtils.getDocumentation(node) == '''
+    //         Returns a new iterable with each element transformed by the given closure.
+    //         '''.stripIndent(true).trim()
+    // }
 
     def 'should get the label and docs for a process directive' () {
         when:

@@ -22,6 +22,7 @@ import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.CodeVisitorSupport;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.expr.ElvisOperatorExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 
 /**
@@ -51,5 +52,11 @@ class OutgoingCallsVisitor extends CodeVisitorSupport {
 
         if( node.isImplicitThis() )
             outgoingCalls.add(node);
+    }
+
+    @Override
+    public void visitShortTernaryExpression(ElvisOperatorExpression node) {
+        visit(node.getTrueExpression());
+        visit(node.getFalseExpression());
     }
 }

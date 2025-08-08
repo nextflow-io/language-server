@@ -19,7 +19,10 @@ import java.util.List;
 
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.types.Types;
+import nextflow.script.dsl.OutputDsl;
+import nextflow.script.dsl.ProcessDsl;
+import nextflow.script.types.TypeChecker;
+import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -83,18 +86,34 @@ public class CompletionUtils {
         else if( node instanceof WorkflowNode pn ) {
             result.setDescription("workflow");
         }
-        else if( node instanceof MethodNode mn && Types.isNamespace(mn) ) {
+        else if( node instanceof MethodNode mn && TypesEx.isNamespace(mn) ) {
             result.setDescription("namespace");
         }
         else if( node instanceof MethodNode mn ) {
             result.setDetail("(" + ASTNodeStringUtils.parametersToLabel(mn.getParameters()) + ")");
-            if( Types.hasReturnType(mn) )
-                result.setDescription(Types.getName(mn.getReturnType()));
+            result.setDescription(methodDescription(mn));
         }
         else if( node instanceof Variable variable ) {
-            result.setDescription(Types.getName(variable.getType()));
+            var type = TypeChecker.getType(variable);
+            result.setDescription(TypesEx.getName(type));
         }
         return result;
+    }
+
+    private static String methodDescription(MethodNode mn) {
+        if( TypesEx.hasReturnType(mn) )
+            return TypesEx.getName(mn.getReturnType());
+        var cn = mn.getDeclaringClass();
+        if( cn.isPrimaryClassNode() )
+            return null;
+        var type = cn.getTypeClass();
+        if( type == ProcessDsl.DirectiveDsl.class )
+            return "process directive";
+        if( type == OutputDsl.class )
+            return "output directive";
+        if( type == OutputDsl.IndexDsl.class )
+            return "output index directive";
+        return null;
     }
 
 }

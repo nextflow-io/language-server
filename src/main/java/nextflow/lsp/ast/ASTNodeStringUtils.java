@@ -36,7 +36,7 @@ import nextflow.script.dsl.ProcessDsl;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.script.formatter.Formatter;
 import nextflow.script.types.TypeChecker;
-import nextflow.script.types.Types;
+import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -180,7 +180,7 @@ public class ASTNodeStringUtils {
         var an = findAnnotation(node, Constant.class);
         if( an.isPresent() ) {
             var name = an.get().getMember("value").getText();
-            if( Types.isNamespace(node) )
+            if( TypesEx.isNamespace(node) )
                 return "(namespace) " + name;
             var fn = new FieldNode(name, 0xF, node.getReturnType(), node.getDeclaringClass(), null);
             return variableToLabel(fn);
@@ -200,17 +200,22 @@ public class ASTNodeStringUtils {
         if( node instanceof FunctionNode ) {
             builder.append("def ");
         }
-        else if( Logger.isDebugEnabled() || (!isDslFunction(node) && !isNamespaceFunction(node)) ) {
-            builder.append(Types.getName(node.getDeclaringClass()));
+        else if( !isDslFunction(node) && !isNamespaceFunction(node) ) {
+            builder.append(TypesEx.getName(node.getDeclaringClass()));
             builder.append(' ');
+        }
+        else if( Logger.isDebugEnabled() ) {
+            builder.append('[');
+            builder.append(TypesEx.getName(node.getDeclaringClass()));
+            builder.append("] ");
         }
         builder.append(node.getName());
         builder.append('(');
         builder.append(parametersToLabel(node.getParameters()));
         builder.append(')');
-        if( Types.hasReturnType(node) ) {
+        if( TypesEx.hasReturnType(node) ) {
             builder.append(" -> ");
-            builder.append(Types.getName(node.getReturnType()));
+            builder.append(TypesEx.getName(node.getReturnType()));
         }
         return builder.toString();
     }
@@ -254,14 +259,12 @@ public class ASTNodeStringUtils {
     private static String variableToLabel(Variable variable) {
         var builder = new StringBuilder();
         builder.append(variable.getName());
-        var type = variable instanceof ASTNode node
-            ? TypeChecker.getType(node)
-            : variable.getOriginType();
+        var type = TypeChecker.getType(variable);
         if( type.isArray() )
             builder.append("...");
         if( !ClassHelper.isObjectType(type) ) {
             builder.append(": ");
-            builder.append(Types.getName(type));
+            builder.append(TypesEx.getName(type));
         }
         return builder.toString();
     }

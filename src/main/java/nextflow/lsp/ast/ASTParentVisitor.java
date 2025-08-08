@@ -240,8 +240,8 @@ public class ASTParentVisitor extends CodeVisitorSupport {
     public void visitShortTernaryExpression(ElvisOperatorExpression node) {
         push(node);
         try {
-            // see CodeVisitorSupport::visitShortTernaryExpression()
-            super.visitTernaryExpression(node);
+            node.getTrueExpression().visit(this);
+            node.getFalseExpression().visit(this);
         }
         finally {
             pop();
