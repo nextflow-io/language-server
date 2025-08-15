@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idea-plugin>
+    <id>io.nextflow.intellij.lsp</id>
+    <name>Nextflow Language Support</name>
+    <version>1.0.0</version>
+    <vendor email="info@nextflow.io" url="https://nextflow.io">Nextflow</vendor>
+
+    <description><![CDATA[
+    Complete language support for Nextflow scripts and configuration files using LSP4IJ and the Nextflow Language Server.
+    
+    Features:
+    - Syntax highlighting and file type recognition
+    - Code completion with intelligent suggestions
+    - Go to definition and find references
+    - Hover documentation for functions and variables
+    - Real-time error diagnostics and validation
+    - Code formatting and semantic highlighting
+    - DAG preview for workflows
+    
+    Requires the Nextflow Language Server to be installed.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.intellij.groovy</depends>
+    <depends>com.redhat.devtools.lsp4ij</depends>
+
+    <idea-version since-build="233.0"/>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- File Type for .nf files -->
+        <fileType name="Nextflow"
+                  implementationClass="io.nextflow.intellij.NextflowFileType"
+                  fieldName="INSTANCE"
+                  language="Groovy"
+                  extensions="nf"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <!-- Language Server Definition -->
+        <server id="nextflow-language-server"
+                name="Nextflow Language Server"
+                factoryClass="io.nextflow.intellij.NextflowLanguageServerFactory">
+            <description>Language Server for Nextflow scripts and configuration files</description>
+        </server>
+
+        <!-- File Name Pattern Mappings -->
+        <fileNamePatternMapping patterns="*.nf;*.nf.test;nextflow.config;*.config"
+                               serverId="nextflow-language-server"/>
+        
+        <!-- Language Mappings -->
+        <languageMapping language="Groovy"
+                        serverId="nextflow-language-server"/>
+    </extensions>
+</idea-plugin>
