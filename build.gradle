@@ -33,24 +33,24 @@ configurations {
 }
 
 dependencies {
-  implementation 'io.nextflow:nf-lang:25.06.0-edge'
-  implementation 'org.apache.groovy:groovy:4.0.27'
-  implementation 'org.apache.groovy:groovy-json:4.0.27'
+  implementation 'io.nextflow:nf-lang:25.07.0-edge'
+  implementation 'org.apache.groovy:groovy:4.0.28'
+  implementation 'org.apache.groovy:groovy-json:4.0.28'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.23.0'
 
   // runtime dependencies for Nextflow scripts
-  runtimeOnly 'org.apache.groovy:groovy-templates:4.0.27'
+  runtimeOnly 'org.apache.groovy:groovy-templates:4.0.28'
   runtimeOnly 'org.yaml:snakeyaml:2.2'
 
   // include Nextflow runtime at build-time to extract language definitions
-  nextflowRuntime 'io.nextflow:nextflow:25.06.0-edge'
-  nextflowRuntime 'io.nextflow:nf-amazon:3.0.0'
-  nextflowRuntime 'io.nextflow:nf-azure:1.18.0'
-  nextflowRuntime 'io.nextflow:nf-google:1.22.1'
-  nextflowRuntime 'io.nextflow:nf-k8s:1.1.0'
-  nextflowRuntime 'io.nextflow:nf-tower:1.13.0'
-  nextflowRuntime 'io.nextflow:nf-wave:1.14.0'
+  nextflowRuntime 'io.nextflow:nextflow:25.07.0-edge'
+  nextflowRuntime 'io.nextflow:nf-amazon:3.1.0'
+  nextflowRuntime 'io.nextflow:nf-azure:1.19.0'
+  nextflowRuntime 'io.nextflow:nf-google:1.22.2'
+  nextflowRuntime 'io.nextflow:nf-k8s:1.1.1'
+  nextflowRuntime 'io.nextflow:nf-tower:1.14.0'
+  nextflowRuntime 'io.nextflow:nf-wave:1.14.1'
 
   testImplementation ('org.objenesis:objenesis:3.4')
   testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
