@@ -44,7 +44,6 @@ import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
-import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 import static nextflow.script.ast.ASTUtils.*;
@@ -152,8 +151,7 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
 
     private Object getParameterSchema(Path schemaPath) {
         try {
-            var schemaText = IOGroovyMethods.getText(Files.newInputStream(schemaPath));
-            return new JsonSlurper().parseText(schemaText);
+            return new JsonSlurper().parse(schemaPath);
         }
         catch( IOException e ) {
             System.err.println("Failed to read parameter schema: " + e.toString());
