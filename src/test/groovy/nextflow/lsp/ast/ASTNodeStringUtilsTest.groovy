@@ -165,7 +165,7 @@ class ASTNodeStringUtilsTest extends Specification {
         when:
         def node = new ClassNode(ScriptDsl.class).getDeclaredMethods('env').first()
         then:
-        ASTNodeStringUtils.getLabel(node) == 'env(arg0: String) -> String'
+        ASTNodeStringUtils.getLabel(node) == 'env(name: String) -> String'
         ASTNodeStringUtils.getDocumentation(node) == '''
             Get the value of an environment variable from the launch environment.
             '''.stripIndent(true).trim()
@@ -175,7 +175,7 @@ class ASTNodeStringUtilsTest extends Specification {
         when:
         def node = new ClassNode(ChannelNamespace.class).getDeclaredMethods('of').first()
         then:
-        ASTNodeStringUtils.getLabel(node) == 'of(arg0...: E) -> Channel<E>'
+        ASTNodeStringUtils.getLabel(node) == 'of(values...: E) -> Channel<E>'
         ASTNodeStringUtils.getDocumentation(node) == '''
             Create a channel that emits each argument.
 
