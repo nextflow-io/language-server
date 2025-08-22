@@ -56,6 +56,7 @@ dependencies {
   testImplementation ('org.objenesis:objenesis:3.4')
   testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
   testImplementation ('org.spockframework:spock-core:2.3-groovy-4.0') { exclude group: 'org.apache.groovy' }
+  testImplementation ("io.github.java-diff-utils:java-diff-utils:4.12")
 }
 
 sourceSets {
