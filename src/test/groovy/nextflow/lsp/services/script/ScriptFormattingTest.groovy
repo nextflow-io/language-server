@@ -30,7 +30,8 @@ class ScriptFormattingTest extends Specification {
     boolean checkFormat(ScriptService service, String uri, String before, String after) {
         open(service, uri, before)
         def textEdits = service.formatting(URI.create(uri), new FormattingOptions(4, true))
-        return textEdits.first().getNewText() == after.stripIndent()
+        assert textEdits.first().getNewText() == after.stripIndent()
+        return true
     }
 
     def 'should format a script' () {
