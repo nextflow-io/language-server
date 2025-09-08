@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.ast;
 
+import java.util.Arrays;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -24,6 +25,9 @@ import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ProcessNodeV1;
+import nextflow.script.ast.ProcessNodeV2;
+import nextflow.script.ast.TupleParameter;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
@@ -45,6 +49,8 @@ import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 
@@ -67,7 +73,10 @@ public class ASTNodeStringUtils {
         if( node instanceof WorkflowNode wn )
             return workflowToLabel(wn);
 
-        if( node instanceof ProcessNode pn )
+        if( node instanceof ProcessNodeV2 pn )
+            return processToLabel(pn);
+
+        if( node instanceof ProcessNodeV1 pn )
             return processToLabel(pn);
 
         if( node instanceof MethodNode mn )
@@ -131,10 +140,7 @@ public class ASTNodeStringUtils {
         emits.stream().forEach((stmt) -> {
             var emit = ((ExpressionStatement) stmt).getExpression();
             fmt.appendIndent();
-            if( emit instanceof AssignmentExpression assign )
-                fmt.visit(assign.getLeftExpression());
-            else
-                fmt.visit(emit);
+            typedOutput(emit, fmt);
             fmt.appendNewLine();
         });
         fmt.decIndent();
@@ -142,7 +148,72 @@ public class ASTNodeStringUtils {
         return fmt.toString();
     }
 
-    private static String processToLabel(ProcessNode node) {
+    private static void typedOutput(Expression output, Formatter fmt) {
+        if( output instanceof AssignmentExpression assign ) {
+            var target = (VariableExpression) assign.getLeftExpression();
+            fmt.append(target.getText());
+            if( fmt.hasType(target) ) {
+                fmt.append(": ");
+                fmt.visitTypeAnnotation(target.getType());
+            }
+        }
+        else {
+            fmt.visit(output);
+        }
+    }
+
+    private static String processToLabel(ProcessNodeV2 node) {
+        var fmt = new Formatter(new FormattingOptions(2, true));
+        fmt.append("process ");
+        fmt.append(node.getName());
+        fmt.append(" {\n");
+        fmt.incIndent();
+        fmt.appendIndent();
+        fmt.append("input:\n");
+        if( node.inputs.length == 0 ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+        }
+        for( var input : node.inputs ) {
+            fmt.appendIndent();
+            if( input instanceof TupleParameter tp ) {
+                fmt.append('(');
+                fmt.append(
+                    Arrays.stream(tp.components)
+                        .map(p -> p.getName())
+                        .collect(Collectors.joining(", "))
+                );
+                fmt.append(')');
+            }
+            else {
+                fmt.append(input.getName());
+            }
+            if( fmt.hasType(input) ) {
+                fmt.append(": ");
+                fmt.visitTypeAnnotation(input.getType());
+            }
+            fmt.appendNewLine();
+        }
+        fmt.appendNewLine();
+        fmt.appendIndent();
+        fmt.append("output:\n");
+        var outputs = asBlockStatements(node.outputs);
+        if( outputs.isEmpty() ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+        }
+        outputs.stream().forEach((stmt) -> {
+            var output = ((ExpressionStatement) stmt).getExpression();
+            fmt.appendIndent();
+            typedOutput(output, fmt);
+            fmt.appendNewLine();
+        });
+        fmt.decIndent();
+        fmt.append('}');
+        return fmt.toString();
+    }
+
+    private static String processToLabel(ProcessNodeV1 node) {
         var fmt = new Formatter(new FormattingOptions(2, true));
         fmt.append("process ");
         fmt.append(node.getName());
@@ -243,9 +314,9 @@ public class ASTNodeStringUtils {
         var type = cn.getTypeClass();
         if( type == ProcessDsl.DirectiveDsl.class )
             return "process directive";
-        if( type == ProcessDsl.InputDsl.class )
+        if( type == ProcessDsl.InputDslV1.class )
             return "process input";
-        if( type == ProcessDsl.OutputDsl.class )
+        if( type == ProcessDsl.OutputDslV1.class )
             return "process output";
         if( type == OutputDsl.class )
             return "output directive";

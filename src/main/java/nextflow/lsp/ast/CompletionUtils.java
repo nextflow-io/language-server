@@ -109,6 +109,8 @@ public class CompletionUtils {
         var type = cn.getTypeClass();
         if( type == ProcessDsl.DirectiveDsl.class )
             return "process directive";
+        if( type == ProcessDsl.StageDsl.class )
+            return "stage directive";
         if( type == OutputDsl.class )
             return "output directive";
         if( type == OutputDsl.IndexDsl.class )

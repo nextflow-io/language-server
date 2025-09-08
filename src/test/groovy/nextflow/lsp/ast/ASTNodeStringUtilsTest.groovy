@@ -19,7 +19,7 @@ package nextflow.lsp.ast
 import groovy.lang.groovydoc.Groovydoc
 import nextflow.script.ast.FeatureFlagNode
 import nextflow.script.ast.FunctionNode
-import nextflow.script.ast.ProcessNode
+import nextflow.script.ast.ProcessNodeV1
 import nextflow.script.ast.WorkflowNode
 import nextflow.script.dsl.FeatureFlagDsl
 import nextflow.script.dsl.ProcessDsl
@@ -114,7 +114,7 @@ class ASTNodeStringUtilsTest extends Specification {
 
     def 'should get the label and docs for a process' () {
         when:
-        def node = Mock(ProcessNode) {
+        def node = Mock(ProcessNodeV1) {
             getName() >> 'BAR'
             inputs >> EmptyStatement.INSTANCE
             outputs >> EmptyStatement.INSTANCE
