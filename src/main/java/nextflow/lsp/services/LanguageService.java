@@ -363,8 +363,14 @@ public abstract class LanguageService {
             log.debug(builder.toString());
         }
 
-        var changedUris = astCache.update(uris, fileCache);
-        publishDiagnostics(changedUris);
+        try {
+            var changedUris = astCache.update(uris, fileCache);
+            publishDiagnostics(changedUris);
+        }
+        catch( Throwable e ) {
+            System.err.println(e);
+            e.printStackTrace();
+        }
     }
 
     /**
