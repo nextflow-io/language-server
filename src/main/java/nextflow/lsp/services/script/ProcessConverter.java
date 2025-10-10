@@ -49,6 +49,7 @@ import org.codehaus.groovy.ast.expr.NamedArgumentListExpression;
 import org.codehaus.groovy.ast.expr.TupleExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.EmptyStatement;
+import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.syntax.Token;
 import org.codehaus.groovy.syntax.Types;
@@ -152,11 +153,10 @@ class ProcessConverter {
                 .map(mce -> typedInput(mce, stagers))
                 .toArray(Parameter[]::new);
             var type = new ClassNode(Tuple.class);
-            type.setGenericsTypes(
-                Arrays.stream(components)
-                    .map(p -> new GenericsType(p.getType()))
-                    .toArray(GenericsType[]::new)
-            );
+            var genericsTypes = Arrays.stream(components)
+                .map(p -> new GenericsType(p.getType()))
+                .toArray(GenericsType[]::new);
+            type.setGenericsTypes(genericsTypes);
             return new TupleParameter(type, components);
         }
 
@@ -229,7 +229,21 @@ class ProcessConverter {
             .map(call -> typedOutput(call, topics))
             .filter(call -> call != null)
             .toList();
+        checkExpressionOutput(statements);
         return block(null, statements);
+    }
+
+    private void checkExpressionOutput(List<Statement> statements) {
+        if( statements.size() != 1 )
+            return;
+        var es = (ExpressionStatement) statements.get(0);
+        if( es.getExpression() instanceof AssignmentExpression ae ) {
+            var target = (VariableExpression) ae.getLeftExpression();
+            if( !target.getName().startsWith("$out") )
+                return;
+            var source = ae.getRightExpression();
+            es.setExpression(source);
+        }
     }
 
     private static final Token RIGHT_SHIFT = Token.newSymbol(Types.RIGHT_SHIFT, -1, -1);
@@ -356,7 +370,7 @@ class ModuleSchemaVisitor {
         if( "integer".equals(type) )
             return ClassHelper.Integer_TYPE;
         if( "map".equals(type) )
-            return ClassHelper.MAP_TYPE;
+            return ClassHelper.MAP_TYPE.getPlainNodeReference();
         if( "number".equals(type) )
             return ClassHelper.Float_TYPE;
         if( "string".equals(type) )
@@ -418,8 +432,7 @@ class OutputDslTransformer implements ExpressionTransformer {
             if( arity != null )
                 return !"1".equals(arity);
         }
-        return args.get(args.size() - 1) instanceof ConstantExpression ce
-            && FileParamASTUtils.isGlobPattern(ce);
+        return false;
     }
 
     private static void addNamedArg(Expression arguments, MapEntryExpression entry) {

@@ -24,7 +24,6 @@ import nextflow.lsp.util.Logger;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.types.TypeChecker;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
@@ -38,6 +37,8 @@ import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
+
+import static nextflow.script.types.TypeCheckingUtils.*;
 
 /**
  * Provide hints for an expression or statement when hovered
@@ -104,7 +105,7 @@ public class ScriptHoverProvider implements HoverProvider {
                 }
                 if( node instanceof Expression exp ) {
                     builder.append(": ");
-                    builder.append(Types.getName(TypeChecker.getType(exp)));
+                    builder.append(Types.getName(getType(exp)));
                 }
                 builder.append('\n');
             }

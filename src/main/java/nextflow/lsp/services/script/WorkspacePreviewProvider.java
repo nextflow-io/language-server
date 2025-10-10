@@ -22,7 +22,8 @@ import java.util.stream.Stream;
 
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.types.TypeChecker;
+
+import static nextflow.script.types.TypeCheckingUtils.*;
 
 /**
  *
@@ -65,7 +66,7 @@ public class WorkspacePreviewProvider {
 
     private List<? extends Object> children(WorkflowNode node) {
         return new OutgoingCallsVisitor().apply(node).stream()
-            .map(call -> TypeChecker.inferMethodTarget(call))
+            .map(call -> resolveMethodCall(call))
             .filter(mn -> mn instanceof ProcessNode || mn instanceof WorkflowNode)
             .distinct()
             .map(mn -> Map.of(

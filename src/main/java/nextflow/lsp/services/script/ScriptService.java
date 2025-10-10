@@ -139,12 +139,11 @@ public class ScriptService extends LanguageService {
             var options = formattingOptions(configuration);
             return provider.convertPipelineToTyped(options);
         }
-        if( "nextflow.server.convertProcessToTyped".equals(command) ) {
+        if( "nextflow.server.convertScriptToTyped".equals(command) ) {
             var uri = getJsonString(arguments.get(0));
-            var name = getJsonString(arguments.get(1));
             var provider = new ScriptCodeLensProvider(astCache);
             var options = formattingOptions(configuration);
-            return provider.convertProcessToTyped(uri, name, options);
+            return provider.convertScriptToTyped(uri, options);
         }
         return null;
     }

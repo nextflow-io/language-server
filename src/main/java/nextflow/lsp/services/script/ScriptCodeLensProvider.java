@@ -62,6 +62,11 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
         this.ast = ast;
     }
 
+    /**
+     * Get the list of code lenses available for a file.
+     *
+     * @param textDocument
+     */
     @Override
     public List<CodeLens> codeLens(TextDocumentIdentifier textDocument) {
         if( ast == null ) {
@@ -73,8 +78,8 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
         if( !ast.hasAST(uri) )
             return Collections.emptyList();
 
+        // add "Preview DAG" code lens for each workflow
         var result = new ArrayList<CodeLens>();
-
         for( var wn : ast.getWorkflowNodes(uri) ) {
             var range = LanguageServerUtils.astNodeToRange(wn);
             if( range == null )
@@ -84,18 +89,17 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             result.add(new CodeLens(range, command, null));
         }
 
-        for( var pn : ast.getProcessNodes(uri) ) {
-            if( !(pn instanceof ProcessNodeV1) )
-                continue;
-            var range = LanguageServerUtils.astNodeToRange(pn);
-            var arguments = List.of(asJson(uri.toString()), asJson(pn.getName()));
-            var command = new Command("Convert to static types", "nextflow.convertProcessToTyped", arguments);
-            result.add(new CodeLens(range, command, null));
-        }
-
         return result;
     }
 
+    /**
+     * Generate the DAG for a given workflow as a Mermaid diagram.
+     *
+     * @param documentUri
+     * @param name
+     * @param direction
+     * @param verbose
+     */
     public Map<String,String> previewDag(String documentUri, String name, String direction, boolean verbose) {
         var uri = URI.create(documentUri);
         if( !ast.hasAST(uri) || ast.hasErrors(uri) )
@@ -117,6 +121,11 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             .orElse(null);
     }
 
+    /**
+     * Convert all scripts in a workspace to static types.
+     *
+     * @param options
+     */
     public Map<String,Object> convertPipelineToTyped(FormattingOptions options) {
         for( var uri : ast.getUris() ) {
             if( !ast.hasAST(uri) || ast.hasErrors(uri) )
@@ -142,7 +151,34 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
         return Map.of("applyEdit", (Object) new WorkspaceEdit(textEdits));
     }
 
-    public void convertParamsToTyped(ScriptNode sn, FormattingOptions options, Map<String,List<TextEdit>> textEdits) {
+    /**
+     * Convert a script to static types.
+     *
+     * @param documentUri
+     * @param options
+     */
+    public Map<String,Object> convertScriptToTyped(String documentUri, FormattingOptions options) {
+        var uri = URI.create(documentUri);
+        if( !ast.hasAST(uri) || ast.hasErrors(uri) )
+            return Map.of("error", "Script cannot be converted because it has errors.");
+
+        var sn = ast.getScriptNode(uri);
+        var textEdits = new HashMap<String,List<TextEdit>>();
+
+        // convert legacy parameters to params definition
+        convertParamsToTyped(sn, options, textEdits);
+
+        // convert legacy processes to static types
+        for( var pn : sn.getProcesses() ) {
+            if( !(pn instanceof ProcessNodeV1) )
+                continue;
+            convertProcessToTyped((ProcessNodeV1) pn, options, textEdits);
+        }
+            
+        return Map.of("applyEdit", (Object) new WorkspaceEdit(textEdits));
+    }
+
+    private void convertParamsToTyped(ScriptNode sn, FormattingOptions options, Map<String,List<TextEdit>> textEdits) {
         // construct params block from schema, legacy parameters
         var entry = sn.getEntry();
         if( entry == null || sn.getParams() != null )
@@ -199,22 +235,6 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             var deletion = new TextEdit(LanguageServerUtils.astNodeToRange(param), "");
             edits.add(deletion);
         }
-    }
-
-    public Map<String,Object> convertProcessToTyped(String documentUri, String name, FormattingOptions options) {
-        var uri = URI.create(documentUri);
-        if( !ast.hasAST(uri) || ast.hasErrors(uri) )
-            return Map.of("error", "Legacy process cannot be converted because the script has errors.");
-
-        return ast.getProcessNodes(uri).stream()
-            .filter(pn -> pn instanceof ProcessNodeV1 && pn.getName().equals(name))
-            .findFirst()
-            .map((pn) -> {
-                var textEdits = new HashMap<String,List<TextEdit>>();
-                convertProcessToTyped((ProcessNodeV1) pn, options, textEdits);
-                return Map.of("applyEdit", (Object) new WorkspaceEdit(textEdits));
-            })
-            .orElse(null);
     }
 
     private void convertProcessToTyped(ProcessNodeV1 pn, FormattingOptions options, Map<String,List<TextEdit>> textEdits) {

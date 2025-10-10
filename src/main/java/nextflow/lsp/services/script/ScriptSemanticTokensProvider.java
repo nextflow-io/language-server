@@ -130,6 +130,8 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
                 visitWorkflowEmits(block.getStatements());
 
             tok.visit(node.publishers);
+            tok.visit(node.onComplete);
+            tok.visit(node.onError);
         }
 
         protected void visitWorkflowEmits(List<Statement> emits) {

@@ -20,7 +20,6 @@ import java.util.Collection;
 import java.util.List;
 
 import nextflow.script.dsl.Constant;
-import nextflow.script.types.TypeChecker;
 import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -35,6 +34,7 @@ import org.eclipse.lsp4j.CompletionItemKind;
 
 import static nextflow.lsp.ast.CompletionUtils.*;
 import static nextflow.script.ast.ASTUtils.*;
+import static nextflow.script.types.TypeCheckingUtils.*;
 
 /**
  * Helper class for collecting completion proposals.
@@ -71,7 +71,7 @@ public class CompletionHelper {
     }
 
     public void addItemsFromObjectScope(Expression object, String namePrefix) {
-        ClassNode cn = TypeChecker.getType(object);
+        ClassNode cn = TypesEx.normalize(getType(object));
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var isStatic = object instanceof ClassExpression;
 
@@ -105,7 +105,7 @@ public class CompletionHelper {
     }
 
     public void addMethodsFromObjectScope(Expression object, String namePrefix) {
-        ClassNode cn = TypeChecker.getType(object);
+        ClassNode cn = TypesEx.normalize(getType(object));
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var isStatic = object instanceof ClassExpression;
 

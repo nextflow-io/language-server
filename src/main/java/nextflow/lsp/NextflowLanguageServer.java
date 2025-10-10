@@ -169,7 +169,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             "nextflow.server.previewDag",
             "nextflow.server.previewWorkspace",
             "nextflow.server.convertPipelineToTyped",
-            "nextflow.server.convertProcessToTyped"
+            "nextflow.server.convertScriptToTyped"
         );
         var executeCommandOptions = new ExecuteCommandOptions(commands);
         result.setExecuteCommandProvider(executeCommandOptions);
@@ -583,8 +583,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                     }
                 }
             }
-            if( "nextflow.server.convertProcessToTyped".equals(command) && arguments.size() == 2 ) {
-                log.debug(String.format("textDocument/convertProcessToTyped %s", arguments.toString()));
+            if( "nextflow.server.convertScriptToTyped".equals(command) && arguments.size() == 1 ) {
+                log.debug(String.format("textDocument/convertScriptToTyped %s", arguments.toString()));
                 var uri = JsonUtils.getString(arguments.get(0));
                 var service = getLanguageService(uri);
                 if( service != null ) {

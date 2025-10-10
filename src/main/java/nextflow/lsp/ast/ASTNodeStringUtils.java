@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import groovy.lang.groovydoc.Groovydoc;
+import groovy.transform.NamedParams;
 import nextflow.lsp.util.Logger;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
@@ -34,12 +35,9 @@ import nextflow.script.dsl.Description;
 import nextflow.script.dsl.DslScope;
 import nextflow.script.dsl.FeatureFlag;
 import nextflow.script.dsl.Namespace;
-import nextflow.script.dsl.Operator;
-import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDsl;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.script.formatter.Formatter;
-import nextflow.script.types.TypeChecker;
 import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
@@ -49,12 +47,14 @@ import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.ast.expr.ClassExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 
 import static nextflow.script.ast.ASTUtils.*;
+import static nextflow.script.types.TypeCheckingUtils.*;
 
 /**
  * Utility methods for retreiving text information for ast nodes.
@@ -81,6 +81,9 @@ public class ASTNodeStringUtils {
 
         if( node instanceof MethodNode mn )
             return methodToLabel(mn);
+
+        if( node instanceof Parameter param )
+            return parameterToLabel(param);
 
         if( node instanceof Variable var )
             return variableToLabel(var);
@@ -150,15 +153,16 @@ public class ASTNodeStringUtils {
 
     private static void typedOutput(Expression output, Formatter fmt) {
         if( output instanceof AssignmentExpression assign ) {
-            var target = (VariableExpression) assign.getLeftExpression();
-            fmt.append(target.getText());
-            if( fmt.hasType(target) ) {
+            var target = assign.getLeftExpression();
+            fmt.visit(target);
+            var type = getType(target);
+            if( fmt.hasType(type) ) {
                 fmt.append(": ");
-                fmt.visitTypeAnnotation(target.getType());
+                fmt.visitTypeAnnotation(type);
             }
         }
         else {
-            fmt.visit(output);
+            fmt.visitTypeAnnotation(getType(output));
         }
     }
 
@@ -258,7 +262,7 @@ public class ASTNodeStringUtils {
             if( TypesEx.isNamespace(node) )
                 return "(namespace) " + name;
             var fn = new FieldNode(name, 0xF, node.getReturnType(), node.getDeclaringClass(), null);
-            return variableToLabel(fn);
+            return parameterToLabel(fn);
         }
 
         var label = methodTypeLabel(node);
@@ -271,17 +275,18 @@ public class ASTNodeStringUtils {
             return builder.toString();
         }
 
+        var declaringType = node.getDeclaringClass();
         var builder = new StringBuilder();
         if( node instanceof FunctionNode ) {
             builder.append("def ");
         }
-        else if( !isDslFunction(node) && !isNamespaceFunction(node) ) {
-            builder.append(TypesEx.getName(node.getDeclaringClass()));
+        else if( isDeclaringTypeVisible(declaringType) ) {
+            builder.append(TypesEx.getName(declaringType));
             builder.append(' ');
         }
         else if( Logger.isDebugEnabled() ) {
             builder.append('[');
-            builder.append(TypesEx.getName(node.getDeclaringClass()));
+            builder.append(TypesEx.getName(declaringType));
             builder.append("] ");
         }
         builder.append(node.getName());
@@ -295,49 +300,63 @@ public class ASTNodeStringUtils {
         return builder.toString();
     }
 
-    private static boolean isDslFunction(MethodNode mn) {
-        return mn.getDeclaringClass().implementsInterface(ClassHelper.makeCached(DslScope.class));
-    }
-
-    private static boolean isNamespaceFunction(MethodNode mn) {
-        return mn.getDeclaringClass().implementsInterface(ClassHelper.makeCached(Namespace.class));
+    private static boolean isDeclaringTypeVisible(ClassNode declaringType) {
+        if( declaringType.implementsInterface(ClassHelper.makeCached(DslScope.class)) )
+            return false;
+        if( declaringType.implementsInterface(ClassHelper.makeCached(Namespace.class)) )
+            return false;
+        return true;
     }
 
     private static String methodTypeLabel(MethodNode mn) {
         if( mn instanceof FunctionNode )
             return null;
-        if( findAnnotation(mn, Operator.class).isPresent() )
-            return "operator";
         var cn = mn.getDeclaringClass();
         if( cn.isPrimaryClassNode() )
             return null;
         var type = cn.getTypeClass();
-        if( type == ProcessDsl.DirectiveDsl.class )
-            return "process directive";
         if( type == ProcessDsl.InputDslV1.class )
             return "process input";
         if( type == ProcessDsl.OutputDslV1.class )
             return "process output";
-        if( type == OutputDsl.class )
-            return "output directive";
-        if( type == OutputDsl.IndexDsl.class )
-            return "output index directive";
         return null;
     }
 
     public static String parametersToLabel(Parameter[] params) {
-        return Stream.of(params)
-            .map(param -> variableToLabel(param))
-            .collect(Collectors.joining(", "));
+        var hasNamedParams = params.length > 0 && findAnnotation(params[0], NamedParams.class).isPresent();
+        var builder = new StringBuilder();
+        for( int i = hasNamedParams ? 1 : 0; i < params.length; i++ ) {
+            builder.append(parameterToLabel(params[i]));
+            if( i < params.length - 1 || hasNamedParams )
+                builder.append(", ");
+        }
+        if( hasNamedParams )
+            builder.append("[options]");
+        return builder.toString();
+    }
+
+    private static boolean isNamedParams(Parameter parameter) {
+        return findAnnotation(parameter, NamedParams.class).isPresent();
+    }
+
+    private static String parameterToLabel(Variable parameter) {
+        var builder = new StringBuilder();
+        builder.append(parameter.getName());
+        var type = parameter.getType();
+        if( type.isArray() )
+            builder.append("...");
+        if( !ClassHelper.isObjectType(type) || type.isGenericsPlaceHolder() ) {
+            builder.append(": ");
+            builder.append(TypesEx.getName(type));
+        }
+        return builder.toString();
     }
 
     private static String variableToLabel(Variable variable) {
         var builder = new StringBuilder();
         builder.append(variable.getName());
-        var type = TypeChecker.getType(variable);
-        if( type.isArray() )
-            builder.append("...");
-        if( !ClassHelper.isObjectType(type) ) {
+        var type = getType(variable);
+        if( !ClassHelper.isObjectType(type) || type.isGenericsPlaceHolder() ) {
             builder.append(": ");
             builder.append(TypesEx.getName(type));
         }
@@ -377,6 +396,9 @@ public class ASTNodeStringUtils {
             var result = groovydocToMarkdown(mn.getGroovydoc());
             if( result == null )
                 result = annotationValueToMarkdown(mn);
+            var namedParams = namedParams(mn.getParameters());
+            if( namedParams != null )
+                result = (result != null ? result : "") + namedParams;
             return result;
         }
 
@@ -393,6 +415,30 @@ public class ASTNodeStringUtils {
                 return StringGroovyMethods.stripIndent(description, true).trim();
             })
             .orElse(null);
+    }
+
+    private static String namedParams(Parameter[] parameters) {
+        if( parameters.length == 0 )
+            return null;
+        var param = parameters[0];
+        if( !TypesEx.isEqual(param.getType(), ClassHelper.MAP_TYPE) )
+            return null;
+        var namedParams = asNamedParams(param);
+        if( namedParams.isEmpty() )
+            return null;
+        var builder = new StringBuilder();
+        builder.append("\n\nAvailable options:\n");
+        namedParams.forEach((name, an) -> {
+            var namedParam = asNamedParam(an);
+            builder.append("\n`");
+            builder.append(name);
+            if( !ClassHelper.isObjectType(namedParam.getType()) ) {
+                builder.append(": ");
+                builder.append(TypesEx.getName(namedParam.getType()));
+            }
+            builder.append("`\n");
+        });
+        return builder.toString();
     }
 
     private static String groovydocToMarkdown(Groovydoc groovydoc) {
