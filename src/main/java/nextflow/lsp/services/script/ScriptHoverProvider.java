@@ -70,6 +70,12 @@ public class ScriptHoverProvider implements HoverProvider {
         var offsetNode = nodeStack.get(0);
         var defNode = LanguageServerASTUtils.getDefinition(offsetNode);
 
+        // don't show definition hover hint in the definition's own body
+        if( defNode == offsetNode ) {
+            if( position.getLine() != defNode.getLineNumber() - 1 )
+                defNode = null;
+        }
+
         var builder = new StringBuilder();
 
         var label = ASTNodeStringUtils.getLabel(defNode);

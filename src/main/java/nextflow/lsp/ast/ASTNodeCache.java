@@ -299,13 +299,13 @@ public abstract class ASTNodeCache {
             })
             .sorted((n1, n2) -> {
                 // select node with later start position
-                var p1 = nodeToRange.get(n1);
-                var p2 = nodeToRange.get(n2);
-                var cmpStart = Positions.COMPARATOR.compare(p1.getStart(), p2.getStart());
+                var r1 = nodeToRange.get(n1);
+                var r2 = nodeToRange.get(n2);
+                var cmpStart = Positions.COMPARATOR.compare(r1.getStart(), r2.getStart());
                 if( cmpStart != 0 )
                     return -cmpStart;
                 // select node with earlier end position
-                var cmpEnd = Positions.COMPARATOR.compare(p1.getEnd(), p2.getEnd());
+                var cmpEnd = Positions.COMPARATOR.compare(r1.getEnd(), r2.getEnd());
                 if( cmpEnd != 0 )
                     return cmpEnd;
                 // select the most descendant node
