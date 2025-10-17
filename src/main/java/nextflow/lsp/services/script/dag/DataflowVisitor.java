@@ -30,6 +30,8 @@ import nextflow.lsp.services.script.ScriptAstCache;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ProcessNodeV1;
+import nextflow.script.ast.ProcessNodeV2;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
@@ -350,7 +352,11 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             var mn = result.getV1();
             var label = result.getV2();
             var propName = result.getV3();
-            if( mn instanceof ProcessNode pn ) {
+            if( mn instanceof ProcessNodeV2 pn ) {
+                visitProcessOut(pn, label, propName);
+                return;
+            }
+            if( mn instanceof ProcessNodeV1 pn ) {
                 visitProcessOut(pn, label, propName);
                 return;
             }
@@ -385,14 +391,31 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return null;
     }
 
-    private void visitProcessOut(ProcessNode process, String label, String propName) {
+    private void visitProcessOut(ProcessNodeV2 process, String label, String propName) {
+        if( propName == null ) {
+            addOperatorPred(label, process);
+            return;
+        }
+        asBlockStatements(process.outputs).stream()
+            .map(stmt -> ((ExpressionStatement) stmt).getExpression())
+            .filter((output) -> {
+                var outputName = typedOutputName(output);
+                return propName.equals(outputName);
+            })
+            .findFirst()
+            .ifPresent((call) -> {
+                addOperatorPred(label, process);
+            });
+    }
+
+    private void visitProcessOut(ProcessNodeV1 process, String label, String propName) {
         if( propName == null ) {
             addOperatorPred(label, process);
             return;
         }
         asDirectives(process.outputs)
             .filter((call) -> {
-                var emitName = getProcessEmitName(call);
+                var emitName = processEmitName(call);
                 return propName.equals(emitName);
             })
             .findFirst()
@@ -401,7 +424,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             });
     }
 
-    private String getProcessEmitName(MethodCallExpression output) {
+    private String processEmitName(MethodCallExpression output) {
         return Optional.of(output)
             .flatMap(call -> Optional.ofNullable(asNamedArgs(call)))
             .flatMap(namedArgs ->
@@ -423,7 +446,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         asBlockStatements(workflow.emits).stream()
             .map(stmt -> ((ExpressionStatement) stmt).getExpression())
             .filter((emit) -> {
-                var emitName = getWorkflowEmitName(emit);
+                var emitName = typedOutputName(emit);
                 return propName.equals(emitName);
             })
             .findFirst()
@@ -432,7 +455,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             });
     }
 
-    private String getWorkflowEmitName(Expression emit) {
+    private String typedOutputName(Expression emit) {
         if( emit instanceof VariableExpression ve ) {
             return ve.getName();
         }

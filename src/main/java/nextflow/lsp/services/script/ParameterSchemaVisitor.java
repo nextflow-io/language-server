@@ -27,6 +27,7 @@ import java.util.stream.Stream;
 
 import groovy.json.JsonSlurper;
 import nextflow.lsp.ast.ASTNodeStringUtils;
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.ParamBlockNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
@@ -49,6 +50,7 @@ import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 import static nextflow.script.ast.ASTUtils.*;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.*;
 
 /**
  * Validate params based on the JSON schema.
@@ -162,14 +164,23 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
             if( attrs == null )
                 continue;
             var type = getTypeClassFromString(asString(attrs.get("type")));
+            var defaultValue = attrs.get("default");
             var description = asString(attrs.get("description"));
             var fn = new FieldNode(name, Modifier.PUBLIC, type, cn, null);
             fn.setHasNoRealSourcePosition(true);
             fn.setDeclaringClass(cn);
             fn.setSynthetic(true);
-            var an = new AnnotationNode(ClassHelper.makeCached(Description.class));
-            an.addMember("value", new ConstantExpression(description));
-            fn.addAnnotation(an);
+            if( defaultValue != null ) {
+                var ce = constX(defaultValue);
+                if( defaultValue instanceof String )
+                    ce.putNodeMetaData(ASTNodeMarker.VERBATIM_TEXT, "'" + defaultValue + "'");
+                fn.setInitialValueExpression(ce);
+            }
+            if( description != null ) {
+                var an = new AnnotationNode(ClassHelper.makeCached(Description.class));
+                an.addMember("value", new ConstantExpression(description));
+                fn.addAnnotation(an);
+            }
             cn.addField(fn);
         }
 
@@ -200,11 +211,11 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
 
     private ClassNode getTypeClassFromString(String type) {
         if( "boolean".equals(type) )
-            return ClassHelper.boolean_TYPE;
+            return ClassHelper.Boolean_TYPE;
         if( "integer".equals(type) )
-            return ClassHelper.long_TYPE;
+            return ClassHelper.Integer_TYPE;
         if( "number".equals(type) )
-            return ClassHelper.double_TYPE;
+            return ClassHelper.Float_TYPE;
         if( "string".equals(type) )
             return ClassHelper.STRING_TYPE;
         return ClassHelper.dynamicType();

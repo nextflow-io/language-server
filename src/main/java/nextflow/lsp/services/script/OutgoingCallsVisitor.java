@@ -18,7 +18,8 @@ package nextflow.lsp.services.script;
 import java.util.ArrayList;
 import java.util.List;
 
-import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ProcessNodeV1;
+import nextflow.script.ast.ProcessNodeV2;
 import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.CodeVisitorSupport;
 import org.codehaus.groovy.ast.MethodNode;
@@ -36,7 +37,9 @@ class OutgoingCallsVisitor extends CodeVisitorSupport {
 
     public List<MethodCallExpression> apply(MethodNode node) {
         outgoingCalls = new ArrayList<>();
-        if( node instanceof ProcessNode pn )
+        if( node instanceof ProcessNodeV2 pn )
+            visit(pn.exec);
+        else if( node instanceof ProcessNodeV1 pn )
             visit(pn.exec);
         else if( node instanceof WorkflowNode wn )
             visit(wn.main);

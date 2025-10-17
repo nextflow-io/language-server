@@ -19,6 +19,7 @@ import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
@@ -100,7 +101,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
         var defNode = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
-        if( defNode instanceof ProcessNode || defNode instanceof WorkflowNode )
+        if( defNode instanceof ProcessNodeV1 || defNode instanceof WorkflowNode )
             checkMethodCallArguments(node, defNode);
         super.visitMethodCallExpression(node);
     }

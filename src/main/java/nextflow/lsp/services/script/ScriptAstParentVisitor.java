@@ -24,14 +24,18 @@ import nextflow.script.ast.IncludeEntryNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.OutputNode;
 import nextflow.script.ast.ParamBlockNode;
-import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ProcessNodeV1;
+import nextflow.script.ast.ProcessNodeV2;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
+import nextflow.script.ast.TupleParameter;
 import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.control.SourceUnit;
+
+import static nextflow.script.ast.ASTUtils.asFlatParams;
 
 /**
  *
@@ -121,7 +125,25 @@ class ScriptAstParentVisitor extends ScriptVisitorSupport {
     }
 
     @Override
-    public void visitProcess(ProcessNode node) {
+    public void visitProcessV2(ProcessNodeV2 node) {
+        lookup.push(node);
+        try {
+            lookup.visitParameters(asFlatParams(node.inputs));
+            lookup.visit(node.directives);
+            lookup.visit(node.stagers);
+            lookup.visit(node.outputs);
+            lookup.visit(node.topics);
+            lookup.visit(node.when);
+            lookup.visit(node.exec);
+            lookup.visit(node.stub);
+        }
+        finally {
+            lookup.pop();
+        }
+    }
+
+    @Override
+    public void visitProcessV1(ProcessNodeV1 node) {
         lookup.push(node);
         try {
             lookup.visit(node.directives);

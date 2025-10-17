@@ -27,7 +27,8 @@ import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.OutputNode;
 import nextflow.script.ast.ParamBlockNode;
-import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ProcessNodeV1;
+import nextflow.script.ast.ProcessNodeV2;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
@@ -153,7 +154,19 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
         }
 
         @Override
-        public void visitProcess(ProcessNode node) {
+        public void visitProcessV2(ProcessNodeV2 node) {
+            tok.visitParameters(asFlatParams(node.inputs));
+            tok.visit(node.directives);
+            tok.visit(node.stagers);
+            tok.visit(node.outputs);
+            tok.visit(node.topics);
+            tok.visit(node.when);
+            tok.visit(node.exec);
+            tok.visit(node.stub);
+        }
+
+        @Override
+        public void visitProcessV1(ProcessNodeV1 node) {
             tok.visit(node.directives);
             tok.visit(node.inputs);
             tok.visit(node.outputs);
