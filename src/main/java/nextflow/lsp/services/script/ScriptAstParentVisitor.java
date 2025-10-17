@@ -118,6 +118,8 @@ class ScriptAstParentVisitor extends ScriptVisitorSupport {
             lookup.visit(node.main);
             lookup.visit(node.emits);
             lookup.visit(node.publishers);
+            lookup.visit(node.onComplete);
+            lookup.visit(node.onError);
         }
         finally {
             lookup.pop();
