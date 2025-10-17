@@ -22,7 +22,7 @@ import java.util.List;
 import nextflow.config.ast.ConfigApplyBlockNode;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
-import nextflow.config.schema.SchemaNode;
+import nextflow.config.spec.SpecNode;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTNodeStringUtils;
 import nextflow.lsp.ast.LanguageServerASTUtils;
@@ -101,7 +101,7 @@ public class ConfigHoverProvider implements HoverProvider {
             names.addAll(assign.names);
 
             var fqName = String.join(".", names);
-            var option = SchemaNode.ROOT.getOption(names);
+            var option = SpecNode.ROOT.getOption(names);
             if( option != null ) {
                 var description = StringGroovyMethods.stripIndent(option.description(), true).trim();
                 var builder = new StringBuilder();
@@ -120,7 +120,7 @@ public class ConfigHoverProvider implements HoverProvider {
             if( names.isEmpty() )
                 return null;
 
-            var scope = SchemaNode.ROOT.getChild(names);
+            var scope = SpecNode.ROOT.getChild(names);
             if( scope != null ) {
                 return StringGroovyMethods.stripIndent(scope.description(), true).trim();
             }

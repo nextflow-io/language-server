@@ -16,13 +16,14 @@
 package nextflow.lsp.services.config;
 
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.Stack;
 
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigVisitorSupport;
-import nextflow.config.schema.SchemaNode;
+import nextflow.config.spec.SpecNode;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.types.TypesEx;
@@ -38,19 +39,19 @@ import org.codehaus.groovy.syntax.Token;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class ConfigSchemaVisitor extends ConfigVisitorSupport {
+public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private SchemaNode.Scope schema;
+    private SpecNode.Scope spec;
 
     private boolean typeChecking;
 
     private Stack<String> scopes = new Stack<>();
 
-    public ConfigSchemaVisitor(SourceUnit sourceUnit, SchemaNode.Scope schema, boolean typeChecking) {
+    public ConfigSpecVisitor(SourceUnit sourceUnit, Map<String,SpecNode> scopes, boolean typeChecking) {
         this.sourceUnit = sourceUnit;
-        this.schema = schema;
+        this.spec = new SpecNode.Scope("", scopes);
         this.typeChecking = typeChecking;
     }
 
@@ -88,7 +89,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
         var fqName = String.join(".", names);
         if( fqName.startsWith("process.ext.") )
             return;
-        var option = schema.getOption(names);
+        var option = spec.getOption(names);
         if( option == null ) {
             var message = "Unrecognized config option '" + fqName + "'";
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
@@ -117,7 +118,7 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
 
     @Override
     public void addError(String message, ASTNode node) {
-        var cause = new ConfigSchemaError(message, node);
+        var cause = new ConfigSpecError(message, node);
         var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
@@ -127,9 +128,9 @@ public class ConfigSchemaVisitor extends ConfigVisitorSupport {
         sourceUnit.getErrorCollector().addWarning(WarningMessage.POSSIBLE_ERRORS, message, token, sourceUnit);
     }
 
-    private class ConfigSchemaError extends SyntaxException implements PhaseAware {
+    private class ConfigSpecError extends SyntaxException implements PhaseAware {
 
-        public ConfigSchemaError(String message, ASTNode node) {
+        public ConfigSpecError(String message, ASTNode node) {
             super(message, node);
         }
 

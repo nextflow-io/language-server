@@ -30,11 +30,11 @@ test {
 
 configurations {
   nextflowRuntime
-  schemaImplementation.extendsFrom(nextflowRuntime)
+  specImplementation.extendsFrom(nextflowRuntime)
 }
 
 dependencies {
-  implementation 'io.nextflow:nf-lang:25.07.0-edge'
+  implementation 'io.nextflow:nf-lang:25.09.1-edge'
   implementation 'org.apache.groovy:groovy:4.0.28'
   implementation 'org.apache.groovy:groovy-json:4.0.28'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
@@ -45,13 +45,13 @@ dependencies {
   runtimeOnly 'org.yaml:snakeyaml:2.2'
 
   // include Nextflow runtime at build-time to extract language definitions
-  nextflowRuntime 'io.nextflow:nextflow:25.07.0-edge'
-  nextflowRuntime 'io.nextflow:nf-amazon:3.1.0'
-  nextflowRuntime 'io.nextflow:nf-azure:1.19.0'
-  nextflowRuntime 'io.nextflow:nf-google:1.22.2'
-  nextflowRuntime 'io.nextflow:nf-k8s:1.1.1'
-  nextflowRuntime 'io.nextflow:nf-tower:1.14.0'
-  nextflowRuntime 'io.nextflow:nf-wave:1.14.1'
+  nextflowRuntime 'io.nextflow:nextflow:25.09.1-edge'
+  nextflowRuntime 'io.nextflow:nf-amazon:3.3.0'
+  nextflowRuntime 'io.nextflow:nf-azure:1.20.1'
+  nextflowRuntime 'io.nextflow:nf-google:1.23.1'
+  nextflowRuntime 'io.nextflow:nf-k8s:1.2.1'
+  nextflowRuntime 'io.nextflow:nf-tower:1.16.0'
+  nextflowRuntime 'io.nextflow:nf-wave:1.16.0'
 
   testImplementation ('org.objenesis:objenesis:3.4')
   testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
@@ -59,23 +59,23 @@ dependencies {
 }
 
 sourceSets {
-  schema {
-    groovy.srcDir 'src/schema/groovy'
+  spec {
+    groovy.srcDir 'src/spec/groovy'
     compileClasspath += configurations.nextflowRuntime
     runtimeClasspath += configurations.nextflowRuntime
   }
 }
 
-task buildSchema(type: JavaExec) {
-  description = 'Build JSON schema of Nextflow configuration'
+task buildSpec(type: JavaExec) {
+  description = 'Build spec file of core definitions'
   group = 'build'
 
-  dependsOn compileSchemaGroovy
-  classpath = sourceSets.schema.runtimeClasspath
-  mainClass.set('nextflow.SchemaRenderer')
-  args "$buildDir/generated/index.json"
+  dependsOn compileSpecGroovy
+  classpath = sourceSets.spec.runtimeClasspath
+  mainClass.set('nextflow.SpecWriter')
+  args "$buildDir/generated/definitions.json"
 
-  outputs.file("$buildDir/generated/index.json")
+  outputs.file("$buildDir/generated/definitions.json")
   outputs.cacheIf { true }
 
   doFirst {
@@ -84,17 +84,17 @@ task buildSchema(type: JavaExec) {
 }
 
 processResources {
-  dependsOn buildSchema
-  from(buildSchema.outputs.files) {
-    into 'schema'
+  dependsOn buildSpec
+  from(buildSpec.outputs.files) {
+    into 'spec'
   }
 }
 
 jar {
-  dependsOn buildSchema
+  dependsOn buildSpec
   from("$buildDir/generated") {
-    include 'index.json'
-    into 'schema'
+    include 'definitions.json'
+    into 'spec'
   }
 }
 

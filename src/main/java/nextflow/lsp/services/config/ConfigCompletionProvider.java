@@ -24,7 +24,7 @@ import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.dsl.ConfigDsl;
-import nextflow.config.schema.SchemaNode;
+import nextflow.config.spec.SpecNode;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.CompletionHelper;
 import nextflow.lsp.services.CompletionProvider;
@@ -180,11 +180,11 @@ public class ConfigCompletionProvider implements CompletionProvider {
     }
 
     private void addConfigOptions(List<String> names) {
-        var scope = SchemaNode.ROOT.getScope(names);
+        var scope = SpecNode.ROOT.getScope(names);
         if( scope == null )
             return;
         scope.children().forEach((name, child) -> {
-            if( child instanceof SchemaNode.Option option )
+            if( child instanceof SpecNode.Option option )
                 ch.addItem(configOption(name, option.description(), option.type()));
             else
                 ch.addItem(configScope(name, child.description()));
@@ -193,8 +193,8 @@ public class ConfigCompletionProvider implements CompletionProvider {
 
     private static List<CompletionItem> topLevelItems() {
         var result = new ArrayList<CompletionItem>();
-        SchemaNode.ROOT.children().forEach((name, child) -> {
-            if( child instanceof SchemaNode.Option option ) {
+        SpecNode.ROOT.children().forEach((name, child) -> {
+            if( child instanceof SpecNode.Option option ) {
                 result.add(configOption(name, option.description(), option.type()));
             }
             else {
