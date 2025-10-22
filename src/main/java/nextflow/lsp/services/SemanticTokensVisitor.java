@@ -21,6 +21,7 @@ import java.util.stream.Stream;
 
 import nextflow.lsp.util.Positions;
 import nextflow.lsp.util.LanguageServerUtils;
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.dsl.Constant;
 import nextflow.script.parser.TokenPosition;
 import nextflow.script.types.TypesEx;
@@ -125,7 +126,8 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
     public void visitMethodCallExpression(MethodCallExpression node) {
         if( !node.isImplicitThis() )
             visit(node.getObjectExpression());
-        append(node.getMethod(), SemanticTokenTypes.Function);
+        if( node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET) != null )
+            append(node.getMethod(), SemanticTokenTypes.Function);
         visit(node.getArguments());
     }
 

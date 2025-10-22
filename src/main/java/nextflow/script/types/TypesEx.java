@@ -15,14 +15,18 @@
  */
 package nextflow.script.types;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 
+import groovy.lang.GString;
 import nextflow.script.ast.ASTNodeMarker;
-import nextflow.script.dsl.DslScope;
 import nextflow.script.dsl.Namespace;
-import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
@@ -32,21 +36,17 @@ import org.codehaus.groovy.ast.tools.GenericsUtils;
 /**
  * Utility constants and functions for working with Nextflow types.
  *
+ * ClassNodes should be "normalized" into one of the standard Nextflow
+ * types (see STANDARD_TYPES) before resolving fields and methods. They
+ * must be normalized in a particular way in order to preserve generics
+ * types and node metadata (e.g. ASTNodeMarker.NULLABLE).
+ *
+ * The functions in this class (isAssignableFrom, isEqual, getName)
+ * normalize types automatically.
+ *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class TypesEx {
-
-    public static final List<ClassNode> DEFAULT_SCRIPT_IMPORTS = List.of(
-        new ClassNode(Channel.class),
-        new ClassNode(Duration.class),
-        new ClassNode(MemoryUnit.class),
-        new ClassNode(Path.class)
-    );
-
-    public static final List<ClassNode> DEFAULT_CONFIG_IMPORTS = List.of(
-        new ClassNode(Duration.class),
-        new ClassNode(MemoryUnit.class)
-    );
 
     /**
      * Determine whether a method has a non-void return type.
@@ -67,39 +67,88 @@ public class TypesEx {
      *
      * @param target
      * @param source
+     * @param checkGenerics
      */
-    public static boolean isAssignableFrom(ClassNode target, ClassNode source) {
-        if( ClassHelper.isObjectType(target) )
+    public static boolean isAssignableFrom(ClassNode target, ClassNode source, boolean checkGenerics) {
+        if( ClassHelper.isObjectType(target) || ClassHelper.isDynamicTyped(source) )
             return true;
         if( target.equals(source) )
             return true;
-        return isAssignableFrom(target.getTypeClass(), source.getTypeClass());
+        return target.isResolved() && source.isResolved()
+            && isAssignableFrom(target.getTypeClass(), source.getTypeClass())
+            && (!checkGenerics || isAssignableFrom(target.getGenericsTypes(), source.getGenericsTypes()));
+    }
+
+    public static boolean isAssignableFrom(ClassNode target, ClassNode source) {
+        return isAssignableFrom(target, source, false);
     }
 
     public static boolean isAssignableFrom(Class target, Class source) {
-        if( target == Integer.class && source == Number.class )
-            return false;
-        if( target == Number.class && source == Integer.class )
+        target = normalize(target);
+        source = normalize(source);
+        if( target == Float_TYPE && source == Integer_TYPE )
             return true;
-        return target.equals(source);
+        return target.isAssignableFrom(source);
+    }
+
+    private static boolean isAssignableFrom(GenericsType[] a, GenericsType[] b) {
+        if( a == null || b == null )
+            return true;
+        if( a.length != b.length )
+            return false;
+        for( int i = 0; i < a.length; i++ ) {
+            if( a[i].isWildcard() )
+                continue;
+            if( !isEqual(a[i].getType(), b[i].getType()) )
+                return false;
+        }
+        return true;
     }
 
     /**
-     * Determine whether a class is a DSL scope.
+     * Determine whether two types are equal.
      *
-     * @param cn
+     * @param a
+     * @param b
      */
-    public static boolean isDslScope(ClassNode cn) {
-        return cn.implementsInterface(ClassHelper.makeCached(DslScope.class));
+    public static boolean isEqual(ClassNode a, ClassNode b) {
+        if( a == null || b == null )
+            return false;
+        if( a.equals(b) )
+            return true;
+        return a.isResolved() && b.isResolved()
+            && isEqual(a.getTypeClass(), b.getTypeClass())
+            && isEqual(a.getGenericsTypes(), b.getGenericsTypes());
+    }
+
+    private static boolean isEqual(Class a, Class b) {
+        a = normalize(a);
+        b = normalize(b);
+        return a.equals(b);
+    }
+
+    private static boolean isEqual(GenericsType[] a, GenericsType[] b) {
+        if( a == null && b == null )
+            return true;
+        if( a == null || b == null || a.length != b.length )
+            return false;
+        for( int i = 0; i < a.length; i++ ) {
+            if( !isEqual(a[i].getType(), b[i].getType()) )
+                return false;
+        }
+        return true;
     }
 
     /**
-     * Determine whether a class is a namespace.
+     * Determine whether a type is a functional interface.
      *
-     * @param cn
+     * @param type
      */
-    public static boolean isNamespace(ClassNode cn) {
-        return cn.implementsInterface(ClassHelper.makeCached(Namespace.class));
+    public static boolean isFunctionalInterface(ClassNode type) {
+        return type.getAnnotations().stream()
+            .filter(an -> an.getClassNode().getName().equals(FunctionalInterface.class.getName()))
+            .findFirst()
+            .isPresent();
     }
 
     /**
@@ -109,7 +158,17 @@ public class TypesEx {
      * @param mn
      */
     public static boolean isNamespace(MethodNode mn) {
-        return isNamespace(mn.getReturnType());
+        var cn = mn.getReturnType();
+        return cn.isResolved() && Namespace.class.isAssignableFrom(cn.getTypeClass());
+    }
+
+    /**
+     * Determine whether a class is a namespace.
+     *
+     * @param cn
+     */
+    public static boolean isNamespace(ClassNode cn) {
+        return cn.implementsInterface(ClassHelper.makeCached(Namespace.class));
     }
 
     /**
@@ -124,53 +183,33 @@ public class TypesEx {
         if( type.isArray() )
             return getName(type.getComponentType());
 
-        if( ClassHelper.isFunctionalInterface(type) )
-            return closureName(type);
-
-        if( type.isDerivedFrom(ClassHelper.TUPLE_TYPE) )
-            return tupleName(type);
+        if( isFunctionalInterface(type) ) {
+            var samTypeInfo = GenericsUtils.parameterizeSAM(type);
+            return getName(samTypeInfo.getV1(), samTypeInfo.getV2());
+        }
 
         return typeName(type);
     }
 
-    private static String closureName(ClassNode type) {
-        var mn = ClassHelper.findSAM(type);
-        var spec = GenericsUtils.extractPlaceholders(type);
+    /**
+     * Get the display name of a functional type.
+     *
+     * @param parameterTypes
+     * @param returnType
+     */
+    public static String getName(ClassNode[] parameterTypes, ClassNode returnType) {
         var builder = new StringBuilder();
 
-        var params = mn.getParameters();
         builder.append('(');
-        for( int i = 0; i < params.length; i++ ) {
+        for( int i = 0; i < parameterTypes.length; i++ ) {
             if( i > 0 )
                 builder.append(", ");
-            var paramType = specificType(params[i].getType(), spec);
-            builder.append(getName(paramType));
+            builder.append(getName(parameterTypes[i]));
         }
         builder.append(')');
-
-        var returnType = specificType(mn.getReturnType(), spec);
         builder.append(" -> ");
-        builder.append(
-            ClassHelper.VOID_TYPE.equals(returnType)
-                ? "()"
-                : getName(returnType)
-        );
+        builder.append(ClassHelper.VOID_TYPE.equals(returnType) ? "()" : getName(returnType));
 
-        return builder.toString();
-    }
-
-    private static ClassNode specificType(ClassNode type, Map<GenericsType.GenericsTypeName, GenericsType> spec) {
-        if( !type.isGenericsPlaceHolder() )
-            return type;
-        var name = type.getUnresolvedName();
-        return spec.get(new GenericsType.GenericsTypeName(name)).getType();
-    }
-
-    private static String tupleName(ClassNode type) {
-        var builder = new StringBuilder();
-        builder.append('(');
-        genericsTypeNames(type.getGenericsTypes(), builder);
-        builder.append(')');
         return builder.toString();
     }
 
@@ -178,20 +217,30 @@ public class TypesEx {
         var builder = new StringBuilder();
 
         var placeholder = type.isGenericsPlaceHolder();
-        if( placeholder )
+        if( placeholder && type.getGenericsTypes() != null ) {
+            builder.append(typeName(type.getGenericsTypes()[0].getType()));
+        }
+        else if( placeholder ) {
             builder.append(type.getUnresolvedName());
-        else if( type.getNodeMetaData(ASTNodeMarker.FULLY_QUALIFIED) != null )
+        }
+        else if( type.getNodeMetaData(ASTNodeMarker.FULLY_QUALIFIED) != null ) {
             builder.append(type.getName());
-        else if( hasTypeClass(type) )
+        }
+        else if( type.isResolved() ) {
             builder.append(getName(type.getTypeClass()));
-        else
+        }
+        else {
             builder.append(getName(type.getNameWithoutPackage()));
+        }
 
-        if( !placeholder && type.isUsingGenerics() ) {
+        if( !placeholder && type.getGenericsTypes() != null ) {
             builder.append('<');
             genericsTypeNames(type.getGenericsTypes(), builder);
             builder.append('>');
         }
+
+        if( type.getNodeMetaData(ASTNodeMarker.NULLABLE) != null )
+            builder.append('?');
 
         return builder.toString();
     }
@@ -204,24 +253,119 @@ public class TypesEx {
         }
     }
 
-    private static boolean hasTypeClass(ClassNode type) {
-        try {
-            type.getTypeClass();
-            return true;
-        }
-        catch( GroovyBugError e ) {
-            return false;
-        }
-    }
-
     public static String getName(Class type) {
-        return getName(type.getSimpleName());
+        return getName(normalize(type).getSimpleName());
     }
 
     public static String getName(String name) {
         if( "Object".equals(name) )
             return "?";
         return name;
+    }
+
+    public static final Class Bag_TYPE          = nextflow.script.types.shim.Bag.class;
+    public static final Class Boolean_TYPE      = Boolean.class;
+    public static final Class Duration_TYPE     = nextflow.script.types.shim.Duration.class;
+    public static final Class Float_TYPE        = nextflow.script.types.shim.Float.class;
+    public static final Class Integer_TYPE      = nextflow.script.types.shim.Integer.class;
+    public static final Class Iterable_TYPE     = nextflow.script.types.shim.Iterable.class;
+    public static final Class List_TYPE         = nextflow.script.types.shim.List.class;
+    public static final Class Map_TYPE          = nextflow.script.types.shim.Map.class;
+    public static final Class MapEntry_TYPE     = nextflow.script.types.shim.Map.Entry.class;
+    public static final Class MemoryUnit_TYPE   = nextflow.script.types.shim.MemoryUnit.class;
+    public static final Class Path_TYPE         = nextflow.script.types.shim.Path.class;
+    public static final Class Set_TYPE          = nextflow.script.types.shim.Set.class;
+    public static final Class String_TYPE       = nextflow.script.types.shim.String.class;
+
+    private static final List<Class> STANDARD_TYPES = List.of(
+        Bag_TYPE,
+        Boolean_TYPE,
+        Duration_TYPE,
+        Float_TYPE,
+        Integer_TYPE,
+        Iterable_TYPE,
+        List_TYPE,
+        Map_TYPE,
+        MapEntry_TYPE,
+        MemoryUnit_TYPE,
+        Path_TYPE,
+        Set_TYPE,
+        String_TYPE
+    );
+
+    /**
+     * Mapping of Java types to Nextflow types, which
+     * provide method signatures and documentation.
+     */
+    private static final Map<Class,Class> TYPE_ALIASES = Map.ofEntries(
+        Map.entry(Bag.class,        Bag_TYPE),
+
+        Map.entry(boolean.class,    Boolean_TYPE),
+
+        Map.entry(Duration.class,   Duration_TYPE),
+
+        Map.entry(BigDecimal.class, Float_TYPE),
+        Map.entry(Double.class,     Float_TYPE),
+        Map.entry(Float.class,      Float_TYPE),
+        Map.entry(double.class,     Float_TYPE),
+        Map.entry(float.class,      Float_TYPE),
+
+        Map.entry(BigInteger.class, Integer_TYPE),
+        Map.entry(Integer.class,    Integer_TYPE),
+        Map.entry(Long.class,       Integer_TYPE),
+        Map.entry(int.class,        Integer_TYPE),
+        Map.entry(long.class,       Integer_TYPE),
+
+        Map.entry(Collection.class, Iterable_TYPE),
+        Map.entry(Iterable.class,   Iterable_TYPE),
+
+        Map.entry(List.class,       List_TYPE),
+
+        Map.entry(Map.class,        Map_TYPE),
+        Map.entry(Map.Entry.class,  MapEntry_TYPE),
+
+        Map.entry(MemoryUnit.class, MemoryUnit_TYPE),
+
+        Map.entry(Path.class,       Path_TYPE),
+
+        Map.entry(Set.class,        Set_TYPE),
+
+        Map.entry(String.class,     String_TYPE),
+        Map.entry(GString.class,    String_TYPE)
+    );
+
+    /**
+     * Determine the canonical Nextflow type for a given class.
+     *
+     * @param type
+     */
+    public static Class normalize(Class type) {
+        if( TYPE_ALIASES.containsKey(type) )
+            return TYPE_ALIASES.get(type);
+        var queue = new LinkedList<Class>();
+        queue.add(type);
+        while( !queue.isEmpty() ) {
+            var c = queue.remove();
+            if( c == null )
+                continue;
+            if( STANDARD_TYPES.contains(c) )
+                return c;
+            queue.add(c.getSuperclass());
+            for( var ic : c.getInterfaces() )
+                queue.add(ic);
+        }
+        return type;
+    }
+
+    public static ClassNode normalize(ClassNode cn) {
+        if( cn == null || !cn.isResolved() )
+            return cn;
+        if( cn.getTypeClass() == ParamsMap.class || cn.getTypeClass() == Record.class )
+            return cn;
+        var result = ClassHelper.makeCached(normalize(cn.getTypeClass())).getPlainNodeReference();
+        if( cn.getGenericsTypes() != null )
+            result.setGenericsTypes(cn.getGenericsTypes());
+        return result;
     }
 
 }

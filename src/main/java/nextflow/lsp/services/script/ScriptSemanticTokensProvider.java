@@ -191,6 +191,7 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
 
         @Override
         public void visitOutput(OutputNode node) {
+            tok.append(node, node.getName().length(), SemanticTokenTypes.Parameter);
             visitOutputBody(node.body);
         }
 

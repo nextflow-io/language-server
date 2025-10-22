@@ -21,7 +21,6 @@ import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDsl;
-import nextflow.script.types.TypeChecker;
 import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -34,6 +33,8 @@ import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.CompletionItemLabelDetails;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
+
+import static nextflow.script.types.TypeCheckingUtils.*;
 
 /**
  * Utility methods for retreiving completion information for ast nodes.
@@ -94,7 +95,7 @@ public class CompletionUtils {
             result.setDescription(methodDescription(mn));
         }
         else if( node instanceof Variable variable ) {
-            var type = TypeChecker.getType(variable);
+            var type = getType(variable);
             result.setDescription(TypesEx.getName(type));
         }
         return result;

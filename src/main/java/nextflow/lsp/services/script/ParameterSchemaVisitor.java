@@ -26,9 +26,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import groovy.json.JsonSlurper;
-import nextflow.lsp.ast.ASTNodeStringUtils;
 import nextflow.script.ast.ASTNodeMarker;
-import nextflow.script.ast.ParamBlockNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.ast.WorkflowNode;
@@ -41,7 +39,6 @@ import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
-import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
@@ -75,36 +72,11 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
     public void visit() {
         var moduleNode = sourceUnit.getAST();
         if( moduleNode instanceof ScriptNode sn ) {
-            if( sn.getEntry() != null ) {
-                paramsType = sn.getParams() != null
-                    ? declareParamsFromScript(sn.getParams())
-                    : declareParamsFromSchema(sn.getEntry());
-                if( paramsType != null )
-                    visitWorkflow(sn.getEntry());
+            if( sn.getEntry() != null && sn.getParams() == null ) {
+                paramsType = declareParamsFromSchema(sn.getEntry());
+                visitWorkflow(sn.getEntry());
             }
         }
-    }
-
-    private ClassNode declareParamsFromScript(ParamBlockNode node) {
-        var cn = new ClassNode(ParamsMap.class);
-
-        for( var param : node.declarations ) {
-            var name = param.getName();
-            var type = param.getType();
-            var fn = new FieldNode(name, Modifier.PUBLIC, type, cn, null);
-            fn.setHasNoRealSourcePosition(true);
-            fn.setDeclaringClass(cn);
-            fn.setSynthetic(true);
-            var description = ASTNodeStringUtils.getDocumentation(param);
-            if( description != null ) {
-                var an = new AnnotationNode(ClassHelper.makeCached(Description.class));
-                an.addMember("value", new ConstantExpression(description));
-                fn.addAnnotation(an);
-            }
-            cn.addField(fn);
-        }
-
-        return cn;
     }
 
     private ClassNode declareParamsFromSchema(WorkflowNode entry) {

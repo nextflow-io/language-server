@@ -18,21 +18,27 @@ package nextflow.lsp.ast;
 import java.util.Collections;
 import java.util.Iterator;
 
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.IncludeEntryNode;
-import nextflow.script.types.TypeChecker;
+import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.WorkflowNode;
 import nextflow.script.types.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.expr.ClassExpression;
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
+import org.codehaus.groovy.ast.expr.MapEntryExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 
 import static nextflow.script.ast.ASTUtils.*;
+import static nextflow.script.types.TypeCheckingUtils.*;
 
 /**
  * Utility methods for querying an AST.
@@ -51,17 +57,31 @@ public class LanguageServerASTUtils {
         if( node instanceof VariableExpression ve )
             return getDefinitionFromVariable(ve.getAccessedVariable());
 
-        if( node instanceof MethodCallExpression mce )
-            return TypeChecker.inferMethodTarget(mce);
+        if( node instanceof MethodCallExpression mce ) {
+            var mn = (MethodNode) mce.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
+            if( mn != null )
+                return mn;
+            return resolveMethodCall(mce);
+        }
 
-        if( node instanceof PropertyExpression pe )
-            return TypeChecker.inferPropertyTarget(pe);
+        if( node instanceof PropertyExpression pe ) {
+            var fn = (FieldNode) pe.getNodeMetaData(ASTNodeMarker.PROPERTY_TARGET);
+            if( fn != null )
+                return fn;
+            return resolveProperty(pe);
+        }
 
         if( node instanceof ClassExpression ce )
             return ce.getType().redirect();
 
         if( node instanceof ConstructorCallExpression cce )
             return cce.getType().redirect();
+
+        if( node instanceof MapEntryExpression ) {
+            var namedParam = (Parameter) node.getNodeMetaData("_NAMED_PARAM");
+            if( namedParam != null )
+                return namedParam;
+        }
 
         if( node instanceof FeatureFlagNode ffn )
             return ffn.target != null ? ffn : null;

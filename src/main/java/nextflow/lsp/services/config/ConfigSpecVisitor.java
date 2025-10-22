@@ -28,6 +28,7 @@ import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -96,13 +97,13 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             return;
         }
         // validate type
-        if( typeChecking ) {
-            var expectedType = option.type();
-            var actualType = node.value.getType().getTypeClass();
-            if( expectedType != null && !TypesEx.isAssignableFrom(expectedType, actualType) ) {
-                var message = "Type mismatch for config option '" + fqName + "' -- expected a " + TypesEx.getName(expectedType) + " but received a " + TypesEx.getName(actualType);
-                addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
-            }
+        if( !typeChecking )
+            return;
+        var expectedType = option.type() != null ? ClassHelper.makeCached(option.type()) : ClassHelper.dynamicType();
+        var actualType = node.value.getType();
+        if( !TypesEx.isAssignableFrom(expectedType, actualType) ) {
+            var message = "Config option '" + fqName + "' with type " + TypesEx.getName(expectedType) + " cannot be assigned to value with type " + TypesEx.getName(actualType);
+            addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
         }
     }
 
