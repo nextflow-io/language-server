@@ -18,6 +18,7 @@ package nextflow.lsp.services.script;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -77,7 +78,7 @@ public class GroovyLibCache {
 
     private static Set<URI> groovyFiles(Path libDir) {
         try {
-            return Files.walk(libDir)
+            return Files.walk(libDir, FileVisitOption.FOLLOW_LINKS)
                 .filter(path -> path.toString().endsWith(".groovy"))
                 .map(path -> path.toUri())
                 .collect(Collectors.toSet());
