@@ -27,6 +27,7 @@ import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.spec.SpecNode;
 import nextflow.lsp.spec.ConfigSpecFactory;
+import nextflow.lsp.spec.PluginRef;
 import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
@@ -94,8 +95,8 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
     }
 
     private Map<String, SpecNode> pluginConfigScopes(ConfigNode cn) {
-        var entries = cn.getConfigStatements().stream()
-            // get plugin refs from `plugins` block
+        // get plugin refs from `plugins` block
+        var refs = cn.getConfigStatements().stream()
             .map(stmt ->
                 stmt instanceof ConfigApplyBlockNode node && "plugins".equals(node.name) ? node : null
             )
@@ -106,18 +107,26 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
                 var firstArg = arguments.get(0);
                 return firstArg instanceof ConstantExpression ce ? ce.getText() : null;
             })
-            // fetch plugin specs from plugin registry
             .filter(ref -> ref != null)
             .map((ref) -> {
                 var tokens = ref.split("@");
                 var name = tokens[0];
                 var version = tokens.length == 2 ? tokens[1] : null;
-                return pluginSpecCache.get(name, version);
+                return new PluginRef(name, version);
             })
+            .toList();
+
+        // fetch plugin specs from plugin registry
+        var entries = refs.stream()
+            .map((ref) -> pluginSpecCache.get(ref.name(), ref.version()))
             .filter(spec -> spec != null)
             .map(spec -> spec.configScopes())
             .toList();
 
+        // set current versions in plugin spec cache
+        pluginSpecCache.setCurrentVersions(refs);
+
+        // collect config scopes from plugin specs
         var result = new HashMap<String, SpecNode>();
         for( var entry : entries )
             result.putAll(entry);

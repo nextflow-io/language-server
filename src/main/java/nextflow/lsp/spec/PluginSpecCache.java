@@ -44,6 +44,8 @@ public class PluginSpecCache {
 
     private Map<PluginRef, PluginSpec> cache = new HashMap<>();
 
+    private List<PluginRef> currentVersions;
+
     public PluginSpecCache(String registryUrl) {
         this.registryUri = URI.create(registryUrl);
     }
@@ -138,10 +140,29 @@ public class PluginSpecCache {
         );
     }
 
+    /**
+     * Set the plugin versions currently specified by the config.
+     *
+     * @param currentVersions
+     */
+    public void setCurrentVersions(List<PluginRef> currentVersions) {
+        this.currentVersions = currentVersions;
+    }
+
+    /**
+     * Get the currently loaded spec for a plugin.
+     * 
+     * @param name
+     */
+    public PluginSpec getCurrent(String name) {
+        if( currentVersions == null )
+            return null;
+        var ref = currentVersions.stream()
+            .filter(r -> r.name().equals(name))
+            .findFirst().orElse(null);
+        if( ref == null )
+            return null;
+        return cache.get(ref);
+    }
+
 }
-
-
-record PluginRef(
-    String name,
-    String version
-) {}

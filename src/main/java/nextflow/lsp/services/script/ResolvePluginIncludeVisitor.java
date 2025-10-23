@@ -62,7 +62,7 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
         if( !source.startsWith("plugin/") )
             return;
         var pluginName = source.split("/")[1];
-        var spec = pluginSpecCache.get(pluginName, null);
+        var spec = pluginSpecCache.getCurrent(pluginName);
         if( spec == null ) {
             addError("Plugin '" + pluginName + "' does not exist or is not specified in the configuration file", node);
             return;
