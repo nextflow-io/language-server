@@ -41,7 +41,6 @@ class ConfigHoverTest extends Specification {
         given:
         def service = getConfigService()
         def uri = getUri('nextflow.config')
-        def value
 
         when:
         open(service, uri, '''\
@@ -49,9 +48,15 @@ class ConfigHoverTest extends Specification {
             }
             ''')
         service.updateNow()
-        value = getHoverHint(service, uri, new Position(1, 0))
+        def value = getHoverHint(service, uri, new Position(1, 0))
         then:
         value == 'The `executor` scope controls various executor behaviors.\n'
+    }
+
+    def 'should get hover hint for a plugin config scope' () {
+        given:
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
 
         when:
         open(service, uri, '''\
@@ -63,7 +68,7 @@ class ConfigHoverTest extends Specification {
             }
             ''')
         service.updateNow()
-        value = getHoverHint(service, uri, new Position(4, 0))
+        def value = getHoverHint(service, uri, new Position(4, 0))
         then:
         value == 'The `prov` scope allows you to configure the `nf-prov` plugin.\n'
     }
