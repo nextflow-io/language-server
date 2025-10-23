@@ -49,5 +49,6 @@ class TestLanguageClient implements LanguageClient {
 
     @Override
     public void logMessage(MessageParams message) {
+        System.err.println(message.getMessage())
     }
 }

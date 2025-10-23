@@ -30,6 +30,7 @@ import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.services.LanguageServerConfiguration;
+import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.ProcessNode;
@@ -60,6 +61,8 @@ public class ScriptAstCache extends ASTNodeCache {
 
     private LanguageServerConfiguration configuration;
 
+    private PluginSpecCache pluginSpecCache;
+
     public ScriptAstCache(String rootUri) {
         super(createCompiler());
         this.libCache = createLibCache(rootUri);
@@ -89,8 +92,9 @@ public class ScriptAstCache extends ASTNodeCache {
         return config;
     }
 
-    public void initialize(LanguageServerConfiguration configuration) {
+    public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {
         this.configuration = configuration;
+        this.pluginSpecCache = pluginSpecCache;
     }
 
     @Override
@@ -110,6 +114,8 @@ public class ScriptAstCache extends ASTNodeCache {
         for( var sourceUnit : getSourceUnits() ) {
             var visitor = new ResolveIncludeVisitor(sourceUnit, compiler(), uris);
             visitor.visit();
+
+            new ResolvePluginIncludeVisitor(sourceUnit, pluginSpecCache).visit();
 
             var uri = sourceUnit.getSource().getURI();
             if( visitor.isChanged() ) {

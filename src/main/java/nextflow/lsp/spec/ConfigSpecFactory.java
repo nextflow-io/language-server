@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.lsp.services.config;
+package nextflow.lsp.spec;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -29,7 +29,7 @@ import nextflow.script.types.MemoryUnit;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
 
 /**
- * Load config scopes from core definitions.
+ * Load config scopes from core definitions and plugin specs.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -61,6 +61,24 @@ public class ConfigSpecFactory {
             System.err.println("Failed to read core definitions: " + e.toString());
             return Collections.emptyMap();
         }
+    }
+
+    /**
+     * Load config scopes from a plugin spec.
+     *
+     * @param definitions
+     */
+    public static Map<String,SpecNode> fromDefinitions(List<Map> definitions) {
+        var entries = definitions.stream()
+            .filter(node -> "ConfigScope".equals(node.get("type")))
+            .map((node) -> {
+                var spec = (Map) node.get("spec");
+                var name = (String) spec.get("name");
+                var scope = fromScope(spec);
+                return Map.entry(name, scope);
+            })
+            .toArray(Map.Entry[]::new);
+        return Map.ofEntries(entries);
     }
 
     private static Map<String,SpecNode> fromChildren(List<Map> children) {

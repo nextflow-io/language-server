@@ -25,7 +25,6 @@ import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.dsl.ConfigDsl;
 import nextflow.config.spec.SpecNode;
-import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.CompletionHelper;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.Logger;
@@ -62,14 +61,12 @@ import static nextflow.lsp.ast.CompletionUtils.*;
  */
 public class ConfigCompletionProvider implements CompletionProvider {
 
-    private static final List<CompletionItem> TOPLEVEL_ITEMS = topLevelItems();
-
     private static Logger log = Logger.getInstance();
 
-    private ASTNodeCache ast;
+    private ConfigAstCache ast;
     private CompletionHelper ch;
 
-    public ConfigCompletionProvider(ASTNodeCache ast, int maxItems) {
+    public ConfigCompletionProvider(ConfigAstCache ast, int maxItems) {
         this.ast = ast;
         this.ch = new CompletionHelper(maxItems);
     }
@@ -86,8 +83,9 @@ public class ConfigCompletionProvider implements CompletionProvider {
             return Either.forLeft(Collections.emptyList());
 
         var nodeStack = ast.getNodesAtPosition(uri, position);
+        var spec = ast.getConfigNode(uri).getSpec();
         if( nodeStack.isEmpty() )
-            return Either.forLeft(TOPLEVEL_ITEMS);
+            return Either.forLeft(topLevelItems(spec));
 
         if( isConfigExpression(nodeStack) ) {
             addCompletionItems(nodeStack);
@@ -95,8 +93,8 @@ public class ConfigCompletionProvider implements CompletionProvider {
         else {
             var names = currentConfigScope(nodeStack);
             if( names.isEmpty() )
-                return Either.forLeft(TOPLEVEL_ITEMS);
-            addConfigOptions(names);
+                return Either.forLeft(topLevelItems(spec));
+            addConfigOptions(names, spec);
         }
 
         return ch.isIncomplete()
@@ -179,8 +177,8 @@ public class ConfigCompletionProvider implements CompletionProvider {
         return names;
     }
 
-    private void addConfigOptions(List<String> names) {
-        var scope = SpecNode.ROOT.getScope(names);
+    private void addConfigOptions(List<String> names, SpecNode.Scope spec) {
+        var scope = spec.getScope(names);
         if( scope == null )
             return;
         scope.children().forEach((name, child) -> {
@@ -191,9 +189,9 @@ public class ConfigCompletionProvider implements CompletionProvider {
         });
     }
 
-    private static List<CompletionItem> topLevelItems() {
+    private static List<CompletionItem> topLevelItems(SpecNode.Scope spec) {
         var result = new ArrayList<CompletionItem>();
-        SpecNode.ROOT.children().forEach((name, child) -> {
+        spec.children().forEach((name, child) -> {
             if( child instanceof SpecNode.Option option ) {
                 result.add(configOption(name, option.description(), option.type()));
             }

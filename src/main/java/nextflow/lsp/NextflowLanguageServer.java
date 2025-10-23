@@ -121,8 +121,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private LanguageClient client = null;
 
     private Map<String, String> workspaceRoots = new HashMap<>();
-    private Map<String, LanguageService> scriptServices = new HashMap<>();
-    private Map<String, LanguageService> configServices = new HashMap<>();
+    private Map<String, ConfigService> configServices = new HashMap<>();
+    private Map<String, ScriptService> scriptServices = new HashMap<>();
 
     private LanguageServerConfiguration configuration = LanguageServerConfiguration.defaults();
 
@@ -461,6 +461,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.harshilAlignment"), configuration.harshilAlignment()),
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.maheshForm"), configuration.maheshForm()),
             withDefault(JsonUtils.getInteger(settings, "nextflow.completion.maxItems"), configuration.maxCompletionItems()),
+            withDefault(JsonUtils.getString(settings, "nextflow.pluginRegistryUrl"), configuration.pluginRegistryUrl()),
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), configuration.sortDeclarations()),
             withDefault(JsonUtils.getBoolean(settings, "nextflow.typeChecking"), configuration.typeChecking())
         );
@@ -483,6 +484,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private boolean shouldInitialize(LanguageServerConfiguration previous, LanguageServerConfiguration current) {
         return previous.errorReportingMode() != current.errorReportingMode()
             || !DefaultGroovyMethods.equals(previous.excludePatterns(), current.excludePatterns())
+            || previous.pluginRegistryUrl() != current.pluginRegistryUrl()
             || previous.typeChecking() != current.typeChecking();
     }
 
@@ -500,8 +502,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             progress.update(progressMessage, count * 100 / total);
             count++;
 
-            scriptServices.get(name).initialize(configuration);
             configServices.get(name).initialize(configuration);
+            scriptServices.get(name).initialize(configuration, configServices.get(name).getPluginSpecCache());
         }
 
         progress.end();
@@ -519,16 +521,16 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var name = workspaceFolder.getName();
             log.debug("workspace/didChangeWorkspaceFolders remove " + name);
             workspaceRoots.remove(name);
-            scriptServices.remove(name).clearDiagnostics();
             configServices.remove(name).clearDiagnostics();
+            scriptServices.remove(name).clearDiagnostics();
         }
         for( var workspaceFolder : event.getAdded() ) {
             var name = workspaceFolder.getName();
             var uri = workspaceFolder.getUri();
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
             addWorkspaceFolder(name, uri);
-            scriptServices.get(name).initialize(configuration);
             configServices.get(name).initialize(configuration);
+            scriptServices.get(name).initialize(configuration, configServices.get(name).getPluginSpecCache());
         }
     }
 
@@ -620,13 +622,13 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private void addWorkspaceFolder(String name, String uri) {
         workspaceRoots.put(name, uri);
 
-        var scriptService = new ScriptService(uri);
-        scriptService.connect(client);
-        scriptServices.put(name, scriptService);
-
         var configService = new ConfigService(uri);
         configService.connect(client);
         configServices.put(name, configService);
+
+        var scriptService = new ScriptService(uri);
+        scriptService.connect(client);
+        scriptServices.put(name, scriptService);
     }
 
     private String relativePath(String uri) {
@@ -654,12 +656,12 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         return service;
     }
 
-    private LanguageService getLanguageService0(String uri, Map<String, LanguageService> services) {
+    private LanguageService getLanguageService0(String uri, Map<String, ? extends LanguageService> services) {
         var service = workspaceRoots.entrySet().stream()
             .filter((entry) -> entry.getValue() != null && uri.startsWith(entry.getValue()))
             .findFirst()
-            .map((entry) -> services.get(entry.getKey()))
-            .orElse(services.get(DEFAULT_WORKSPACE_FOLDER_NAME));
+            .map((entry) -> (LanguageService) services.get(entry.getKey()))
+            .orElse((LanguageService) services.get(DEFAULT_WORKSPACE_FOLDER_NAME));
         if( service == null || !service.matchesFile(uri) )
             return null;
         return service;

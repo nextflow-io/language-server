@@ -33,6 +33,7 @@ import nextflow.lsp.services.RenameProvider;
 import nextflow.lsp.services.SemanticTokensProvider;
 import nextflow.lsp.services.SymbolProvider;
 import nextflow.script.formatter.FormattingOptions;
+import nextflow.lsp.spec.PluginSpecCache;
 
 /**
  * Implementation of language services for Nextflow scripts.
@@ -53,10 +54,9 @@ public class ScriptService extends LanguageService {
         return uri.endsWith(".nf");
     }
 
-    @Override
-    public void initialize(LanguageServerConfiguration configuration) {
+    public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {
         synchronized (this) {
-            astCache.initialize(configuration);
+            astCache.initialize(configuration, pluginSpecCache);
         }
         super.initialize(configuration);
     }
