@@ -16,19 +16,24 @@
 package nextflow.lsp.services.config;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Stack;
 
+import nextflow.config.ast.ConfigApplyBlockNode;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.spec.SpecNode;
+import nextflow.lsp.spec.ConfigSpecFactory;
+import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
+import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -36,7 +41,13 @@ import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.syntax.Token;
 
+import static nextflow.script.ast.ASTUtils.*;
+
 /**
+ * Validate config options against the config spec.
+ *
+ * Config scopes from third-party plugins are inferred
+ * from the `plugins` block, if specified.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -44,15 +55,15 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private SpecNode.Scope spec;
+    private PluginSpecCache pluginSpecCache;
 
     private boolean typeChecking;
 
     private Stack<String> scopes = new Stack<>();
 
-    public ConfigSpecVisitor(SourceUnit sourceUnit, Map<String,SpecNode> scopes, boolean typeChecking) {
+    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache, boolean typeChecking) {
         this.sourceUnit = sourceUnit;
-        this.spec = new SpecNode.Scope("", scopes);
+        this.pluginSpecCache = pluginSpecCache;
         this.typeChecking = typeChecking;
     }
 
@@ -61,10 +72,56 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         return sourceUnit;
     }
 
+    private SpecNode.Scope spec;
+
     public void visit() {
         var moduleNode = sourceUnit.getAST();
-        if( moduleNode instanceof ConfigNode cn )
+        if( moduleNode instanceof ConfigNode cn ) {
+            this.spec = getPluginScopes(cn);
+            cn.setSpec(spec);
             super.visit(cn);
+            this.spec = null;
+        }
+    }
+
+    private SpecNode.Scope getPluginScopes(ConfigNode cn) {
+        var defaultScopes = ConfigSpecFactory.defaultScopes();
+        var pluginScopes = pluginConfigScopes(cn);
+        var children = new HashMap<String, SpecNode>();
+        children.putAll(defaultScopes);
+        children.putAll(pluginScopes);
+        return new SpecNode.Scope("", children);
+    }
+
+    private Map<String, SpecNode> pluginConfigScopes(ConfigNode cn) {
+        var entries = cn.getConfigStatements().stream()
+            // get plugin refs from `plugins` block
+            .map(stmt ->
+                stmt instanceof ConfigApplyBlockNode node && "plugins".equals(node.name) ? node : null
+            )
+            .filter(node -> node != null)
+            .flatMap(node -> node.statements.stream())
+            .map((call) -> {
+                var arguments = asMethodCallArguments(call);
+                var firstArg = arguments.get(0);
+                return firstArg instanceof ConstantExpression ce ? ce.getText() : null;
+            })
+            // fetch plugin specs from plugin registry
+            .filter(ref -> ref != null)
+            .map((ref) -> {
+                var tokens = ref.split("@");
+                var name = tokens[0];
+                var version = tokens.length == 2 ? tokens[1] : null;
+                return pluginSpecCache.get(name, version);
+            })
+            .filter(spec -> spec != null)
+            .map(spec -> spec.configScopes())
+            .toList();
+
+        var result = new HashMap<String, SpecNode>();
+        for( var entry : entries )
+            result.putAll(entry);
+        return result;
     }
 
     @Override

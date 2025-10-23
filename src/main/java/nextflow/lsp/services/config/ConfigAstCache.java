@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 
 import groovy.lang.GroovyClassLoader;
+import nextflow.config.ast.ConfigNode;
 import nextflow.config.control.ConfigResolveVisitor;
 import nextflow.config.control.ResolveIncludeVisitor;
 import nextflow.config.parser.ConfigParserPluginFactory;
@@ -30,6 +31,7 @@ import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.services.LanguageServerConfiguration;
+import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.types.Types;
@@ -46,7 +48,7 @@ public class ConfigAstCache extends ASTNodeCache {
 
     private LanguageServerConfiguration configuration;
 
-    private Map<String,SpecNode> spec = ConfigSpecFactory.defaultScopes();
+    private PluginSpecCache pluginSpecCache;
 
     public ConfigAstCache() {
         super(createCompiler());
@@ -65,8 +67,9 @@ public class ConfigAstCache extends ASTNodeCache {
         return config;
     }
 
-    public void initialize(LanguageServerConfiguration configuration) {
+    public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {
         this.configuration = configuration;
+        this.pluginSpecCache = pluginSpecCache;
     }
 
     @Override
@@ -92,7 +95,7 @@ public class ConfigAstCache extends ASTNodeCache {
                 continue;
             // phase 3: name checking
             new ConfigResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_CONFIG_IMPORTS).visit();
-            new ConfigSpecVisitor(sourceUnit, spec, configuration.typeChecking()).visit();
+            new ConfigSpecVisitor(sourceUnit, pluginSpecCache, configuration.typeChecking()).visit();
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;
             // phase 4: type checking
@@ -119,6 +122,10 @@ public class ConfigAstCache extends ASTNodeCache {
             .filter(error -> error instanceof PhaseAware pa ? pa.getPhase() == Phases.SYNTAX : true)
             .findFirst()
             .isPresent();
+    }
+
+    public ConfigNode getConfigNode(URI uri) {
+        return (ConfigNode) getSourceUnit(uri).getAST();
     }
 
 }

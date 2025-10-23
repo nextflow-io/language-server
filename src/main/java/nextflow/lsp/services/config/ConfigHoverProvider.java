@@ -23,7 +23,6 @@ import nextflow.config.ast.ConfigApplyBlockNode;
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.spec.SpecNode;
-import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.ast.ASTNodeStringUtils;
 import nextflow.lsp.ast.LanguageServerASTUtils;
 import nextflow.lsp.services.HoverProvider;
@@ -49,9 +48,9 @@ public class ConfigHoverProvider implements HoverProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ASTNodeCache ast;
+    private ConfigAstCache ast;
 
-    public ConfigHoverProvider(ASTNodeCache ast) {
+    public ConfigHoverProvider(ConfigAstCache ast) {
         this.ast = ast;
     }
 
@@ -69,7 +68,7 @@ public class ConfigHoverProvider implements HoverProvider {
 
         var builder = new StringBuilder();
 
-        var content = getHoverContent(nodeStack);
+        var content = getHoverContent(nodeStack, ast.getConfigNode(uri).getSpec());
         if( content != null ) {
             builder.append(content);
             builder.append('\n');
@@ -94,14 +93,14 @@ public class ConfigHoverProvider implements HoverProvider {
         return new Hover(new MarkupContent(MarkupKind.MARKDOWN, value));
     }
 
-    protected String getHoverContent(List<ASTNode> nodeStack) {
+    protected String getHoverContent(List<ASTNode> nodeStack, SpecNode.Scope spec) {
         var offsetNode = nodeStack.get(0);
         if( offsetNode instanceof ConfigAssignNode assign ) {
             var names = getCurrentScope(nodeStack);
             names.addAll(assign.names);
 
             var fqName = String.join(".", names);
-            var option = SpecNode.ROOT.getOption(names);
+            var option = spec.getOption(names);
             if( option != null ) {
                 var description = StringGroovyMethods.stripIndent(option.description(), true).trim();
                 var builder = new StringBuilder();
@@ -120,7 +119,7 @@ public class ConfigHoverProvider implements HoverProvider {
             if( names.isEmpty() )
                 return null;
 
-            var scope = SpecNode.ROOT.getChild(names);
+            var scope = spec.getChild(names);
             if( scope != null ) {
                 return StringGroovyMethods.stripIndent(scope.description(), true).trim();
             }

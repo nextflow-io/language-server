@@ -23,6 +23,7 @@ import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.LinkProvider;
 import nextflow.lsp.services.SemanticTokensProvider;
+import nextflow.lsp.spec.PluginSpecCache;
 
 /**
  * Implementation of language services for Nextflow config files.
@@ -30,6 +31,8 @@ import nextflow.lsp.services.SemanticTokensProvider;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class ConfigService extends LanguageService {
+
+    private PluginSpecCache pluginSpecCache;
 
     private ConfigAstCache astCache;
 
@@ -46,9 +49,14 @@ public class ConfigService extends LanguageService {
     @Override
     public void initialize(LanguageServerConfiguration configuration) {
         synchronized (this) {
-            astCache.initialize(configuration);
+            pluginSpecCache = new PluginSpecCache(configuration.pluginRegistryUrl());
+            astCache.initialize(configuration, pluginSpecCache);
         }
         super.initialize(configuration);
+    }
+
+    public PluginSpecCache getPluginSpecCache() {
+        return pluginSpecCache;
     }
 
     @Override
