@@ -31,11 +31,10 @@ import static nextflow.lsp.TestUtils.*
 class ConfigHoverTest extends Specification {
 
     String getHoverHint(ConfigService service, String uri, Position position) {
-        return service
-            .hover(new HoverParams(new TextDocumentIdentifier(uri), position))
-            .getContents()
-            .getRight()
-            .getValue()
+        def hover = service.hover(new HoverParams(new TextDocumentIdentifier(uri), position))
+        return hover
+            ? hover.getContents().getRight().getValue()
+            : null
     }
 
     def 'should get hover hint for a config scope' () {
