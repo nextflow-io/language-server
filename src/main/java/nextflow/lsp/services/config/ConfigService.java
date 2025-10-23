@@ -48,8 +48,12 @@ public class ConfigService extends LanguageService {
 
     @Override
     public void initialize(LanguageServerConfiguration configuration) {
+        initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()));
+    }
+
+    public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {
         synchronized (this) {
-            pluginSpecCache = new PluginSpecCache(configuration.pluginRegistryUrl());
+            this.pluginSpecCache = pluginSpecCache;
             astCache.initialize(configuration, pluginSpecCache);
         }
         super.initialize(configuration);

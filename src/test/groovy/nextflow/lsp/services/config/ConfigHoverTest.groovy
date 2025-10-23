@@ -16,6 +16,11 @@
 
 package nextflow.lsp.services.config
 
+import nextflow.config.spec.SpecNode
+import nextflow.lsp.TestLanguageClient
+import nextflow.lsp.services.LanguageServerConfiguration
+import nextflow.lsp.spec.PluginSpec
+import nextflow.lsp.spec.PluginSpecCache
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.Position
@@ -55,8 +60,18 @@ class ConfigHoverTest extends Specification {
 
     def 'should get hover hint for a plugin config scope' () {
         given:
-        def service = getConfigService()
         def uri = getUri('nextflow.config')
+        def service = new ConfigService(workspaceRoot().toUri().toString())
+        def configuration = LanguageServerConfiguration.defaults()
+        def pluginSpecCache = Spy(new PluginSpecCache(configuration.pluginRegistryUrl()))
+        pluginSpecCache.get('nf-prov', '1.6.0') >> new PluginSpec(
+            [
+                'prov': new SpecNode.Scope('The `prov` scope allows you to configure the `nf-prov` plugin.', [:])
+            ],
+            [], [], []
+        )
+        service.connect(new TestLanguageClient())
+        service.initialize(configuration, pluginSpecCache)
 
         when:
         open(service, uri, '''\
