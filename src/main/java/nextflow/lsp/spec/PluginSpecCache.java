@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,8 +40,6 @@ public class PluginSpecCache {
     private static Logger log = Logger.getInstance();
 
     private URI registryUri;
-
-    private HttpClient client = HttpClient.newBuilder().build();
 
     private Map<PluginRef, PluginSpec> cache = new HashMap<>();
 
@@ -63,36 +62,31 @@ public class PluginSpecCache {
     public PluginSpec get(String name, String version) {
         var ref = new PluginRef(name, version);
         if( !cache.containsKey(ref) )
-            cache.put(ref, compute(name, version));
+            updateCache(ref);
         return cache.get(ref);
     }
 
-    private PluginSpec compute(String name, String version) {
+    private void updateCache(PluginRef ref) {
         try {
-            return compute0(name, version);
+            // fetch plugin spec from registry
+            var response = fetch(ref.name(), ref.version());
+            if( response == null )
+                return;
+
+            // select plugin release (or latest if not specified)
+            var release = pluginRelease(response);
+            if( release == null )
+                return;
+
+            // save plugin spec to cache
+            cache.put(ref, pluginSpec(release));
         }
-        catch( Exception e ) {
-            log.error(e.toString());
-            return null;
+        catch( IOException | InterruptedException e ) {
+            e.printStackTrace(System.err);
         }
     }
 
-    private PluginSpec compute0(String name, String version) {
-        // fetch plugin spec from registry
-        var response = fetch(name, version);
-        if( response == null )
-            return null;
-
-        // select plugin release (or latest if not specified)
-        var release = pluginRelease(response);
-        if( release == null )
-            return null;
-
-        // get spec from plugin release
-        return pluginSpec(release);
-    }
-
-    private Map fetch(String name, String version) {
+    private Map fetch(String name, String version) throws IOException, InterruptedException {
         var path = version != null
             ? String.format("v1/plugins/%s/%s", name, version)
             : String.format("v1/plugins/%s", name);
@@ -100,20 +94,15 @@ public class PluginSpecCache {
 
         log.debug("fetch plugin " + uri);
 
-        try {
-            var request = HttpRequest.newBuilder()
-                .uri(uri)
-                .GET()
-                .header("Accept", "application/json")
-                .build();
-            var httpResponse = client.send(request, BodyHandlers.ofString());
-            var response = new JsonSlurper().parseText(httpResponse.body());
-            return response instanceof Map m ? m : null;
-        }
-        catch( IOException | InterruptedException e ) {
-            log.error(e.toString());
-            return null;
-        }
+        var client = HttpClient.newBuilder().build();
+        var request = HttpRequest.newBuilder()
+            .uri(uri)
+            .GET()
+            .header("Accept", "application/json")
+            .build();
+        var httpResponse = client.send(request, BodyHandlers.ofString());
+        var response = new JsonSlurper().parseText(httpResponse.body());
+        return response instanceof Map m ? m : null;
     }
 
     private static Map pluginRelease(Map response) {
@@ -129,15 +118,21 @@ public class PluginSpecCache {
     }
 
     private static PluginSpec pluginSpec(Map release) {
-        var specJson = (String) release.get("spec");
-        var spec = (Map) new JsonSlurper().parseText(specJson);
-        var definitions = (List<Map>) spec.get("definitions");
+        var definitions = pluginDefinitions(release);
         return new PluginSpec(
             ConfigSpecFactory.fromDefinitions(definitions),
             ScriptSpecFactory.fromDefinitions(definitions, "Factory"),
             ScriptSpecFactory.fromDefinitions(definitions, "Function"),
             ScriptSpecFactory.fromDefinitions(definitions, "Operator")
         );
+    }
+
+    private static List<Map> pluginDefinitions(Map release) {
+        var specJson = (String) release.get("spec");
+        if( specJson == null )
+            return Collections.emptyList();
+        var spec = (Map) new JsonSlurper().parseText(specJson);
+        return (List<Map>) spec.get("definitions");
     }
 
     /**

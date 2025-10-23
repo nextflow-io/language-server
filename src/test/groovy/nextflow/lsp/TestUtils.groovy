@@ -21,6 +21,7 @@ import java.nio.file.Path
 
 import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.lsp.services.LanguageService
+import nextflow.lsp.services.config.ConfigService
 import nextflow.lsp.services.script.ScriptService
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.TextDocumentItem
@@ -38,6 +39,20 @@ class TestUtils {
         if( !Files.exists(workspaceRoot) )
             workspaceRoot.toFile().mkdirs()
         return workspaceRoot
+    }
+
+    /**
+     * Get a language service instance for Nextflow config files.
+     */
+    static ConfigService getConfigService() {
+        def service = new ConfigService(workspaceRoot.toUri().toString())
+        def configuration = LanguageServerConfiguration.defaults()
+        service.connect(new TestLanguageClient())
+        service.initialize(configuration)
+        // skip workspace scan
+        open(service, getUri('nextflow.config'), '')
+        service.updateNow()
+        return service
     }
 
     /**

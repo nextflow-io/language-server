@@ -484,6 +484,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private boolean shouldInitialize(LanguageServerConfiguration previous, LanguageServerConfiguration current) {
         return previous.errorReportingMode() != current.errorReportingMode()
             || !DefaultGroovyMethods.equals(previous.excludePatterns(), current.excludePatterns())
+            || previous.pluginRegistryUrl() != current.pluginRegistryUrl()
             || previous.typeChecking() != current.typeChecking();
     }
 
