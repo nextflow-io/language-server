@@ -121,8 +121,8 @@ class ProcessConverter {
 
         if( "env".equals(qualifier) ) {
             var param = nextParam(ClassHelper.STRING_TYPE);
-            var envName = constX(param.getName());
-            var envValue = lastArg(call);
+            var envName = lastArg(call);
+            var envValue = constX(param.getName());
             var stager = stmt(callThisX("env", args(envName, envValue)));
             stagers.add(stager);
             return param;
