@@ -962,6 +962,9 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     private void applyConditionalExpression(TernaryExpression node) {
+        if( !experimental )
+            return;
+
         var trueExpr = node.getTrueExpression();
         var falseExpr = node.getFalseExpression();
         var trueType = getType(trueExpr);
@@ -986,8 +989,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             nullable = isNullable(trueType) || isNullable(falseType);
         }
         else {
-            if( experimental )
-                addError(String.format("Conditional expression has inconsistent types -- true branch has type %s but false branch has type %s", TypesEx.getName(trueType), TypesEx.getName(falseType)), node);
+            addError(String.format("Conditional expression has inconsistent types -- true branch has type %s but false branch has type %s", TypesEx.getName(trueType), TypesEx.getName(falseType)), node);
             return;
         }
 
@@ -1054,6 +1056,9 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitRangeExpression(RangeExpression node) {
         super.visitRangeExpression(node);
+
+        if( !experimental )
+            return;
 
         var lhs = node.getFrom();
         var rhs = node.getTo();
