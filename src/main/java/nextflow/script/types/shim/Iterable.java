@@ -139,6 +139,11 @@ public interface Iterable<E> {
     <R> R sum(Function<E,R> transform);
 
     @Description("""
+        Converts the iterable to a list.
+    """)
+    List<E> toList();
+
+    @Description("""
         Converts the iterable to a set. Duplicate elements are excluded.
     """)
     Set<E> toSet();
