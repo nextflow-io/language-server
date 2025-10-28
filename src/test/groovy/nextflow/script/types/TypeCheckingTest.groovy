@@ -447,6 +447,20 @@ class TypeCheckingTest extends Specification {
         'workflow.outputDir.name'       | null
     }
 
+    def 'should check a map property' () {
+        when:
+        def exp = parseExpression(
+            '''
+            workflow {
+                def meta: Map = [:]
+                meta.id
+            }
+            '''
+        )
+        then:
+        checkType(exp, Object)
+    }
+
     def 'should check a workflow call' () {
         expect:
         check(

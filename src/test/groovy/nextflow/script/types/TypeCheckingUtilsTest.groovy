@@ -110,20 +110,6 @@ class TypeCheckingUtilsTest extends Specification {
         'workflow.projectDir.name'  | String
     }
 
-    def 'should resolve the type of a map property' () {
-        when:
-        def exp = parseExpression(
-            '''
-            workflow {
-                def meta: Map = [:]
-                meta.id
-            }
-            '''
-        )
-        then:
-        checkType(exp, Object)
-    }
-
     @Unroll
     def 'should resolve the return type of a method call' () {
         expect:

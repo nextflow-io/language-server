@@ -1179,9 +1179,11 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             return;
         }
 
-        var type = getType(node);
-        if( !ClassHelper.isDynamicTyped(type) )
+        var target = resolveProperty(node);
+        if( target != null ) {
+            node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, target.getType());
             return;
+        }
 
         var mn = asMethodNamedOutput(node);
         var property = node.getPropertyAsString();
