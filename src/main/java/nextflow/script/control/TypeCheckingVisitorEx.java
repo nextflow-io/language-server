@@ -80,7 +80,9 @@ import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
+import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
+import org.codehaus.groovy.syntax.Token;
 import org.codehaus.groovy.syntax.Types;
 
 import static nextflow.script.ast.ASTUtils.*;
@@ -226,13 +228,24 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitProcessV2(ProcessNodeV2 node) {
-        visit(node.directives);
+        visitProcessDirectives(node.directives);
         visit(node.stagers);
         visit(node.when);
         visit(node.exec);
         visit(node.stub);
         visit(node.outputs);
         visitProcessTopics(node.topics);
+    }
+
+    private void visitProcessDirectives(Statement block) {
+        asDirectives(block).forEach((call) -> {
+            var arguments = asMethodCallArguments(call);
+            if( arguments.size() == 1 && arguments.get(0) instanceof ClosureExpression ) {
+                addWarning("Closure is no longer required for dynamic process directives", call.getMethodAsString(), call);
+                return;
+            }
+            visit(call);
+        });
     }
 
     private void visitProcessTopics(Statement block) {
@@ -252,7 +265,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitProcessV1(ProcessNodeV1 node) {
         // don't try to type-check input/output directives
-        visit(node.directives);
+        visitProcessDirectives(node.directives);
         visit(node.when);
         visit(node.exec);
         visit(node.stub);
@@ -1217,6 +1230,11 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( node.getObjectExpression() instanceof PropertyExpression pe )
             return asMethodOutput(pe);
         return null;
+    }
+
+    public void addWarning(String message, String tokenText, ASTNode node) {
+        var token = new Token(0, tokenText, node.getLineNumber(), node.getColumnNumber()); // ASTNode to CSTNode
+        sourceUnit.getErrorCollector().addWarning(WarningMessage.POSSIBLE_ERRORS, message, token, sourceUnit);
     }
 
     @Override
