@@ -347,20 +347,32 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitOutput(OutputNode node) {
+        var type = node.getType();
+        var elementType = CHANNEL_TYPE.equals(type) || VALUE_TYPE.equals(type)
+            ? elementType(type)
+            : type;
         for( var stmt : asBlockStatements(node.body) ) {
             var call = asMethodCallX(stmt);
-            if( checkPublishStatements(call) )
+            if( checkPublishStatements(call, elementType) )
                 continue;
             super.visitMethodCallExpression(call);
         }
     }
 
-    private boolean checkPublishStatements(MethodCallExpression node) {
+    private boolean checkPublishStatements(MethodCallExpression node, ClassNode elementType) {
         if( !"path".equals(node.getMethodAsString()) )
             return false;
-        var code = asDslBlock(node, 1);
-        if( code == null )
+        var args = asMethodCallArguments(node);
+        if( args.size() != 1 )
             return false;
+        var firstArg = args.get(0);
+        if( !(firstArg instanceof ClosureExpression) )
+            return false;
+        var closure = (ClosureExpression) firstArg;
+        if( closure.getParameters().length == 1 ) {
+            closure.getParameters()[0].setType(elementType);
+        }
+        var code = (BlockStatement) closure.getCode();
         for( var stmt : code.getStatements() ) {
             if( checkPublishStatement(stmt) )
                 continue;
