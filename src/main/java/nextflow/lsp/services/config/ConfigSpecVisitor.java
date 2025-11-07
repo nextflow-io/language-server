@@ -137,10 +137,8 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
     public void visitConfigAssign(ConfigAssignNode node) {
         var names = new ArrayList<>(scopes);
         names.addAll(node.names);
-        if( "profiles".equals(names.get(0)) ) {
-            if( !names.isEmpty() ) names.remove(0);
-            if( !names.isEmpty() ) names.remove(0);
-        }
+
+        // validate dynamic scopes (env, params, etc)
         var scope = names.get(0);
         if( "env".equals(scope) ) {
             var envName = String.join(".", DefaultGroovyMethods.tail(names));
@@ -175,12 +173,22 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     @Override
     public void visitConfigBlock(ConfigBlockNode node) {
-        var newScope = node.kind == null;
-        if( newScope )
-            scopes.add(node.name);
+        // exclude selector name from scope stack
+        if( node.kind != null ) {
+            super.visitConfigBlock(node);
+            return;
+        }
+        // exclude profiles.<profile> from scope stack
+        if( scopes.size() == 1 && "profiles".equals(scopes.get(0)) ) {
+            scopes.clear();
+            super.visitConfigBlock(node);
+            scopes.push("profiles");
+            return;
+        }
+        // otherwise visit block statements normally
+        scopes.push(node.name);
         super.visitConfigBlock(node);
-        if( newScope )
-            scopes.pop();
+        scopes.pop();
     }
 
     @Override
