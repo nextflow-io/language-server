@@ -347,6 +347,10 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitOutput(OutputNode node) {
+        if( !experimental ) {
+            super.visitOutput(node);
+            return;
+        }
         var type = node.getType();
         var elementType = CHANNEL_TYPE.equals(type) || VALUE_TYPE.equals(type)
             ? elementType(type)
