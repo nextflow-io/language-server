@@ -82,10 +82,6 @@ task buildSpec(type: JavaExec) {
 
   outputs.file("$buildDir/generated/definitions.json")
   outputs.cacheIf { true }
-
-  doFirst {
-    file("$buildDir/generated").mkdirs()
-  }
 }
 
 processResources {
