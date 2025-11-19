@@ -915,7 +915,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
             // TODO: =~: (String, String) -> Matcher
             case Types.FIND_REGEX:
-                resultType = TypesEx.isEqual(ClassHelper.STRING_TYPE, lhsType) && TypesEx.isEqual(ClassHelper.STRING_TYPE, rhsType) ? ClassHelper.Boolean_TYPE : null;
+                resultType = TypesEx.isEqual(ClassHelper.STRING_TYPE, lhsType) && TypesEx.isEqual(ClassHelper.STRING_TYPE, rhsType) ? ClassHelper.dynamicType() : null;
                 break;
 
             case Types.MATCH_REGEX:
