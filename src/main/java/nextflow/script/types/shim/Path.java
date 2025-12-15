@@ -33,11 +33,6 @@ public interface Path {
 
     // file attributes
 
-    @Description("""
-        Returns `true` if the file exists.
-    """)
-    boolean exists();
-
     @Constant("baseName")
     @Description("""
         Gets the file name without its extension, e.g. `/some/path/file.tar.gz` -> `file.tar`.
@@ -56,12 +51,6 @@ public interface Path {
     """)
     String getName();
 
-    @Constant("simpleName")
-    @Description("""
-        Gets the file name without any extension, e.g. `/some/path/file.tar.gz` -> `file`.
-    """)
-    String getSimpleName();
-
     @Constant("parent")
     @Description("""
         Gets the file parent path, e.g. `/some/path/file.txt` -> `/some/path`.
@@ -73,6 +62,17 @@ public interface Path {
         Gets the file URI scheme, e.g. `s3://some-bucket/foo.txt` -> `s3`.
     """)
     String getScheme();
+
+    @Constant("simpleName")
+    @Description("""
+        Gets the file name without any extension, e.g. `/some/path/file.tar.gz` -> `file`.
+    """)
+    String getSimpleName();
+
+    @Description("""
+        Returns `true` if the file exists.
+    """)
+    boolean exists();
 
     @Description("""
         Returns `true` if the file is a directory.
@@ -132,20 +132,9 @@ public interface Path {
     // reading
 
     @Description("""
-        Iterates over the file, applying the specified closure to each byte.
-    """)
-    void eachByte(Consumer<Byte> action);
-
-    @Description("""
         Iterates over the file, applying the specified closure to each line.
     """)
     void eachLine(Consumer<String> action);
-
-    @Constant("bytes")
-    @Description("""
-        Returns the file content as a byte array.
-    """)
-    byte[] getBytes();
 
     @Constant("text")
     @Description("""
@@ -164,11 +153,6 @@ public interface Path {
         Appends text to a file without replacing existing content.
     """)
     void append(String text);
-
-    @Description("""
-        Writes a byte array to a file. Equivalent to setting the `bytes` property.
-    """)
-    void setBytes(byte[] bytes);
 
     @Description("""
         Writes text to a file. Equivalent to setting the `text` property.
@@ -201,16 +185,6 @@ public interface Path {
         Returns a file's permissions using the [symbolic notation](http://en.wikipedia.org/wiki/File_system_permissions#Symbolic_notation), e.g. `'rw-rw-r--'`.
     """)
     String getPermissions();
-
-    @Description("""
-        Returns the first-level elements (files and directories) of a directory as a list of strings.
-    """)
-    List<String> list();
-
-    @Description("""
-        Returns the first-level elements (files and directories) of a directory as a list of Paths.
-    """)
-    List<Path> listFiles();
 
     @Description("""
         Creates a directory at the given path, returning `true` if the directory is created successfully, and `false` otherwise.
@@ -247,20 +221,7 @@ public interface Path {
     """)
     boolean setPermissions(int owner, int group, int other);
 
-    @Description("""
-        Iterates through first-level directories only.
-    """)
-    void eachDir(Consumer<Path> action);
-
-    @Description("""
-        Iterates through directories whose names match the given filter.
-    """)
-    void eachDirMatch(String nameFilter, Consumer<Path> action);
-
-    @Description("""
-        Iterates through directories depth-first (regular files are ignored).
-    """)
-    void eachDirRecurse(Consumer<Path> action);
+    // listing and traversing directories
 
     @Description("""
         Iterates through first-level files and directories.
@@ -268,14 +229,20 @@ public interface Path {
     void eachFile(Consumer<Path> action);
 
     @Description("""
-        Iterates through files and directories whose names match the given filter.
-    """)
-    void eachFileMatch(String nameFilter, Consumer<Path> action);
-
-    @Description("""
         Iterates through files and directories depth-first.
     """)
     void eachFileRecurse(Consumer<Path> action);
+
+    @Description("""
+        Returns the first-level elements (files and directories) in a directory.
+    """)
+    List<Path> listDirectory();
+
+    @Deprecated
+    @Description("""
+        Returns the first-level elements (files and directories) in a directory.
+    """)
+    List<Path> listFiles();
 
     // splitting
 

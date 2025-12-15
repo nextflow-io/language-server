@@ -35,11 +35,13 @@ public interface List<E> extends Iterable<E> {
         Collates the list into a list of sub-lists of length `size`. If `keepRemainder` is `true`, any remaining elements are included as a partial sub-list, otherwise they are excluded.
     """)
     List<List<E>> collate(int size, boolean keepRemainder);
+    List<List<E>> collate(int size);
 
     @Description("""
         Collates the list into a list of sub-lists of length `size`, stepping through the list `step` elements for each sub-list. If `keepRemainder` is `true`, any remaining elements are included as a partial sub-list, otherwise they are excluded.
     """)
     List<List<E>> collate(int size, int step, boolean keepRemainder);
+    List<List<E>> collate(int size, int step);
 
     @Description("""
         Returns the first value in the list that satisfies the given condition.
