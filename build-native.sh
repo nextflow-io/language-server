@@ -3,14 +3,13 @@ set -euo pipefail
 
 #
 # Build script for GraalVM native image of nf-language-server
-# Supports: linux/amd64, linux/arm64, darwin/arm64 (Apple Silicon)
+# Supports: linux/amd64, linux/arm64, macos/amd64, macos/arm64 (Apple Silicon)
 #
 # Usage:
 #   ./build-native.sh [options]
 #
 # Options:
 #   --skip-test      Skip testing the native binary
-#   --skip-package   Skip packaging the binary
 #   --help, -h       Show this help message
 #
 
@@ -86,32 +85,12 @@ check_requirements() {
 # Detect platform
 detect_platform() {
     OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-    ARCH="$(uname -m)"
-
-    case "$ARCH" in
-        x86_64|amd64)
-            ARCH="amd64"
-            ;;
-        aarch64|arm64)
-            ARCH="arm64"
-            ;;
-        *)
-            log_error "Unsupported architecture: $ARCH"
-            exit 1
-            ;;
-    esac
 
     case "$OS" in
-        linux)
-            PLATFORM="linux-$ARCH"
-            BINARY_EXT=""
-            ;;
-        darwin)
-            PLATFORM="macos-$ARCH"
+        linux|darwin)
             BINARY_EXT=""
             ;;
         mingw*|msys*|cygwin*)
-            PLATFORM="windows-$ARCH"
             BINARY_EXT=".exe"
             ;;
         *)
@@ -119,8 +98,6 @@ detect_platform() {
             exit 1
             ;;
     esac
-
-    log_info "Detected platform: $PLATFORM"
 }
 
 # Build native image (includes shadow jar, tracing agent, and native compilation)
@@ -128,7 +105,7 @@ build_native_image() {
     log_info "Building native image (this includes JAR build and tracing agent)..."
     ./gradlew nativeCompile --no-configuration-cache --no-daemon
 
-    local BINARY_PATH="build/native/nativeCompile/nf-language-server${BINARY_EXT}"
+    local BINARY_PATH="build/native/nativeCompile/nlsp${BINARY_EXT}"
     if [[ -f "$BINARY_PATH" ]]; then
         log_info "Native image built successfully: $BINARY_PATH"
         ls -lh "$BINARY_PATH"
@@ -142,7 +119,7 @@ build_native_image() {
 test_native_binary() {
     log_info "Testing native binary..."
 
-    local BINARY_PATH="build/native/nativeCompile/nf-language-server${BINARY_EXT}"
+    local BINARY_PATH="build/native/nativeCompile/nlsp${BINARY_EXT}"
     local OUTPUT
 
     OUTPUT=$(./lsp-simulator.sh | "$BINARY_PATH" 2>&1 | head -20)
@@ -156,40 +133,16 @@ test_native_binary() {
     fi
 }
 
-# Package the binary
-package_binary() {
-    log_info "Packaging binary for $PLATFORM..."
-
-    local BINARY_PATH="build/native/nativeCompile/nf-language-server${BINARY_EXT}"
-    local DIST_DIR="build/dist"
-    local ARCHIVE_NAME="nf-language-server-$PLATFORM"
-
-    mkdir -p "$DIST_DIR"
-
-    if [[ "$OS" == "darwin" ]] || [[ "$OS" == "linux" ]]; then
-        tar -czvf "$DIST_DIR/$ARCHIVE_NAME.tar.gz" -C "build/native/nativeCompile" "nf-language-server${BINARY_EXT}"
-        log_info "Created: $DIST_DIR/$ARCHIVE_NAME.tar.gz"
-    else
-        # Windows - create zip
-        (cd "build/native/nativeCompile" && zip -r "../../../$DIST_DIR/$ARCHIVE_NAME.zip" "nf-language-server${BINARY_EXT}")
-        log_info "Created: $DIST_DIR/$ARCHIVE_NAME.zip"
-    fi
-}
 
 # Main build process
 main() {
     local SKIP_TEST=false
-    local SKIP_PACKAGE=false
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
             --skip-test)
                 SKIP_TEST=true
-                shift
-                ;;
-            --skip-package)
-                SKIP_PACKAGE=true
                 shift
                 ;;
             --help|-h)
@@ -199,7 +152,6 @@ main() {
                 echo ""
                 echo "Options:"
                 echo "  --skip-test     Skip testing the native binary"
-                echo "  --skip-package  Skip packaging the binary"
                 echo "  --help, -h      Show this help message"
                 echo ""
                 echo "Requirements:"
@@ -225,16 +177,9 @@ main() {
         test_native_binary
     fi
 
-    if [[ "$SKIP_PACKAGE" != "true" ]]; then
-        package_binary
-    fi
-
     echo ""
     log_info "Build completed successfully!"
-    log_info "Binary: build/native/nativeCompile/nf-language-server${BINARY_EXT}"
-    if [[ "$SKIP_PACKAGE" != "true" ]]; then
-        log_info "Package: build/dist/nf-language-server-$PLATFORM.tar.gz"
-    fi
+    log_info "Binary: build/native/nativeCompile/nlsp${BINARY_EXT}"
 }
 
 main "$@"

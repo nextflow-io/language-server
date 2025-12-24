@@ -154,7 +154,7 @@ graalvmNative {
   }
   binaries {
     main {
-      imageName = 'nf-language-server'
+      imageName = 'nlsp'
       mainClass = 'nextflow.lsp.NextflowLanguageServer'
       buildArgs.addAll([
         '--no-fallback',
