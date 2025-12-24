@@ -33,8 +33,10 @@ jobs:
             platform: linux-amd64
           - os: ubuntu-24.04-arm
             platform: linux-arm64
-          - os: macos-14
-            platform: darwin-arm64
+          - os: macos-latest-large
+            platform: macos-amd64
+          - os: macos-latest-xlarge
+            platform: macos-arm64
 
     steps:
       - name: Checkout repository

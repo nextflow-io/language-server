@@ -168,7 +168,7 @@ graalvmNative {
         '--initialize-at-build-time=groovyjarjarantlr4',
         '--initialize-at-build-time=java.beans',
         '--initialize-at-build-time=com.sun.beans',
-        "-H:ConfigurationFileDirectories=$buildDir/native-image-agent"
+        "-H:ConfigurationFileDirectories=$buildDir/native-image-agent,$projectDir/conf/native-image"
       ])
     }
   }

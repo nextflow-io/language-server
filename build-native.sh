@@ -107,7 +107,7 @@ detect_platform() {
             BINARY_EXT=""
             ;;
         darwin)
-            PLATFORM="darwin-$ARCH"
+            PLATFORM="macos-$ARCH"
             BINARY_EXT=""
             ;;
         mingw*|msys*|cygwin*)
