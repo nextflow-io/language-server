@@ -1,5 +1,6 @@
 plugins {
   id 'com.gradleup.shadow' version '8.3.5'
+  id 'org.graalvm.buildtools.native' version '0.10.4'
   id 'application'
   id 'groovy'
   id 'java'
@@ -93,6 +94,7 @@ processResources {
 
 jar {
   dependsOn buildSpec
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   from("$buildDir/generated") {
     include 'definitions.json'
     into 'spec'
@@ -105,4 +107,70 @@ application {
 
 shadowJar {
   archiveVersion = ''
+}
+
+task generateNativeImageConfig(type: Exec) {
+  description = 'Generate native-image configuration using tracing agent'
+  group = 'native'
+
+  dependsOn shadowJar
+
+  def agentOutputDir = file("$buildDir/native-image-agent")
+  def simulateScript = file("$projectDir/lsp-simulator.sh")
+
+  inputs.file(shadowJar.archiveFile)
+  inputs.file(simulateScript)
+  outputs.dir(agentOutputDir)
+
+  doFirst {
+    agentOutputDir.mkdirs()
+  }
+
+  commandLine 'bash', '-c', """
+    ${simulateScript.absolutePath} | java \\
+      -agentlib:native-image-agent=config-output-dir=${agentOutputDir.absolutePath} \\
+      -cp ${shadowJar.archiveFile.get().asFile.absolutePath} \\
+      nextflow.lsp.NextflowLanguageServer
+  """
+}
+
+tasks.named('nativeCompile') {
+  dependsOn generateNativeImageConfig
+}
+
+graalvmNative {
+  agent {
+    defaultMode = 'standard'
+    builtinCallerFilter = true
+    builtinHeuristicFilter = true
+    enableExperimentalPredefinedClasses = false
+    enableExperimentalUnsafeAllocationTracing = false
+    trackReflectionMetadata = true
+    metadataCopy {
+      inputTaskNames.add('run')
+      outputDirectories.add("$buildDir/native-image-agent")
+      mergeWithExisting = true
+    }
+  }
+  binaries {
+    main {
+      imageName = 'nf-language-server'
+      mainClass = 'nextflow.lsp.NextflowLanguageServer'
+      buildArgs.addAll([
+        '--no-fallback',
+        '--enable-url-protocols=http,https',
+        '-H:+ReportExceptionStackTraces',
+        '--report-unsupported-elements-at-runtime',
+        '--initialize-at-build-time=org.slf4j',
+        '--initialize-at-build-time=org.apache.groovy',
+        '--initialize-at-build-time=groovy',
+        '--initialize-at-build-time=org.codehaus.groovy',
+        '--initialize-at-build-time=groovyjarjarantlr4',
+        '--initialize-at-build-time=java.beans',
+        '--initialize-at-build-time=com.sun.beans',
+        "-H:ConfigurationFileDirectories=$buildDir/native-image-agent"
+      ])
+    }
+  }
+  toolchainDetection = false
 }

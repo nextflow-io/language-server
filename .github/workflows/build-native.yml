@@ -1,0 +1,105 @@
+name: Build Native Image
+
+on:
+  push:
+    branches:
+      - '*'
+      - '!refs/tags/.*'
+    tags-ignore:
+      - '*'
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - '*'
+      - '!refs/tags/.*'
+    tags-ignore:
+      - '*'
+
+env:
+  GRAALVM_VERSION: '21'
+  GRAALVM_DISTRIBUTION: 'graalvm'
+  JAVA_VERSION: '21'
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-amd64
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
+          - os: macos-14
+            platform: darwin-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.GRAALVM_DISTRIBUTION }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build native image
+        run: |
+          chmod +x ./gradlew ./lsp-simulator.sh ./build-native.sh
+          ./build-native.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nf-language-server-${{ matrix.platform }}
+          path: build/dist/nf-language-server-${{ matrix.platform }}.tar.gz
+          retention-days: 7
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -name "*.tar.gz" -exec cp {} release/ \;
+          cd release
+          sha256sum *.tar.gz > checksums.txt
+          cat checksums.txt
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+          generate_release_notes: true
+          files: |
+            release/*.tar.gz
+            release/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
