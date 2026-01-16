@@ -17,8 +17,10 @@ package nextflow.lsp.services.config;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import java.util.stream.Collectors;
 
 import nextflow.config.ast.ConfigApplyBlockNode;
 import nextflow.config.ast.ConfigAssignNode;
@@ -34,6 +36,7 @@ import nextflow.script.control.Phases;
 import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
+import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
@@ -163,12 +166,27 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         // validate type
         if( !typeChecking )
             return;
-        var expectedType = option.type() != null ? ClassHelper.makeCached(option.type()) : ClassHelper.dynamicType();
+        var expectedTypes = option.types().stream()
+            .map(t -> ClassHelper.makeCached(t).getPlainNodeReference())
+            .toList();
         var actualType = node.value.getType();
-        if( !TypesEx.isAssignableFrom(expectedType, actualType) ) {
-            var message = "Config option '" + fqName + "' with type " + TypesEx.getName(expectedType) + " cannot be assigned to value with type " + TypesEx.getName(actualType);
+        if( !isAssignableFromAny(expectedTypes, actualType) ) {
+            var validTypes = expectedTypes.stream()
+                .map(cn -> TypesEx.getName(cn))
+                .collect(Collectors.joining(", "));
+            var message = "Config option '" + fqName + "' with cannot be assigned to value with type " + TypesEx.getName(actualType) + " -- valid types are: " + validTypes;
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
         }
+    }
+
+    private boolean isAssignableFromAny(List<ClassNode> targetTypes, ClassNode sourceType) {
+        if( targetTypes.isEmpty() )
+            return true;
+        for( var targetType : targetTypes ) {
+            if( TypesEx.isAssignableFrom(targetType, sourceType) )
+                return true;
+        }
+        return false;
     }
 
     @Override

@@ -183,7 +183,7 @@ public class ConfigCompletionProvider implements CompletionProvider {
             return;
         scope.children().forEach((name, child) -> {
             if( child instanceof SpecNode.Option option )
-                ch.addItem(configOption(name, option.description(), option.type()));
+                ch.addItem(configOption(name, option.description(), option.types().get(0)));
             else
                 ch.addItem(configScope(name, child.description()));
         });
@@ -193,7 +193,7 @@ public class ConfigCompletionProvider implements CompletionProvider {
         var result = new ArrayList<CompletionItem>();
         spec.children().forEach((name, child) -> {
             if( child instanceof SpecNode.Option option ) {
-                result.add(configOption(name, option.description(), option.type()));
+                result.add(configOption(name, option.description(), option.types().get(0)));
             }
             else {
                 result.add(configScope(name, child.description()));

@@ -33,7 +33,7 @@ configurations {
 }
 
 dependencies {
-  implementation 'io.nextflow:nf-lang:25.10.0'
+  implementation 'io.nextflow:nf-lang:25.12.0-edge'
   implementation 'org.apache.groovy:groovy:4.0.28'
   implementation 'org.apache.groovy:groovy-json:4.0.28'
   implementation 'org.apache.groovy:groovy-yaml:4.0.28'
@@ -45,13 +45,13 @@ dependencies {
   runtimeOnly 'org.yaml:snakeyaml:2.2'
 
   // include Nextflow runtime at build-time to extract language definitions
-  nextflowRuntime 'io.nextflow:nextflow:25.10.0'
-  nextflowRuntime 'io.nextflow:nf-amazon:3.4.1'
-  nextflowRuntime 'io.nextflow:nf-azure:1.20.2'
-  nextflowRuntime 'io.nextflow:nf-google:1.23.3'
-  nextflowRuntime 'io.nextflow:nf-k8s:1.2.2'
-  nextflowRuntime 'io.nextflow:nf-tower:1.17.1'
-  nextflowRuntime 'io.nextflow:nf-wave:1.16.1'
+  nextflowRuntime 'io.nextflow:nextflow:25.12.0-edge'
+  nextflowRuntime 'io.nextflow:nf-amazon:3.6.0'
+  nextflowRuntime 'io.nextflow:nf-azure:1.21.0'
+  nextflowRuntime 'io.nextflow:nf-google:1.25.0'
+  nextflowRuntime 'io.nextflow:nf-k8s:1.4.0'
+  nextflowRuntime 'io.nextflow:nf-tower:1.19.0'
+  nextflowRuntime 'io.nextflow:nf-wave:1.18.0'
 
   testImplementation ('org.objenesis:objenesis:3.4')
   testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
