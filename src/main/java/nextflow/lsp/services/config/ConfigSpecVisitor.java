@@ -33,11 +33,16 @@ import nextflow.lsp.spec.PluginRef;
 import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
+import nextflow.script.control.ReturnStatementVisitor;
+import nextflow.script.control.TypeCheckingVisitorEx;
+import nextflow.script.types.TypeCheckingUtils;
 import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
+import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -169,14 +174,28 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         var expectedTypes = option.types().stream()
             .map(t -> ClassHelper.makeCached(t).getPlainNodeReference())
             .toList();
-        var actualType = node.value.getType();
+        var actualType = inferredType(node.value, names);
         if( !isAssignableFromAny(expectedTypes, actualType) ) {
             var validTypes = expectedTypes.stream()
                 .map(cn -> TypesEx.getName(cn))
                 .collect(Collectors.joining(", "));
-            var message = "Config option '" + fqName + "' with cannot be assigned to value with type " + TypesEx.getName(actualType) + " -- valid types are: " + validTypes;
+            var message = expectedTypes.size() == 1
+                ? "Config option '" + fqName + "' with type " + TypesEx.getName(expectedTypes.get(0)) + " cannot be assigned to value with type " + TypesEx.getName(actualType)
+                : "Config option '" + fqName + "' cannot be assigned to value with type " + TypesEx.getName(actualType) + " -- valid types are: " + validTypes;
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
         }
+    }
+
+    private ClassNode inferredType(Expression node, List<String> scopes) {
+        new TypeCheckingVisitorEx(sourceUnit, true).visit(node);
+        var type = TypeCheckingUtils.getType(node);
+        if( node instanceof ClosureExpression ce && "process".equals(scopes.get(0)) ) {
+            var visitor = new ReturnStatementVisitor(sourceUnit);
+            visitor.visit(ClassHelper.dynamicType(), ce.getCode());
+            var inferredReturnType = visitor.getInferredReturnType();
+            return inferredReturnType != null ? inferredReturnType : ClassHelper.dynamicType();
+        }
+        return type;
     }
 
     private boolean isAssignableFromAny(List<ClassNode> targetTypes, ClassNode sourceType) {

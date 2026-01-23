@@ -46,7 +46,6 @@ import nextflow.script.types.Value;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.CodeVisitorSupport;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
@@ -75,8 +74,6 @@ import org.codehaus.groovy.ast.expr.UnaryPlusExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
-import org.codehaus.groovy.ast.stmt.IfStatement;
-import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
@@ -282,67 +279,12 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( !experimental )
             return;
             
-        var visitor = new ReturnStatementVisitor();
+        var visitor = new ReturnStatementVisitor(sourceUnit);
         visitor.visit(node.getReturnType(), node.getCode());
 
         var inferredReturnType = visitor.getInferredReturnType();
         if( inferredReturnType != null && ClassHelper.isDynamicTyped(node.getReturnType()) )
             node.setReturnType(inferredReturnType);
-    }
-
-    private class ReturnStatementVisitor extends CodeVisitorSupport {
-
-        private ClassNode returnType;
-
-        private ClassNode inferredReturnType;
-
-        public void visit(ClassNode returnType, Statement code) {
-            this.returnType = returnType;
-            visit(addReturnsIfNeeded(code));
-            this.returnType = null;
-        }
-
-        private Statement addReturnsIfNeeded(Statement node) {
-            if( node instanceof BlockStatement block && !block.isEmpty() ) {
-                var statements = new ArrayList<>(block.getStatements());
-                int lastIndex = statements.size() - 1;
-                var last = addReturnsIfNeeded(statements.get(lastIndex));
-                statements.set(lastIndex, last);
-                return new BlockStatement(statements, block.getVariableScope());
-            }
-
-            if( node instanceof ExpressionStatement es ) {
-                return new ReturnStatement(es.getExpression());
-            }
-
-            if( node instanceof IfStatement ies ) {
-                return new IfStatement(
-                    ies.getBooleanExpression(),
-                    addReturnsIfNeeded(ies.getIfBlock()),
-                    addReturnsIfNeeded(ies.getElseBlock()) );
-            }
-
-            return node;
-        }
-
-        @Override
-        public void visitReturnStatement(ReturnStatement node) {
-            var sourceType = getType(node.getExpression());
-            if( inferredReturnType != null && !ClassHelper.isDynamicTyped(returnType) ) {
-                if( !TypesEx.isAssignableFrom(inferredReturnType, sourceType) )
-                    addError(String.format("Return value with type %s does not match previous return type (%s)", TypesEx.getName(sourceType), TypesEx.getName(inferredReturnType)), node);
-            }
-            else if( TypesEx.isAssignableFrom(returnType, sourceType) ) {
-                inferredReturnType = sourceType;
-            }
-            else {
-                addError(String.format("Return value with type %s does not match the declared return type (%s)", TypesEx.getName(sourceType), TypesEx.getName(returnType)), node);
-            }
-        }
-
-        public ClassNode getInferredReturnType() {
-            return inferredReturnType;
-        }
     }
 
     @Override
@@ -1042,7 +984,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             return;
         var returnType = (ClassNode) node.getNodeMetaData(ASTNodeMarker.INFERRED_RETURN_TYPE);
         if( returnType != null ) {
-            var visitor = new ReturnStatementVisitor();
+            var visitor = new ReturnStatementVisitor(sourceUnit);
             visitor.visit(returnType, node.getCode());
 
             var inferredReturnType = visitor.getInferredReturnType();
