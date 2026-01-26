@@ -38,6 +38,7 @@ import nextflow.lsp.file.FileCache;
 import nextflow.lsp.util.DebouncingExecutor;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
+import nextflow.lsp.util.ProgressNotification;
 import nextflow.lsp.util.Positions;
 import nextflow.script.control.ParanoidWarning;
 import nextflow.script.control.RelatedInformationAware;
@@ -363,13 +364,33 @@ public abstract class LanguageService {
             log.debug(builder.toString());
         }
 
+        // Create progress notification for multi-file updates
+        ProgressNotification progress = null;
+        if( uris.size() > 1 && client != null ) {
+            var token = "indexing-" + (rootUri != null ? rootUri.hashCode() : "default");
+            progress = new ProgressNotification(client, token);
+            progress.create();
+            progress.begin(String.format("Indexing %d files...", uris.size()));
+        }
+
         try {
-            var changedUris = astCache.update(uris, fileCache);
+            final var progressNotification = progress;
+            var changedUris = astCache.update(uris, fileCache,
+                progressNotification != null
+                    ? (current, total) -> progressNotification.update(
+                        String.format("Indexing: %d / %d files", current, total),
+                        current * 100 / total)
+                    : null);
             publishDiagnostics(changedUris);
         }
         catch( Throwable e ) {
             System.err.println(e);
             e.printStackTrace();
+        }
+        finally {
+            if( progress != null ) {
+                progress.end();
+            }
         }
     }
 
