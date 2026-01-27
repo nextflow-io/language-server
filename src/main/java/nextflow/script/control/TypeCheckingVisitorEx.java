@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
-import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
@@ -117,8 +116,18 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     public void visit() {
         var moduleNode = sourceUnit.getAST();
-        if( moduleNode instanceof ScriptNode sn )
-            visit(sn);
+        if( moduleNode instanceof ScriptNode sn ) {
+            for( var featureFlag : sn.getFeatureFlags() )
+                visitFeatureFlag(featureFlag);
+            if( sn.getParams() != null )
+                visitParams(sn.getParams());
+            for( var functionNode : sn.getFunctions() )
+                visitFunction(functionNode);
+            for( var processNode : sn.getProcesses() )
+                visitProcess(processNode);
+            for( var workflowNode : sn.getWorkflows() )
+                visitWorkflow(workflowNode);
+        }
     }
 
     // script declarations
@@ -478,6 +487,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             var dummyMethod = resolveGenericReturnType(receiverType, target, arguments);
             node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, dummyMethod);
             node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, dummyMethod.getReturnType());
+
+            checkOperatorCall(node);
         }
         else if( node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET) instanceof MethodNode mn ) {
             var parameters = mn.getParameters();
@@ -548,6 +559,30 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         else {
             addError(String.format("Unrecognized method `%s` for element type %s", name, TypesEx.getName(elementType)), node);
         }
+    }
+
+    /**
+     * Resolve the return type of operators that transform tuples.
+     * such as `combine`, `groupTuple`, and `join`.
+     *
+     * @param node
+     */
+    private void checkOperatorCall(MethodCallExpression node) {
+        if( node.isImplicitThis() )
+            return;
+
+        var receiverType = getType(node.getObjectExpression());
+        if( !CHANNEL_TYPE.equals(receiverType) )
+            return;
+
+        var lhsType = elementType(receiverType);
+        var method = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
+        var arguments = asMethodCallArguments(node);
+        var resultType = new TupleOpResolver().apply(lhsType, method, arguments);
+        if( ClassHelper.isDynamicTyped(resultType) )
+            return;
+
+        node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
     }
 
     /**
@@ -689,13 +724,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( CHANNEL_TYPE.equals(type) || VALUE_TYPE.equals(type) )
             return elementType(type);
         return type;
-    }
-
-    private static ClassNode elementType(ClassNode type) {
-        var gts = type.getGenericsTypes();
-        if( gts == null || gts.length != 1 )
-            return ClassHelper.dynamicType();
-        return gts[0].getType();
     }
 
     private static ClassNode processOutputType(ClassNode dataflowType, Statement block) {
