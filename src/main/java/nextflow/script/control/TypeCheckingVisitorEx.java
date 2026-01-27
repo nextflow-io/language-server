@@ -835,6 +835,10 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
                 resultType = resolveOpResultType(lhsType, rhsType, lhsOps, rhsOps, "rightShiftUnsigned");
                 break;
 
+            case Types.KEYWORD_INSTANCEOF:
+            case Types.COMPARE_NOT_INSTANCEOF:
+                return;
+
             case Types.COMPARE_LESS_THAN:
             case Types.COMPARE_LESS_THAN_EQUAL:
             case Types.COMPARE_GREATER_THAN:
