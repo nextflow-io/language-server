@@ -191,12 +191,11 @@ class ConvertScriptStaticTypesTest extends Specification {
         "path 'output.txt'"                 | "file('output.txt')"                  | null
         "path 'output.txt', emit: txt"      | "txt = file('output.txt')"            | null
         "path 'output.txt', topic: txt"     | null                                  | "file('output.txt') >> 'txt'"
-        // "path 'output.txt', hidden: true"   | "file('output.txt', hidden: true)"    | null
+        "path 'output.txt', hidden: true"   | "file('output.txt', hidden: true)"    | null
         "path 'output.txt', optional: true" | "file('output.txt', optional: true)"  | null
         "path '*.txt', arity: '1'"          | "file('*.txt')"                       | null
-        // "path '*.txt', arity: '1..*'"       | "files('*.txt')"                      | null
-        // "path '*.txt', arity: '0..*'"       | "files('*.txt', optional: true)"      | null
-        // "path '-'"                          | "stdout()"                            | null
+        "path '*.txt', arity: '1..*'"       | "files('*.txt')"                      | null
+        "path '*.txt', arity: '0..*'"       | "files('*.txt')"                      | null
     }
 
     def 'should convert env outputs' () {
@@ -231,11 +230,12 @@ class ConvertScriptStaticTypesTest extends Specification {
         checkOutputs(service, OUTPUT, TYPED_OUTPUT)
 
         where:
-        OUTPUT                                  | TYPED_OUTPUT
-        "tuple val('id'), path('*.fastq')"      | "tuple('id', file('*.fastq'))"
-        "tuple stdout(), val('id')"             | "tuple(stdout(), 'id')"
-        "tuple val('x'), val('y'), emit: xy"    | "xy = tuple('x', 'y')"
-        "tuple stdout(), env('BAR'), emit: bar" | "bar = tuple(stdout(), env('BAR'))"
+        OUTPUT                                                      | TYPED_OUTPUT
+        "tuple val('id'), path('*.fastq')"                          | "tuple('id', file('*.fastq'))"
+        "tuple stdout(), val('id')"                                 | "tuple(stdout(), 'id')"
+        "tuple val('x'), val('y'), emit: xy"                        | "xy = tuple('x', 'y')"
+        "tuple stdout(), env('BAR'), emit: bar"                     | "bar = tuple(stdout(), env('BAR'))"
+        "tuple val('id'), path('*.fastq', hidden: true), emit: bar" | "bar = tuple('id', file('*.fastq', hidden: true))"
     }
 
 }

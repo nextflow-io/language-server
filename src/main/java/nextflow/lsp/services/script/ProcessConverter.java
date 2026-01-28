@@ -103,6 +103,16 @@ class ProcessConverter {
             .toArray(Parameter[]::new);
     }
 
+    /**
+     * Convert a legacy input to a typed input.
+     *
+     * Stage directives are added as needed to handle
+     * inputs that require custom staging, such as env
+     * and stdin.
+     *
+     * @param call
+     * @param stagers
+     */
     private Parameter typedInput(MethodCallExpression call, List<Statement> stagers) {
         var qualifier = call.getMethodAsString();
 
@@ -257,12 +267,20 @@ class ProcessConverter {
 
     private static final Token RIGHT_SHIFT = Token.newSymbol(Types.RIGHT_SHIFT, -1, -1);
 
+    /**
+     * Convert a legacy output to a typed output.
+     *
+     * Topic emissions are added as needed for outputs
+     * that specify a topic.
+     *
+     * @param call
+     * @param topics
+     */
     private Statement typedOutput(MethodCallExpression call, List<Statement> topics) {
         var namedArgs = namedArgs(call);
         var hasEmit = namedArgs.containsKey("emit");
         var hasTopic = namedArgs.containsKey("topic");
-        var optional = namedArgs.get("optional") instanceof ConstantExpression ce && Boolean.TRUE.equals(ce.getValue());
-        var outputValue = typedOutputValue(call, optional);
+        var outputValue = typedOutputValue(call);
         if( hasTopic ) {
             var topicName = namedArgs.get("topic").getText();
             var topic = stmt(binX(outputValue, RIGHT_SHIFT, stringX(topicName)));
@@ -276,6 +294,12 @@ class ProcessConverter {
         return stmt(new AssignmentExpression(varX(outputName), outputValue));
     }
 
+    /**
+     * Get the named arguments of a method call as a
+     * mapping of names to expressions.
+     *
+     * @param call
+     */
     private static Map<String,Expression> namedArgs(MethodCallExpression call) {
         var entries = asNamedArgs(call).stream()
             .map((entry) -> {
@@ -287,19 +311,8 @@ class ProcessConverter {
         return Map.ofEntries(entries);
     }
 
-    private static Expression typedOutputValue(MethodCallExpression call, boolean optional) {
-        // TODO: preserve named args in output dsl xform, filter out emit/topic/optional after xform
-        var arguments = withoutNamedArgs(call);
-        var result = callThisX(call.getMethodAsString(), args(arguments));
-        result.setSourcePosition(call);
-        return new OutputDslTransformer(optional).transform(result);
-    }
-
-    private static List<Expression> withoutNamedArgs(MethodCallExpression call) {
-        var args = asMethodCallArguments(call);
-        return args.size() > 0 && args.get(0) instanceof NamedArgumentListExpression
-            ? args.subList(1, args.size())
-            : args;
+    private static Expression typedOutputValue(MethodCallExpression call) {
+        return new OutputDslTransformer().transform(call);
     }
 
     private static Expression stringX(String str) {
@@ -391,16 +404,15 @@ class ModuleSpecVisitor {
 
 class OutputDslTransformer implements ExpressionTransformer {
 
-    private boolean optional;
-
-    public OutputDslTransformer(boolean optional) {
-        this.optional = optional;
-    }
+    private static final List<String> LEGACY_OPTS = List.of("arity", "emit", "topic");
 
     @Override
     public Expression transform(Expression node) {
         if( node == null )
             return null;
+
+        if( node instanceof ArgumentListExpression ale )
+            return transformArgumentListExpression(ale);
 
         if( node instanceof VariableExpression ve )
             return transformVariableExpression(ve);
@@ -411,6 +423,24 @@ class OutputDslTransformer implements ExpressionTransformer {
         return node.transformExpression(this);
     }
 
+    private Expression transformArgumentListExpression(ArgumentListExpression ale) {
+        var args = ale.getExpressions();
+        if( args.size() > 0 && args.get(0) instanceof NamedArgumentListExpression nale ) {
+            var entries = nale.getMapEntryExpressions().stream()
+                .filter((e) -> (
+                    !LEGACY_OPTS.contains(e.getKeyExpression().getText())
+                ))
+                .toList();
+            var newArgs = new ArrayList<Expression>(args.size());
+            if( !entries.isEmpty() )
+                newArgs.add(new NamedArgumentListExpression(entries));
+            for( var arg : args.subList(1, args.size()) )
+                newArgs.add(transform(arg));
+            return new ArgumentListExpression(newArgs);
+        }
+        return ale.transformExpression(this);
+    }
+
     private Expression transformVariableExpression(VariableExpression ve) {
         if( "stdout".equals(ve) )
             return callThisX(ve.getName(), new ArgumentListExpression());
@@ -419,17 +449,15 @@ class OutputDslTransformer implements ExpressionTransformer {
 
     private Expression transformMethodCallExpression(MethodCallExpression mce) {
         if( !mce.isImplicitThis() )
-            return mce.transformExpression(this);
+            return mce;
         var name = mce.getMethodAsString();
         if( "val".equals(name) )
             return lastArg(mce);
-        var arguments = transform(mce.getArguments());
+        var arguments = mce.getArguments();
         if( "file".equals(name) || "path".equals(name) ) {
             name = isFileCollection(arguments) ? "files" : "file";
-            if( optional )
-                addNamedArg(arguments, entryX(constX("optional"), constX(true)));
         }
-        var result = callThisX(name, arguments);
+        var result = callThisX(name, transform(arguments));
         result.setSourcePosition(mce);
         return result;
     }
@@ -442,18 +470,6 @@ class OutputDslTransformer implements ExpressionTransformer {
                 return !"1".equals(arity);
         }
         return false;
-    }
-
-    private static void addNamedArg(Expression arguments, MapEntryExpression entry) {
-        var args = ((TupleExpression) arguments).getExpressions();
-        if( args.size() > 0 && args.get(0) instanceof NamedArgumentListExpression nale ) {
-            nale.addMapEntryExpression(entry);
-        }
-        else {
-            var namedArgs = new NamedArgumentListExpression();
-            namedArgs.addMapEntryExpression(entry);
-            args.add(0, namedArgs);
-        }
     }
 
     private static Expression lastArg(MethodCallExpression call) {
