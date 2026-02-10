@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
-import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.FeatureFlagNode;
@@ -46,7 +45,6 @@ import nextflow.script.types.Value;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.CodeVisitorSupport;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
@@ -75,8 +73,6 @@ import org.codehaus.groovy.ast.expr.UnaryPlusExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
-import org.codehaus.groovy.ast.stmt.IfStatement;
-import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
@@ -120,8 +116,18 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     public void visit() {
         var moduleNode = sourceUnit.getAST();
-        if( moduleNode instanceof ScriptNode sn )
-            visit(sn);
+        if( moduleNode instanceof ScriptNode sn ) {
+            for( var featureFlag : sn.getFeatureFlags() )
+                visitFeatureFlag(featureFlag);
+            if( sn.getParams() != null )
+                visitParams(sn.getParams());
+            for( var functionNode : sn.getFunctions() )
+                visitFunction(functionNode);
+            for( var processNode : sn.getProcesses() )
+                visitProcess(processNode);
+            for( var workflowNode : sn.getWorkflows() )
+                visitWorkflow(workflowNode);
+        }
     }
 
     // script declarations
@@ -282,67 +288,12 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( !experimental )
             return;
             
-        var visitor = new ReturnStatementVisitor();
+        var visitor = new ReturnStatementVisitor(sourceUnit);
         visitor.visit(node.getReturnType(), node.getCode());
 
         var inferredReturnType = visitor.getInferredReturnType();
         if( inferredReturnType != null && ClassHelper.isDynamicTyped(node.getReturnType()) )
             node.setReturnType(inferredReturnType);
-    }
-
-    private class ReturnStatementVisitor extends CodeVisitorSupport {
-
-        private ClassNode returnType;
-
-        private ClassNode inferredReturnType;
-
-        public void visit(ClassNode returnType, Statement code) {
-            this.returnType = returnType;
-            visit(addReturnsIfNeeded(code));
-            this.returnType = null;
-        }
-
-        private Statement addReturnsIfNeeded(Statement node) {
-            if( node instanceof BlockStatement block && !block.isEmpty() ) {
-                var statements = new ArrayList<>(block.getStatements());
-                int lastIndex = statements.size() - 1;
-                var last = addReturnsIfNeeded(statements.get(lastIndex));
-                statements.set(lastIndex, last);
-                return new BlockStatement(statements, block.getVariableScope());
-            }
-
-            if( node instanceof ExpressionStatement es ) {
-                return new ReturnStatement(es.getExpression());
-            }
-
-            if( node instanceof IfStatement ies ) {
-                return new IfStatement(
-                    ies.getBooleanExpression(),
-                    addReturnsIfNeeded(ies.getIfBlock()),
-                    addReturnsIfNeeded(ies.getElseBlock()) );
-            }
-
-            return node;
-        }
-
-        @Override
-        public void visitReturnStatement(ReturnStatement node) {
-            var sourceType = getType(node.getExpression());
-            if( inferredReturnType != null && !ClassHelper.isDynamicTyped(returnType) ) {
-                if( !TypesEx.isAssignableFrom(inferredReturnType, sourceType) )
-                    addError(String.format("Return value with type %s does not match previous return type (%s)", TypesEx.getName(sourceType), TypesEx.getName(inferredReturnType)), node);
-            }
-            else if( TypesEx.isAssignableFrom(returnType, sourceType) ) {
-                inferredReturnType = sourceType;
-            }
-            else {
-                addError(String.format("Return value with type %s does not match the declared return type (%s)", TypesEx.getName(sourceType), TypesEx.getName(returnType)), node);
-            }
-        }
-
-        public ClassNode getInferredReturnType() {
-            return inferredReturnType;
-        }
     }
 
     @Override
@@ -536,6 +487,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             var dummyMethod = resolveGenericReturnType(receiverType, target, arguments);
             node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, dummyMethod);
             node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, dummyMethod.getReturnType());
+
+            checkOperatorCall(node);
         }
         else if( node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET) instanceof MethodNode mn ) {
             var parameters = mn.getParameters();
@@ -606,6 +559,30 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         else {
             addError(String.format("Unrecognized method `%s` for element type %s", name, TypesEx.getName(elementType)), node);
         }
+    }
+
+    /**
+     * Resolve the return type of operators that transform tuples.
+     * such as `combine`, `groupTuple`, and `join`.
+     *
+     * @param node
+     */
+    private void checkOperatorCall(MethodCallExpression node) {
+        if( node.isImplicitThis() )
+            return;
+
+        var receiverType = getType(node.getObjectExpression());
+        if( !CHANNEL_TYPE.equals(receiverType) )
+            return;
+
+        var lhsType = elementType(receiverType);
+        var method = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
+        var arguments = asMethodCallArguments(node);
+        var resultType = new TupleOpResolver().apply(lhsType, method, arguments);
+        if( ClassHelper.isDynamicTyped(resultType) )
+            return;
+
+        node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
     }
 
     /**
@@ -749,13 +726,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         return type;
     }
 
-    private static ClassNode elementType(ClassNode type) {
-        var gts = type.getGenericsTypes();
-        if( gts == null || gts.length != 1 )
-            return ClassHelper.dynamicType();
-        return gts[0].getType();
-    }
-
     private static ClassNode processOutputType(ClassNode dataflowType, Statement block) {
         var outputs = asBlockStatements(block);
         if( outputs.size() == 1 ) {
@@ -892,6 +862,10 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             case Types.RIGHT_SHIFT_UNSIGNED:
                 resultType = resolveOpResultType(lhsType, rhsType, lhsOps, rhsOps, "rightShiftUnsigned");
                 break;
+
+            case Types.KEYWORD_INSTANCEOF:
+            case Types.COMPARE_NOT_INSTANCEOF:
+                return;
 
             case Types.COMPARE_LESS_THAN:
             case Types.COMPARE_LESS_THAN_EQUAL:
@@ -1042,7 +1016,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             return;
         var returnType = (ClassNode) node.getNodeMetaData(ASTNodeMarker.INFERRED_RETURN_TYPE);
         if( returnType != null ) {
-            var visitor = new ReturnStatementVisitor();
+            var visitor = new ReturnStatementVisitor(sourceUnit);
             visitor.visit(returnType, node.getCode());
 
             var inferredReturnType = visitor.getInferredReturnType();

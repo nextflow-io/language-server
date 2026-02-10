@@ -104,7 +104,7 @@ public class ConfigHoverProvider implements HoverProvider {
             if( option != null ) {
                 var description = StringGroovyMethods.stripIndent(option.description(), true).trim();
                 var builder = new StringBuilder();
-                builder.append(String.format("`%s (%s)`", fqName, Types.getName(option.type())));
+                builder.append(String.format("`%s (%s)`", fqName, Types.getName(option.types().get(0))));
                 builder.append("\n\n");
                 builder.append(description);
                 return builder.toString();

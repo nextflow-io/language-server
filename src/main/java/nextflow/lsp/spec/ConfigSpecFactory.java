@@ -16,6 +16,7 @@
 package nextflow.lsp.spec;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -110,8 +111,14 @@ public class ConfigSpecFactory {
 
     private static SpecNode.Option fromOption(Map<String,?> spec) {
         var description = (String) spec.get("description");
-        var type = fromType(spec.get("type"));
-        return new SpecNode.Option(description, type);
+        var types = new ArrayList<Class>();
+        types.add(fromType(spec.get("type")));
+        if( spec.containsKey("additionalTypes") ) {
+            var additionalTypes = (List) spec.get("additionalTypes");
+            for( var additionalType : additionalTypes )
+                types.add(fromType(additionalType));
+        }
+        return new SpecNode.Option(description, types);
     }
 
     private static SpecNode.Placeholder fromPlaceholder(Map<String,?> spec) {
@@ -137,6 +144,7 @@ public class ConfigSpecFactory {
         Map.entry("Integer", Integer.class),
         Map.entry("int", Integer.class),
         Map.entry("List", List.class),
+        Map.entry("Map", Map.class),
         Map.entry("MemoryUnit", MemoryUnit.class),
         Map.entry("Set", Set.class),
         Map.entry("String", String.class)

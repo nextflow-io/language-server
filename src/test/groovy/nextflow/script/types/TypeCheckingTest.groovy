@@ -643,6 +643,31 @@ class TypeCheckingTest extends Specification {
         type = getType(exp)
         then:
         TypesEx.getName(type) == 'Value<String>'
+
+        when:
+        exp = parseExpression(
+            '''\
+            nextflow.preview.types = true
+
+            process hello {
+                input:
+                target: String
+
+                output:
+                tuple(target, "Hello, $target!")
+
+                exec:
+                true
+            }
+
+            workflow {
+                hello( 'World' )
+            }
+            '''
+        )
+        type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Value<Tuple<String, String>>'
     }
 
     def 'should resolve tuple type' () {
@@ -703,6 +728,47 @@ class TypeCheckingTest extends Specification {
         "'*.txt'*.getDirName()"         | "Spread-dot is only supported for Iterable types"
         "files('*.txt')*.getDirName()"  | "Unrecognized method `getDirName` for element type Path"
         "files('*.txt')*.toUriString()" | null
+    }
+
+    def 'should resolve a `combine` operation' () {
+        when:
+        def exp = parseExpression(
+            '''\
+            left  = channel.of( tuple(42, 'hello') )
+            right = channel.of( true )
+            left.combine(right)
+            '''
+        )
+        def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Channel<Tuple<Integer, String, Boolean>>'
+    }
+
+    def 'should resolve a `groupTuple` operation' () {
+        when:
+        def exp = parseExpression(
+            '''\
+            left = channel.of( tuple(42, 'hello'), tuple(42, 'goodbye') )
+            left.groupTuple()
+            '''
+        )
+        def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Channel<Tuple<Integer, Bag<String>>>'
+    }
+
+    def 'should resolve a `join` operation' () {
+        when:
+        def exp = parseExpression(
+            '''\
+            left  = channel.of( tuple(42, 'hello') )
+            right = channel.of( tuple(42, true) )
+            left.join(right)
+            '''
+        )
+        def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Channel<Tuple<Integer, String, Boolean>>'
     }
 
 }

@@ -859,4 +859,16 @@ public class TypeCheckingUtils {
         cn.setGenericsTypes(gts);
         return cn;
     }
+
+    /**
+     * Return the element type of a type with one type parameter.
+     *
+     * @param type
+     */
+    public static ClassNode elementType(ClassNode type) {
+        var gts = type.getGenericsTypes();
+        if( gts == null || gts.length != 1 )
+            return ClassHelper.dynamicType();
+        return gts[0].getType();
+    }
 }
