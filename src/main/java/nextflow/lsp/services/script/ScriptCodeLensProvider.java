@@ -257,7 +257,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
         var uri = ast.getURI(pn);
         var sourceUnit = ast.getSourceUnit(uri);
         var range = LanguageServerUtils.astNodeToRange(pn);
-        var newPn = new ProcessConverter(uri).apply(pn);
+        var newPn = new ProcessConverter(uri, true).apply(pn);
         var formatter = new ScriptFormattingVisitor(sourceUnit, options);
         formatter.visitProcess(newPn);
         var newText = formatter.toString().trim();

@@ -131,8 +131,7 @@ class TypeCheckingUtilsTest extends Specification {
                 target: String
 
                 output:
-                x = 'hello'
-                y = target
+                record(x: 'hello', y: target)
 
                 script:
                 """

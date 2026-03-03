@@ -28,6 +28,7 @@ import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
+import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.TupleParameter;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
@@ -93,7 +94,9 @@ public class ASTNodeStringUtils {
 
     private static String classToLabel(ClassNode node) {
         var builder = new StringBuilder();
-        if( node.isEnum() )
+        if( node instanceof RecordNode )
+            builder.append("record ");
+        else if( node.isEnum() )
             builder.append("enum ");
         else
             builder.append("class ");
@@ -158,11 +161,11 @@ public class ASTNodeStringUtils {
             var type = getType(target);
             if( fmt.hasType(type) ) {
                 fmt.append(": ");
-                fmt.visitTypeAnnotation(type);
+                fmt.append(TypesEx.getName(type));
             }
         }
         else {
-            fmt.visitTypeAnnotation(getType(output));
+            fmt.append(TypesEx.getName(getType(output)));
         }
     }
 
@@ -181,12 +184,11 @@ public class ASTNodeStringUtils {
         for( var input : node.inputs ) {
             fmt.appendIndent();
             if( input instanceof TupleParameter tp ) {
+                var components = Arrays.stream(tp.components)
+                    .map(p -> p.getName())
+                    .collect(Collectors.joining(", "));
                 fmt.append('(');
-                fmt.append(
-                    Arrays.stream(tp.components)
-                        .map(p -> p.getName())
-                        .collect(Collectors.joining(", "))
-                );
+                fmt.append(components);
                 fmt.append(')');
             }
             else {
@@ -194,7 +196,11 @@ public class ASTNodeStringUtils {
             }
             if( fmt.hasType(input) ) {
                 fmt.append(": ");
-                fmt.visitTypeAnnotation(input.getType());
+                var type = input.getType();
+                if( type.getNameWithoutPackage().startsWith("__Record") )
+                    processRecordToLabel(type.redirect(), fmt);
+                else
+                    fmt.visitTypeAnnotation(type);
             }
             fmt.appendNewLine();
         }
@@ -215,6 +221,24 @@ public class ASTNodeStringUtils {
         fmt.decIndent();
         fmt.append('}');
         return fmt.toString();
+    }
+
+    private static void processRecordToLabel(ClassNode type, Formatter fmt) {
+        fmt.append("Record {");
+        fmt.appendNewLine();
+        fmt.incIndent();
+        for( var fn : type.getFields() ) {
+            fmt.appendIndent();
+            fmt.append(fn.getName());
+            if( fmt.hasType(fn) ) {
+                fmt.append(": ");
+                fmt.append(TypesEx.getName(fn.getType()));
+            }
+            fmt.appendNewLine();
+        }
+        fmt.decIndent();
+        fmt.appendIndent();
+        fmt.append('}');
     }
 
     private static String processToLabel(ProcessNodeV1 node) {

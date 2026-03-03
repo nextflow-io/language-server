@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,10 +34,13 @@ import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
+import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.TupleParameter;
+import nextflow.script.types.Record;
 import nextflow.script.types.Tuple;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.expr.ArgumentListExpression;
@@ -48,6 +52,7 @@ import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.NamedArgumentListExpression;
 import org.codehaus.groovy.ast.expr.TupleExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
+import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.EmptyStatement;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
@@ -68,8 +73,11 @@ class ProcessConverter {
 
     private Map<String,ClassNode> specInputs;
 
-    public ProcessConverter(URI uri) {
-        specInputs = new ModuleSpecVisitor().getInputs(uri);
+    private boolean useRecords;
+
+    public ProcessConverter(URI uri, boolean useRecords) {
+        this.specInputs = new ModuleSpecVisitor().getInputs(uri);
+        this.useRecords = useRecords;
     }
 
     public ProcessNodeV2 apply(ProcessNodeV1 node) {
@@ -79,7 +87,7 @@ class ProcessConverter {
         var topics = new ArrayList<Statement>();
         var outputs = typedOutputs(node.outputs, topics);
 
-        return new ProcessNodeV2(
+        var result = new ProcessNodeV2(
             node.getName(),
             node.directives,
             inputs,
@@ -90,6 +98,8 @@ class ProcessConverter {
             node.type,
             node.exec,
             node.stub);
+
+        return new RenameVariableTransformer(result).apply();
     }
 
     private int nextInputId;
@@ -145,7 +155,7 @@ class ProcessConverter {
                 param = nextParam(type);
             var stageName = stageName(call);
             if( stageName != null ) {
-                var stageValue = constX(param.getName());
+                var stageValue = varX(param.getName());
                 var stager = stmt(callThisX("stageAs", args(stageName, stageValue)));
                 stagers.add(stager);
             }
@@ -176,7 +186,8 @@ class ProcessConverter {
                 .map(p -> new GenericsType(p.getType()))
                 .toArray(GenericsType[]::new);
             type.setGenericsTypes(genericsTypes);
-            return new TupleParameter(type, components);
+            var param = new TupleParameter(type, components);
+            return useRecords ? recordParam(param) : param;
         }
 
         if( "val".equals(qualifier) ) {
@@ -205,8 +216,22 @@ class ProcessConverter {
     }
 
     private Parameter nextParam(ClassNode type) {
-        var name = String.format("$in%d", nextInputId++);
+        var name = String.format("in%d", nextInputId++);
         return param(name, type);
+    }
+
+    private Parameter recordParam(TupleParameter tupleParam) {
+        var recordNode = new RecordNode("__Record");
+        for( var param : tupleParam.components ) {
+            var fn = new FieldNode(
+                param.getName(),
+                0x0,
+                param.getType(),
+                recordNode,
+                null);
+            recordNode.addField(fn);
+        }
+        return nextParam(recordNode.getPlainNodeReference());
     }
 
     private static Expression stageName(MethodCallExpression call) {
@@ -248,8 +273,10 @@ class ProcessConverter {
             .map(call -> typedOutput(call, topics))
             .filter(call -> call != null)
             .toList();
-        checkExpressionOutput(statements);
-        return block(null, statements);
+        var fatRecord = useRecords ? fatRecord(statements) : null;
+        if( fatRecord == null )
+            checkExpressionOutput(statements);
+        return block(null, fatRecord != null ? List.of(stmt(fatRecord)) : statements);
     }
 
     private void checkExpressionOutput(List<Statement> statements) {
@@ -263,6 +290,65 @@ class ProcessConverter {
             var source = ae.getRightExpression();
             es.setExpression(source);
         }
+    }
+
+    /**
+     * Convert one or more "skinny tuple" outputs into a
+     * single "fat record" output.
+     *
+     * For example, the following snippet:
+     *
+     *   output:
+     *   bam = tuple(meta, file('*.bam'))
+     *   bai = tuple(meta, file('*.bai'))
+     *
+     * Is converted to:
+     *
+     *   output:
+     *   record(
+     *     meta: meta,
+     *     bam: file('*.bam'),
+     *     bai: file('*.bai')
+     *   )
+     *
+     * If the outputs do not conform to the expected structure,
+     * the function returns null.
+     *
+     * @param statements
+     */
+    private Expression fatRecord(List<Statement> statements) {
+        if( statements.isEmpty() )
+            return null;
+        var entries = new ArrayList<MapEntryExpression>();
+        var names = new HashSet<String>();
+        for( var output : statements ) {
+            if( !isSkinnyTupleOutput(output) )
+                return null;
+            var es = (ExpressionStatement) output;
+            var ae = (AssignmentExpression) es.getExpression();
+            var target = (VariableExpression) ae.getLeftExpression();
+            var source = (MethodCallExpression) ae.getRightExpression();
+            var args = (ArgumentListExpression) source.getArguments();
+            var first = (VariableExpression) args.getExpression(0);
+            if( !names.contains(first.getName()) ) {
+                entries.add(mapEntryX(first.getName(), first));
+                names.add(first.getName());
+            }
+            entries.add(mapEntryX(target.getName(), args.getExpression(1)));
+        }
+        var arguments = args(new NamedArgumentListExpression(entries));
+        arguments.putNodeMetaData(ASTNodeMarker.TRAILING_COMMA, Boolean.TRUE);
+        return callThisX("record", arguments);
+    }
+
+    private boolean isSkinnyTupleOutput(Statement output) {
+        return output instanceof ExpressionStatement es
+            && es.getExpression() instanceof AssignmentExpression ae
+            && ae.getRightExpression() instanceof MethodCallExpression mce
+            && "tuple".equals(mce.getMethodAsString())
+            && mce.getArguments() instanceof ArgumentListExpression args
+            && args.getExpressions().size() == 2
+            && args.getExpression(0) instanceof VariableExpression;
     }
 
     private static final Token RIGHT_SHIFT = Token.newSymbol(Types.RIGHT_SHIFT, -1, -1);
@@ -495,5 +581,92 @@ class FileParamASTUtils {
 
     public static boolean isGlobPattern(ConstantExpression ce) {
         return ce.getValue() instanceof String s && (s.contains("*") || s.contains("?"));
+    }
+}
+
+
+class RenameVariableTransformer implements ExpressionTransformer {
+
+    private ProcessNodeV2 node;
+    private Map<String,Expression> renameMap;
+
+    public RenameVariableTransformer(ProcessNodeV2 node) {
+        this.node = node;
+        this.renameMap = renameMap(node);
+    }
+
+    /**
+     * Build a mapping from tuple component names to record fields.
+     *
+     * @param node
+     */
+    private static Map<String,Expression> renameMap(ProcessNodeV2 node) {
+        var result = new HashMap<String,Expression>();
+        for( var param : node.inputs ) {
+            if( param.getType().implementsInterface(ClassHelper.makeCached(Record.class)) ) {
+                var recordType = param.getType();
+                var paramName = param.getName();
+                for( var field : recordType.getFields() ) {
+                    var componentName = field.getName();
+                    result.put(componentName, propX(varX(paramName), componentName));
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Refactor references to tuple components by replacing
+     * them with record field accesses.
+     */
+    public ProcessNodeV2 apply() {
+        if( renameMap.isEmpty() )
+            return node;
+
+        return new ProcessNodeV2(
+            node.getName(),
+            transformStatement(node.directives),
+            node.inputs,
+            transformStatement(node.stagers),
+            transformStatement(node.outputs),
+            transformStatement(node.topics),
+            transform(node.when),
+            node.type,
+            transformStatement(node.exec),
+            transformStatement(node.stub)
+        );
+    }
+
+    private Statement transformStatement(Statement stmt) {
+        if( stmt.isEmpty() )
+            return stmt;
+        if( stmt instanceof BlockStatement block ) {
+            var statements = block.getStatements().stream()
+                .map(this::transformStatement)
+                .toList();
+            return block(null, statements);
+        }
+        if( stmt instanceof ExpressionStatement es ) {
+            return stmt(transform(es.getExpression()));
+        }
+        return stmt;
+    }
+
+    @Override
+    public Expression transform(Expression expr) {
+        if( expr == null )
+            return null;
+
+        if( expr instanceof VariableExpression ve )
+            return transformVariableExpression(ve);
+
+        return expr.transformExpression(this);
+    }
+
+    private Expression transformVariableExpression(VariableExpression ve) {
+        var name = ve.getName();
+        return renameMap.containsKey(name)
+            ? renameMap.get(name)
+            : ve;
     }
 }

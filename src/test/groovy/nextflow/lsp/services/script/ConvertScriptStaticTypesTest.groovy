@@ -30,76 +30,76 @@ class ConvertScriptStaticTypesTest extends Specification {
 
     boolean check(ScriptService service, String before, String after) {
         def uri = getUri('main.nf')
-        open(service, uri, wrapInProcess(before))
+        open(service, uri, before)
         def response = service.executeCommand('nextflow.server.convertScriptToTyped', [asJson(uri)], LanguageServerConfiguration.defaults())
         def newText = response.applyEdit.getChanges()[uri][0].getNewText()
-        assert newText == wrapInProcess(after).strip()
+        assert newText == after
         return true
     }
 
-    String wrapInProcess(String section) {
-        """\
-        process test {
-            ${section.strip()}
-
-            script:
-            true
-        }
-        """.stripIndent()
-    }
-
     boolean checkInputs(ScriptService service, String beforeInput, String afterInput, String stage=null) {
-        def before = """\
-            input:
-            ${beforeInput}
-            """
-
+        def before = [
+            "    input:",
+            "    ${beforeInput}"
+        ]
+        
         def after = stage != null
             ?
-            """\
-            input:
-            ${afterInput}
-
-            stage:
-            ${stage}
-            """
+            [
+                "    input:",
+                "    ${afterInput}",
+                "",
+                "    stage:",
+                "    ${stage}"
+            ]
             :
-            """\
-            input:
-            ${afterInput}
-            """
+            [
+                "    input:",
+                "    ${afterInput}"
+            ]
 
-        return check(service, before, after)
+        return check(service, wrapInProcess(before), wrapInProcess(after))
     }
 
     boolean checkOutputs(ScriptService service, String beforeOutput, String afterOutput, String topic=null) {
-        def before = """\
-            output:
-            ${beforeOutput}
-            """
-
+        def before = [
+            "    output:",
+            "    ${beforeOutput}"
+        ]
+        
         def after = afterOutput != null && topic != null
             ?
-            """\
-            output:
-            ${afterOutput}
-
-            topic:
-            ${topic}
-            """
+            [
+                "    output:",
+                "    ${afterOutput}",
+                "",
+                "    topic:",
+                "    ${topic}"
+            ]
             : afterOutput != null
             ?
-            """\
-            output:
-            ${afterOutput}
-            """
+            [
+                "    output:",
+                "    ${afterOutput}",
+            ]
             :
-            """\
-            topic:
-            ${topic}
-            """
+            [
+                "    topic:",
+                "    ${topic}"
+            ]
 
-        return check(service, before, after)
+        return check(service, wrapInProcess(before), wrapInProcess(after))
+    }
+
+    String wrapInProcess(List<String> lines) {
+        [
+            "process test {",
+            *lines,
+            "",
+            "    script:",
+            "    true",
+            "}",
+        ].join('\n')
     }
 
     def 'should convert val inputs' () {
@@ -120,7 +120,7 @@ class ConvertScriptStaticTypesTest extends Specification {
         where:
         INPUT                               | TYPED_INPUT           | STAGE
         'path fastq'                        | 'fastq: Path'         | null
-        "path 'file.txt'"                   | '$in1: Path'          | "stageAs 'file.txt', \$in1"
+        "path 'file.txt'"                   | 'in1: Path'           | "stageAs 'file.txt', in1"
         "path fastq, stageAs: 'file.txt'"   | 'fastq: Path'         | "stageAs 'file.txt', fastq"
         "path fastq, arity: '1'"            | 'fastq: Path'         | null
         "path fastq, arity: '0..*'"         | 'fastq: Set<Path>'    | null
@@ -132,7 +132,7 @@ class ConvertScriptStaticTypesTest extends Specification {
         def service = getScriptService()
 
         expect:
-        checkInputs(service, "env 'FOO'", '$in1: String', "env 'FOO', \$in1")
+        checkInputs(service, "env 'FOO'", 'in1: String', "env 'FOO', in1")
     }
 
     def 'should convert stdin inputs' () {
@@ -140,7 +140,7 @@ class ConvertScriptStaticTypesTest extends Specification {
         def service = getScriptService()
 
         expect:
-        checkInputs(service, 'stdin', '$in1: String', 'stdin $in1')
+        checkInputs(service, 'stdin', 'in1: String', 'stdin in1')
     }
 
     def 'should convert tuple inputs' () {
@@ -151,9 +151,9 @@ class ConvertScriptStaticTypesTest extends Specification {
         checkInputs(service, INPUT, TYPED_INPUT, STAGE)
 
         where:
-        INPUT                               | TYPED_INPUT                   | STAGE
-        'tuple val(id), path(fastq)'        | '(id, fastq): Tuple<?, Path>' | null
-        "tuple val(id), path('file.txt')"   | '(id, $in1): Tuple<?, Path>'  | "stageAs 'file.txt', \$in1"
+        INPUT                               | TYPED_INPUT                                               | STAGE
+        'tuple val(id), path(fastq)'        | 'in1: Record {\n        id\n        fastq: Path\n    }'   | null
+        "tuple val(id), path('file.txt')"   | 'in2: Record {\n        id\n        in1: Path\n    }'     | "stageAs 'file.txt', in2.in1"
     }
 
     def 'should convert each inputs as val or path' () {
@@ -163,7 +163,7 @@ class ConvertScriptStaticTypesTest extends Specification {
         expect:
         checkInputs(service, 'each method', 'method')
         checkInputs(service, 'each path(index)', 'index: Path')
-        checkInputs(service, "each path('file.txt')", '$in1: Path', "stageAs 'file.txt', \$in1")
+        checkInputs(service, "each path('file.txt')", 'in1: Path', "stageAs 'file.txt', in1")
     }
 
     def 'should convert val outputs' () {
@@ -236,6 +236,59 @@ class ConvertScriptStaticTypesTest extends Specification {
         "tuple val('x'), val('y'), emit: xy"                        | "xy = tuple('x', 'y')"
         "tuple stdout(), env('BAR'), emit: bar"                     | "bar = tuple(stdout(), env('BAR'))"
         "tuple val('id'), path('*.fastq', hidden: true), emit: bar" | "bar = tuple('id', file('*.fastq', hidden: true))"
+    }
+
+    def 'should rename variables when converting tuple inputs to records' () {
+        given:
+        def service = getScriptService()
+
+        when:
+        def before = [
+            'process FASTQC {',
+            '    tag id',
+            '',
+            '    input:',
+            '    tuple val(id), path(fastq_1, stageAs: "input.fastq"), path(fastq_2)',
+            '',
+            '    output:',
+            '    tuple val(id), path("fastqc_${id}_logs"), emit: fastqc',
+            '',
+            '    script:',
+            '    """',
+            '    fastqc.sh "${id}" "${fastq_1} ${fastq_2}"',
+            '    """',
+            '}',
+        ].join('\n')
+
+        def after = [
+            'process FASTQC {',
+            '    tag in1.id',
+            '',
+            '    input:',
+            '    in1: Record {',
+            '        id',
+            '        fastq_1: Path',
+            '        fastq_2: Path',
+            '    }',
+            '',
+            '    stage:',
+            '    stageAs "input.fastq", in1.fastq_1',
+            '',
+            '    output:',
+            '    record(',
+            '        id: in1.id,',
+            '        fastqc: file("fastqc_${in1.id}_logs"),',
+            '    )',
+            '',
+            '    script:',
+            '    """',
+            '    fastqc.sh "${in1.id}" "${in1.fastq_1} ${in1.fastq_2}"',
+            '    """',
+            '}',
+        ].join('\n')
+
+        then:
+        check(service, before, after)
     }
 
 }
