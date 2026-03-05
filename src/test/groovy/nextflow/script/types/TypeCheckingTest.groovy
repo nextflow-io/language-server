@@ -17,11 +17,13 @@
 package nextflow.script.types
 
 import nextflow.script.ast.ASTNodeMarker
+import nextflow.script.ast.FeatureFlagNode
 import nextflow.script.control.ScriptParser
 import nextflow.script.control.ScriptResolveVisitor
 import nextflow.script.control.TypeCheckingVisitorEx
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassHelper
+import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
@@ -51,7 +53,8 @@ class TypeCheckingTest extends Specification {
 
     SourceUnit parse(String contents) {
         def source = scriptParser.parse('main.nf', contents.stripIndent())
-        new ScriptResolveVisitor(source, scriptParser.compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, Collections.emptyList()).visit()
+        source.getAST()?.addFeatureFlag(new FeatureFlagNode("nextflow.preview.types", new ConstantExpression(true)))
+        new ScriptResolveVisitor(source, scriptParser.compiler().compilationUnit(), TypesEx.SCRIPT_IMPORTS_V2, Collections.emptyList()).visit()
         new TypeCheckingVisitorEx(source, true).visit()
         return source
     }
@@ -263,6 +266,43 @@ class TypeCheckingTest extends Specification {
         "file('input.txt', checkIfExist: true)"     | "Named param `checkIfExist` is not defined"
         "file('input.txt', checkIfExists: 'true')"  | "Named param `checkIfExists` expects a Boolean but received a String"
         "file('input.txt', checkIfExists: true)"    | null
+    }
+
+    def 'should check a function call with record parameters' () {
+        expect:
+        check(
+            '''\
+            def hello(s: Sample) {
+            }
+
+            record Sample {
+                id: String
+                fastq: Path
+            }
+
+            workflow {
+                hello( record(id: '1') )
+            }
+            ''',
+            'Argument with type Record {\n    id: String\n} is not compatible with parameter of type Sample'
+        )
+        and:
+        check(
+            '''\
+            def hello(s: Sample) {
+            }
+
+            record Sample {
+                id: String
+                fastq: Path
+            }
+
+            workflow {
+                hello( record(id: '1', fastq: file('1.fastq')) )
+            }
+            ''',
+            null
+        )
     }
 
     @Unroll
@@ -739,6 +779,20 @@ class TypeCheckingTest extends Specification {
         then:
         TypesEx.getName(type) == 'String'
     }
+    
+    def 'should resolve record sum' () {
+        when:
+        def exp = parseExpression(
+            '''\
+            record(id: '1') + record(count: 42)
+            '''
+        )
+        def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Record {\n    id: String\n    count: Integer\n}'
+        type.getField('id') != null
+        type.getField('count') != null
+    }
 
     def 'should resolve tuple type' () {
         when:
@@ -800,29 +854,40 @@ class TypeCheckingTest extends Specification {
         "files('*.txt')*.toUriString()" | null
     }
 
-    def 'should resolve a `combine` operation' () {
+    def 'should resolve a `cross` operation' () {
         when:
         def exp = parseExpression(
             '''\
-            left  = channel.of( tuple(42, 'hello') )
-            right = channel.of( true )
-            left.combine(right)
+            left  = channel.of( 42 )
+            right = channel.of( 'hello' )
+            left.cross(right)
             '''
         )
         def type = getType(exp)
         then:
-        TypesEx.getName(type) == 'Channel<Tuple<Integer, String, Boolean>>'
+        TypesEx.getName(type) == 'Channel<Tuple<Integer, String>>'
     }
 
-    def 'should resolve a `groupTuple` operation' () {
+    def 'should resolve a `groupBy` operation' () {
         when:
         def exp = parseExpression(
             '''\
             left = channel.of( tuple(42, 'hello'), tuple(42, 'goodbye') )
-            left.groupTuple()
+            left.groupBy()
             '''
         )
         def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Channel<Tuple<Integer, Bag<String>>>'
+
+        when:
+        exp = parseExpression(
+            '''\
+            left = channel.of( tuple(42, 2, 'hello'), tuple(42, 2, 'goodbye') )
+            left.groupBy()
+            '''
+        )
+        type = getType(exp)
         then:
         TypesEx.getName(type) == 'Channel<Tuple<Integer, Bag<String>>>'
     }
@@ -831,14 +896,14 @@ class TypeCheckingTest extends Specification {
         when:
         def exp = parseExpression(
             '''\
-            left  = channel.of( tuple(42, 'hello') )
-            right = channel.of( tuple(42, true) )
+            left  = channel.of( record(id: 42, name: 'hello') )
+            right = channel.of( record(id: 42, alive: true) )
             left.join(right)
             '''
         )
         def type = getType(exp)
         then:
-        TypesEx.getName(type) == 'Channel<Tuple<Integer, String, Boolean>>'
+        TypesEx.getName(type) == 'Channel<Record {\n    id: Integer\n    name: String\n    alive: Boolean\n}>'
     }
 
 }

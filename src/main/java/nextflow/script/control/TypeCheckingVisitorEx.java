@@ -103,6 +103,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
+    private boolean previewTypes;
+
     private boolean experimental;
 
     public TypeCheckingVisitorEx(SourceUnit sourceUnit, boolean experimental) {
@@ -118,6 +120,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     public void visit() {
         var moduleNode = sourceUnit.getAST();
         if( moduleNode instanceof ScriptNode sn ) {
+            previewTypes = sn.isPreviewTypes();
+
             for( var featureFlag : sn.getFeatureFlags() )
                 visitFeatureFlag(featureFlag);
             if( sn.getParams() != null )
@@ -297,6 +301,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             node.setReturnType(inferredReturnType);
     }
 
+    // TODO: apply dataflow element type to path closure ?
     @Override
     public void visitOutput(OutputNode node) {
         if( !experimental ) {
@@ -304,9 +309,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             return;
         }
         var type = node.getType();
-        var elementType = CHANNEL_TYPE.equals(type) || VALUE_TYPE.equals(type)
-            ? elementType(type)
-            : type;
+        var elementType = dataflowElementType(type);
         for( var stmt : asBlockStatements(node.body) ) {
             var call = asMethodCallX(stmt);
             if( checkPublishStatements(call, elementType) )
@@ -491,7 +494,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
             var dummyMethod = resolveGenericReturnType(receiverType, target, arguments);
             node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, dummyMethod);
-            node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, dummyMethod.getReturnType());
+            node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, normalizeChannelType(dummyMethod.getReturnType()));
 
             checkOperatorCall(node);
         }
@@ -502,7 +505,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             }
             else {
                 checkArguments(parameters, arguments);
-
                 if( arguments.size() > 0 && arguments.get(0) instanceof MapExpression me )
                     checkNamedParams(mn.getParameters()[0], me);
             }
@@ -519,6 +521,15 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             var className = className(receiver);
             addError(String.format("Unrecognized method `%s` for %s", node.getMethodAsString(), className), node.getMethod());
         }
+    }
+
+    private ClassNode normalizeChannelType(ClassNode type) {
+        if( type.isResolved() && type.getTypeClass() == Channel.class ) {
+            var newType = channelType(previewTypes).getPlainNodeReference();
+            newType.setGenericsTypes(type.getGenericsTypes());
+            type = newType;
+        }
+        return type;
     }
 
     /**
@@ -567,8 +578,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     /**
-     * Resolve the return type of operators that transform tuples.
-     * such as `combine`, `groupTuple`, and `join`.
+     * Resolve the return type of dataflow operators where applicable.
      *
      * @param node
      */
@@ -583,7 +593,9 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var lhsType = elementType(receiverType);
         var method = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
         var arguments = asMethodCallArguments(node);
-        var resultType = new TupleOpResolver().apply(lhsType, method, arguments);
+        var resultType = previewTypes
+            ? new DataflowOpResolverV2().apply(lhsType, method, arguments)
+            : new DataflowOpResolverV1().apply(lhsType, method, arguments);
         if( ClassHelper.isDynamicTyped(resultType) )
             return;
 
@@ -713,7 +725,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( numChannelArgs > 1 )
             addError("Process `" + mn.getName() + "` was called with multiple channel arguments which can lead to non-deterministic behavior -- make sure that at most one argument is a channel and that all other arguments are dataflow values", node);
 
-        var dataflowType = numChannelArgs + numDynamicArgs > 0 ? CHANNEL_TYPE : VALUE_TYPE;
+        var dataflowType = numChannelArgs + numDynamicArgs > 0 ? channelType(previewTypes) : VALUE_TYPE;
         var resultType = processOutputType(dataflowType, ((ProcessNodeV2) mn).outputs);
         node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
 
@@ -728,6 +740,10 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( CHANNEL_TYPE.equals(type) || VALUE_TYPE.equals(type) )
             return elementType(type);
         return type;
+    }
+
+    private static ClassNode channelType(boolean previewTypes) {
+        return previewTypes ? TypesEx.CHANNEL_TYPE_V2 : TypesEx.CHANNEL_TYPE_V1;
     }
 
     private static ClassNode processOutputType(ClassNode dataflowType, Statement block) {
@@ -848,6 +864,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             return;
 
         var op = node.getOperation();
+        if( op.getType() == Types.PLUS && checkRecordSum(node) )
+            return;
         if( op.getType() == Types.LEFT_SQUARE_BRACKET && checkTupleComponent(node) )
             return;
 
@@ -955,6 +973,31 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
         else
             addError(String.format("The `%s` operator is not defined for operands with types %s and %s", op.getText(), TypesEx.getName(lhsType), TypesEx.getName(rhsType)), node);
+    }
+
+    /**
+     * Resolve the type of a record sum.
+     *
+     * For example, the expression `record(foo: 1) + record(bar: '...')` has type
+     * Record { foo: Integer ; bar: String }.
+     *
+     * @param node
+     */
+    private boolean checkRecordSum(BinaryExpression node) {
+        var lhs = node.getLeftExpression();
+        var rhs = node.getRightExpression();
+        var lhsType = getType(lhs);
+        var rhsType = getType(rhs);
+        if( !(isRecordType(lhsType) && isRecordType(rhsType)) )
+            return false;
+
+        var resultType = recordSumType(lhsType, rhsType);
+        node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
+        return true;
+    }
+
+    private static boolean isRecordType(ClassNode type) {
+        return RECORD_TYPE.equals(type) || type.redirect() instanceof RecordNode;
     }
 
     /**
@@ -1180,6 +1223,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( !RECORD_TYPE.equals(sourceType) )
             return false;
         for( var target : targetType.getFields() ) {
+            if( target.getType().getNodeMetaData(ASTNodeMarker.NULLABLE) != null )
+                continue;
             var source = sourceType.getDeclaredField(target.getName());
             if( source == null ) {
                 addError(String.format("Record mismatch -- source record is missing field `%s` required by %s", target.getName(), TypesEx.getName(targetType)), node);
@@ -1261,6 +1306,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             return;
         }
         var elementType = elementType(receiverType);
+        if( RECORD_TYPE.equals(elementType) && elementType.getFields().isEmpty() )
+            return;
         var property = node.getPropertyAsString();
         var fn = resolveProperty(elementType, property);
         if( fn != null ) {
@@ -1291,7 +1338,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class TypeError extends SyntaxException implements PhaseAware {
+    private class TypeError extends SyntaxException implements PhaseAware, TemporaryWarning {
 
         public TypeError(String message, ASTNode node) {
             super(message, node);

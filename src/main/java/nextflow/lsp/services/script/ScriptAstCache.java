@@ -44,7 +44,7 @@ import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.control.ScriptResolveVisitor;
 import nextflow.script.control.TypeCheckingVisitorEx;
 import nextflow.script.parser.ScriptParserPluginFactory;
-import nextflow.script.types.Types;
+import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -133,7 +133,7 @@ public class ScriptAstCache extends ASTNodeCache {
             if( sourceUnit == null )
                 continue;
             // phase 3: name checking
-            new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, libImports).visit();
+            new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), defaultScriptImports(sourceUnit), libImports).visit();
             new ParameterSchemaVisitor(sourceUnit).visit();
         }
 
@@ -146,6 +146,12 @@ public class ScriptAstCache extends ASTNodeCache {
         }
 
         return changedUris;
+    }
+
+    private static List<ClassNode> defaultScriptImports(SourceUnit sourceUnit) {
+        return sourceUnit.getAST() instanceof ScriptNode sn && sn.isPreviewTypes()
+            ? TypesEx.SCRIPT_IMPORTS_V2
+            : TypesEx.SCRIPT_IMPORTS_V1;
     }
 
     private List<ClassNode> libImports() {

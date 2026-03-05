@@ -114,7 +114,7 @@ public class ReturnStatementVisitor extends ClassCodeVisitorSupport {
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class TypeError extends SyntaxException implements PhaseAware {
+    private class TypeError extends SyntaxException implements PhaseAware, TemporaryWarning {
 
         public TypeError(String message, ASTNode node) {
             super(message, node);

@@ -22,6 +22,7 @@ import java.util.Map;
 import nextflow.script.types.Bag;
 import nextflow.script.types.Channel;
 import nextflow.script.types.Tuple;
+import nextflow.script.types.TypesEx;
 import nextflow.script.types.Value;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -37,7 +38,7 @@ import static nextflow.script.types.TypeCheckingUtils.*;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-class TupleOpResolver {
+class DataflowOpResolverV1 {
 
     private static final ClassNode BAG_TYPE = ClassHelper.makeCached(Bag.class);
     private static final ClassNode CHANNEL_TYPE = ClassHelper.makeCached(Channel.class);
@@ -198,7 +199,7 @@ class TupleOpResolver {
     private static ClassNode channelTupleType(GenericsType[] gts) {
         var tupleType = TUPLE_TYPE.getPlainNodeReference();
         tupleType.setGenericsTypes(gts);
-        return makeType(CHANNEL_TYPE, tupleType);
+        return makeType(TypesEx.CHANNEL_TYPE_V1, tupleType);
     }
 
 }

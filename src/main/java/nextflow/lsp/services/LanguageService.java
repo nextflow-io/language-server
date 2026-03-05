@@ -41,6 +41,7 @@ import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
 import nextflow.script.control.ParanoidWarning;
 import nextflow.script.control.RelatedInformationAware;
+import nextflow.script.control.TemporaryWarning;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.util.PathUtils;
 import org.eclipse.lsp4j.CallHierarchyIncomingCall;
@@ -419,7 +420,10 @@ public abstract class LanguageService {
                     continue;
                 }
 
-                var diagnostic = new Diagnostic(range, message, DiagnosticSeverity.Error, "nextflow");
+                var severity = error instanceof TemporaryWarning
+                    ? DiagnosticSeverity.Warning
+                    : DiagnosticSeverity.Error;
+                var diagnostic = new Diagnostic(range, message, severity, "nextflow");
                 if( error instanceof RelatedInformationAware ria )
                     diagnostic.setRelatedInformation(relatedInformation(ria, uri));
                 diagnostics.add(diagnostic);

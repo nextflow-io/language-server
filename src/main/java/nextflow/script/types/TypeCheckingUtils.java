@@ -15,9 +15,11 @@
  */
 package nextflow.script.types;
 
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +28,7 @@ import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.dsl.Ops;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
+import nextflow.script.types.Record;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -870,5 +873,28 @@ public class TypeCheckingUtils {
         if( gts == null || gts.length != 1 )
             return ClassHelper.dynamicType();
         return gts[0].getType();
+    }
+
+    /**
+     * Return a record type for the sum of two records.
+     *
+     * @param lhsType
+     * @param rhsType
+     */
+    public static ClassNode recordSumType(ClassNode lhsType, ClassNode rhsType) {
+        var fields = new LinkedHashMap<String,FieldNode>();
+        for( var fn : lhsType.getFields() )
+            fields.put(fn.getName(), fn);
+        for( var fn : rhsType.getFields() )
+            fields.put(fn.getName(), fn);
+
+        var resultType = new ClassNode(Record.class);
+        for( var fn0 : fields.values() ) {
+            var fn = new FieldNode(fn0.getName(), Modifier.PUBLIC, fn0.getType(), resultType, null);
+            fn.setDeclaringClass(resultType);
+            resultType.addField(fn);
+        }
+
+        return resultType;
     }
 }

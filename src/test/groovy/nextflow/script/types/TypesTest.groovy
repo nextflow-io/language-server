@@ -57,7 +57,7 @@ class TypesTest extends Specification {
 
     def 'should render a functional type' () {
         given:
-        def cn = ClassHelper.makeCached(Channel)
+        def cn = TypesEx.CHANNEL_TYPE_V2
 
         when:
         def param = cn.getDeclaredMethods('filter')[0].getParameters()[0]
@@ -94,6 +94,36 @@ class TypesTest extends Specification {
         Iterable    | Bag       | true
         Iterable    | List      | true
         Iterable    | Set       | true
+    }
+
+    def 'should provide specialized class nodes for v1/v2 dataflow' () {
+        expect:
+        TypesEx.CHANNEL_TYPE_V1 == ClassHelper.makeCached(Channel.class)
+        TypesEx.CHANNEL_TYPE_V2 == ClassHelper.makeCached(Channel.class)
+
+        when:
+        def opsV1 = TypesEx.SCRIPT_IMPORTS_V1
+            .find { cn -> cn.getNameWithoutPackage() == 'Channel' }
+            .getMethods()
+            .collect{ mn -> mn.getName() }
+        then:
+        opsV1.contains 'combine'
+        opsV1.contains 'filter'
+        opsV1.contains 'groupTuple'
+        opsV1.contains 'join'
+        opsV1.contains 'map'
+
+        when:
+        def opsV2 = TypesEx.SCRIPT_IMPORTS_V2
+            .find { cn -> cn.getNameWithoutPackage() == 'Channel' }
+            .getMethods()
+            .collect{ mn -> mn.getName() }
+        then:
+        opsV2.contains 'cross'
+        opsV2.contains 'filter'
+        opsV2.contains 'groupBy'
+        opsV2.contains 'join'
+        opsV2.contains 'map'
     }
 
 }
