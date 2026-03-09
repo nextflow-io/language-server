@@ -66,14 +66,11 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private PluginSpecCache pluginSpecCache;
 
-    private boolean typeChecking;
-
     private Stack<String> scopes = new Stack<>();
 
-    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache, boolean typeChecking) {
+    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache) {
         this.sourceUnit = sourceUnit;
         this.pluginSpecCache = pluginSpecCache;
-        this.typeChecking = typeChecking;
     }
 
     @Override
@@ -170,8 +167,6 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             return;
         }
         // validate type
-        if( !typeChecking )
-            return;
         var expectedTypes = option.types().stream()
             .map(t -> ClassHelper.makeCached(t).getPlainNodeReference())
             .toList();
@@ -188,7 +183,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
     }
 
     private ClassNode inferredType(Expression node, List<String> scopes) {
-        new TypeCheckingVisitorEx(sourceUnit, true).visit(node);
+        new TypeCheckingVisitorEx(sourceUnit).visit(node);
         var type = TypeCheckingUtils.getType(node);
         if( node instanceof ClosureExpression ce && "process".equals(scopes.get(0)) ) {
             var visitor = new ReturnStatementVisitor(sourceUnit);

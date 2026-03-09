@@ -95,7 +95,7 @@ public class ConfigAstCache extends ASTNodeCache {
                 continue;
             // phase 3: name checking
             new ConfigResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_CONFIG_IMPORTS).visit();
-            new ConfigSpecVisitor(sourceUnit, pluginSpecCache, configuration.typeChecking()).visit();
+            new ConfigSpecVisitor(sourceUnit, pluginSpecCache).visit();
         }
 
         return changedUris;

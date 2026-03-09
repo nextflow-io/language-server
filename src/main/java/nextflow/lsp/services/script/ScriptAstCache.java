@@ -42,9 +42,10 @@ import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.control.ScriptResolveVisitor;
+import nextflow.script.control.TypeCheckingVisitor;
 import nextflow.script.control.TypeCheckingVisitorEx;
 import nextflow.script.parser.ScriptParserPluginFactory;
-import nextflow.script.types.Types;
+import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -61,8 +62,6 @@ public class ScriptAstCache extends ASTNodeCache {
     private Path projectDir;
 
     private GroovyLibCache libCache;
-
-    private LanguageServerConfiguration configuration;
 
     private PluginSpecCache pluginSpecCache;
 
@@ -97,7 +96,6 @@ public class ScriptAstCache extends ASTNodeCache {
     }
 
     public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {
-        this.configuration = configuration;
         this.pluginSpecCache = pluginSpecCache;
     }
 
@@ -136,7 +134,7 @@ public class ScriptAstCache extends ASTNodeCache {
             if( sourceUnit == null )
                 continue;
             // phase 3: name checking
-            new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, libImports).visit();
+            new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), defaultScriptImports(sourceUnit), libImports).visit();
             new ParameterSchemaVisitor(sourceUnit).visit();
         }
 
@@ -145,10 +143,21 @@ public class ScriptAstCache extends ASTNodeCache {
             if( sourceUnit == null || sourceUnit.getErrorCollector().hasErrors() )
                 continue;
             // phase 4: type checking
-            new TypeCheckingVisitorEx(sourceUnit, configuration.typeChecking()).visit();
+            if( sourceUnit.getAST() instanceof ScriptNode sn ) {
+                if( sn.isTypingEnabled() )
+                    new TypeCheckingVisitorEx(sourceUnit).visit();
+                else
+                    new TypeCheckingVisitor(sourceUnit).visit();
+            }
         }
 
         return changedUris;
+    }
+
+    private static List<ClassNode> defaultScriptImports(SourceUnit sourceUnit) {
+        return sourceUnit.getAST() instanceof ScriptNode sn && sn.isTypingEnabled()
+            ? TypesEx.SCRIPT_IMPORTS_V2
+            : TypesEx.SCRIPT_IMPORTS_V1;
     }
 
     private List<ClassNode> libImports() {

@@ -407,15 +407,46 @@ public class TypesEx {
         return type;
     }
 
+    private static final List<Class> STATEFUL_TYPES = List.of(
+        Channel.class,      // don't normalize since methods are injected based on v1/v2 dataflow
+        ParamsMap.class,    // don't normalize since param fields are injected by params block
+        Record.class        // don't normalize since record fields are injected during type inference
+    );
+
     public static ClassNode normalize(ClassNode cn) {
         if( cn == null || !cn.isResolved() )
             return cn;
-        if( cn.getTypeClass() == ParamsMap.class || cn.getTypeClass() == Record.class )
+        if( STATEFUL_TYPES.contains(cn.getTypeClass()) )
             return cn;
         var result = ClassHelper.makeCached(normalize(cn.getTypeClass())).getPlainNodeReference();
         if( cn.getGenericsTypes() != null )
             result.setGenericsTypes(cn.getGenericsTypes());
         return result;
+    }
+
+    /**
+     * Specializations of script types for v1 and v2 dataflow.
+     */
+    public static final ClassNode CHANNEL_TYPE_V1 = typeWithMethods(Channel.class, ChannelV1.class);
+    public static final ClassNode CHANNEL_TYPE_V2 = typeWithMethods(Channel.class, ChannelV2.class);
+
+    private static ClassNode typeWithMethods(Class type, Class methodsType) {
+        var result = ClassHelper.makeWithoutCaching(type);
+        var methods = ClassHelper.makeCached(methodsType).getMethods();
+        for( var mn : methods )
+            result.addMethod(mn);
+        return result;
+    }
+
+    public static final List<ClassNode> SCRIPT_IMPORTS_V1 = scriptImports(CHANNEL_TYPE_V1);
+    public static final List<ClassNode> SCRIPT_IMPORTS_V2 = scriptImports(CHANNEL_TYPE_V2);
+
+    private static List<ClassNode> scriptImports(ClassNode channelType) {
+        return Types.DEFAULT_SCRIPT_IMPORTS.stream()
+            .map((cn) -> (
+                cn.getTypeClass() == Channel.class ? channelType : cn
+            ))
+            .toList();
     }
 
 }

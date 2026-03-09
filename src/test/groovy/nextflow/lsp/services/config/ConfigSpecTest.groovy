@@ -48,7 +48,7 @@ class ConfigSpecTest extends Specification {
         def pluginSpecCache = new PluginSpecCache(configuration.pluginRegistryUrl())
         def source = configParser.parse('nextflow.config', contents.stripIndent())
         new ConfigResolveVisitor(source, configParser.compiler().compilationUnit(), Types.DEFAULT_CONFIG_IMPORTS).visit()
-        new ConfigSpecVisitor(source, pluginSpecCache, true).visit()
+        new ConfigSpecVisitor(source, pluginSpecCache).visit()
         return source
     }
 

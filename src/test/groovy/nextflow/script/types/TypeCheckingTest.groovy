@@ -17,11 +17,13 @@
 package nextflow.script.types
 
 import nextflow.script.ast.ASTNodeMarker
+import nextflow.script.ast.FeatureFlagNode
 import nextflow.script.control.ScriptParser
 import nextflow.script.control.ScriptResolveVisitor
 import nextflow.script.control.TypeCheckingVisitorEx
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassHelper
+import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
@@ -51,8 +53,9 @@ class TypeCheckingTest extends Specification {
 
     SourceUnit parse(String contents) {
         def source = scriptParser.parse('main.nf', contents.stripIndent())
-        new ScriptResolveVisitor(source, scriptParser.compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, Collections.emptyList()).visit()
-        new TypeCheckingVisitorEx(source, true).visit()
+        source.getAST()?.addFeatureFlag(new FeatureFlagNode("nextflow.preview.types", new ConstantExpression(true)))
+        new ScriptResolveVisitor(source, scriptParser.compiler().compilationUnit(), TypesEx.SCRIPT_IMPORTS_V2, Collections.emptyList()).visit()
+        new TypeCheckingVisitorEx(source).visit()
         return source
     }
 
@@ -142,6 +145,8 @@ class TypeCheckingTest extends Specification {
         when:
         def errors = getErrors(
             '''\
+            nextflow.preview.types = true
+
             workflow hello {
                 emit:
                 result: String = 42
@@ -150,13 +155,15 @@ class TypeCheckingTest extends Specification {
         )
         then:
         errors.size() == 1
-        errors[0].getStartLine() == 3
+        errors[0].getStartLine() == 5
         errors[0].getStartColumn() == 5
         errors[0].getOriginalMessage() == "Assignment target with type String cannot be assigned to value with type Integer"
 
         when:
         errors = getErrors(
             '''\
+            nextflow.preview.types = true
+
             workflow hello {
                 emit:
                 result: Integer = 42
@@ -548,6 +555,8 @@ class TypeCheckingTest extends Specification {
         expect:
         check(
             '''
+            nextflow.preview.types = true
+
             workflow hello {
                 take:
                 messages: Channel<String>
@@ -568,6 +577,8 @@ class TypeCheckingTest extends Specification {
         when:
         def exp = parseExpression(
             '''\
+            nextflow.preview.types = true
+
             workflow hello {
                 emit:
                 result: Integer = 42
@@ -851,29 +862,40 @@ class TypeCheckingTest extends Specification {
         "files('*.txt')*.toUriString()" | null
     }
 
-    def 'should resolve a `combine` operation' () {
+    def 'should resolve a `cross` operation' () {
         when:
         def exp = parseExpression(
             '''\
-            left  = channel.of( tuple(42, 'hello') )
-            right = channel.of( true )
-            left.combine(right)
+            left  = channel.of( 42 )
+            right = channel.of( 'hello' )
+            left.cross(right)
             '''
         )
         def type = getType(exp)
         then:
-        TypesEx.getName(type) == 'Channel<Tuple<Integer, String, Boolean>>'
+        TypesEx.getName(type) == 'Channel<Tuple<Integer, String>>'
     }
 
-    def 'should resolve a `groupTuple` operation' () {
+    def 'should resolve a `groupBy` operation' () {
         when:
         def exp = parseExpression(
             '''\
             left = channel.of( tuple(42, 'hello'), tuple(42, 'goodbye') )
-            left.groupTuple()
+            left.groupBy()
             '''
         )
         def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Channel<Tuple<Integer, Bag<String>>>'
+
+        when:
+        exp = parseExpression(
+            '''\
+            left = channel.of( tuple(42, 2, 'hello'), tuple(42, 2, 'goodbye') )
+            left.groupBy()
+            '''
+        )
+        type = getType(exp)
         then:
         TypesEx.getName(type) == 'Channel<Tuple<Integer, Bag<String>>>'
     }
@@ -882,14 +904,14 @@ class TypeCheckingTest extends Specification {
         when:
         def exp = parseExpression(
             '''\
-            left  = channel.of( tuple(42, 'hello') )
-            right = channel.of( tuple(42, true) )
+            left  = channel.of( record(id: 42, name: 'hello') )
+            right = channel.of( record(id: 42, alive: true) )
             left.join(right)
             '''
         )
         def type = getType(exp)
         then:
-        TypesEx.getName(type) == 'Channel<Tuple<Integer, String, Boolean>>'
+        TypesEx.getName(type) == 'Channel<Record {\n    id: Integer\n    name: String\n    alive: Boolean\n}>'
     }
 
 }

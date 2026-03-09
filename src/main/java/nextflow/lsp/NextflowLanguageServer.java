@@ -462,8 +462,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.maheshForm"), configuration.maheshForm()),
             withDefault(JsonUtils.getInteger(settings, "nextflow.completion.maxItems"), configuration.maxCompletionItems()),
             withDefault(JsonUtils.getString(settings, "nextflow.pluginRegistryUrl"), configuration.pluginRegistryUrl()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), configuration.sortDeclarations()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.typeChecking"), configuration.typeChecking())
+            withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), configuration.sortDeclarations())
         );
 
         if( shouldInitialize(oldConfiguration, configuration) )
@@ -484,8 +483,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private boolean shouldInitialize(LanguageServerConfiguration previous, LanguageServerConfiguration current) {
         return previous.errorReportingMode() != current.errorReportingMode()
             || !DefaultGroovyMethods.equals(previous.excludePatterns(), current.excludePatterns())
-            || previous.pluginRegistryUrl() != current.pluginRegistryUrl()
-            || previous.typeChecking() != current.typeChecking();
+            || previous.pluginRegistryUrl() != current.pluginRegistryUrl();
     }
 
     private void initializeWorkspaces() {

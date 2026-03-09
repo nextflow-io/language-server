@@ -94,7 +94,7 @@ import static nextflow.script.types.TypeCheckingUtils.*;
  */
 public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
-    private static final ClassNode CHANNEL_TYPE = ClassHelper.makeCached(Channel.class);
+    private static final ClassNode CHANNEL_TYPE = TypesEx.CHANNEL_TYPE_V2;
     private static final ClassNode PATH_TYPE = ClassHelper.makeCached(Path.class);
     private static final ClassNode PARAMS_TYPE = ClassHelper.makeCached(ParamsMap.class);
     private static final ClassNode RECORD_TYPE = ClassHelper.makeCached(Record.class);
@@ -103,11 +103,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private boolean experimental;
-
-    public TypeCheckingVisitorEx(SourceUnit sourceUnit, boolean experimental) {
+    public TypeCheckingVisitorEx(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
-        this.experimental = experimental;
     }
 
     @Override
@@ -135,8 +132,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitFeatureFlag(FeatureFlagNode node) {
-        if( !experimental )
-            return;
         var fn = node.target;
         if( fn == null )
             return;
@@ -155,8 +150,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     private void visitParameter(Parameter node, boolean allowPathCoercion) {
-        if( !experimental )
-            return;
         if( !node.hasInitialExpression() )
             return;
         var expectedType = node.getType();
@@ -172,11 +165,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitWorkflow(WorkflowNode node) {
-        if( !experimental ) {
-            super.visitWorkflow(node);
-            return;
-        }
-
         currentWorkflow = node;
 
         visit(node.main);
@@ -286,9 +274,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         visit(node.getCode());
 
         // check return statements against declared return type
-        if( !experimental )
-            return;
-            
         var visitor = new ReturnStatementVisitor(sourceUnit);
         visitor.visit(node.getReturnType(), node.getCode());
 
@@ -297,16 +282,11 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             node.setReturnType(inferredReturnType);
     }
 
+    // TODO: apply dataflow element type to path closure ?
     @Override
     public void visitOutput(OutputNode node) {
-        if( !experimental ) {
-            super.visitOutput(node);
-            return;
-        }
         var type = node.getType();
-        var elementType = CHANNEL_TYPE.equals(type) || VALUE_TYPE.equals(type)
-            ? elementType(type)
-            : type;
+        var elementType = dataflowElementType(type);
         for( var stmt : asBlockStatements(node.body) ) {
             var call = asMethodCallX(stmt);
             if( checkPublishStatements(call, elementType) )
@@ -385,8 +365,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     private void applyAssignment(BinaryExpression node) {
-        if( !experimental )
-            return;
         var target = node.getLeftExpression();
         var source = node.getRightExpression();
         if( source instanceof EmptyExpression )
@@ -438,11 +416,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
-        if( !experimental ) {
-            super.visitMethodCallExpression(node);
-            return;
-        }
-
         // resolve argument types (except for closures)
         var arguments = asMethodCallArguments(node);
         boolean hasClosureArgs = false;
@@ -491,7 +464,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
             var dummyMethod = resolveGenericReturnType(receiverType, target, arguments);
             node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, dummyMethod);
-            node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, dummyMethod.getReturnType());
+            node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, normalizeChannelType(dummyMethod.getReturnType()));
 
             checkOperatorCall(node);
         }
@@ -502,7 +475,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             }
             else {
                 checkArguments(parameters, arguments);
-
                 if( arguments.size() > 0 && arguments.get(0) instanceof MapExpression me )
                     checkNamedParams(mn.getParameters()[0], me);
             }
@@ -512,13 +484,22 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
                 node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, dummyMethod);
             }
         }
-        else if( experimental && node.getNodeMetaData(ASTNodeMarker.METHOD_OVERLOADS) != null ) {
+        else if( node.getNodeMetaData(ASTNodeMarker.METHOD_OVERLOADS) != null ) {
             addError(String.format("Function `%s` (with multiple signatures) was called with incorrect number of arguments and/or incorrect argument types", node.getMethodAsString()), node.getMethod());
         }
-        else if( experimental && !node.isImplicitThis() ) {
+        else if( !node.isImplicitThis() ) {
             var className = className(receiver);
             addError(String.format("Unrecognized method `%s` for %s", node.getMethodAsString(), className), node.getMethod());
         }
+    }
+
+    private ClassNode normalizeChannelType(ClassNode type) {
+        if( type.isResolved() && type.getTypeClass() == Channel.class ) {
+            var newType = CHANNEL_TYPE.getPlainNodeReference();
+            newType.setGenericsTypes(type.getGenericsTypes());
+            type = newType;
+        }
+        return type;
     }
 
     /**
@@ -567,8 +548,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     /**
-     * Resolve the return type of operators that transform tuples.
-     * such as `combine`, `groupTuple`, and `join`.
+     * Resolve the return type of dataflow operators where applicable.
      *
      * @param node
      */
@@ -583,7 +563,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var lhsType = elementType(receiverType);
         var method = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
         var arguments = asMethodCallArguments(node);
-        var resultType = new TupleOpResolver().apply(lhsType, method, arguments);
+        var resultType = new DataflowOpResolverV2().apply(lhsType, method, arguments);
         if( ClassHelper.isDynamicTyped(resultType) )
             return;
 
@@ -844,9 +824,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     public void visitBinaryExpression(BinaryExpression node) {
         super.visitBinaryExpression(node);
 
-        if( !experimental )
-            return;
-
         var op = node.getOperation();
         if( op.getType() == Types.PLUS && checkRecordSum(node) )
             return;
@@ -861,7 +838,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var lhsOps = resolveOpsType(lhsType);
         var rhsOps = resolveOpsType(rhsType);
 
-        ClassNode resultType = null;        
+        ClassNode resultType = null;
         switch( op.getType() ) {
             case Types.POWER:
                 resultType = resolveOpResultType(lhsType, rhsType, lhsOps, rhsOps, "power");
@@ -1026,9 +1003,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     private void applyConditionalExpression(TernaryExpression node) {
-        if( !experimental )
-            return;
-
         var trueExpr = node.getTrueExpression();
         var falseExpr = node.getFalseExpression();
         var trueType = getType(trueExpr);
@@ -1073,8 +1047,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         super.visitClosureExpression(node);
 
         // resolve return type and check against declared return type
-        if( !experimental )
-            return;
         var returnType = (ClassNode) node.getNodeMetaData(ASTNodeMarker.INFERRED_RETURN_TYPE);
         if( returnType != null ) {
             var visitor = new ReturnStatementVisitor(sourceUnit);
@@ -1089,9 +1061,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitListExpression(ListExpression node) {
         super.visitListExpression(node);
-
-        if( !experimental )
-            return;
 
         ClassNode elementType = null;
         for( var el : node.getExpressions() ) {
@@ -1120,9 +1089,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitRangeExpression(RangeExpression node) {
         super.visitRangeExpression(node);
-
-        if( !experimental )
-            return;
 
         var lhs = node.getFrom();
         var rhs = node.getTo();
@@ -1154,24 +1120,18 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitUnaryMinusExpression(UnaryMinusExpression node) {
         super.visitUnaryMinusExpression(node);
-        if( !experimental )
-            return;
         resolveUnaryOpOrFail(node.getExpression(), "-", "negative", node);
     }
 
     @Override
     public void visitUnaryPlusExpression(UnaryPlusExpression node) {
         super.visitUnaryPlusExpression(node);
-        if( !experimental )
-            return;
         resolveUnaryOpOrFail(node.getExpression(), "+", "positive", node);
     }
 
     @Override
     public void visitBitwiseNegationExpression(BitwiseNegationExpression node) {
         super.visitBitwiseNegationExpression(node);
-        if( !experimental )
-            return;
         resolveUnaryOpOrFail(node.getExpression(), "~", "bitwiseNegate", node);
     }
 
@@ -1188,8 +1148,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitCastExpression(CastExpression node) {
         super.visitCastExpression(node);
-        if( !experimental )
-            return;
         var sourceType = getType(node.getExpression());
         var targetType = node.getType();
         if( ClassHelper.isObjectType(sourceType) || TypesEx.isAssignableFrom(targetType, sourceType) )
@@ -1225,9 +1183,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitPropertyExpression(PropertyExpression node) {
         super.visitPropertyExpression(node);
-
-        if( !experimental )
-            return;
 
         var receiver = node.getObjectExpression();
         var receiverType = getType(receiver);
@@ -1322,7 +1277,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class TypeError extends SyntaxException implements PhaseAware {
+    private class TypeError extends SyntaxException implements PhaseAware, TemporaryWarning {
 
         public TypeError(String message, ASTNode node) {
             super(message, node);
