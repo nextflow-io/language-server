@@ -30,76 +30,76 @@ class ConvertScriptStaticTypesTest extends Specification {
 
     boolean check(ScriptService service, String before, String after) {
         def uri = getUri('main.nf')
-        open(service, uri, wrapInProcess(before))
+        open(service, uri, before)
         def response = service.executeCommand('nextflow.server.convertScriptToTyped', [asJson(uri)], LanguageServerConfiguration.defaults())
         def newText = response.applyEdit.getChanges()[uri][0].getNewText()
-        assert newText == wrapInProcess(after).strip()
+        assert newText == after
         return true
     }
 
-    String wrapInProcess(String section) {
-        """\
-        process test {
-            ${section.strip()}
-
-            script:
-            true
-        }
-        """.stripIndent()
-    }
-
     boolean checkInputs(ScriptService service, String beforeInput, String afterInput, String stage=null) {
-        def before = """\
-            input:
-            ${beforeInput}
-            """
-
+        def before = [
+            "    input:",
+            "    ${beforeInput}"
+        ]
+        
         def after = stage != null
             ?
-            """\
-            input:
-            ${afterInput}
-
-            stage:
-            ${stage}
-            """
+            [
+                "    input:",
+                "    ${afterInput}",
+                "",
+                "    stage:",
+                "    ${stage}"
+            ]
             :
-            """\
-            input:
-            ${afterInput}
-            """
+            [
+                "    input:",
+                "    ${afterInput}"
+            ]
 
-        return check(service, before, after)
+        return check(service, wrapInProcess(before), wrapInProcess(after))
     }
 
     boolean checkOutputs(ScriptService service, String beforeOutput, String afterOutput, String topic=null) {
-        def before = """\
-            output:
-            ${beforeOutput}
-            """
-
+        def before = [
+            "    output:",
+            "    ${beforeOutput}"
+        ]
+        
         def after = afterOutput != null && topic != null
             ?
-            """\
-            output:
-            ${afterOutput}
-
-            topic:
-            ${topic}
-            """
+            [
+                "    output:",
+                "    ${afterOutput}",
+                "",
+                "    topic:",
+                "    ${topic}"
+            ]
             : afterOutput != null
             ?
-            """\
-            output:
-            ${afterOutput}
-            """
+            [
+                "    output:",
+                "    ${afterOutput}",
+            ]
             :
-            """\
-            topic:
-            ${topic}
-            """
+            [
+                "    topic:",
+                "    ${topic}"
+            ]
 
-        return check(service, before, after)
+        return check(service, wrapInProcess(before), wrapInProcess(after))
+    }
+
+    String wrapInProcess(List<String> lines) {
+        [
+            "process test {",
+            *lines,
+            "",
+            "    script:",
+            "    true",
+            "}",
+        ].join('\n')
     }
 
     def 'should convert val inputs' () {

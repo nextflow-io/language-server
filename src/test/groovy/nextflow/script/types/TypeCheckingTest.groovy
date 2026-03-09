@@ -265,6 +265,43 @@ class TypeCheckingTest extends Specification {
         "file('input.txt', checkIfExists: true)"    | null
     }
 
+    def 'should check a function call with record parameters' () {
+        expect:
+        check(
+            '''\
+            def hello(s: Sample) {
+            }
+
+            record Sample {
+                id: String
+                fastq: Path
+            }
+
+            workflow {
+                hello( record(id: '1') )
+            }
+            ''',
+            'Argument with type Record {\n    id: String\n} is not compatible with parameter of type Sample'
+        )
+        and:
+        check(
+            '''\
+            def hello(s: Sample) {
+            }
+
+            record Sample {
+                id: String
+                fastq: Path
+            }
+
+            workflow {
+                hello( record(id: '1', fastq: file('1.fastq')) )
+            }
+            ''',
+            null
+        )
+    }
+
     @Unroll
     def 'should check a namespaced function call' () {
         expect:
@@ -432,6 +469,52 @@ class TypeCheckingTest extends Specification {
         '[] as List<Path>'      | null
         "'24 h' as Duration"    | null
         "'8 GB' as MemoryUnit"  | null
+    }
+
+    def 'should check a record cast' () {
+        expect:
+        check(
+            '''\
+            workflow {
+                record(id: '1', fastq_1: file('1_1.fastq'), fastq_2: file('1_2.fastq')) as FastqPair
+            }
+
+            record FastqPair {
+                id: String
+                fastq_1: Path
+                fastq_2: Path
+            }
+            ''',
+            null
+        )
+        check(
+            '''\
+            workflow {
+                record(id: '1', fastq_1: file('1_1.fastq')) as FastqPair
+            }
+
+            record FastqPair {
+                id: String
+                fastq_1: Path
+                fastq_2: Path
+            }
+            ''',
+            'Record mismatch -- source record is missing field `fastq_2` required by FastqPair'
+        )
+        check(
+            '''\
+            workflow {
+                record(id: '1', fastq_1: file('1_1.fastq'), fastq_2: '1_2.fastq') as FastqPair
+            }
+
+            record FastqPair {
+                id: String
+                fastq_1: Path
+                fastq_2: Path
+            }
+            ''',
+            'Record mismatch -- field `fastq_2` of FastqPair expects a Path but received a String'
+        )
     }
 
     @Unroll
@@ -668,6 +751,44 @@ class TypeCheckingTest extends Specification {
         type = getType(exp)
         then:
         TypesEx.getName(type) == 'Value<Tuple<String, String>>'
+    }
+
+    def 'should resolve record type' () {
+        when:
+        def exp = parseExpression(
+            '''\
+            record(id: '1', count: 42)
+            '''
+        )
+        def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Record {\n    id: String\n    count: Integer\n}'
+        type.getField('id') != null
+        type.getField('count') != null
+
+        when:
+        exp = parseExpression(
+            '''\
+            record(id: '1', count: 42).id
+            '''
+        )
+        type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'String'
+    }
+    
+    def 'should resolve record sum' () {
+        when:
+        def exp = parseExpression(
+            '''\
+            record(id: '1') + record(count: 42)
+            '''
+        )
+        def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Record {\n    id: String\n    count: Integer\n}'
+        type.getField('id') != null
+        type.getField('count') != null
     }
 
     def 'should resolve tuple type' () {

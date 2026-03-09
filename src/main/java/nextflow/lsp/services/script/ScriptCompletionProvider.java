@@ -152,7 +152,7 @@ public class ScriptCompletionProvider implements CompletionProvider {
         ch.addTypes(ast.getTypeNodes(uri), namePrefix);
 
         if( !extended ) {
-            addIncludes(namePrefix);
+            addIncludedMethods(namePrefix);
             return;
         }
         if( declarationNode instanceof FunctionNode || declarationNode instanceof ProcessNode || declarationNode instanceof OutputNode ) {
@@ -165,11 +165,11 @@ public class ScriptCompletionProvider implements CompletionProvider {
         }
     }
 
-    private void addIncludes(String namePrefix) {
+    private void addIncludedMethods(String namePrefix) {
         for( var includeNode : ast.getIncludeNodes(uri) ) {
             for( var entry : includeNode.entries ) {
                 var node = entry.getTarget();
-                if( node == null || ast.getURI(node) == null )
+                if( !(node instanceof MethodNode) || ast.getURI(node) == null )
                     continue;
 
                 var name = entry.getNameOrAlias();
