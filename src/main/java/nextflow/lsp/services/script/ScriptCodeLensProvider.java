@@ -100,7 +100,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
      * @param direction
      * @param verbose
      */
-    public Map<String,String> previewDag(String documentUri, String name, String direction, boolean verbose) {
+    public Map<String,String> previewDag(String documentUri, String name, String direction, boolean verbose, boolean addTakesEmits) {
         var uri = URI.create(documentUri);
         if( !ast.hasAST(uri) || ast.hasErrors(uri) )
             return Map.of("error", "DAG preview cannot be shown because the script has errors.");
@@ -110,9 +110,9 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             .filter(wn -> wn.isEntry() ? name == null : wn.getName().equals(name))
             .findFirst()
             .map((wn) -> {
-                var visitor = new DataflowVisitor(sourceUnit, ast, verbose);
+                var visitor = new DataflowVisitor(sourceUnit, ast, verbose, addTakesEmits);
                 visitor.visit();
-
+                ast.putControlConditions(documentUri, visitor.getControlConditions());
                 var graph = visitor.getGraph(wn.isEntry() ? "<entry>" : wn.getName());
                 var result = new MermaidRenderer(direction, verbose).render(wn.getName(), graph);
                 log.debug(result);
@@ -270,4 +270,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             .add(new TextEdit(range, newText));
     }
 
+    public Map<Integer, String> getControlConditions(String documentUri) {
+        return ast.getControlConditions(documentUri);
+    }
 }
