@@ -20,8 +20,10 @@ import java.util.concurrent.CompletableFuture
 
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
+import org.eclipse.lsp4j.ProgressParams
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.ShowMessageRequestParams
+import org.eclipse.lsp4j.WorkDoneProgressCreateParams
 import org.eclipse.lsp4j.services.LanguageClient
 
 /**
@@ -50,5 +52,15 @@ class TestLanguageClient implements LanguageClient {
     @Override
     public void logMessage(MessageParams message) {
         System.err.println(message.getMessage())
+    }
+
+    @Override
+    public CompletableFuture<Void> createProgress(WorkDoneProgressCreateParams params) {
+        return CompletableFuture.completedFuture(null)
+    }
+
+    @Override
+    public void notifyProgress(ProgressParams params) {
+        // No-op for tests
     }
 }
