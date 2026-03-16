@@ -1,0 +1,12 @@
+[
+  {
+    "name": "[Ljava.lang.reflect.AccessFlag;",
+    "allPublicMethods": true,
+    "allPublicFields": true
+  },
+  {
+    "name": "java.lang.reflect.AccessFlag",
+    "allPublicMethods": true,
+    "allPublicFields": true
+  }
+]
