@@ -143,10 +143,10 @@ class ProcessConverter {
             var param = param(call, type);
             if( param == null )
                 param = nextParam(type);
-            var stageName = stageName(call);
-            if( stageName != null ) {
-                var stageValue = varX(param.getName());
-                var stager = stmt(callThisX("stageAs", args(stageName, stageValue)));
+            var stageTarget = stageName(call);
+            if( stageTarget != null ) {
+                var stageSource = varX(param.getName());
+                var stager = stmt(callThisX("stageAs", args(stageSource, stageTarget)));
                 stagers.add(stager);
             }
             return param;

@@ -120,8 +120,8 @@ class ConvertScriptStaticTypesTest extends Specification {
         where:
         INPUT                               | TYPED_INPUT           | STAGE
         'path fastq'                        | 'fastq: Path'         | null
-        "path 'file.txt'"                   | '$in1: Path'          | "stageAs 'file.txt', \$in1"
-        "path fastq, stageAs: 'file.txt'"   | 'fastq: Path'         | "stageAs 'file.txt', fastq"
+        "path 'file.txt'"                   | '$in1: Path'          | "stageAs \$in1, 'file.txt'"
+        "path fastq, stageAs: 'file.txt'"   | 'fastq: Path'         | "stageAs fastq, 'file.txt'"
         "path fastq, arity: '1'"            | 'fastq: Path'         | null
         "path fastq, arity: '0..*'"         | 'fastq: Set<Path>'    | null
         "path fastq, arity: '2'"            | 'fastq: Set<Path>'    | null
@@ -153,7 +153,7 @@ class ConvertScriptStaticTypesTest extends Specification {
         where:
         INPUT                               | TYPED_INPUT                   | STAGE
         'tuple val(id), path(fastq)'        | '(id, fastq): Tuple<?, Path>' | null
-        "tuple val(id), path('file.txt')"   | '(id, $in1): Tuple<?, Path>'  | "stageAs 'file.txt', \$in1"
+        "tuple val(id), path('file.txt')"   | '(id, $in1): Tuple<?, Path>'  | "stageAs \$in1, 'file.txt'"
     }
 
     def 'should convert each inputs as val or path' () {
@@ -163,7 +163,7 @@ class ConvertScriptStaticTypesTest extends Specification {
         expect:
         checkInputs(service, 'each method', 'method')
         checkInputs(service, 'each path(index)', 'index: Path')
-        checkInputs(service, "each path('file.txt')", '$in1: Path', "stageAs 'file.txt', \$in1")
+        checkInputs(service, "each path('file.txt')", '$in1: Path', "stageAs \$in1, 'file.txt'")
     }
 
     def 'should convert val outputs' () {
