@@ -58,6 +58,8 @@ import org.codehaus.groovy.control.messages.WarningMessage;
  */
 public class ScriptAstCache extends ASTNodeCache {
 
+    private Path projectDir;
+
     private GroovyLibCache libCache;
 
     private LanguageServerConfiguration configuration;
@@ -66,6 +68,7 @@ public class ScriptAstCache extends ASTNodeCache {
 
     public ScriptAstCache(String rootUri) {
         super(createCompiler());
+        this.projectDir = rootUri != null ? Path.of(URI.create(rootUri)) : null;
         this.libCache = createLibCache(rootUri);
     }
 
@@ -105,7 +108,7 @@ public class ScriptAstCache extends ASTNodeCache {
 
         for( var uri : uris ) {
             var source = compiler().getSource(uri);
-            new ModuleResolver(compiler()).resolve(source, (newUri) -> {
+            new ModuleResolver(projectDir, compiler()).resolve(source, (newUri) -> {
                 changedUris.add(newUri);
                 return compiler().createSourceUnit(newUri, fileCache);
             });
@@ -113,7 +116,7 @@ public class ScriptAstCache extends ASTNodeCache {
 
         // phase 2: include checking
         for( var sourceUnit : getSourceUnits() ) {
-            var visitor = new ResolveIncludeVisitor(sourceUnit, compiler(), uris);
+            var visitor = new ResolveIncludeVisitor(sourceUnit, projectDir, compiler(), uris);
             visitor.visit();
 
             new ResolvePluginIncludeVisitor(sourceUnit, pluginSpecCache).visit();
