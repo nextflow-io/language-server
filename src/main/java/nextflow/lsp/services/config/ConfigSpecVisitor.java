@@ -131,8 +131,9 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             .map(spec -> spec.configScopes())
             .toList();
 
-        // set current versions in plugin spec cache
-        pluginSpecCache.setCurrentVersions(refs);
+        // save current versions to plugin cache
+        var uri = sourceUnit.getSource().getURI();
+        pluginSpecCache.setCurrentVersions(uri, refs);
 
         // collect config scopes from plugin specs
         var result = new HashMap<String, SpecNode>();

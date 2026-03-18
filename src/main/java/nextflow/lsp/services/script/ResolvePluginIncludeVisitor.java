@@ -58,11 +58,12 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitInclude(IncludeNode node) {
+        var uri = sourceUnit.getSource().getURI();
         var source = node.source.getText();
         if( !source.startsWith("plugin/") )
             return;
         var pluginName = source.split("/")[1];
-        var spec = pluginSpecCache.getCurrent(pluginName);
+        var spec = pluginSpecCache.getCurrent(uri, pluginName);
         if( spec == null ) {
             addError("Plugin '" + pluginName + "' does not exist or is not specified in the configuration file", node);
             return;

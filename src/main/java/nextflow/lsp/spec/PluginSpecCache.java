@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -43,7 +44,7 @@ public class PluginSpecCache {
 
     private Map<PluginRef, PluginSpec> cache = new HashMap<>();
 
-    private List<PluginRef> currentVersions;
+    private Map<Path, List<PluginRef>> pluginsMap = new HashMap<>();
 
     public PluginSpecCache(String registryUrl) {
         this.registryUri = URI.create(registryUrl);
@@ -136,23 +137,39 @@ public class PluginSpecCache {
     }
 
     /**
-     * Set the plugin versions currently specified by the config.
+     * Set the plugin versions currently specified for a given config file.
      *
-     * @param currentVersions
+     * Only "main" config files, i.e. files named `nextflow.config`, are recorded.
+     *
+     * @param uri
+     * @param refs
      */
-    public void setCurrentVersions(List<PluginRef> currentVersions) {
-        this.currentVersions = currentVersions;
+    public void setCurrentVersions(URI uri, List<PluginRef> refs) {
+        if( uri.getPath() == null || !uri.getPath().endsWith("nextflow.config") )
+            return;
+        var parent = Path.of(uri).getParent();
+        this.pluginsMap.put(parent, refs);
     }
 
     /**
      * Get the currently loaded spec for a plugin.
-     * 
+     *
+     * Given the URI of the including file, "./nextflow.config" is
+     * used if present, otherwise "../nextflow.config" is used if
+     * present, and so on.
+     *
+     * @param uri
      * @param name
      */
-    public PluginSpec getCurrent(String name) {
-        if( currentVersions == null )
+    public PluginSpec getCurrent(URI uri, String name) {
+        var parent = Path.of(uri).getParent();
+        var key = pluginsMap.keySet().stream()
+            .filter(p -> parent.startsWith(p))
+            .sorted((a, b) -> b.compareTo(a))
+            .findFirst().orElse(null);
+        if( key == null )
             return null;
-        var ref = currentVersions.stream()
+        var ref = pluginsMap.get(key).stream()
             .filter(r -> r.name().equals(name))
             .findFirst().orElse(null);
         if( ref == null )
