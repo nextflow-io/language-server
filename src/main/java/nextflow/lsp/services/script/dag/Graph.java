@@ -111,7 +111,9 @@ class Node {
     public enum Type {
         NAME,
         OPERATOR,
-        CONTROL
+        CONTROL,
+        INPUT, 
+        OUTPUT 
     }
 
     public final int id;

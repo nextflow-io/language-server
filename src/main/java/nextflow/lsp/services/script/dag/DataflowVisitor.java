@@ -15,6 +15,11 @@
  */
 package nextflow.lsp.services.script.dag;
 
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.LinkedHashMap;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -68,16 +73,22 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private boolean verbose;
 
+    private boolean addTakesEmits;
+
     private Map<String,Graph> graphs = new HashMap<>();
 
     private Stack<Set<Node>> stackPreds = new Stack<>();
 
     private VariableContext vc = new VariableContext();
 
-    public DataflowVisitor(SourceUnit sourceUnit, ScriptAstCache ast, boolean verbose) {
+    private final Map<Integer, String> controlConditions = new LinkedHashMap<>();
+    private final Map<String, Node> globalNodes = new LinkedHashMap<>();
+
+    public DataflowVisitor(SourceUnit sourceUnit, ScriptAstCache ast, boolean verbose, boolean addTakesEmits) {
         this.sourceUnit = sourceUnit;
         this.ast = ast;
         this.verbose = verbose;
+        this.addTakesEmits = addTakesEmits;
 
         stackPreds.push(new HashSet<>());
     }
@@ -156,13 +167,60 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         }
     }
 
+    private String extractSourceText(ASTNode expr) {
+        if (expr == null) return null;
+
+        try {
+            java.nio.file.Path path = java.nio.file.Paths.get(
+                    getSourceUnit().getSource().getURI()
+            );
+
+            String source = java.nio.file.Files.readString(path);
+            String[] lines = source.split("\n", -1);
+
+            int startLine = expr.getLineNumber() - 1;
+            int endLine   = expr.getLastLineNumber() - 1;
+            int startCol  = expr.getColumnNumber();
+            int endCol    = expr.getLastColumnNumber() - 2;
+
+            if (startLine < 0 || endLine >= lines.length)
+                return null;
+
+            if (startLine == endLine) {
+                return lines[startLine].substring(
+                        Math.min(startCol, lines[startLine].length()),
+                        Math.min(endCol, lines[startLine].length())
+                ).trim();
+            }
+
+            StringBuilder sb = new StringBuilder();
+
+            sb.append(lines[startLine].substring(startCol)).append("\n");
+
+            for (int i = startLine + 1; i < endLine; i++) {
+                sb.append(lines[i]).append("\n");
+            }
+
+            sb.append(lines[endLine].substring(0,
+                    Math.min(endCol, lines[endLine].length())));
+
+            return sb.toString().trim();
+        }
+        catch (Exception e) {
+            return null;
+        }
+    }
+
+
     // statements
 
     @Override
     public void visitIfElse(IfStatement node) {
         // visit the conditional expression
+        String conditionText = extractSourceText(node.getBooleanExpression());
         var controlPreds = visitWithPreds(node.getBooleanExpression());
         var controlDn = current.addNode("", Node.Type.CONTROL, null, controlPreds);
+        controlConditions.put(controlDn.id, conditionText);
 
         // visit the if branch
         vc.pushScope();
@@ -209,6 +267,41 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         }
     }
 
+    private void visitSubWorkflowCall(WorkflowNode subworkflow, List<ASTNode> callArgs) {
+        var params = subworkflow.getParameters();
+        int n = Math.min(params.length, callArgs.size());
+
+        Map<String, Node> subInputs = new LinkedHashMap<>();
+        List<Node> inputNodes = new ArrayList<>();
+
+        //Create input nodes and connect the corresponding argument nodes
+        for (int i = 0; i < n; i++) {
+            var param = params[i];
+            var arg = callArgs.get(i);
+
+            // Get predecessor nodes from this argument
+            var argPreds = visitWithPreds(arg);
+
+            Node inNode = addNode("take:"+param.getName(), Node.Type.INPUT, param, argPreds);
+            subInputs.put(param.getName(), inNode);
+            inputNodes.add(inNode);
+        }
+
+        //Create subworkflow operator node which depends on its input nodes
+        Node subNode = addNode(subworkflow.getName(), Node.Type.OPERATOR, subworkflow, new HashSet<>(inputNodes));
+        vc.putSymbol(subworkflow.getName(), subNode);
+
+        //Create output nodes and connect subworkflow operator -> outputs (then output -> other nodes (if possible) is done later on)
+        for (var stmt : asBlockStatements(subworkflow.emits)) {
+            Expression emit = ((ExpressionStatement) stmt).getExpression();
+            String name = typedOutputName(emit);
+
+            Node outNode = addNode("emit:"+name, Node.Type.OUTPUT, emit);
+            outNode.preds.add(subNode);
+            vc.putSymbol(name, outNode);
+        }
+    }
+
     // expressions
 
     @Override
@@ -226,11 +319,30 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         }
 
         var defNode = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
-        if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
-            var preds = visitWithPreds(node.getArguments());
-            var dn = addNode(name, Node.Type.OPERATOR, defNode, preds);
-            vc.putSymbol(name, dn);
-            return;
+        if(!addTakesEmits){
+            if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
+                var preds = visitWithPreds(node.getArguments());
+                var dn = addNode(name, Node.Type.OPERATOR, defNode, preds);
+                vc.putSymbol(name, dn);
+                return;
+            }
+        } else {
+            if( defNode instanceof ProcessNode ) {
+                var preds = visitWithPreds(node.getArguments());
+                var dn = addNode(name, Node.Type.OPERATOR, defNode, preds);
+                vc.putSymbol(name, dn);
+                return;
+            }
+            else if (defNode instanceof WorkflowNode wn) {
+                // Get the argument expressions as a list
+                var args = new ArrayList<ASTNode>();
+                if (node.getArguments() instanceof TupleExpression te)
+                    args.addAll(te.getExpressions());
+                else
+                    args.add(node.getArguments());
+                visitSubWorkflowCall(wn, args);
+                return;
+            }
         }
 
         super.visitMethodCallExpression(node);
@@ -310,8 +422,10 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitTernaryExpression(TernaryExpression node) {
+        String conditionText = extractSourceText(node.getBooleanExpression());
         var controlPreds = visitWithPreds(node.getBooleanExpression());
         var controlDn = current.addNode("", Node.Type.CONTROL, null, controlPreds);
+        controlConditions.put(controlDn.id, conditionText);
 
         current.pushSubgraph(controlDn);
         var truePreds = visitWithPreds(node.getTrueExpression());
@@ -443,17 +557,42 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             addOperatorPred(label, workflow);
             return;
         }
-        asBlockStatements(workflow.emits).stream()
-            .map(stmt -> ((ExpressionStatement) stmt).getExpression())
-            .filter((emit) -> {
-                var emitName = typedOutputName(emit);
-                return propName.equals(emitName);
-            })
-            .findFirst()
-            .ifPresent((call) -> {
-                addOperatorPred(label, workflow);
-            });
+        if(!addTakesEmits){
+            asBlockStatements(workflow.emits).stream()
+                .map(stmt -> ((ExpressionStatement) stmt).getExpression())
+                .filter((emit) -> {
+                    var emitName = typedOutputName(emit);
+                    return propName.equals(emitName);
+                })
+                .findFirst()
+                .ifPresent((call) -> {
+                    addOperatorPred(label, workflow);
+                });
+        } else {
+            //Here we connect where possible the emited nodes with its correct successor 
+            asBlockStatements(workflow.emits).stream()
+                .map(stmt -> ((ExpressionStatement) stmt).getExpression())
+                .filter(emit -> propName.equals(typedOutputName(emit)))
+                .findFirst()
+                .ifPresent(emit -> {
+                    //Find the emit:propName node
+                    Node emitNode = globalNodes.get("emit:" + propName);
+
+                    //Fallback
+                    if (emitNode == null) {
+                        var preds = vc.getSymbolPreds(propName);
+                        if (!preds.isEmpty())
+                            emitNode = preds.iterator().next();
+                    }
+
+                    //ONLY add emitNode as predecessor
+                    currentPreds().add(emitNode);
+                });
+        }
     }
+
+
+
 
     private String typedOutputName(Expression emit) {
         if( emit instanceof VariableExpression ve ) {
@@ -513,9 +652,14 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return stackPreds.pop();
     }
 
+    public Map<String, Node> getGlobalNodes() {
+        return globalNodes;
+    }
+
     private Node addNode(String label, Node.Type type, ASTNode an, Set<Node> preds) {
         var uri = ast.getURI(an);
         var dn = current.addNode(label, type, uri, preds);
+        globalNodes.put(dn.label, dn);
         currentPreds().add(dn);
         return dn;
     }
@@ -524,4 +668,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         return addNode(label, type, an, new HashSet<>());
     }
 
+    public Map<Integer, String> getControlConditions() {
+        return controlConditions;
+    }
 }
