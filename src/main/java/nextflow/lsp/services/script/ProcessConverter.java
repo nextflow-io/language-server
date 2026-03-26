@@ -20,7 +20,6 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -172,10 +171,6 @@ class ProcessConverter {
                 .map(mce -> typedInput(mce, stagers))
                 .toArray(Parameter[]::new);
             var type = new ClassNode(Tuple.class);
-            var genericsTypes = Arrays.stream(components)
-                .map(p -> new GenericsType(p.getType()))
-                .toArray(GenericsType[]::new);
-            type.setGenericsTypes(genericsTypes);
             return new TupleParameter(type, components);
         }
 

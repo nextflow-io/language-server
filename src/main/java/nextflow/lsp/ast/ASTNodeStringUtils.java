@@ -128,11 +128,7 @@ public class ASTNodeStringUtils {
         }
         for( var take : takes ) {
             fmt.appendIndent();
-            fmt.append(take.getName());
-            if( fmt.hasType(take) ) {
-                fmt.append(": ");
-                fmt.visitTypeAnnotation(take.getType());
-            }
+            typedInput(take, fmt);
             fmt.appendNewLine();
         }
         fmt.appendNewLine();
@@ -183,25 +179,7 @@ public class ASTNodeStringUtils {
         }
         for( var input : node.inputs ) {
             fmt.appendIndent();
-            if( input instanceof TupleParameter tp ) {
-                var components = Arrays.stream(tp.components)
-                    .map(p -> p.getName())
-                    .collect(Collectors.joining(", "));
-                fmt.append('(');
-                fmt.append(components);
-                fmt.append(')');
-            }
-            else {
-                fmt.append(input.getName());
-            }
-            if( fmt.hasType(input) ) {
-                fmt.append(": ");
-                var type = input.getType();
-                if( type.getNameWithoutPackage().startsWith("__Record") )
-                    processRecordToLabel(type.redirect(), fmt);
-                else
-                    fmt.visitTypeAnnotation(type);
-            }
+            typedInput(input, fmt);
             fmt.appendNewLine();
         }
         fmt.appendNewLine();
@@ -223,22 +201,53 @@ public class ASTNodeStringUtils {
         return fmt.toString();
     }
 
-    private static void processRecordToLabel(ClassNode type, Formatter fmt) {
+    private static void typedInput(Parameter input, Formatter fmt) {
+        if( input instanceof TupleParameter tp ) {
+            if( "Record".equals(tp.getType().getNameWithoutPackage()) )
+                processRecordInput(tp, fmt);
+            else
+                processTupleInput(tp, fmt);
+        }
+        else {
+            fmt.append(input.getName());
+            if( fmt.hasType(input) ) {
+                fmt.append(": ");
+                fmt.visitTypeAnnotation(input.getType());
+            }
+        }
+    }
+
+    private static void processRecordInput(TupleParameter tp, Formatter fmt) {
         fmt.append("Record {");
         fmt.appendNewLine();
         fmt.incIndent();
-        for( var fn : type.getFields() ) {
+        for( var p : tp.components ) {
             fmt.appendIndent();
-            fmt.append(fn.getName());
-            if( fmt.hasType(fn) ) {
+            fmt.append(p.getName());
+            if( fmt.hasType(p) ) {
                 fmt.append(": ");
-                fmt.append(TypesEx.getName(fn.getType()));
+                fmt.append(TypesEx.getName(p.getType()));
             }
             fmt.appendNewLine();
         }
         fmt.decIndent();
         fmt.appendIndent();
         fmt.append('}');
+    }
+
+    private static void processTupleInput(TupleParameter tp, Formatter fmt) {
+        fmt.append("Tuple<");
+        for( int i = 0; i < tp.components.length; i++ ) {
+            var p = tp.components[i];
+            fmt.append(p.getName());
+            if( fmt.hasType(p) ) {
+                fmt.append(": ");
+                fmt.append(TypesEx.getName(p.getType()));
+            }
+            if( i < tp.components.length - 1 )
+                fmt.append(", ");
+        }
+        fmt.append(">");
     }
 
     private static String processToLabel(ProcessNodeV1 node) {

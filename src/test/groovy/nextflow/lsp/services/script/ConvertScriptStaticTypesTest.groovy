@@ -151,9 +151,9 @@ class ConvertScriptStaticTypesTest extends Specification {
         checkInputs(service, INPUT, TYPED_INPUT, STAGE)
 
         where:
-        INPUT                               | TYPED_INPUT                   | STAGE
-        'tuple val(id), path(fastq)'        | '(id, fastq): Tuple<?, Path>' | null
-        "tuple val(id), path('file.txt')"   | '(id, $in1): Tuple<?, Path>'  | "stageAs \$in1, 'file.txt'"
+        INPUT                               | TYPED_INPUT               | STAGE
+        'tuple val(id), path(fastq)'        | 'tuple(id, fastq: Path)'  | null
+        "tuple val(id), path('file.txt')"   | 'tuple(id, $in1: Path)'   | "stageAs \$in1, 'file.txt'"
     }
 
     def 'should convert each inputs as val or path' () {
