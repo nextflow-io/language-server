@@ -23,6 +23,7 @@ import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
+import nextflow.script.control.SeverityAware;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.SourceUnit;
@@ -96,7 +97,7 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class ResolveIncludeError extends SyntaxException implements PhaseAware {
+    private class ResolveIncludeError extends SyntaxException implements PhaseAware, SeverityAware {
 
         public ResolveIncludeError(String message, ASTNode node) {
             super(message, node);
@@ -105,6 +106,11 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
         @Override
         public int getPhase() {
             return Phases.INCLUDE_RESOLUTION;
+        }
+
+        @Override
+        public boolean isSoftError() {
+            return true;
         }
     }
 }

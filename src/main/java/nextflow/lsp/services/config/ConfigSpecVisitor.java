@@ -176,7 +176,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             .map(t -> ClassHelper.makeCached(t).getPlainNodeReference())
             .toList();
         var actualType = inferredType(node.value, names);
-        if( !isAssignableFromAny(expectedTypes, actualType) ) {
+        if( !isAnyAssignableFrom(expectedTypes, actualType) ) {
             var validTypes = expectedTypes.stream()
                 .map(cn -> TypesEx.getName(cn))
                 .collect(Collectors.joining(", "));
@@ -199,8 +199,8 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         return type;
     }
 
-    private boolean isAssignableFromAny(List<ClassNode> targetTypes, ClassNode sourceType) {
-        if( targetTypes.isEmpty() )
+    private boolean isAnyAssignableFrom(List<ClassNode> targetTypes, ClassNode sourceType) {
+        if( targetTypes.isEmpty() || ClassHelper.isObjectType(sourceType) )
             return true;
         for( var targetType : targetTypes ) {
             if( TypesEx.isAssignableFrom(targetType, sourceType) )

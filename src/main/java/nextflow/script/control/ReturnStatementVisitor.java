@@ -114,7 +114,7 @@ public class ReturnStatementVisitor extends ClassCodeVisitorSupport {
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class TypeError extends SyntaxException implements PhaseAware {
+    private class TypeError extends SyntaxException implements PhaseAware, SeverityAware {
 
         public TypeError(String message, ASTNode node) {
             super(message, node);
@@ -123,6 +123,11 @@ public class ReturnStatementVisitor extends ClassCodeVisitorSupport {
         @Override
         public int getPhase() {
             return Phases.TYPE_CHECKING;
+        }
+
+        @Override
+        public boolean isSoftError() {
+            return true;
         }
     }
 }

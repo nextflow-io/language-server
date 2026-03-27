@@ -375,6 +375,19 @@ class TypeCheckingTest extends Specification {
         "true ? 42 : null"  | null
     }
 
+    def 'should resolve a ternary expression' () {
+        when:
+        def exp = parseExpression(
+            '''
+            workflow {
+                true ? 42 : null
+            }
+            '''
+        )
+        then:
+        checkType(exp, Integer)
+    }
+
     def 'should check an elvis expression' () {
         when:
         def exp = parseExpression(

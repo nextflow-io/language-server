@@ -147,6 +147,8 @@ public class PluginSpecCache {
     public void setCurrentVersions(URI uri, List<PluginRef> refs) {
         if( uri.getPath() == null || !uri.getPath().endsWith("nextflow.config") )
             return;
+        if( refs.isEmpty() )
+            return;
         var parent = Path.of(uri).getParent();
         this.pluginsMap.put(parent, refs);
     }

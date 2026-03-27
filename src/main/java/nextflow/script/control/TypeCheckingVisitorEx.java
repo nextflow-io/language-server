@@ -304,9 +304,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             return;
         }
         var type = node.getType();
-        var elementType = CHANNEL_TYPE.equals(type) || VALUE_TYPE.equals(type)
-            ? elementType(type)
-            : type;
+        var elementType = dataflowElementType(type);
         for( var stmt : asBlockStatements(node.body) ) {
             var call = asMethodCallX(stmt);
             if( checkPublishStatements(call, elementType) )
@@ -402,7 +400,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
                 applyTupleAssignment(te, sourceType);
         }
         else {
-            addError("Assignment target with type " + TypesEx.getName(targetType) + " cannot be assigned to value with type " + TypesEx.getName(sourceType), node);
+            addSoftError("Assignment target with type " + TypesEx.getName(targetType) + " cannot be assigned to value with type " + TypesEx.getName(sourceType), node);
         }
     }
 
@@ -502,7 +500,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             }
             else {
                 checkArguments(parameters, arguments);
-
                 if( arguments.size() > 0 && arguments.get(0) instanceof MapExpression me )
                     checkNamedParams(mn.getParameters()[0], me);
             }
@@ -513,7 +510,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             }
         }
         else if( experimental && node.getNodeMetaData(ASTNodeMarker.METHOD_OVERLOADS) != null ) {
-            addError(String.format("Function `%s` (with multiple signatures) was called with incorrect number of arguments and/or incorrect argument types", node.getMethodAsString()), node.getMethod());
+            addSoftError(String.format("Function `%s` (with multiple signatures) was called with incorrect number of arguments and/or incorrect argument types", node.getMethodAsString()), node.getMethod());
         }
         else if( experimental && !node.isImplicitThis() ) {
             var className = className(receiver);
@@ -609,10 +606,10 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
                     .map(p -> p.getType())
                     .toArray(ClassNode[]::new);
                 var returnType = ClassHelper.dynamicType();
-                addError("Closure with signature " + TypesEx.getName(parameterTypes, returnType) + " is not compatible with expected signature: " + TypesEx.getName(paramType), argument);
+                addSoftError("Closure with signature " + TypesEx.getName(parameterTypes, returnType) + " is not compatible with expected signature: " + TypesEx.getName(paramType), argument);
             }
             else {
-                addError("Argument with type " + TypesEx.getName(argType) + " is not compatible with parameter of type " + TypesEx.getName(paramType), argument);
+                addSoftError("Argument with type " + TypesEx.getName(argType) + " is not compatible with parameter of type " + TypesEx.getName(paramType), argument);
             }
         }
     }
@@ -642,7 +639,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             var namedParam = asNamedParam(namedParams.get(name));
             var argType = getType(value);
             if( !TypesEx.isAssignableFrom(namedParam.getType(), argType) )
-                addError("Named param `" + name + "` expects a " + TypesEx.getName(namedParam.getType()) + " but received a " + TypesEx.getName(argType), value);
+                addSoftError("Named param `" + name + "` expects a " + TypesEx.getName(namedParam.getType()) + " but received a " + TypesEx.getName(argType), value);
             entry.putNodeMetaData("_NAMED_PARAM", namedParam);
         }
     }
@@ -705,7 +702,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             var argType = getType(arguments.get(i));
             var elementType = dataflowElementType(argType);
             if( !TypesEx.isAssignableFrom(paramType, elementType) )
-                addError("Argument with type " + TypesEx.getName(elementType) + " is not compatible with process input of type " + TypesEx.getName(paramType), arguments.get(i));
+                addSoftError("Argument with type " + TypesEx.getName(elementType) + " is not compatible with process input of type " + TypesEx.getName(paramType), arguments.get(i));
         }
 
         var numChannelArgs = arguments.stream().filter((arg) -> CHANNEL_TYPE.equals(getType(arg))).count();
@@ -861,7 +858,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var lhsOps = resolveOpsType(lhsType);
         var rhsOps = resolveOpsType(rhsType);
 
-        ClassNode resultType = null;        
+        ClassNode resultType = null;
         switch( op.getType() ) {
             case Types.POWER:
                 resultType = resolveOpResultType(lhsType, rhsType, lhsOps, rhsOps, "power");
@@ -956,7 +953,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( resultType != null )
             node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
         else
-            addError(String.format("The `%s` operator is not defined for operands with types %s and %s", op.getText(), TypesEx.getName(lhsType), TypesEx.getName(rhsType)), node);
+            addSoftError(String.format("The `%s` operator is not defined for operands with types %s and %s", op.getText(), TypesEx.getName(lhsType), TypesEx.getName(rhsType)), node);
     }
 
     /**
@@ -1034,9 +1031,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var trueType = getType(trueExpr);
         var falseType = getType(falseExpr);
 
-        if( ClassHelper.isDynamicTyped(trueType) || ClassHelper.isDynamicTyped(falseType) )
-            return;
-
         ClassNode resultType;
         boolean nullable = true;
         if( isNullConstant(trueExpr) && isNullConstant(falseExpr) ) {
@@ -1048,12 +1042,15 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         else if( isNullConstant(trueExpr) && !isNullConstant(falseExpr) ) {
             resultType = falseType;
         }
+        else if( ClassHelper.isDynamicTyped(trueType) || ClassHelper.isDynamicTyped(falseType) ) {
+            return;
+        }
         else if( TypesEx.isEqual(trueType, falseType) ) {
             resultType = trueType;
             nullable = isNullable(trueType) || isNullable(falseType);
         }
         else {
-            addError(String.format("Conditional expression has inconsistent types -- true branch has type %s but false branch has type %s", TypesEx.getName(trueType), TypesEx.getName(falseType)), node);
+            addSoftError(String.format("Conditional expression has inconsistent types -- true branch has type %s but false branch has type %s", TypesEx.getName(trueType), TypesEx.getName(falseType)), node);
             return;
         }
 
@@ -1100,7 +1097,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
                 elementType = type;
             }
             else if( !TypesEx.isEqual(elementType, type) ) {
-                addError(String.format("List expression has inconsistent element types -- some elements have type %s while others have type %s", TypesEx.getName(elementType), TypesEx.getName(type)), node);
+                addSoftError(String.format("List expression has inconsistent element types -- some elements have type %s while others have type %s", TypesEx.getName(elementType), TypesEx.getName(type)), node);
                 break;
             }
         }
@@ -1130,7 +1127,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var rhsType = getType(rhs);
 
         if( !TypesEx.isEqual(lhsType, rhsType) ) {
-            addError("Lower bound and upper bound of range expression should have the same type", node);
+            addSoftError("Lower bound and upper bound of range expression should have the same type", node);
             node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, ClassHelper.dynamicType());
             return;
         }
@@ -1144,7 +1141,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
         }
         else {
-            addError("Range expression with elements of type " + TypesEx.getName(lhsType) + " is not supported", node);
+            addSoftError("Range expression with elements of type " + TypesEx.getName(lhsType) + " is not supported", node);
             node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, ClassHelper.dynamicType());
         }
     }
@@ -1182,7 +1179,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( resultType != null )
             node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
         else
-            addError(String.format("The `%s` operator is not defined for an operand with type %s", op, TypesEx.getName(type)), node);
+            addSoftError(String.format("The `%s` operator is not defined for an operand with type %s", op, TypesEx.getName(type)), node);
     }
 
     @Override
@@ -1198,7 +1195,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             return;
         var opsType = resolveOpsType(targetType);
         if( resolveOpResultType(sourceType, opsType, "ofType") == null )
-            addError(String.format("Value of type %s cannot be cast to %s", TypesEx.getName(sourceType), TypesEx.getName(targetType)), node);
+            addSoftError(String.format("Value of type %s cannot be cast to %s", TypesEx.getName(sourceType), TypesEx.getName(targetType)), node);
     }
 
     private boolean checkRecordCast(ClassNode targetType, ClassNode sourceType, ASTNode node) {
@@ -1322,15 +1319,33 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class TypeError extends SyntaxException implements PhaseAware {
+    public void addSoftError(String message, ASTNode node) {
+        var cause = new TypeError(message, node, true);
+        var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
+        sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
+    }
+
+    private class TypeError extends SyntaxException implements PhaseAware, SeverityAware {
+
+        boolean softError;
+
+        public TypeError(String message, ASTNode node, boolean softError) {
+            super(message, node);
+            this.softError = softError;
+        }
 
         public TypeError(String message, ASTNode node) {
-            super(message, node);
+            this(message, node, false);
         }
 
         @Override
         public int getPhase() {
             return Phases.TYPE_CHECKING;
+        }
+
+        @Override
+        public boolean isSoftError() {
+            return softError;
         }
     }
 }

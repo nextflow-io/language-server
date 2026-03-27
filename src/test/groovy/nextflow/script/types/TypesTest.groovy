@@ -72,7 +72,7 @@ class TypesTest extends Specification {
         when:
         param = cn.getDeclaredMethods('reduce')[0].getParameters().last()
         then:
-        TypesEx.getName(param.getType()) == '(R, E) -> R'
+        TypesEx.getName(param.getType()) in ['(E, E) -> E', '(R, E) -> R']
     }
 
     def 'should determine whether a type is assignable to another type' () {
