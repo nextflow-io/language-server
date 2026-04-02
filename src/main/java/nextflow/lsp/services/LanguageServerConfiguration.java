@@ -28,8 +28,7 @@ public record LanguageServerConfiguration(
     boolean maheshForm,
     int maxCompletionItems,
     String pluginRegistryUrl,
-    boolean sortDeclarations,
-    boolean typeChecking
+    boolean sortDeclarations
 ) {
 
     public static LanguageServerConfiguration defaults() {
@@ -43,7 +42,6 @@ public record LanguageServerConfiguration(
             false,
             100,
             "https://registry.nextflow.io/api/",
-            false,
             false
         );
     }

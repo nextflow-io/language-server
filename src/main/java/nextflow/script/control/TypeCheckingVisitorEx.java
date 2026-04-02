@@ -103,11 +103,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private boolean experimental;
-
-    public TypeCheckingVisitorEx(SourceUnit sourceUnit, boolean experimental) {
+    public TypeCheckingVisitorEx(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
-        this.experimental = experimental;
     }
 
     @Override
@@ -137,8 +134,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitFeatureFlag(FeatureFlagNode node) {
-        if( !experimental )
-            return;
         var fn = node.target;
         if( fn == null )
             return;
@@ -157,8 +152,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     private void visitParameter(Parameter node, boolean allowPathCoercion) {
-        if( !experimental )
-            return;
         if( !node.hasInitialExpression() )
             return;
         var expectedType = node.getType();
@@ -174,11 +167,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitWorkflow(WorkflowNode node) {
-        if( !experimental ) {
-            super.visitWorkflow(node);
-            return;
-        }
-
         currentWorkflow = node;
 
         visit(node.main);
@@ -288,9 +276,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         visit(node.getCode());
 
         // check return statements against declared return type
-        if( !experimental )
-            return;
-            
         var visitor = new ReturnStatementVisitor(sourceUnit);
         visitor.visit(node.getReturnType(), node.getCode());
 
@@ -301,10 +286,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitOutput(OutputNode node) {
-        if( !experimental ) {
-            super.visitOutput(node);
-            return;
-        }
         var type = node.getType();
         var elementType = dataflowElementType(type);
         for( var stmt : asBlockStatements(node.body) ) {
@@ -390,8 +371,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     private void applyAssignment(BinaryExpression node) {
-        if( !experimental )
-            return;
         var target = node.getLeftExpression();
         var source = node.getRightExpression();
         if( source instanceof EmptyExpression )
@@ -432,11 +411,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitMethodCallExpression(MethodCallExpression node) {
-        if( !experimental ) {
-            super.visitMethodCallExpression(node);
-            return;
-        }
-
         // resolve argument types (except for closures)
         var arguments = asMethodCallArguments(node);
         boolean hasClosureArgs = false;
@@ -505,10 +479,10 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
                 node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, dummyMethod);
             }
         }
-        else if( experimental && node.getNodeMetaData(ASTNodeMarker.METHOD_OVERLOADS) != null ) {
+        else if( node.getNodeMetaData(ASTNodeMarker.METHOD_OVERLOADS) != null ) {
             addSoftError(String.format("Function `%s` (with multiple signatures) was called with incorrect number of arguments and/or incorrect argument types", node.getMethodAsString()), node.getMethod());
         }
-        else if( experimental && !node.isImplicitThis() ) {
+        else if( !node.isImplicitThis() ) {
             var className = className(receiver);
             addError(String.format("Unrecognized method `%s` for %s", node.getMethodAsString(), className), node.getMethod());
         }
@@ -837,9 +811,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     public void visitBinaryExpression(BinaryExpression node) {
         super.visitBinaryExpression(node);
 
-        if( !experimental )
-            return;
-
         var op = node.getOperation();
         if( op.getType() == Types.PLUS && checkRecordSum(node) )
             return;
@@ -1019,9 +990,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     private void applyConditionalExpression(TernaryExpression node) {
-        if( !experimental )
-            return;
-
         var trueExpr = node.getTrueExpression();
         var falseExpr = node.getFalseExpression();
         var trueType = getType(trueExpr);
@@ -1066,8 +1034,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         super.visitClosureExpression(node);
 
         // resolve return type and check against declared return type
-        if( !experimental )
-            return;
         var returnType = (ClassNode) node.getNodeMetaData(ASTNodeMarker.INFERRED_RETURN_TYPE);
         if( returnType != null ) {
             var visitor = new ReturnStatementVisitor(sourceUnit);
@@ -1082,9 +1048,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitListExpression(ListExpression node) {
         super.visitListExpression(node);
-
-        if( !experimental )
-            return;
 
         ClassNode elementType = null;
         for( var el : node.getExpressions() ) {
@@ -1113,9 +1076,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitRangeExpression(RangeExpression node) {
         super.visitRangeExpression(node);
-
-        if( !experimental )
-            return;
 
         var lhs = node.getFrom();
         var rhs = node.getTo();
@@ -1147,24 +1107,18 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitUnaryMinusExpression(UnaryMinusExpression node) {
         super.visitUnaryMinusExpression(node);
-        if( !experimental )
-            return;
         resolveUnaryOpOrFail(node.getExpression(), "-", "negative", node);
     }
 
     @Override
     public void visitUnaryPlusExpression(UnaryPlusExpression node) {
         super.visitUnaryPlusExpression(node);
-        if( !experimental )
-            return;
         resolveUnaryOpOrFail(node.getExpression(), "+", "positive", node);
     }
 
     @Override
     public void visitBitwiseNegationExpression(BitwiseNegationExpression node) {
         super.visitBitwiseNegationExpression(node);
-        if( !experimental )
-            return;
         resolveUnaryOpOrFail(node.getExpression(), "~", "bitwiseNegate", node);
     }
 
@@ -1181,8 +1135,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitCastExpression(CastExpression node) {
         super.visitCastExpression(node);
-        if( !experimental )
-            return;
         var sourceType = getType(node.getExpression());
         var targetType = node.getType();
         if( ClassHelper.isObjectType(sourceType) || TypesEx.isAssignableFrom(targetType, sourceType) )
@@ -1218,9 +1170,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitPropertyExpression(PropertyExpression node) {
         super.visitPropertyExpression(node);
-
-        if( !experimental )
-            return;
 
         var receiver = node.getObjectExpression();
         var receiverType = getType(receiver);

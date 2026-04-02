@@ -17,11 +17,13 @@
 package nextflow.script.types
 
 import nextflow.script.ast.ASTNodeMarker
+import nextflow.script.ast.FeatureFlagNode
 import nextflow.script.control.ScriptParser
 import nextflow.script.control.ScriptResolveVisitor
 import nextflow.script.control.TypeCheckingVisitorEx
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassHelper
+import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
@@ -51,8 +53,9 @@ class TypeCheckingTest extends Specification {
 
     SourceUnit parse(String contents) {
         def source = scriptParser.parse('main.nf', contents.stripIndent())
+        source.getAST()?.addFeatureFlag(new FeatureFlagNode("nextflow.preview.types", new ConstantExpression(true)))
         new ScriptResolveVisitor(source, scriptParser.compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, Collections.emptyList()).visit()
-        new TypeCheckingVisitorEx(source, true).visit()
+        new TypeCheckingVisitorEx(source).visit()
         return source
     }
 
@@ -142,6 +145,8 @@ class TypeCheckingTest extends Specification {
         when:
         def errors = getErrors(
             '''\
+            nextflow.preview.types = true
+
             workflow hello {
                 emit:
                 result: String = 42
@@ -150,13 +155,15 @@ class TypeCheckingTest extends Specification {
         )
         then:
         errors.size() == 1
-        errors[0].getStartLine() == 3
+        errors[0].getStartLine() == 5
         errors[0].getStartColumn() == 5
         errors[0].getOriginalMessage() == "Assignment target with type String cannot be assigned to value with type Integer"
 
         when:
         errors = getErrors(
             '''\
+            nextflow.preview.types = true
+
             workflow hello {
                 emit:
                 result: Integer = 42
@@ -633,6 +640,8 @@ class TypeCheckingTest extends Specification {
         expect:
         check(
             '''
+            nextflow.preview.types = true
+
             workflow hello {
                 take:
                 messages: Channel<String>
@@ -653,6 +662,8 @@ class TypeCheckingTest extends Specification {
         when:
         def exp = parseExpression(
             '''\
+            nextflow.preview.types = true
+
             workflow hello {
                 emit:
                 result: Integer = 42
