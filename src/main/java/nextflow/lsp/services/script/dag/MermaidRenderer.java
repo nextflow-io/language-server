@@ -186,7 +186,9 @@ public class MermaidRenderer {
             case NAME     -> String.format("v%d[\"%s\"]", id, label);
             case OPERATOR -> String.format("v%d([%s])", id, label);
             case CONTROL  -> String.format("v%d{ }", id);
-        };
+            case INPUT  -> String.format("v%d(\"%s\")", id, label);
+            case OUTPUT  -> String.format("v%d(\"%s\")", id, label);
+             };
     }
 
     /**
