@@ -154,6 +154,8 @@ class TypeCheckingUtilsTest extends Specification {
         when:
         def exp = parseExpression(
             '''
+            nextflow.preview.types = true
+
             workflow hello {
                 take:
                 target: String

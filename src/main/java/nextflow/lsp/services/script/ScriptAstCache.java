@@ -42,6 +42,7 @@ import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.control.ScriptResolveVisitor;
+import nextflow.script.control.TypeCheckingVisitor;
 import nextflow.script.control.TypeCheckingVisitorEx;
 import nextflow.script.parser.ScriptParserPluginFactory;
 import nextflow.script.types.Types;
@@ -61,8 +62,6 @@ public class ScriptAstCache extends ASTNodeCache {
     private Path projectDir;
 
     private GroovyLibCache libCache;
-
-    private LanguageServerConfiguration configuration;
 
     private PluginSpecCache pluginSpecCache;
 
@@ -97,7 +96,6 @@ public class ScriptAstCache extends ASTNodeCache {
     }
 
     public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {
-        this.configuration = configuration;
         this.pluginSpecCache = pluginSpecCache;
     }
 
@@ -145,7 +143,12 @@ public class ScriptAstCache extends ASTNodeCache {
             if( sourceUnit == null || sourceUnit.getErrorCollector().hasErrors() )
                 continue;
             // phase 4: type checking
-            new TypeCheckingVisitorEx(sourceUnit, configuration.typeChecking()).visit();
+            if( sourceUnit.getAST() instanceof ScriptNode sn ) {
+                if( sn.isTypingEnabled() )
+                    new TypeCheckingVisitorEx(sourceUnit).visit();
+                else
+                    new TypeCheckingVisitor(sourceUnit).visit();
+            }
         }
 
         return changedUris;
