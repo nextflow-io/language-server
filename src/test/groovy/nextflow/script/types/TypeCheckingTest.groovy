@@ -167,6 +167,78 @@ class TypeCheckingTest extends Specification {
         errors.size() == 0
     }
 
+    def 'should check output path directive' () {
+        when:
+        def errors = getErrors(
+            '''\
+            nextflow.preview.types = true
+
+            workflow {
+                main:
+                ch_samples = channel.empty()
+
+                publish:
+                samples = ch_samples
+            }
+
+            output {
+                samples: Channel<Sample> {
+                    path { s ->
+                        s.id >> 42
+                        s.fastq >> params.save_fastq ? 'fastq' : null
+                    }
+                }
+            }
+
+            record Sample {
+                id: String
+                fastq: Path
+            }
+            '''
+        )
+        then:
+        errors.size() == 3
+        errors[0].getStartLine() == 14
+        errors[0].getStartColumn() == 13
+        errors[0].getOriginalMessage() == "Publish source should be a Path or Iterable<Path> but was specified as a String"
+        errors[1].getStartLine() == 14
+        errors[1].getStartColumn() == 21
+        errors[1].getOriginalMessage() == "Publish target should be a String but was specified as a Integer"
+        errors[2].getStartLine() == 15
+        errors[2].getStartColumn() == 13
+        errors[2].getOriginalMessage().contains "Statement is not a valid publish statement"
+
+        when:
+        errors = getErrors(
+            '''\
+            nextflow.preview.types = true
+
+            workflow {
+                main:
+                ch_samples = channel.empty()
+
+                publish:
+                samples = ch_samples
+            }
+
+            output {
+                samples: Channel<Sample> {
+                    path { s ->
+                        s.fastq >> (params.save_fastq ? 'fastq' : null)
+                    }
+                }
+            }
+
+            record Sample {
+                id: String
+                fastq: Path
+            }
+            '''
+        )
+        then:
+        errors.size() == 0
+    }
+
     def 'should check a return statement' () {
         when:
         def errors = getErrors(

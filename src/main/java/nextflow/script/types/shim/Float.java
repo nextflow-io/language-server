@@ -25,6 +25,7 @@ import nextflow.script.dsl.Ops;
 """)
 @Ops(FloatOps.class)
 public interface Float {
+    Integer intValue();
 }
 
 interface FloatOps {

@@ -407,10 +407,15 @@ public class TypesEx {
         return type;
     }
 
+    private static final List<Class> STATEFUL_TYPES = List.of(
+        ParamsMap.class,    // don't normalize since param fields are injected by params block
+        Record.class        // don't normalize since record fields are injected during type inference
+    );
+
     public static ClassNode normalize(ClassNode cn) {
         if( cn == null || !cn.isResolved() )
             return cn;
-        if( cn.getTypeClass() == ParamsMap.class || cn.getTypeClass() == Record.class )
+        if( STATEFUL_TYPES.contains(cn.getTypeClass()) )
             return cn;
         var result = ClassHelper.makeCached(normalize(cn.getTypeClass())).getPlainNodeReference();
         if( cn.getGenericsTypes() != null )

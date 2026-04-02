@@ -128,6 +128,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
                 visitProcess(processNode);
             for( var workflowNode : sn.getWorkflows() )
                 visitWorkflow(workflowNode);
+            if( sn.getOutputs() != null )
+                visitOutputs(sn.getOutputs());
         }
     }
 
@@ -327,18 +329,24 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             closure.getParameters()[0].setType(elementType);
         }
         var code = (BlockStatement) closure.getCode();
+        boolean checkPublish = code.getStatements().stream().anyMatch(stmt -> (
+            asPublishStatement(stmt) != null
+        ));
         for( var stmt : code.getStatements() ) {
-            if( checkPublishStatement(stmt) )
-                continue;
-            visit(stmt);
+            if( checkPublish )
+                checkPublishStatement(stmt);
+            else
+                visit(stmt);
         }
         return true;
     }
 
-    private boolean checkPublishStatement(Statement node) {
+    private void checkPublishStatement(Statement node) {
         var publish = asPublishStatement(node);
-        if( publish == null )
-            return false;
+        if( publish == null ) {
+            addError("Statement is not a valid publish statement (hint: make sure right-hand side of `>>` expression is wrapped in parentheses)", node);
+            return;
+        }
         var source = publish.getLeftExpression();
         var target = publish.getRightExpression();
         visit(source);
@@ -349,7 +357,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var targetType = getType(target);
         if( !TypesEx.isAssignableFrom(ClassHelper.STRING_TYPE, targetType) )
             addError("Publish target should be a String but was specified as a " + TypesEx.getName(targetType), target);
-        return true;
     }
 
     private BinaryExpression asPublishStatement(Statement node) {
@@ -405,32 +412,21 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     private void applyTupleAssignment(TupleExpression target, ClassNode sourceType) {
-        var vars = target.getExpressions();
-
-        if( TUPLE_TYPE.equals(sourceType) ) {
-            var gts = sourceType.getGenericsTypes();
-            if( gts == null )
-                return;
-            if( vars.size() == gts.length ) {
-                for( int i = 0; i < vars.size(); i++ )
-                    vars.get(i).putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, gts[i].getType());
-            }
-            else {
-                addError("Assignment target with " + vars.size() + " components cannot be assigned to tuple with " + gts.length + " components", target);
-            }
+        if( !TUPLE_TYPE.equals(sourceType) ) {
+            addError("Tuple assignment is not compatible with type " + TypesEx.getName(sourceType), target);
+            return;
         }
-
-        if( RECORD_TYPE.equals(sourceType) ) {
-            var fields = sourceType.getFields();
-            if( fields.size() == 0 )
-                return;
-            if( vars.size() == fields.size() ) {
-                for( int i = 0; i < vars.size(); i++ )
-                    vars.get(i).putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, fields.get(i).getType());
-            }
-            else {
-                addError("Assignment target with " + vars.size() + " components cannot be assigned to record with " + fields.size() + " fields", target);
-            }
+        
+        var vars = target.getExpressions();
+        var gts = sourceType.getGenericsTypes();
+        if( gts == null )
+            return;
+        if( vars.size() == gts.length ) {
+            for( int i = 0; i < vars.size(); i++ )
+                vars.get(i).putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, gts[i].getType());
+        }
+        else {
+            addError("Assignment target with " + vars.size() + " components cannot be assigned to tuple with " + gts.length + " components", target);
         }
     }
 
