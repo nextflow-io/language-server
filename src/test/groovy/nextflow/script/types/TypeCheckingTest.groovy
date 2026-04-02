@@ -305,6 +305,17 @@ class TypeCheckingTest extends Specification {
         target = exp.getLeftExpression()
         then:
         checkType(target, String)
+
+        when:
+        exp = parseExpression(
+            '''
+            x = null
+            x = 'hello'
+            '''
+        )
+        target = exp.getLeftExpression()
+        then:
+        checkType(target, String)
     }
 
     @Unroll
@@ -666,16 +677,56 @@ class TypeCheckingTest extends Specification {
 
             workflow hello {
                 emit:
+                42
+            }
+
+            workflow {
+                hello()
+            }
+            '''
+        )
+        def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Value<Integer>'
+
+        when:
+        exp = parseExpression(
+            '''\
+            nextflow.preview.types = true
+
+            workflow hello {
+                emit:
                 result: Integer = 42
             }
 
             workflow {
-                hello().result
+                hello()
             }
             '''
         )
+        type = getType(exp)
         then:
-        checkType(exp, Integer)
+        TypesEx.getName(type) == 'Value<Integer>'
+
+        when:
+        exp = parseExpression(
+            '''\
+            nextflow.preview.types = true
+
+            workflow hello {
+                emit:
+                foo: String = 'hello'
+                bar: Integer = 42
+            }
+
+            workflow {
+                hello().bar
+            }
+            '''
+        )
+        type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Value<Integer>'
     }
 
     def 'should check a process call' () {
@@ -815,7 +866,6 @@ class TypeCheckingTest extends Specification {
 
             workflow {
                 hello( 'World' )
-                hello.out.message
             }
             '''
         )
@@ -951,25 +1001,60 @@ class TypeCheckingTest extends Specification {
         when:
         def exp = parseExpression(
             '''\
-            left  = channel.of( tuple(42, 'hello') )
-            right = channel.of( true )
+            left  = channel.of( 42 )
+            right = channel.of( 'hello' )
             left.combine(right)
             '''
         )
         def type = getType(exp)
         then:
-        TypesEx.getName(type) == 'Channel<Tuple<Integer, String, Boolean>>'
+        TypesEx.getName(type) == 'Channel<Tuple<Integer, String>>'
+
+        when:
+        exp = parseExpression(
+            '''\
+            left  = channel.of( tuple(1, 2) )
+            right = channel.of( tuple('red', 'blue') )
+            left.combine(right)
+            '''
+        )
+        type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Channel<Tuple<Integer, Integer, String, String>>'
+
+        when:
+        exp = parseExpression(
+            '''\
+            samples = channel.of( record(id: 1, fastq: file('1.fq')) )
+            index = channel.value( file('index.fa') )
+            samples.combine( single_end: true, index: index )
+            '''
+        )
+        type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Channel<Record {\n    id: Integer\n    fastq: Path\n    single_end: Boolean\n    index: Path\n}>'
     }
 
-    def 'should resolve a `groupTuple` operation' () {
+    def 'should resolve a `groupBy` operation' () {
         when:
         def exp = parseExpression(
             '''\
             left = channel.of( tuple(42, 'hello'), tuple(42, 'goodbye') )
-            left.groupTuple()
+            left.groupBy()
             '''
         )
         def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Channel<Tuple<Integer, Bag<String>>>'
+
+        when:
+        exp = parseExpression(
+            '''\
+            left = channel.of( tuple(42, 2, 'hello'), tuple(42, 2, 'goodbye') )
+            left.groupBy()
+            '''
+        )
+        type = getType(exp)
         then:
         TypesEx.getName(type) == 'Channel<Tuple<Integer, Bag<String>>>'
     }
@@ -978,14 +1063,14 @@ class TypeCheckingTest extends Specification {
         when:
         def exp = parseExpression(
             '''\
-            left  = channel.of( tuple(42, 'hello') )
-            right = channel.of( tuple(42, true) )
-            left.join(right)
+            left  = channel.of( record(id: 42, name: 'hello') )
+            right = channel.of( record(id: 42, alive: true) )
+            left.join(right, by: 'id')
             '''
         )
         def type = getType(exp)
         then:
-        TypesEx.getName(type) == 'Channel<Tuple<Integer, String, Boolean>>'
+        TypesEx.getName(type) == 'Channel<Record {\n    id: Integer\n    name: String\n    alive: Boolean\n}>'
     }
 
 }

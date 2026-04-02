@@ -29,7 +29,6 @@ import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.OutputNode;
 import nextflow.script.ast.ProcessNode;
-import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
 import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.ScriptNode;
@@ -260,15 +259,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     @Override
-    public void visitProcessV1(ProcessNodeV1 node) {
-        // don't try to type-check input/output directives
-        visitProcessDirectives(node.directives);
-        visit(node.when);
-        visit(node.exec);
-        visit(node.stub);
-    }
-
-    @Override
     public void visitFunction(FunctionNode node) {
         // visit parameters and code
         for( var parameter : node.getParameters() )
@@ -292,7 +282,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             var call = asMethodCallX(stmt);
             if( checkPublishStatements(call, elementType) )
                 continue;
-            super.visitMethodCallExpression(call);
+            visitMethodCallExpression(call);
         }
     }
 
@@ -462,6 +452,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, dummyMethod.getReturnType());
 
             checkOperatorCall(node);
+            checkWorkflowCall(node);
         }
         else if( node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET) instanceof MethodNode mn ) {
             var parameters = mn.getParameters();
@@ -534,8 +525,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     }
 
     /**
-     * Resolve the return type of operators that transform tuples.
-     * such as `combine`, `groupTuple`, and `join`.
+     * Resolve the return type of dataflow operators where applicable.
      *
      * @param node
      */
@@ -547,14 +537,61 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( !CHANNEL_TYPE.equals(receiverType) )
             return;
 
-        var lhsType = elementType(receiverType);
         var method = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
+        if( findAnnotation(method, Deprecated.class).isPresent() )
+            addSoftError("Operator `" + method.getName() + "` is discouraged from use with static typing", node);
+
+        var lhsType = elementType(receiverType);
         var arguments = asMethodCallArguments(node);
-        var resultType = new TupleOpResolver().apply(lhsType, method, arguments);
+        var resultType = new DataflowOpResolver().apply(lhsType, method, arguments);
         if( ClassHelper.isDynamicTyped(resultType) )
             return;
 
         node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
+    }
+
+    /**
+     * Resolve the return type of a workflow based on the declared outputs.
+     *
+     * When the workflow declares a single output, the return type contains only
+     * that type. When the workflow declares multiple outputs, the return type is
+     * a Record containing each named output.
+     *
+     * @param node
+     */
+    private void checkWorkflowCall(MethodCallExpression node) {
+        var mn = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
+        if( mn instanceof WorkflowNode wn ) {
+            var resultType = workflowOutputType(wn.emits);
+            node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
+        }
+    }
+
+    private static ClassNode workflowOutputType(Statement block) {
+        var emits = asBlockStatements(block);
+        if( emits.size() == 1 ) {
+            var first = emits.get(0);
+            var emit = ((ExpressionStatement) first).getExpression();
+            return workflowEmitType(getType(emit));
+        }
+        var cn = new ClassNode(Record.class);
+        for( var stmt : emits ) {
+            var emit = ((ExpressionStatement) stmt).getExpression();
+            var emitName = outputTarget(emit).getName();
+            var emitType = workflowEmitType(getType(emit));
+            var fn = new FieldNode(emitName, Modifier.PUBLIC, emitType, cn, null);
+            fn.setDeclaringClass(cn);
+            cn.addField(fn);
+        }
+        return cn;
+    }
+
+    private static ClassNode workflowEmitType(ClassNode innerType) {
+        if( ClassHelper.isDynamicTyped(innerType) )
+            return innerType;
+        if( CHANNEL_TYPE.equals(innerType) || VALUE_TYPE.equals(innerType) )
+            return innerType;
+        return makeType(VALUE_TYPE, innerType);
     }
 
     /**
@@ -650,8 +687,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
      * - When a process is called with a Channel argument, the output is wrapped
      *   in a Channel, otherwise it is wrapped in a Value.
      *
-     * - When a process declares a single output expression, the return type contains
-     *   only that type (e.g. T -> Channel<T>). When a process declares named outputs,
+     * - When a process declares a single output, the return type contains only that
+     *   type (e.g. T -> Channel<T>). When a process declares multiple outputs,
      *   the return type is a Record where each field is wrapped in the appropriate
      *   dataflow type.
      *
@@ -684,10 +721,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var resultType = processOutputType(dataflowType, ((ProcessNodeV2) mn).outputs);
         node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
 
-        var methodVariable = currentWorkflow.getVariableScope().getReferencedClassVariable(mn.getName());
-        if( methodVariable instanceof PropertyNode pn )
-            pn.getType().getField("out").setType(resultType);
-
         return true;
     }
 
@@ -702,8 +735,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( outputs.size() == 1 ) {
             var first = outputs.get(0);
             var output = ((ExpressionStatement) first).getExpression();
-            if( outputTarget(output) == null )
-                return processEmitType(dataflowType, getType(output));
+            return processEmitType(dataflowType, getType(output));
         }
         var cn = new ClassNode(Record.class);
         for( var stmt : outputs ) {
