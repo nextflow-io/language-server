@@ -976,10 +976,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         return true;
     }
 
-    private static boolean isRecordType(ClassNode type) {
-        return RECORD_TYPE.equals(type) || type.redirect() instanceof RecordNode;
-    }
-
     /**
      * Resolve the type of a tuple component expression.
      *
@@ -1181,7 +1177,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     private boolean checkRecordCast(ClassNode targetType, ClassNode sourceType, ASTNode node) {
         if( !(targetType.redirect() instanceof RecordNode) )
             return false;
-        if( !RECORD_TYPE.equals(sourceType) )
+        if( !isRecordType(sourceType) )
             return false;
         for( var target : targetType.getFields() ) {
             if( target.getType().getNodeMetaData(ASTNodeMarker.NULLABLE) != null )

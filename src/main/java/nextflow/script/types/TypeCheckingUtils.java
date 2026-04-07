@@ -25,6 +25,7 @@ import java.util.Map;
 
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
+import nextflow.script.ast.RecordNode;
 import nextflow.script.dsl.Ops;
 import nextflow.script.dsl.Constant;
 import nextflow.script.dsl.Description;
@@ -59,6 +60,9 @@ import static org.codehaus.groovy.ast.GenericsType.GenericsTypeName;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class TypeCheckingUtils {
+
+    private static final ClassNode RECORD_TYPE = ClassHelper.makeCached(Record.class);
+    private static final ClassNode TUPLE_TYPE = ClassHelper.makeCached(Tuple.class);
 
     /**
      * Get the type (i.e. class node) of a variable.
@@ -179,8 +183,6 @@ public class TypeCheckingUtils {
             .findFirst()
             .orElse(null);
     }
-
-    private static final ClassNode TUPLE_TYPE = ClassHelper.makeCached(Tuple.class);
 
     private static List<MethodNode> methodOverloads(MethodCallExpression node) {
         if( node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET) instanceof MethodNode mn )
@@ -873,6 +875,16 @@ public class TypeCheckingUtils {
         if( gts == null || gts.length != 1 )
             return ClassHelper.dynamicType();
         return gts[0].getType();
+    }
+
+    /**
+     * Determine whether a type is a record type, either
+     * as Record or a user-defined record type.
+     *
+     * @param type
+     */
+    public static boolean isRecordType(ClassNode type) {
+        return RECORD_TYPE.equals(type) || type.redirect() instanceof RecordNode;
     }
 
     /**

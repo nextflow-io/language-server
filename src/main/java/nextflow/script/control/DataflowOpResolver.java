@@ -23,7 +23,6 @@ import nextflow.script.types.Bag;
 import nextflow.script.types.Channel;
 import nextflow.script.types.Record;
 import nextflow.script.types.Tuple;
-import nextflow.script.types.TypesEx;
 import nextflow.script.types.Value;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -44,7 +43,6 @@ class DataflowOpResolver {
 
     private static final ClassNode BAG_TYPE = ClassHelper.makeCached(Bag.class);
     private static final ClassNode CHANNEL_TYPE = ClassHelper.makeCached(Channel.class);
-    private static final ClassNode RECORD_TYPE = ClassHelper.makeCached(Record.class);
     private static final ClassNode TUPLE_TYPE = ClassHelper.makeCached(Tuple.class);
     private static final ClassNode VALUE_TYPE = ClassHelper.makeCached(Value.class);
 
@@ -98,7 +96,7 @@ class DataflowOpResolver {
     }
 
     private ClassNode applyCombineNamedArgs(ClassNode lhsType, NamedArgumentListExpression nale) {
-        if( !RECORD_TYPE.equals(lhsType) )
+        if( !isRecordType(lhsType) )
             return ClassHelper.dynamicType();
         var rhsType = new ClassNode(Record.class);
         for( var entry : nale.getMapEntryExpressions() ) {
@@ -169,11 +167,11 @@ class DataflowOpResolver {
      * @param arguments
      */
     private ClassNode applyJoin(ClassNode lhsType, List<Expression> arguments) {
-        if( !RECORD_TYPE.equals(lhsType) )
+        if( !isRecordType(lhsType) )
             return ClassHelper.dynamicType();
         var argType = getType(arguments.get(arguments.size() - 1));
         var rhsType = dataflowElementType(argType);
-        if( !RECORD_TYPE.equals(rhsType) )
+        if( !isRecordType(rhsType) )
             return ClassHelper.dynamicType();
         // TODO: report error if `by` field is not in both records
         var elementType = recordSumType(lhsType, rhsType);

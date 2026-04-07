@@ -897,6 +897,31 @@ class TypeCheckingTest extends Specification {
         type = getType(exp)
         then:
         TypesEx.getName(type) == 'Value<Tuple<String, String>>'
+
+        when:
+        exp = parseExpression(
+            '''\
+            nextflow.preview.types = true
+
+            process hello {
+                input:
+                target: String
+
+                output:
+                record(target: target, message: "Hello, $target!")
+
+                exec:
+                true
+            }
+
+            workflow {
+                hello( 'World' )
+            }
+            '''
+        )
+        type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Value<Record {\n    target: String\n    message: String\n}>'
     }
 
     def 'should resolve record type' () {
