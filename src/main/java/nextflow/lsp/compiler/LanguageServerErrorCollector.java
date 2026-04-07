@@ -36,6 +36,18 @@ public class LanguageServerErrorCollector extends LazyErrorCollector {
     }
 
     /**
+     * Determine whether the error collector has errors.
+     *
+     * The default error collector assumes that errors is initialized
+     * only when errors are added, but this implementation can have an
+     * empty error list since errors can be removed.
+     */
+    @Override
+    public boolean hasErrors() {
+        return errors != null && !errors.isEmpty();
+    }
+
+    /**
      * Remove all errors on or after a given phase and replace them
      * with new errors.
      *
