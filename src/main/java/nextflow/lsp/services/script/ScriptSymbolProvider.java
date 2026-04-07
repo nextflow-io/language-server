@@ -89,8 +89,6 @@ public class ScriptSymbolProvider implements SymbolProvider {
         }
 
         var result = new ArrayList<WorkspaceSymbol>();
-        for( var node : ast.getTypeNodes() )
-            addWorkspaceSymbol(node, query, result);
         for( var node : ast.getDefinitions() )
             addWorkspaceSymbol(node, query, result);
 
