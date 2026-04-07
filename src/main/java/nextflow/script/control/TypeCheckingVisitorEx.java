@@ -536,7 +536,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             return;
 
         var receiverType = getType(node.getObjectExpression());
-        if( !CHANNEL_TYPE.equals(receiverType) )
+        if( !CHANNEL_TYPE.equals(receiverType) && !VALUE_TYPE.equals(receiverType) )
             return;
 
         var method = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
@@ -545,7 +545,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
         var lhsType = elementType(receiverType);
         var arguments = asMethodCallArguments(node);
-        var resultType = new DataflowOpResolver().apply(lhsType, method, arguments);
+        var resultType = new DataflowOpResolver(receiverType).apply(lhsType, method, arguments);
         if( ClassHelper.isDynamicTyped(resultType) )
             return;
 
@@ -970,7 +970,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var rhs = node.getRightExpression();
         var lhsType = getType(lhs);
         var rhsType = getType(rhs);
-        if( !(isRecordType(lhsType) && isRecordType(rhsType)) )
+        if( !TypesEx.isRecordType(lhsType) || !TypesEx.isRecordType(rhsType) )
             return false;
 
         var resultType = recordSumType(lhsType, rhsType);
@@ -1179,7 +1179,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     private boolean checkRecordCast(ClassNode targetType, ClassNode sourceType, ASTNode node) {
         if( !(targetType.redirect() instanceof RecordNode) )
             return false;
-        if( !isRecordType(sourceType) )
+        if( !TypesEx.isRecordType(sourceType) )
             return false;
         for( var target : targetType.getFields() ) {
             if( target.getType().getNodeMetaData(ASTNodeMarker.NULLABLE) != null )

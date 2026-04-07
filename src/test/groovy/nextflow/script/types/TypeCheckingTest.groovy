@@ -822,6 +822,47 @@ class TypeCheckingTest extends Specification {
         )
     }
 
+    def 'should check a process call with record inputs' () {
+        expect:
+        check(
+            '''\
+            nextflow.preview.types = true
+
+            process hello {
+                input:
+                record(id: String, fastq: Path)
+
+                exec:
+                println '...'
+            }
+
+            workflow {
+                hello( record(id: '1') )
+            }
+            ''',
+            'Argument with type Record {\n    id: String\n} is not compatible with process input of type Record {\n    id: String\n    fastq: Path\n}'
+        )
+        and:
+        check(
+            '''\
+            nextflow.preview.types = true
+
+            process hello {
+                input:
+                record(id: String, fastq: Path)
+
+                exec:
+                println '...'
+            }
+
+            workflow {
+                hello( record(id: '1', fastq: file('1.fastq')) )
+            }
+            ''',
+            null
+        )
+    }
+
     def 'should recognize process output type' () {
         when:
         def exp = parseExpression(
@@ -1081,6 +1122,32 @@ class TypeCheckingTest extends Specification {
         type = getType(exp)
         then:
         TypesEx.getName(type) == 'Channel<Record {\n    id: Integer\n    fastq: Path\n    single_end: Boolean\n    index: Path\n}>'
+    }
+
+    def 'should resolve a `combine` operation on a dataflow value' () {
+        when:
+        def exp = parseExpression(
+            '''\
+            left  = channel.value( 42 )
+            right = channel.value( 'hello' )
+            left.combine(right)
+            '''
+        )
+        def type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Value<Tuple<Integer, String>>'
+
+        when:
+        exp = parseExpression(
+            '''\
+            sample = channel.value( record(id: 1, fastq: file('1.fq')) )
+            index = channel.value( file('index.fa') )
+            sample.combine( single_end: true, index: index )
+            '''
+        )
+        type = getType(exp)
+        then:
+        TypesEx.getName(type) == 'Value<Record {\n    id: Integer\n    fastq: Path\n    single_end: Boolean\n    index: Path\n}>'
     }
 
     def 'should resolve a `groupBy` operation' () {

@@ -23,6 +23,7 @@ import nextflow.script.types.Bag;
 import nextflow.script.types.Channel;
 import nextflow.script.types.Record;
 import nextflow.script.types.Tuple;
+import nextflow.script.types.TypesEx;
 import nextflow.script.types.Value;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -45,6 +46,12 @@ class DataflowOpResolver {
     private static final ClassNode CHANNEL_TYPE = ClassHelper.makeCached(Channel.class);
     private static final ClassNode TUPLE_TYPE = ClassHelper.makeCached(Tuple.class);
     private static final ClassNode VALUE_TYPE = ClassHelper.makeCached(Value.class);
+
+    private ClassNode receiverType;
+
+    public DataflowOpResolver(ClassNode receiverType) {
+        this.receiverType = receiverType;
+    }
 
     /**
      * Resolve the return type of dataflow operators where applicable,
@@ -96,7 +103,7 @@ class DataflowOpResolver {
     }
 
     private ClassNode applyCombineNamedArgs(ClassNode lhsType, NamedArgumentListExpression nale) {
-        if( !isRecordType(lhsType) )
+        if( !TypesEx.isRecordType(lhsType) )
             return ClassHelper.dynamicType();
         var rhsType = new ClassNode(Record.class);
         for( var entry : nale.getMapEntryExpressions() ) {
@@ -108,7 +115,7 @@ class DataflowOpResolver {
             rhsType.addField(fn);
         }
         var elementType = recordSumType(lhsType, rhsType);
-        return makeType(CHANNEL_TYPE, elementType);
+        return makeType(receiverType, elementType);
     }
 
     private static ClassNode dataflowValueType(ClassNode type) {
@@ -119,7 +126,7 @@ class DataflowOpResolver {
         return type;
     }
 
-    private boolean combineTupleOrValue(List<ClassNode> componentTypes, ClassNode type) {
+    private static boolean combineTupleOrValue(List<ClassNode> componentTypes, ClassNode type) {
         if( TUPLE_TYPE.equals(type) ) {
             var gts = type.getGenericsTypes();
             if( gts == null && gts.length == 0 )
@@ -131,6 +138,12 @@ class DataflowOpResolver {
             componentTypes.add(type);
         }
         return true;
+    }
+
+    private ClassNode channelTupleType(GenericsType[] gts) {
+        var tupleType = TUPLE_TYPE.getPlainNodeReference();
+        tupleType.setGenericsTypes(gts);
+        return makeType(receiverType, tupleType);
     }
 
     /**
@@ -167,11 +180,11 @@ class DataflowOpResolver {
      * @param arguments
      */
     private ClassNode applyJoin(ClassNode lhsType, List<Expression> arguments) {
-        if( !isRecordType(lhsType) )
+        if( !TypesEx.isRecordType(lhsType) )
             return ClassHelper.dynamicType();
         var argType = getType(arguments.get(arguments.size() - 1));
         var rhsType = dataflowElementType(argType);
-        if( !isRecordType(rhsType) )
+        if( !TypesEx.isRecordType(rhsType) )
             return ClassHelper.dynamicType();
         // TODO: report error if `by` field is not in both records
         var elementType = recordSumType(lhsType, rhsType);
@@ -182,12 +195,6 @@ class DataflowOpResolver {
         if( CHANNEL_TYPE.equals(type) || VALUE_TYPE.equals(type) )
             return elementType(type);
         return ClassHelper.dynamicType();
-    }
-
-    private static ClassNode channelTupleType(GenericsType[] gts) {
-        var tupleType = TUPLE_TYPE.getPlainNodeReference();
-        tupleType.setGenericsTypes(gts);
-        return makeType(CHANNEL_TYPE, tupleType);
     }
 
 }

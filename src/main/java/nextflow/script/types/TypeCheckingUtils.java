@@ -879,16 +879,6 @@ public class TypeCheckingUtils {
     }
 
     /**
-     * Determine whether a type is a record type, either
-     * as Record or a user-defined record type.
-     *
-     * @param type
-     */
-    public static boolean isRecordType(ClassNode type) {
-        return RECORD_TYPE.equals(type) || type.redirect() instanceof RecordNode;
-    }
-
-    /**
      * Return a record type for the sum of two records.
      *
      * @param lhsType

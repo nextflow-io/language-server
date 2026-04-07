@@ -51,6 +51,9 @@ import org.codehaus.groovy.ast.tools.GenericsUtils;
  */
 public class TypesEx {
 
+    private static final ClassNode PARAMS_TYPE = ClassHelper.makeCached(ParamsMap.class);
+    private static final ClassNode RECORD_TYPE = ClassHelper.makeCached(Record.class);
+
     /**
      * Determine whether a method has a non-void return type.
      *
@@ -75,19 +78,14 @@ public class TypesEx {
     public static boolean isAssignableFrom(ClassNode target, ClassNode source, boolean checkGenerics) {
         if( ClassHelper.isObjectType(target) || ClassHelper.isDynamicTyped(source) )
             return true;
+        if( isRecordType(target) && (PARAMS_TYPE.equals(source) || isRecordType(source)) )
+            return isAssignableFromRecord(target, source);
         if( target.equals(source) )
             return true;
-        if( RECORD_TYPE.equals(target) && source.redirect() instanceof RecordNode )
-            return true;
-        if( target.redirect() instanceof RecordNode && (PARAMS_TYPE.equals(source) || RECORD_TYPE.equals(source)) )
-            return isAssignableFromRecord(target, source);
         return target.isResolved() && source.isResolved()
             && isAssignableFrom(target.getTypeClass(), source.getTypeClass())
             && (!checkGenerics || isAssignableFrom(target.getGenericsTypes(), source.getGenericsTypes()));
     }
-
-    private static final ClassNode PARAMS_TYPE = ClassHelper.makeCached(ParamsMap.class);
-    private static final ClassNode RECORD_TYPE = ClassHelper.makeCached(Record.class);
 
     private static boolean isAssignableFromRecord(ClassNode target, ClassNode source) {
         for( var targetFn : target.getFields() ) {
@@ -190,6 +188,16 @@ public class TypesEx {
      */
     public static boolean isNamespace(ClassNode cn) {
         return cn.implementsInterface(ClassHelper.makeCached(Namespace.class));
+    }
+
+    /**
+     * Determine whether a type is a record type, either
+     * as Record or a user-defined record type.
+     *
+     * @param type
+     */
+    public static boolean isRecordType(ClassNode type) {
+        return RECORD_TYPE.equals(type) || type.redirect() instanceof RecordNode;
     }
 
     /**
