@@ -226,6 +226,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     public void visitProcessV2(ProcessNodeV2 node) {
         visitProcessDirectives(node.directives);
         visit(node.stagers);
+        if( !(node.when instanceof EmptyExpression) )
+            addError("Process `when` section is not supported with static typing -- use conditinal logic in the calling workflow instead", node.when);
         visit(node.when);
         visit(node.exec);
         visit(node.stub);
@@ -539,7 +541,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
         var method = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
         if( findAnnotation(method, Deprecated.class).isPresent() )
-            addSoftError("Operator `" + method.getName() + "` is discouraged from use with static typing", node);
+            addSoftError("Operator `" + method.getName() + "` is discouraged from use with static typing", node.getMethod());
 
         var lhsType = elementType(receiverType);
         var arguments = asMethodCallArguments(node);
@@ -1199,6 +1201,12 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     public void visitPropertyExpression(PropertyExpression node) {
         super.visitPropertyExpression(node);
 
+        var mn = asMethodOutput(node);
+        if( mn instanceof ProcessNode || mn instanceof WorkflowNode ) {
+            addError("Using the `.out` property to access process/workflow outputs is not supported with static typing -- assign the output to a variable instead", node);
+            return;
+        }
+
         var receiver = node.getObjectExpression();
         var receiverType = getType(receiver);
         if( ClassHelper.isDynamicTyped(receiverType) )
@@ -1217,15 +1225,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             return;
         }
 
-        var mn = asMethodNamedOutput(node);
         var property = node.getPropertyAsString();
-        if( mn instanceof ProcessNode pn ) {
-            addError("Unrecognized output `" + property + "` for process `" + pn.getName() + "`", node);
-        }
-        else if( mn instanceof WorkflowNode wn ) {
-            addError("Unrecognized output `" + property + "` for workflow `" + wn.getName() + "`", node);
-        }
-        else if( TypesEx.isEqual(receiverType, PARAMS_TYPE) ) {
+        if( TypesEx.isEqual(receiverType, PARAMS_TYPE) ) {
             if( hasParamsBlock )
                 addError("Unrecognized parameter `" + property + "`", node);
         }
@@ -1272,12 +1273,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         else {
             addError(String.format("Unrecognized property `%s` for element type %s", property, TypesEx.getName(elementType)), node);
         }
-    }
-
-    private static MethodNode asMethodNamedOutput(PropertyExpression node) {
-        if( node.getObjectExpression() instanceof PropertyExpression pe )
-            return asMethodOutput(pe);
-        return null;
     }
 
     public void addWarning(String message, String tokenText, ASTNode node) {

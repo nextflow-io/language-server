@@ -924,6 +924,29 @@ class TypeCheckingTest extends Specification {
         TypesEx.getName(type) == 'Value<Record {\n    target: String\n    message: String\n}>'
     }
 
+    def 'should report error for process .out property' () {
+        expect:
+        check(
+            '''
+            nextflow.preview.types = true
+
+            process hello {
+                output:
+                stdout()
+
+                script:
+                ''
+            }
+
+            workflow {
+                hello()
+                hello.out
+            }
+            ''',
+            'Using the `.out` property to access process/workflow outputs is not supported with static typing -- assign the output to a variable instead'
+        )
+    }
+
     def 'should resolve record type' () {
         when:
         def exp = parseExpression(

@@ -472,6 +472,7 @@ public class TypeCheckingUtils {
             ClassNode.EMPTY_ARRAY,
             method.getCode() );
         result.setDeclaringClass(receiverType != null ? receiverType : method.getDeclaringClass());
+        result.addAnnotations(method.getAnnotations());
         return result;
     }
 
