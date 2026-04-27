@@ -24,7 +24,7 @@ import nextflow.lsp.util.Logger;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.types.Types;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Variable;

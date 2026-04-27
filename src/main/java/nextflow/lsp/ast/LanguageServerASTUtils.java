@@ -23,7 +23,7 @@ import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.IncludeEntryNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.types.Types;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;

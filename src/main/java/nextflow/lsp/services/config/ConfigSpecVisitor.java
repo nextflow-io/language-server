@@ -15,7 +15,10 @@
  */
 package nextflow.lsp.services.config;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +43,7 @@ import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
@@ -168,7 +172,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         }
         // validate type
         var expectedTypes = option.types().stream()
-            .map(t -> ClassHelper.makeCached(t).getPlainNodeReference())
+            .map(t -> fromType(t))
             .toList();
         var actualType = inferredType(node.value, names);
         if( !isAnyAssignableFrom(expectedTypes, actualType) ) {
@@ -180,6 +184,23 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
                 : "Config option '" + fqName + "' cannot be assigned to value with type " + TypesEx.getName(actualType) + " -- valid types are: " + validTypes;
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
         }
+    }
+
+    private ClassNode fromType(Type type) {
+        if( type instanceof Class c ) {
+            return ClassHelper.makeCached(c).getPlainNodeReference();
+        }
+
+        if( type instanceof ParameterizedType pt ) {
+            var cn = fromType(pt.getRawType());
+            var gts = Arrays.stream(pt.getActualTypeArguments())
+                .map(t -> new GenericsType(fromType(t)))
+                .toArray(GenericsType[]::new);
+            cn.setGenericsTypes(gts);
+            return cn;
+        }
+
+        return ClassHelper.dynamicType();
     }
 
     private ClassNode inferredType(Expression node, List<String> scopes) {

@@ -34,7 +34,7 @@ import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
-import nextflow.script.types.Types;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;

@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.services.config;
 
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,7 +29,7 @@ import nextflow.config.spec.SpecNode;
 import nextflow.lsp.ast.CompletionHelper;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.Logger;
-import nextflow.script.types.Types;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.VariableScope;
@@ -227,7 +228,7 @@ public class ConfigCompletionProvider implements CompletionProvider {
         return item;
     }
 
-    private static CompletionItem configOption(String name, String description, Class type) {
+    private static CompletionItem configOption(String name, String description, Type type) {
         var documentation = StringGroovyMethods.stripIndent(description, true).trim();
         var item = new CompletionItem(name);
         item.setKind(CompletionItemKind.Property);

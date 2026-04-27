@@ -16,6 +16,8 @@
 package nextflow.lsp.spec;
 
 import java.io.IOException;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -111,7 +113,7 @@ public class ConfigSpecFactory {
 
     private static SpecNode.Option fromOption(Map<String,?> spec) {
         var description = (String) spec.get("description");
-        var types = new ArrayList<Class>();
+        var types = new ArrayList<Type>();
         types.add(fromType(spec.get("type")));
         if( spec.containsKey("additionalTypes") ) {
             var additionalTypes = (List) spec.get("additionalTypes");
@@ -150,16 +152,43 @@ public class ConfigSpecFactory {
         Map.entry("String", String.class)
     );
 
-    private static Class fromType(Object type) {
+    private static Type fromType(Object type) {
         if( type instanceof String s ) {
-            return STANDARD_TYPES.getOrDefault(s, Object.class);
+            return rawType(s);
         }
         if( type instanceof Map m ) {
             var name = (String) m.get("name");
-            // TODO: type arguments
-            return STANDARD_TYPES.getOrDefault(name, Object.class);
+            var argumentNames = (List) m.get("typeArguments");
+            var rawType = rawType(name);
+            var typeArguments = argumentNames.stream()
+                .map(el -> (Type) rawType((String) el))
+                .toArray(Type[]::new);
+            return new ParameterizedTypeImpl(rawType, (Type[]) typeArguments);
         }
         throw new IllegalStateException();
+    }
+
+    private static Class rawType(String name) {
+        return STANDARD_TYPES.getOrDefault(name, Object.class);
+    }
+
+    private static class ParameterizedTypeImpl implements ParameterizedType {
+        private Type rawType;
+        private Type[] typeArguments;
+
+        ParameterizedTypeImpl(Type rawType, Type[] typeArguments) {
+            this.rawType = rawType;
+            this.typeArguments = typeArguments;
+        }
+
+        @Override
+        public Type getOwnerType() { return null; }
+
+        @Override
+        public Type getRawType() { return rawType; }
+
+        @Override
+        public Type[] getActualTypeArguments() { return typeArguments; }
     }
 
 }

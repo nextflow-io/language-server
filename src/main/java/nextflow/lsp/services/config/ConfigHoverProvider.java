@@ -27,7 +27,7 @@ import nextflow.lsp.ast.ASTNodeStringUtils;
 import nextflow.lsp.ast.LanguageServerASTUtils;
 import nextflow.lsp.services.HoverProvider;
 import nextflow.lsp.util.Logger;
-import nextflow.script.types.Types;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;

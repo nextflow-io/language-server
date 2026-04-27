@@ -15,6 +15,8 @@
  */
 package nextflow.script.types;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.file.Path;
@@ -291,7 +293,12 @@ public class TypesEx {
 
         if( !placeholder && type.getGenericsTypes() != null ) {
             builder.append('<');
-            genericsTypeNames(type.getGenericsTypes(), builder);
+            var gts = type.getGenericsTypes();
+            for( int i = 0; i < gts.length; i++ ) {
+                if( i > 0 )
+                    builder.append(", ");
+                builder.append(getName(gts[i].getType()));
+            }
             builder.append('>');
         }
 
@@ -301,16 +308,28 @@ public class TypesEx {
         return builder.toString();
     }
 
-    private static void genericsTypeNames(GenericsType[] genericsTypes, StringBuilder builder) {
-        for( int i = 0; i < genericsTypes.length; i++ ) {
-            if( i > 0 )
-                builder.append(", ");
-            builder.append(getName(genericsTypes[i].getType()));
-        }
+    public static String getName(Type type) {
+        return
+            type instanceof Class c ? getName(c) :
+            type instanceof ParameterizedType pt ? getName(pt) :
+            getName(type.getTypeName());
     }
 
     public static String getName(Class type) {
         return getName(normalize(type).getSimpleName());
+    }
+
+    private static String getName(ParameterizedType pt) {
+        var sb = new StringBuilder();
+        sb.append(getName(pt.getRawType()));
+        sb.append('<');
+        for( int i = 0; i < pt.getActualTypeArguments().length; i++ ) {
+            if( i > 0 )
+                sb.append(", ");
+            sb.append(getName(pt.getActualTypeArguments()[i]));
+        }
+        sb.append('>');
+        return sb.toString();
     }
 
     public static String getName(String name) {
