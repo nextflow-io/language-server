@@ -152,7 +152,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
                 var firstProcess = sn.getProcesses().get(0);
                 var start = LanguageServerUtils.astNodeToRange(firstProcess).getStart();
                 var range = new Range(start, start);
-                var newText = "nextflow.preview.types = true\n\n";
+                var newText = "nextflow.enable.types = true\n\n";
                 addTextEdit(textEdits, uri, range, newText);
             }
         }
@@ -189,7 +189,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             var firstProcess = sn.getProcesses().get(0);
             var start = LanguageServerUtils.astNodeToRange(firstProcess).getStart();
             var range = new Range(start, start);
-            var newText = "nextflow.preview.types = true\n\n";
+            var newText = "nextflow.enable.types = true\n\n";
             addTextEdit(textEdits, uri, range, newText);
         }
             

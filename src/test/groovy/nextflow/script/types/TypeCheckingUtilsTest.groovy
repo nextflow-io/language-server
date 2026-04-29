@@ -124,7 +124,7 @@ class TypeCheckingUtilsTest extends Specification {
         when:
         def exp = parseExpression(
             '''
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -154,7 +154,7 @@ class TypeCheckingUtilsTest extends Specification {
         when:
         def exp = parseExpression(
             '''
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             workflow hello {
                 take:

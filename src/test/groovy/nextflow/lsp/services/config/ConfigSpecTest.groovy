@@ -20,7 +20,7 @@ import nextflow.config.control.ConfigParser
 import nextflow.config.control.ConfigResolveVisitor
 import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.lsp.spec.PluginSpecCache
-import nextflow.script.types.Types
+import nextflow.script.dsl.Types
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.codehaus.groovy.control.messages.WarningMessage
@@ -241,7 +241,7 @@ class ConfigSpecTest extends Specification {
         warnings.size() == 1
         warnings[0].getContext().getStartLine() == 1
         warnings[0].getContext().getStartColumn() == 1
-        warnings[0].getMessage() == "Config option 'trace.fields' cannot be assigned to value with type Boolean -- valid types are: List, String"
+        warnings[0].getMessage() == "Config option 'trace.fields' cannot be assigned to value with type Boolean -- valid types are: List<String>, String"
     }
 
     def 'should check return type for dynamic config settings' () {

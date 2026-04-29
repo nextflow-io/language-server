@@ -16,6 +16,7 @@
 
 package nextflow.script.types
 
+import nextflow.script.dsl.Types
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.GenericsType

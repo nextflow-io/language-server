@@ -21,6 +21,7 @@ import nextflow.script.ast.FeatureFlagNode
 import nextflow.script.control.ScriptParser
 import nextflow.script.control.ScriptResolveVisitor
 import nextflow.script.control.TypeCheckingVisitorEx
+import nextflow.script.dsl.Types
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.expr.ConstantExpression
@@ -53,7 +54,7 @@ class TypeCheckingTest extends Specification {
 
     SourceUnit parse(String contents) {
         def source = scriptParser.parse('main.nf', contents.stripIndent())
-        source.getAST()?.addFeatureFlag(new FeatureFlagNode("nextflow.preview.types", new ConstantExpression(true)))
+        source.getAST()?.addFeatureFlag(new FeatureFlagNode("nextflow.enable.types", new ConstantExpression(true)))
         new ScriptResolveVisitor(source, scriptParser.compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, Collections.emptyList()).visit()
         new TypeCheckingVisitorEx(source).visit()
         return source
@@ -145,7 +146,7 @@ class TypeCheckingTest extends Specification {
         when:
         def errors = getErrors(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             workflow hello {
                 emit:
@@ -162,7 +163,7 @@ class TypeCheckingTest extends Specification {
         when:
         errors = getErrors(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             workflow hello {
                 emit:
@@ -178,7 +179,7 @@ class TypeCheckingTest extends Specification {
         when:
         def errors = getErrors(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             workflow {
                 main:
@@ -218,7 +219,7 @@ class TypeCheckingTest extends Specification {
         when:
         errors = getErrors(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             workflow {
                 main:
@@ -651,7 +652,7 @@ class TypeCheckingTest extends Specification {
         expect:
         check(
             '''
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             workflow hello {
                 take:
@@ -673,7 +674,7 @@ class TypeCheckingTest extends Specification {
         when:
         def exp = parseExpression(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             workflow hello {
                 emit:
@@ -692,7 +693,7 @@ class TypeCheckingTest extends Specification {
         when:
         exp = parseExpression(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             workflow hello {
                 emit:
@@ -711,7 +712,7 @@ class TypeCheckingTest extends Specification {
         when:
         exp = parseExpression(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             workflow hello {
                 emit:
@@ -733,7 +734,7 @@ class TypeCheckingTest extends Specification {
         expect:
         check(
             '''
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -756,7 +757,7 @@ class TypeCheckingTest extends Specification {
         and:
         check(
             '''
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -775,7 +776,7 @@ class TypeCheckingTest extends Specification {
         and:
         check(
             '''
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -798,7 +799,7 @@ class TypeCheckingTest extends Specification {
         and:
         check(
             '''
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -826,7 +827,7 @@ class TypeCheckingTest extends Specification {
         expect:
         check(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -845,7 +846,7 @@ class TypeCheckingTest extends Specification {
         and:
         check(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -867,7 +868,7 @@ class TypeCheckingTest extends Specification {
         when:
         def exp = parseExpression(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -892,7 +893,7 @@ class TypeCheckingTest extends Specification {
         when:
         exp = parseExpression(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -917,7 +918,7 @@ class TypeCheckingTest extends Specification {
         when:
         exp = parseExpression(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -942,7 +943,7 @@ class TypeCheckingTest extends Specification {
         when:
         exp = parseExpression(
             '''\
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 input:
@@ -969,7 +970,7 @@ class TypeCheckingTest extends Specification {
         expect:
         check(
             '''
-            nextflow.preview.types = true
+            nextflow.enable.types = true
 
             process hello {
                 output:
