@@ -489,7 +489,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private void initializeWorkspaces() {
         var progress = new ProgressNotification(client, "initialize");
         progress.create();
-        progress.begin("Initializing workspace...");
+        progress.begin("Initializing", "Initializing workspace...");
 
         var count = 0;
         var total = workspaceRoots.keySet().size() - 1;
