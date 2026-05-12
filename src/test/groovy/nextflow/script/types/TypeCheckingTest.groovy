@@ -1012,7 +1012,24 @@ class TypeCheckingTest extends Specification {
         then:
         TypesEx.getName(type) == 'String'
     }
-    
+
+    def 'should report error for record type constructor' () {
+        expect:
+        check(
+            '''\
+            record Sample {
+                id: String
+                reads: List<Path>
+            }
+
+            workflow {
+                new Sample()
+            }
+            ''',
+            'Record type Sample cannot be used as a constructor -- use `record()` instead'
+        )
+    }
+
     def 'should resolve record sum' () {
         when:
         def exp = parseExpression(

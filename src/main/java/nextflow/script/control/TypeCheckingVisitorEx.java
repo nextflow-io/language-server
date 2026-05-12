@@ -57,6 +57,7 @@ import org.codehaus.groovy.ast.expr.CastExpression;
 import org.codehaus.groovy.ast.expr.ClassExpression;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
+import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
 import org.codehaus.groovy.ast.expr.DeclarationExpression;
 import org.codehaus.groovy.ast.expr.ElvisOperatorExpression;
 import org.codehaus.groovy.ast.expr.EmptyExpression;
@@ -839,6 +840,14 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, dummyMethod);
         node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, returnType);
         return true;
+    }
+
+    @Override
+    public void visitConstructorCallExpression(ConstructorCallExpression node) {
+        var type = node.getType();
+        if( TypesEx.isRecordType(type) )
+            addError("Record type " + TypesEx.getName(type) + " cannot be used as a constructor -- use `record()` instead", node);
+        super.visitConstructorCallExpression(node);
     }
 
     @Override
