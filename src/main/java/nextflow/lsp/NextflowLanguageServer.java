@@ -137,7 +137,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             for( var workspaceFolder : workspaceFolders ) {
                 var name = workspaceFolder.getName();
                 var uri = workspaceFolder.getUri();
-                addWorkspaceFolder(name, uri);
+                addWorkspaceFolder(normaliseWorkspaceFolderName(name, uri), uri);
             }
         }
 
@@ -518,6 +518,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         for( var workspaceFolder : event.getRemoved() ) {
             var name = workspaceFolder.getName();
             log.debug("workspace/didChangeWorkspaceFolders remove " + name);
+            name = normaliseWorkspaceFolderName(name, workspaceFolder.getUri());
             workspaceRoots.remove(name);
             configServices.remove(name).clearDiagnostics();
             scriptServices.remove(name).clearDiagnostics();
@@ -526,6 +527,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var name = workspaceFolder.getName();
             var uri = workspaceFolder.getUri();
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
+            name = normaliseWorkspaceFolderName(name, uri);
             addWorkspaceFolder(name, uri);
             configServices.get(name).initialize(configuration);
             scriptServices.get(name).initialize(configuration, configServices.get(name).getPluginSpecCache());
@@ -627,6 +629,14 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var scriptService = new ScriptService(uri);
         scriptService.connect(client);
         scriptServices.put(name, scriptService);
+    }
+
+    private static String normaliseWorkspaceFolderName(String name, String uri) {
+        if( name == null || !name.isEmpty() || uri == null )
+            return name;
+
+        var path = Path.of(URI.create(uri)).getFileName();
+        return path != null ? path.toString() : name;
     }
 
     private String relativePath(String uri) {
