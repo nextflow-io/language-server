@@ -116,6 +116,10 @@ class TypeCheckingTest extends Specification {
             params {
                 input: String = 3.14
             }
+
+            workflow {
+                params
+            }
             '''
         )
         then:
