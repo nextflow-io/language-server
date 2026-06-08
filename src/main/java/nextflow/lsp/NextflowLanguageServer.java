@@ -88,6 +88,7 @@ import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersOptions;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceSymbol;
@@ -135,9 +136,9 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var workspaceFolders = params.getWorkspaceFolders();
         if( workspaceFolders != null && !workspaceFolders.isEmpty() ) {
             for( var workspaceFolder : workspaceFolders ) {
-                var name = workspaceFolder.getName();
+                var name = workspaceFolderName(workspaceFolder);
                 var uri = workspaceFolder.getUri();
-                addWorkspaceFolder(normaliseWorkspaceFolderName(name, uri), uri);
+                addWorkspaceFolder(name, uri);
             }
         }
 
@@ -516,18 +517,16 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     public void didChangeWorkspaceFolders(DidChangeWorkspaceFoldersParams params) {
         var event = params.getEvent();
         for( var workspaceFolder : event.getRemoved() ) {
-            var name = workspaceFolder.getName();
+            var name = workspaceFolderName(workspaceFolder);
             log.debug("workspace/didChangeWorkspaceFolders remove " + name);
-            name = normaliseWorkspaceFolderName(name, workspaceFolder.getUri());
             workspaceRoots.remove(name);
             configServices.remove(name).clearDiagnostics();
             scriptServices.remove(name).clearDiagnostics();
         }
         for( var workspaceFolder : event.getAdded() ) {
-            var name = workspaceFolder.getName();
+            var name = workspaceFolderName(workspaceFolder);
             var uri = workspaceFolder.getUri();
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
-            name = normaliseWorkspaceFolderName(name, uri);
             addWorkspaceFolder(name, uri);
             configServices.get(name).initialize(configuration);
             scriptServices.get(name).initialize(configuration, configServices.get(name).getPluginSpecCache());
@@ -631,7 +630,9 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         scriptServices.put(name, scriptService);
     }
 
-    private static String normaliseWorkspaceFolderName(String name, String uri) {
+    private static String workspaceFolderName(WorkspaceFolder workspaceFolder) {
+        var name = workspaceFolder.getName();
+        var uri = workspaceFolder.getUri();
         if( name == null || !name.isEmpty() || uri == null )
             return name;
 
