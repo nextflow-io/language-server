@@ -25,6 +25,8 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import nextflow.lsp.compiler.LanguageServerCompiler;
@@ -86,8 +88,9 @@ public abstract class ASTNodeCache {
      *
      * @param uris
      * @param fileCache
+     * @param progress optional callback to report progress as (current, total)
      */
-    public Set<URI> update(Set<URI> uris, FileCache fileCache) {
+    public Set<URI> update(Set<URI> uris, FileCache fileCache, BiConsumer<Integer, Integer> progress) {
         // invalidate cache for each source file
         for( var uri : uris ) {
             var nodes = nodesByURI.remove(uri);
@@ -101,12 +104,17 @@ public abstract class ASTNodeCache {
         }
 
         // parse source files
+        var counter = new AtomicInteger(0);
+        var total = uris.size();
         var sources = uris.parallelStream()
             .map(uri -> compiler.createSourceUnit(uri, fileCache))
             .filter(sourceUnit -> sourceUnit != null)
             .map(sourceUnit -> {
                 compiler.addSource(sourceUnit);
                 compiler.compile(sourceUnit);
+                if( progress != null ) {
+                    progress.accept(counter.incrementAndGet(), total);
+                }
                 return sourceUnit;
             })
             .sequential()
