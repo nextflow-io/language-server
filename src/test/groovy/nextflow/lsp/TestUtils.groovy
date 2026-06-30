@@ -43,6 +43,36 @@ class TestUtils {
     }
 
     /**
+     * Get the URI of the test workspace root.
+     */
+    static String workspaceRootUri() {
+        return workspaceRoot.toUri().toString()
+    }
+
+    /**
+     * Get a recording language service for testing the update mechanics of
+     * the base LanguageService. The service is connected and initialized but
+     * NOT scanned, with no files open.
+     *
+     * Recognized options:
+     *   rootUri - the workspace root URI (defaults to the test workspace;
+     *             pass null explicitly to exercise the no-workspace path)
+     *   client  - the language client (defaults to a fresh TestLanguageClient)
+     *   config  - the configuration (defaults to LanguageServerConfiguration.defaults())
+     *
+     * @param opts
+     */
+    static RecordingLanguageService recordingService(Map opts = [:]) {
+        def rootUri = opts.containsKey('rootUri') ? opts.rootUri : workspaceRootUri()
+        def client = opts.client ?: new TestLanguageClient()
+        def configuration = opts.config ?: LanguageServerConfiguration.defaults()
+        def service = new RecordingLanguageService(rootUri)
+        service.connect(client)
+        service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()))
+        return service
+    }
+
+    /**
      * Get a language service instance for Nextflow config files.
      */
     static ConfigService getConfigService() {
