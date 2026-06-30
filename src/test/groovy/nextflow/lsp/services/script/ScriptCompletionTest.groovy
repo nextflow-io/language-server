@@ -97,4 +97,47 @@ class ScriptCompletionTest extends Specification {
         completions[2].getDetail() == "warn(message: String)"
     }
 
+    def 'should complete the name of a process in a workflow body' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+
+        when:
+        open(service, uri, '''\
+            process ALIGN {
+                script:
+                """
+                echo align
+                """
+            }
+
+            workflow {
+                ALI
+            }
+            ''')
+        def completions = getCompletions(service, uri, new Position(8, 7))
+        then:
+        completions.find { it.getLabel() == "ALIGN" }?.getKind() == CompletionItemKind.Function
+    }
+
+    def 'should complete a process directive in a process body' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+
+        when:
+        open(service, uri, '''\
+            process FOO {
+                cp
+                script:
+                """
+                echo foo
+                """
+            }
+            ''')
+        def completions = getCompletions(service, uri, new Position(1, 6))
+        then:
+        completions.find { it.getLabel() == "cpus" } != null
+    }
+
 }

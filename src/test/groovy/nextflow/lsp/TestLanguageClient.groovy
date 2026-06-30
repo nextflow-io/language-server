@@ -17,7 +17,9 @@
 package nextflow.lsp
 
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 
+import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
 import org.eclipse.lsp4j.PublishDiagnosticsParams
@@ -29,6 +31,8 @@ import org.eclipse.lsp4j.services.LanguageClient
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 class TestLanguageClient implements LanguageClient {
+
+    private final Map<String,List<Diagnostic>> diagnostics = new ConcurrentHashMap<>()
 
     @Override
     public void telemetryEvent(Object object) {
@@ -44,11 +48,35 @@ class TestLanguageClient implements LanguageClient {
     }
 
     @Override
-    public void publishDiagnostics(PublishDiagnosticsParams diagnostics) {
+    public void publishDiagnostics(PublishDiagnosticsParams params) {
+        diagnostics.put(params.getUri(), params.getDiagnostics())
     }
 
     @Override
     public void logMessage(MessageParams message) {
         System.err.println(message.getMessage())
+    }
+
+    /**
+     * Get the most recently published diagnostics for a given file.
+     *
+     * @param uri
+     */
+    List<Diagnostic> getDiagnostics(String uri) {
+        return diagnostics.getOrDefault(uri, Collections.emptyList())
+    }
+
+    /**
+     * Get the most recently published diagnostics for all files.
+     */
+    Map<String,List<Diagnostic>> getAllDiagnostics() {
+        return diagnostics
+    }
+
+    /**
+     * Forget all captured diagnostics.
+     */
+    void resetDiagnostics() {
+        diagnostics.clear()
     }
 }

@@ -46,9 +46,19 @@ class TestUtils {
      * Get a language service instance for Nextflow config files.
      */
     static ConfigService getConfigService() {
+        return getConfigService(new TestLanguageClient())
+    }
+
+    /**
+     * Get a language service instance for Nextflow config files, connected to
+     * the given client so that published diagnostics can be inspected.
+     *
+     * @param client
+     */
+    static ConfigService getConfigService(TestLanguageClient client) {
         def service = new ConfigService(workspaceRoot.toUri().toString())
         def configuration = LanguageServerConfiguration.defaults()
-        service.connect(new TestLanguageClient())
+        service.connect(client)
         service.initialize(configuration)
         // skip workspace scan
         open(service, getUri('nextflow.config'), '')
@@ -60,10 +70,20 @@ class TestUtils {
      * Get a language service instance for Nextflow scripts.
      */
     static ScriptService getScriptService() {
+        return getScriptService(new TestLanguageClient())
+    }
+
+    /**
+     * Get a language service instance for Nextflow scripts, connected to the
+     * given client so that published diagnostics can be inspected.
+     *
+     * @param client
+     */
+    static ScriptService getScriptService(TestLanguageClient client) {
         def service = new ScriptService(workspaceRoot.toUri().toString())
         def configuration = LanguageServerConfiguration.defaults()
         def pluginSpecCache = new PluginSpecCache(configuration.pluginRegistryUrl())
-        service.connect(new TestLanguageClient())
+        service.connect(client)
         service.initialize(configuration, pluginSpecCache)
         // skip workspace scan
         open(service, getUri('main.nf'), '')
