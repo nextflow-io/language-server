@@ -157,11 +157,21 @@ public class ASTNodeStringUtils {
             var type = getType(target);
             if( fmt.hasType(type) ) {
                 fmt.append(": ");
-                fmt.append(TypesEx.getName(type));
+                typedOutputType(type, fmt);
             }
         }
         else {
-            fmt.append(TypesEx.getName(getType(output)));
+            typedOutputType(getType(output), fmt);
+        }
+    }
+
+    private static void typedOutputType(ClassNode type, Formatter fmt) {
+        if( TypesEx.isRecordType(type) ) {
+            fmt.append(type.getNameWithoutPackage());
+            recordBody(type, fmt);
+        }
+        else {
+            fmt.append(TypesEx.getName(type));
         }
     }
 
@@ -214,7 +224,7 @@ public class ASTNodeStringUtils {
                 fmt.append(": ");
                 fmt.visitTypeAnnotation(input.getType());
                 if( input.getType().redirect() instanceof RecordNode )
-                    namedRecordBody(input.getType(), fmt);
+                    recordBody(input.getType(), fmt);
             }
         }
     }
@@ -252,7 +262,7 @@ public class ASTNodeStringUtils {
         fmt.append(">");
     }
 
-    private static void namedRecordBody(ClassNode type, Formatter fmt) {
+    private static void recordBody(ClassNode type, Formatter fmt) {
         var fields = type.redirect().getFields();
         if( fields.isEmpty() )
             return;

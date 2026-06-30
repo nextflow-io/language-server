@@ -223,10 +223,6 @@ public class TypesEx {
             return recordName(type);
         }
 
-        if( type.getNameWithoutPackage().startsWith("__Record") ) {
-            return recordName(type.redirect());
-        }
-
         return typeName(type);
     }
 

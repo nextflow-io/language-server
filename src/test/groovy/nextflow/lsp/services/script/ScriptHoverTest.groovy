@@ -80,12 +80,52 @@ class ScriptHoverTest extends Specification {
         value.startsWith('```nextflow\nworkflow HELLO {')
     }
 
-    def 'should expand a named record type when hovering over a process' () {
+    def 'should show the label when hovering over a process' () {
         given:
         def service = getScriptService()
         def uri = getUri('main.nf')
+        def value
 
-        when:
+        when: 'destructured record inputs/outputs'
+        open(service, uri, '''\
+            nextflow.enable.types = true
+
+            process SAMTOOLS_INDEX {
+                input:
+                record(id: String, input: Path)
+
+                output:
+                record(id: id, index: file('index.fa'))
+
+                script:
+                'samtools index'
+            }
+
+            workflow {
+                SAMTOOLS_INDEX( channel.empty() )
+            }
+            ''')
+        service.updateNow()
+        value = getHoverHint(service, uri, new Position(14, 4))
+        then: 'render as Record { ... } with body'
+        value == '''\
+            ```nextflow
+            process SAMTOOLS_INDEX {
+              input:
+              Record {
+                id: String
+                input: Path
+              }
+
+              output:
+              Record {
+                id: String
+                index: Path
+              }
+            }
+            ```'''.stripIndent(true)
+
+        when: 'named record type input'
         open(service, uri, '''\
             nextflow.enable.types = true
 
@@ -107,8 +147,8 @@ class ScriptHoverTest extends Specification {
             }
             ''')
         service.updateNow()
-        def value = getHoverHint(service, uri, new Position(16, 4))
-        then:
+        value = getHoverHint(service, uri, new Position(16, 4))
+        then: 'expand named record body'
         value == '''\
             ```nextflow
             process SAMTOOLS_INDEX {
