@@ -39,12 +39,14 @@ import nextflow.script.dsl.Ops;
 import nextflow.script.types.Channel;
 import nextflow.script.types.ParamsMap;
 import nextflow.script.types.Record;
+import nextflow.script.types.TaskConfig;
 import nextflow.script.types.Tuple;
 import nextflow.script.types.TypesEx;
 import nextflow.script.types.Value;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.CodeVisitorSupport;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
@@ -98,6 +100,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     private static final ClassNode PATH_TYPE = ClassHelper.makeCached(Path.class);
     private static final ClassNode PARAMS_TYPE = ClassHelper.makeCached(ParamsMap.class);
     private static final ClassNode RECORD_TYPE = ClassHelper.makeCached(Record.class);
+    private static final ClassNode TASK_CONFIG_TYPE = ClassHelper.makeCached(TaskConfig.class);
     private static final ClassNode TUPLE_TYPE = ClassHelper.makeCached(Tuple.class);
     private static final ClassNode VALUE_TYPE = ClassHelper.makeCached(Value.class);
 
@@ -234,6 +237,9 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         visit(node.stub);
         visit(node.outputs);
         visitProcessTopics(node.topics);
+        if( !"exec".equals(node.type) )
+            checkTaskScriptProperties(node.exec);
+        checkTaskScriptProperties(node.stub);
     }
 
     private void visitProcessDirectives(Statement block) {
@@ -258,6 +264,37 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             var targetType = getType(target);
             if( !TypesEx.isEqual(ClassHelper.STRING_TYPE, targetType) )
                 addError("Topic name should be a String but was specified as a " + TypesEx.getName(targetType), target);
+        }
+    }
+
+    /**
+     * Report an error for each use of a restricted task property (e.g.
+     * `task.hash`, `task.workDir`) in the process script section.
+     *
+     * These properties depend on the task hash, which in turn is computed
+     * from the process script, so using them in the script creates a
+     * circular dependency.
+     *
+     * @param block
+     */
+    private void checkTaskScriptProperties(Statement block) {
+        if( block != null )
+            block.visit(new TaskScriptPropertyVisitor());
+    }
+
+    private class TaskScriptPropertyVisitor extends CodeVisitorSupport {
+
+        private static final List<String> RESTRICTED_TASK_PROPERTIES = List.of("hash", "workDir");
+
+        @Override
+        public void visitPropertyExpression(PropertyExpression node) {
+            super.visitPropertyExpression(node);
+            var property = node.getPropertyAsString();
+            if( !RESTRICTED_TASK_PROPERTIES.contains(property) )
+                return;
+            if( !TASK_CONFIG_TYPE.equals(getType(node.getObjectExpression())) )
+                return;
+            addError("`task." + property + "` is not defined in the process `script:` section", node);
         }
     }
 

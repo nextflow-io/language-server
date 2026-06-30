@@ -993,6 +993,79 @@ class TypeCheckingTest extends Specification {
         )
     }
 
+    def 'should report error for task.hash and task.workDir in the process script' () {
+        when:
+        def errors = getErrors(
+            '''\
+            nextflow.enable.types = true
+
+            process hello {
+                script:
+                "echo ${task.hash} > ${task.workDir}/out.txt"
+            }
+            '''
+        )
+        then:
+        errors.size() == 2
+        errors[0].getStartLine() == 5
+        errors[0].getOriginalMessage() == "`task.hash` is not defined in the process `script:` section"
+        errors[1].getStartLine() == 5
+        errors[1].getOriginalMessage() == "`task.workDir` is not defined in the process `script:` section"
+    }
+
+    def 'should report error for task.hash and task.workDir in the process stub' () {
+        when:
+        def errors = getErrors(
+            '''\
+            nextflow.enable.types = true
+
+            process hello {
+                script:
+                'echo hello'
+
+                stub:
+                "echo ${task.hash} > ${task.workDir}/out.txt"
+            }
+            '''
+        )
+        then:
+        errors.size() == 2
+        errors[0].getStartLine() == 8
+        errors[0].getOriginalMessage() == "`task.hash` is not defined in the process `script:` section"
+        errors[1].getStartLine() == 8
+        errors[1].getOriginalMessage() == "`task.workDir` is not defined in the process `script:` section"
+    }
+
+    def 'should allow other task properties in the process script' () {
+        expect:
+        check(
+            '''\
+            nextflow.enable.types = true
+
+            process hello {
+                script:
+                "echo ${task.cpus} ${task.process} ${task.attempt}"
+            }
+            ''',
+            null
+        )
+    }
+
+    def 'should allow task.hash and task.workDir in the process exec section' () {
+        expect:
+        check(
+            '''\
+            nextflow.enable.types = true
+
+            process hello {
+                exec:
+                println "${task.hash} ${task.workDir}"
+            }
+            ''',
+            null
+        )
+    }
+
     def 'should resolve record type' () {
         when:
         def exp = parseExpression(
