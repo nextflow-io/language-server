@@ -228,7 +228,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         visitProcessDirectives(node.directives);
         visit(node.stagers);
         if( !(node.when instanceof EmptyExpression) )
-            addError("Process `when` section is not supported with static typing -- use conditinal logic in the calling workflow instead", node.when);
+            addError("Process `when` section is not supported with static typing -- use conditional logic in the calling workflow instead", node.when);
         visit(node.when);
         visit(node.exec);
         visit(node.stub);
@@ -388,7 +388,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             addError("Tuple assignment is not compatible with type " + TypesEx.getName(sourceType), target);
             return;
         }
-        
+
         var vars = target.getExpressions();
         var gts = sourceType.getGenericsTypes();
         if( gts == null )
