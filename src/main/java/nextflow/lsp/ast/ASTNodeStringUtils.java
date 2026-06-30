@@ -58,7 +58,7 @@ import static nextflow.script.ast.ASTUtils.*;
 import static nextflow.script.types.TypeCheckingUtils.*;
 
 /**
- * Utility methods for retreiving text information for ast nodes.
+ * Utility methods for retrieving text information for ast nodes.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -213,6 +213,8 @@ public class ASTNodeStringUtils {
             if( fmt.hasType(input) ) {
                 fmt.append(": ");
                 fmt.visitTypeAnnotation(input.getType());
+                if( input.getType().redirect() instanceof RecordNode )
+                    namedRecordBody(input.getType(), fmt);
             }
         }
     }
@@ -248,6 +250,25 @@ public class ASTNodeStringUtils {
                 fmt.append(", ");
         }
         fmt.append(">");
+    }
+
+    private static void namedRecordBody(ClassNode type, Formatter fmt) {
+        var fields = type.redirect().getFields();
+        if( fields.isEmpty() )
+            return;
+        fmt.append(" {");
+        fmt.appendNewLine();
+        fmt.incIndent();
+        for( var fn : fields ) {
+            fmt.appendIndent();
+            fmt.append(fn.getName());
+            fmt.append(": ");
+            fmt.append(TypesEx.getName(fn.getType()));
+            fmt.appendNewLine();
+        }
+        fmt.decIndent();
+        fmt.appendIndent();
+        fmt.append('}');
     }
 
     private static String processToLabel(ProcessNodeV1 node) {

@@ -80,6 +80,50 @@ class ScriptHoverTest extends Specification {
         value.startsWith('```nextflow\nworkflow HELLO {')
     }
 
+    def 'should expand a named record type when hovering over a process' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+
+        when:
+        open(service, uri, '''\
+            nextflow.enable.types = true
+
+            record SamtoolsIndexInput {
+                id: String
+                input: Path
+            }
+
+            process SAMTOOLS_INDEX {
+                input:
+                data: SamtoolsIndexInput
+
+                script:
+                'samtools index'
+            }
+
+            workflow {
+                SAMTOOLS_INDEX( channel.empty() )
+            }
+            ''')
+        service.updateNow()
+        def value = getHoverHint(service, uri, new Position(16, 4))
+        then:
+        value == '''\
+            ```nextflow
+            process SAMTOOLS_INDEX {
+              input:
+              data: SamtoolsIndexInput {
+                id: String
+                input: Path
+              }
+
+              output:
+              <none>
+            }
+            ```'''.stripIndent(true)
+    }
+
     def 'should return null when hovering over whitespace' () {
         given:
         def service = getScriptService()
