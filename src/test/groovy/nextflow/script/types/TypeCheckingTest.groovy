@@ -289,6 +289,23 @@ class TypeCheckingTest extends Specification {
         "def x: List<String> ; x = []"      | null
     }
 
+    @Unroll
+    def 'should check a compound assignment' () {
+        expect:
+        check(SOURCE, ERROR)
+
+        where:
+        SOURCE                          | ERROR
+        'def x = 1 ; x += 1'            | null
+        'def x = 1 ; x -= 1'            | null
+        'def x = 1 ; x *= 2'            | null
+        'def x = 1 ; x <<= 2'           | null
+        "def s = 'a' ; s += 'b'"        | null
+        'def d = 1.h ; d *= 2.0'        | null
+        "def s = 'a' ; s *= 'b'"        | "The `*=` operator is not defined for operands with types String and String"
+        "def x = 1 ; x += 'a'"          | "The `+=` operator is not defined for operands with types Integer and String"
+    }
+
     def 'should infer the type of a variable declaration or assignment' () {
         when:
         def exp = parseExpression(
@@ -321,6 +338,17 @@ class TypeCheckingTest extends Specification {
         target = exp.getLeftExpression()
         then:
         checkType(target, String)
+
+        when:
+        exp = parseExpression(
+            '''
+            def x = 1
+            x += 1
+            '''
+        )
+        target = exp.getLeftExpression()
+        then:
+        checkType(target, Integer)
     }
 
     @Unroll

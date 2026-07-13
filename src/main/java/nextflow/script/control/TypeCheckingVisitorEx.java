@@ -372,6 +372,24 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         visit(source);
         var targetType = getType(target);
         var sourceType = getType(source);
+
+        // a compound assignment (e.g. `total += 1`) is equivalent to applying the
+        // corresponding binary operator and assigning the result (e.g. `total = total + 1`),
+        // so resolve the operator result type and use it as the source type
+        var opMethod = compoundAssignmentMethod(node.getOperation().getType());
+        if( opMethod != null ) {
+            if( ClassHelper.isDynamicTyped(targetType) || ClassHelper.isDynamicTyped(sourceType) )
+                return;
+            var lhsOps = resolveOpsType(targetType);
+            var rhsOps = resolveOpsType(sourceType);
+            var resultType = resolveOpResultType(targetType, sourceType, lhsOps, rhsOps, opMethod);
+            if( resultType == null ) {
+                addSoftError(String.format("The `%s` operator is not defined for operands with types %s and %s", node.getOperation().getText(), TypesEx.getName(targetType), TypesEx.getName(sourceType)), node);
+                return;
+            }
+            sourceType = resultType;
+        }
+
         if( TypesEx.isAssignableFrom(targetType, sourceType) ) {
             if( target instanceof VariableExpression ve && ve.isDynamicTyped() )
                 target.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, sourceType);
@@ -380,6 +398,32 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         }
         else {
             addSoftError("Assignment target with type " + TypesEx.getName(targetType) + " cannot be assigned to value with type " + TypesEx.getName(sourceType), node);
+        }
+    }
+
+    /**
+     * Get the operator method name for a compound assignment operator
+     * (e.g. `+=` corresponds to the `plus` operator), or null if the
+     * given operator is not a compound assignment.
+     *
+     * @param type
+     */
+    private static String compoundAssignmentMethod(int type) {
+        switch( type ) {
+            case Types.PLUS_EQUAL:                  return "plus";
+            case Types.MINUS_EQUAL:                 return "minus";
+            case Types.MULTIPLY_EQUAL:              return "multiply";
+            case Types.DIVIDE_EQUAL:                return "div";
+            case Types.INTDIV_EQUAL:                return "intdiv";
+            case Types.MOD_EQUAL:                   return "mod";
+            case Types.POWER_EQUAL:                 return "power";
+            case Types.LEFT_SHIFT_EQUAL:            return "leftShift";
+            case Types.RIGHT_SHIFT_EQUAL:           return "rightShift";
+            case Types.RIGHT_SHIFT_UNSIGNED_EQUAL:  return "rightShiftUnsigned";
+            case Types.BITWISE_AND_EQUAL:           return "and";
+            case Types.BITWISE_OR_EQUAL:            return "or";
+            case Types.BITWISE_XOR_EQUAL:           return "xor";
+            default:                                return null;
         }
     }
 
