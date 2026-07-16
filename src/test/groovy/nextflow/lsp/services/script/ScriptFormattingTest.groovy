@@ -340,6 +340,77 @@ class ScriptFormattingTest extends Specification {
         )
     }
 
+    def 'should sort includes when sorting is enabled' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+        def options = new FormattingOptions(4, true, false, false, true, 120)
+
+        expect:
+        checkFormat(service, uri, options,
+            '''\
+            include { ZULU } from './modules/zulu.nf'
+            include { ALPHA } from './modules/alpha.nf'
+
+            workflow {
+                ALPHA()
+            }
+            ''',
+            '''\
+            include { ALPHA } from './modules/alpha.nf'
+            include { ZULU } from './modules/zulu.nf'
+
+            workflow {
+                ALPHA()
+            }
+            '''
+        )
+    }
+
+    def 'should re-indent multi-line strings' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+        def options = new FormattingOptions(2, true, false, false, false, 120)
+
+        expect:
+        checkFormat(service, uri, options,
+            '''\
+            process foo {
+                script:
+                """
+                echo 'hello world!'
+                """
+            }
+            ''',
+            '''\
+            process foo {
+              script:
+              """
+              echo 'hello world!'
+              """
+            }
+            '''
+        )
+    }
+
+    def 'should format leading comments in a file with CRLF line endings' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+
+        expect:
+        checkFormat(service, uri,
+            "workflow {\r\n    // ALIGN reads to reference genome\r\n    BWA_ALIGN(sample_id, library_id)\r\n}\r\n",
+            '''\
+            workflow {
+                // ALIGN reads to reference genome
+                BWA_ALIGN(sample_id, library_id)
+            }
+            '''
+        )
+    }
+
     def 'should produce identical output when formatting a cached AST twice' () {
         given:
         // formatting the same document repeatedly without a document change
