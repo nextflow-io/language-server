@@ -33,16 +33,7 @@ import spock.lang.Specification
  */
 class ConfigFormattingTest extends Specification {
 
-    String openAndFormat(ConfigService service, Path filePath, String contents) {
-        def uri = filePath.toUri()
-        def textDocumentItem = new TextDocumentItem(uri.toString(), 'nextflow-config', 1, contents)
-        service.didOpen(new DidOpenTextDocumentParams(textDocumentItem))
-        def textEdits = service.formatting(uri, new FormattingOptions(4, true))
-        return textEdits.first().getNewText()
-    }
-
-    def 'should format a config file' () {
-        given:
+    ConfigService newConfigService() {
         def workspaceRoot = Path.of(System.getProperty('user.dir')).resolve('build/test_workspace/')
         if( !Files.exists(workspaceRoot) )
             workspaceRoot.toFile().mkdirs()
@@ -51,9 +42,31 @@ class ConfigFormattingTest extends Specification {
         def configuration = LanguageServerConfiguration.defaults()
         service.connect(new TestLanguageClient())
         service.initialize(configuration)
+        return service
+    }
+
+    Path configPath() {
+        return Path.of(System.getProperty('user.dir')).resolve('build/test_workspace/nextflow.config')
+    }
+
+    void openFile(ConfigService service, Path filePath, String contents) {
+        def uri = filePath.toUri()
+        def textDocumentItem = new TextDocumentItem(uri.toString(), 'nextflow-config', 1, contents)
+        service.didOpen(new DidOpenTextDocumentParams(textDocumentItem))
+    }
+
+    String openAndFormat(ConfigService service, Path filePath, String contents) {
+        openFile(service, filePath, contents)
+        def textEdits = service.formatting(filePath.toUri(), new FormattingOptions(4, true))
+        return textEdits.first().getNewText()
+    }
+
+    def 'should format a config file' () {
+        given:
+        def service = newConfigService()
 
         when:
-        def filePath = workspaceRoot.resolve('nextflow.config')
+        def filePath = configPath()
         def contents = '''\
             process.cpus = 2 ; process.memory = 8.GB
             '''.stripIndent()
@@ -73,6 +86,84 @@ class ConfigFormattingTest extends Specification {
             process.cpus = 2
             process.memory = 8.GB
             '''.stripIndent()
+    }
+
+    def 'should preserve all comments when formatting a config file' () {
+        given:
+        def service = newConfigService()
+        def filePath = configPath()
+
+        expect:
+        // trailing comments, dangling comments at the end of a block and at
+        // the end of the file are all preserved
+        openAndFormat(service, filePath, '''\
+            process {
+                cpus = 2 // trailing comment
+                // comment after the last option
+            }
+
+            // comment at the end of the file
+            '''.stripIndent()
+        ) == '''\
+            process {
+                cpus = 2 // trailing comment
+                // comment after the last option
+            }
+
+            // comment at the end of the file
+            '''.stripIndent()
+    }
+
+    def 'should not format config regions excluded with fmt directives' () {
+        given:
+        def service = newConfigService()
+        def filePath = configPath()
+
+        expect:
+        openAndFormat(service, filePath, '''\
+            process.cpus = 2
+
+            // fmt: off
+            env.FOO    = 'one'
+            env.BARBAZ = 'two'
+            // fmt: on
+            '''.stripIndent()
+        ) == '''\
+            process.cpus = 2
+
+            // fmt: off
+            env.FOO    = 'one'
+            env.BARBAZ = 'two'
+            // fmt: on
+            '''.stripIndent()
+    }
+
+    def 'should produce identical output when formatting a cached config AST twice' () {
+        given:
+        def service = newConfigService()
+        def filePath = configPath()
+        def contents = '''\
+            // top comment
+            process {
+                cpus = 2 // trailing comment
+                // dangling comment
+            }
+            '''.stripIndent()
+        // the file must exist on disk so that the deferred workspace scan
+        // does not evict it from the AST cache between formatting calls
+        Files.writeString(filePath, contents)
+
+        when:
+        openFile(service, filePath, contents)
+        def edits = (1..3).collect {
+            service.formatting(filePath.toUri(), new FormattingOptions(4, true))
+        }
+
+        then:
+        edits.every { it.first().getNewText() == contents }
+
+        cleanup:
+        Files.deleteIfExists(filePath)
     }
 
 }
