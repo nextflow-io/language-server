@@ -144,4 +144,30 @@ class TestUtils {
         service.didOpen(new DidOpenTextDocumentParams(textDocumentItem))
     }
 
+    /**
+     * Open a file, also writing it to disk. Tests that issue multiple
+     * requests against the same file without a document change in between
+     * must use this instead of open(): the deferred workspace scan re-scans
+     * from disk and would evict an in-memory-only file from the AST cache.
+     *
+     * Delete the file with deleteOnDisk() in the test's cleanup block.
+     *
+     * @param service
+     * @param uri
+     * @param contents
+     */
+    static void openOnDisk(LanguageService service, String uri, String contents) {
+        Files.writeString(Path.of(URI.create(uri)), contents.stripIndent())
+        open(service, uri, contents)
+    }
+
+    /**
+     * Delete a file written by openOnDisk().
+     *
+     * @param uri
+     */
+    static void deleteOnDisk(String uri) {
+        Files.deleteIfExists(Path.of(URI.create(uri)))
+    }
+
 }

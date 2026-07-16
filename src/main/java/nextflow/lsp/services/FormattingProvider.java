@@ -18,11 +18,26 @@ package nextflow.lsp.services;
 import java.net.URI;
 import java.util.List;
 
+import nextflow.script.formatter.CommentReattacher;
 import nextflow.script.formatter.FormattingOptions;
 import org.eclipse.lsp4j.TextEdit;
 
 public interface FormattingProvider {
 
     List<? extends TextEdit> formatting(URI uri, FormattingOptions options);
+
+    /**
+     * Determine whether formatting preserved every comment, as a safety
+     * check before returning any edit. The lexing mode must match the
+     * formatting visitor that produced the new text.
+     *
+     * @param oldText
+     * @param newText
+     * @param configFile whether to lex as a config file instead of a script
+     */
+    static boolean commentsPreserved(String oldText, String newText, boolean configFile) {
+        return CommentReattacher.commentTexts(oldText, configFile)
+            .equals(CommentReattacher.commentTexts(newText, configFile));
+    }
 
 }

@@ -16,9 +16,6 @@
 
 package nextflow.lsp.services.script
 
-import java.nio.file.Files
-import java.nio.file.Path
-
 import nextflow.script.formatter.FormattingOptions
 import spock.lang.Specification
 
@@ -33,12 +30,22 @@ class ScriptFormattingTest extends Specification {
     boolean checkFormat(ScriptService service, String uri, FormattingOptions options, String before, String after) {
         open(service, uri, before)
         def textEdits = service.formatting(URI.create(uri), options)
-        assert textEdits.first().getNewText() == after.stripIndent()
+        // no edits means the document was already formatted
+        def newText = textEdits ? textEdits.first().getNewText() : before.stripIndent()
+        assert newText == after.stripIndent()
         return true
     }
 
     boolean checkFormat(ScriptService service, String uri, String before, String after) {
         return checkFormat(service, uri, new FormattingOptions(4, true), before, after)
+    }
+
+    boolean checkRoundTrip(ScriptService service, String uri, FormattingOptions options, String source) {
+        return checkFormat(service, uri, options, source, source)
+    }
+
+    boolean checkRoundTrip(ScriptService service, String uri, String source) {
+        return checkFormat(service, uri, source, source)
     }
 
     def 'should format a script' () {
@@ -189,15 +196,7 @@ class ScriptFormattingTest extends Specification {
         expect:
         // trailing comments, dangling comments at the end of a block and at
         // the end of the file are all preserved
-        checkFormat(service, uri,
-            '''\
-            workflow {
-                x = 1 // trailing comment
-                // comment after the last statement
-            }
-
-            // comment at the end of the file
-            ''',
+        checkRoundTrip(service, uri,
             '''\
             workflow {
                 x = 1 // trailing comment
@@ -208,22 +207,7 @@ class ScriptFormattingTest extends Specification {
             '''
         )
         // a commented-out process is preserved
-        checkFormat(service, uri,
-            '''\
-            // process FOO {
-            //     script:
-            //     "true"
-            // }
-
-            process BAR {
-                script:
-                "true"
-            }
-
-            workflow {
-                BAR()
-            }
-            ''',
+        checkRoundTrip(service, uri,
             '''\
             // process FOO {
             //     script:
@@ -275,12 +259,7 @@ class ScriptFormattingTest extends Specification {
         def options = new FormattingOptions(4, true, false, false, false, 0)
 
         expect:
-        checkFormat(service, uri, options,
-            '''\
-            workflow {
-                ALIGN_AND_SORT(samples_channel, reference_genome, annotation_file, params.threads, extra_arg_one, extra_arg_two, extra_arg_three)
-            }
-            ''',
+        checkRoundTrip(service, uri, options,
             '''\
             workflow {
                 ALIGN_AND_SORT(samples_channel, reference_genome, annotation_file, params.threads, extra_arg_one, extra_arg_two, extra_arg_three)
@@ -310,20 +289,7 @@ class ScriptFormattingTest extends Specification {
             '''
         )
         // a fmt: off / fmt: on region round-trips unchanged
-        checkFormat(service, uri,
-            '''\
-            workflow {
-                a = 1
-
-                // fmt: off
-                matrix = [
-                    [1, 0],
-                    [0, 1] ]
-                // fmt: on
-
-                b = 2
-            }
-            ''',
+        checkRoundTrip(service, uri,
             '''\
             workflow {
                 a = 1
@@ -416,7 +382,8 @@ class ScriptFormattingTest extends Specification {
         // formatting the same document repeatedly without a document change
         // re-derives the comment metadata on the same cached AST -- the
         // output must not change, including for comments inside wrapped
-        // expressions
+        // expressions; the input is deliberately non-canonical so that
+        // every request returns an edit
         def service = getScriptService()
         def uri = getUri('main.nf')
         def contents = '''\
@@ -430,23 +397,23 @@ class ScriptFormattingTest extends Specification {
                     // comment on chain link
                     .map { x -> x }
                     .view()
+                y=1
             }
             '''.stripIndent()
-        // the file must exist on disk so that the deferred workspace scan
-        // does not evict it from the AST cache between formatting calls
-        Files.writeString(Path.of(URI.create(uri)), contents)
+        def expected = contents.replace('y=1', 'y = 1')
 
         when:
-        open(service, uri, contents)
-        def edits = (1..3).collect {
-            service.formatting(URI.create(uri), new FormattingOptions(4, true))
+        openOnDisk(service, uri, contents)
+        def texts = (1..3).collect {
+            def edits = service.formatting(URI.create(uri), new FormattingOptions(4, true))
+            edits ? edits.first().getNewText() : contents
         }
 
         then:
-        edits.every { it.first().getNewText() == contents }
+        texts == [expected] * 3
 
         cleanup:
-        Files.deleteIfExists(Path.of(URI.create(uri)))
+        deleteOnDisk(uri)
     }
 
 }

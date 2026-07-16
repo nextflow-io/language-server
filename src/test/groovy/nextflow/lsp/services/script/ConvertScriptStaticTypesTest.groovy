@@ -245,15 +245,11 @@ class ConvertScriptStaticTypesTest extends Specification {
             }
             '''.stripIndent()
 
-        // the file must exist on disk so that the deferred workspace scan
-        // does not evict it from the AST cache between requests
-        java.nio.file.Files.writeString(java.nio.file.Path.of(URI.create(uri)), contents)
-
         when: 'format the document so comment metadata is re-derived'
-        open(service, uri, contents)
+        openOnDisk(service, uri, contents)
         def edits = service.formatting(URI.create(uri), new FormattingOptions(4, true))
-        then:
-        edits.first().getNewText() == contents
+        then: 'the document is already canonical, so formatting returns no edits'
+        edits.isEmpty()
 
         when: 'convert the same cached AST to static types'
         def response = service.executeCommand('nextflow.server.convertScriptToTyped', [asJson(uri)], LanguageServerConfiguration.defaults())
@@ -269,7 +265,7 @@ class ConvertScriptStaticTypesTest extends Specification {
             }'''.stripIndent()
 
         cleanup:
-        java.nio.file.Files.deleteIfExists(java.nio.file.Path.of(URI.create(uri)))
+        deleteOnDisk(uri)
     }
 
     def 'should convert tuple outputs' () {

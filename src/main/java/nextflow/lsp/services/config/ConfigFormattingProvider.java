@@ -24,7 +24,6 @@ import nextflow.config.formatter.ConfigFormattingVisitor;
 import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
-import nextflow.script.formatter.CommentReattacher;
 import nextflow.script.formatter.FormattingOptions;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.eclipse.lsp4j.Position;
@@ -73,8 +72,10 @@ public class ConfigFormattingProvider implements FormattingProvider {
         visitor.visit();
         var newText = visitor.toString();
 
-        if( !newText.equals(oldText)
-                && !CommentReattacher.commentTexts(oldText, true).equals(CommentReattacher.commentTexts(newText, true)) ) {
+        if( newText.equals(oldText) )
+            return Collections.emptyList();
+
+        if( !FormattingProvider.commentsPreserved(oldText, newText, true) ) {
             log.showError("Refusing to format config file because formatting would remove or alter comments (please report this as a bug): " + uri);
             return Collections.emptyList();
         }

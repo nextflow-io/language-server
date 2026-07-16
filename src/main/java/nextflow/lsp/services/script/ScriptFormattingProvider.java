@@ -23,7 +23,6 @@ import java.util.List;
 import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
-import nextflow.script.formatter.CommentReattacher;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.script.formatter.ScriptFormattingVisitor;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
@@ -73,8 +72,10 @@ public class ScriptFormattingProvider implements FormattingProvider {
         visitor.visit();
         var newText = visitor.toString();
 
-        if( !newText.equals(oldText)
-                && !CommentReattacher.commentTexts(oldText, false).equals(CommentReattacher.commentTexts(newText, false)) ) {
+        if( newText.equals(oldText) )
+            return Collections.emptyList();
+
+        if( !FormattingProvider.commentsPreserved(oldText, newText, false) ) {
             log.showError("Refusing to format script because formatting would remove or alter comments (please report this as a bug): " + uri);
             return Collections.emptyList();
         }

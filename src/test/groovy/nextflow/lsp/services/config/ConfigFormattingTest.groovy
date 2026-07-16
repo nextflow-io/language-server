@@ -16,16 +16,10 @@
 
 package nextflow.lsp.services.config
 
-import java.nio.file.Files
-import java.nio.file.Path
-
-import nextflow.lsp.TestLanguageClient
-import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.script.formatter.FormattingOptions
-import org.eclipse.lsp4j.DidOpenTextDocumentParams
-import org.eclipse.lsp4j.Position
-import org.eclipse.lsp4j.TextDocumentItem
 import spock.lang.Specification
+
+import static nextflow.lsp.TestUtils.*
 
 /**
  *
@@ -33,137 +27,112 @@ import spock.lang.Specification
  */
 class ConfigFormattingTest extends Specification {
 
-    ConfigService newConfigService() {
-        def workspaceRoot = Path.of(System.getProperty('user.dir')).resolve('build/test_workspace/')
-        if( !Files.exists(workspaceRoot) )
-            workspaceRoot.toFile().mkdirs()
-
-        def service = new ConfigService(workspaceRoot.toUri().toString())
-        def configuration = LanguageServerConfiguration.defaults()
-        service.connect(new TestLanguageClient())
-        service.initialize(configuration)
-        return service
+    String openAndFormat(ConfigService service, String uri, String contents) {
+        open(service, uri, contents)
+        def textEdits = service.formatting(URI.create(uri), new FormattingOptions(4, true))
+        // no edits means the document was already formatted
+        return textEdits ? textEdits.first().getNewText() : contents.stripIndent()
     }
 
-    Path configPath() {
-        return Path.of(System.getProperty('user.dir')).resolve('build/test_workspace/nextflow.config')
+    boolean checkFormat(ConfigService service, String uri, String before, String after) {
+        assert openAndFormat(service, uri, before) == after.stripIndent()
+        return true
     }
 
-    void openFile(ConfigService service, Path filePath, String contents) {
-        def uri = filePath.toUri()
-        def textDocumentItem = new TextDocumentItem(uri.toString(), 'nextflow-config', 1, contents)
-        service.didOpen(new DidOpenTextDocumentParams(textDocumentItem))
-    }
-
-    String openAndFormat(ConfigService service, Path filePath, String contents) {
-        openFile(service, filePath, contents)
-        def textEdits = service.formatting(filePath.toUri(), new FormattingOptions(4, true))
-        return textEdits.first().getNewText()
+    boolean checkRoundTrip(ConfigService service, String uri, String source) {
+        return checkFormat(service, uri, source, source)
     }
 
     def 'should format a config file' () {
         given:
-        def service = newConfigService()
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
 
-        when:
-        def filePath = configPath()
-        def contents = '''\
+        expect:
+        checkFormat(service, uri,
+            '''\
             process.cpus = 2 ; process.memory = 8.GB
-            '''.stripIndent()
-        then:
-        openAndFormat(service, filePath, contents) == '''\
+            ''',
+            '''\
             process.cpus = 2
             process.memory = 8.GB
-            '''.stripIndent()
-
-        when:
-        contents = '''\
+            '''
+        )
+        checkRoundTrip(service, uri,
+            '''\
             process.cpus = 2
             process.memory = 8.GB
-            '''.stripIndent()
-        then:
-        openAndFormat(service, filePath, contents) == '''\
-            process.cpus = 2
-            process.memory = 8.GB
-            '''.stripIndent()
+            '''
+        )
     }
 
     def 'should preserve all comments when formatting a config file' () {
         given:
-        def service = newConfigService()
-        def filePath = configPath()
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
 
         expect:
         // trailing comments, dangling comments at the end of a block and at
         // the end of the file are all preserved
-        openAndFormat(service, filePath, '''\
+        checkRoundTrip(service, uri,
+            '''\
             process {
                 cpus = 2 // trailing comment
                 // comment after the last option
             }
 
             // comment at the end of the file
-            '''.stripIndent()
-        ) == '''\
-            process {
-                cpus = 2 // trailing comment
-                // comment after the last option
-            }
-
-            // comment at the end of the file
-            '''.stripIndent()
+            '''
+        )
     }
 
     def 'should not format config regions excluded with fmt directives' () {
         given:
-        def service = newConfigService()
-        def filePath = configPath()
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
 
         expect:
-        openAndFormat(service, filePath, '''\
+        checkRoundTrip(service, uri,
+            '''\
             process.cpus = 2
 
             // fmt: off
             env.FOO    = 'one'
             env.BARBAZ = 'two'
             // fmt: on
-            '''.stripIndent()
-        ) == '''\
-            process.cpus = 2
-
-            // fmt: off
-            env.FOO    = 'one'
-            env.BARBAZ = 'two'
-            // fmt: on
-            '''.stripIndent()
+            '''
+        )
     }
 
     def 'should produce identical output when formatting a cached config AST twice' () {
         given:
-        def service = newConfigService()
-        def filePath = configPath()
+        // formatting the same document repeatedly without a document change
+        // re-derives the comment metadata on the same cached AST -- the
+        // output must not change; the input is deliberately non-canonical
+        // so that every request returns an edit
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
         def contents = '''\
             // top comment
             process {
-                cpus = 2 // trailing comment
+                cpus=2 // trailing comment
                 // dangling comment
             }
             '''.stripIndent()
-        // the file must exist on disk so that the deferred workspace scan
-        // does not evict it from the AST cache between formatting calls
-        Files.writeString(filePath, contents)
+        def expected = contents.replace('cpus=2', 'cpus = 2')
 
         when:
-        openFile(service, filePath, contents)
-        def edits = (1..3).collect {
-            service.formatting(filePath.toUri(), new FormattingOptions(4, true))
+        openOnDisk(service, uri, contents)
+        def texts = (1..3).collect {
+            def edits = service.formatting(URI.create(uri), new FormattingOptions(4, true))
+            edits ? edits.first().getNewText() : contents
         }
 
         then:
-        edits.every { it.first().getNewText() == contents }
+        texts == [expected] * 3
 
         cleanup:
-        Files.deleteIfExists(filePath)
+        deleteOnDisk(uri)
     }
 
 }
