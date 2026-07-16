@@ -17,6 +17,7 @@
 package nextflow.lsp.services.script
 
 import nextflow.lsp.services.LanguageServerConfiguration
+import nextflow.script.formatter.FormattingOptions
 import spock.lang.Specification
 
 import static nextflow.lsp.TestUtils.*
@@ -220,6 +221,51 @@ class ConvertScriptStaticTypesTest extends Specification {
 
         expect:
         checkOutputs(service, 'stdout', 'stdout()')
+    }
+
+    def 'should convert a script after formatting the same cached AST' () {
+        given:
+        // formatting re-derives comment metadata on the cached AST; a
+        // subsequent conversion of the same AST must neither crash nor
+        // duplicate comments into the replacement text
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+        def contents = '''\
+            // about this process
+            process test {
+                input:
+                val id
+
+                script:
+                "true"
+            }
+
+            workflow {
+                test(1)
+            }
+            '''.stripIndent()
+
+        when: 'format the document so comment metadata is re-derived'
+        openOnDisk(service, uri, contents)
+        def edits = service.formatting(URI.create(uri), new FormattingOptions(4, true))
+        then: 'the document is already canonical, so formatting returns no edits'
+        edits.isEmpty()
+
+        when: 'convert the same cached AST to static types'
+        def response = service.executeCommand('nextflow.server.convertScriptToTyped', [asJson(uri)], LanguageServerConfiguration.defaults())
+        def newText = response.applyEdit.getChanges()[uri][0].getNewText()
+        then: 'the replacement text does not duplicate the leading comment, which stays in the document above the replaced range'
+        newText == '''\
+            process test {
+                input:
+                id
+
+                script:
+                "true"
+            }'''.stripIndent()
+
+        cleanup:
+        deleteOnDisk(uri)
     }
 
     def 'should convert tuple outputs' () {

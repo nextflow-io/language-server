@@ -43,7 +43,7 @@ class DiagnosticsReportingTest extends Specification {
         def configuration = new LanguageServerConfiguration(
             d.dagDirection(), d.dagVerbose(), mode, d.excludePatterns(),
             d.extendedCompletion(), d.harshilAlignment(), d.maheshForm(),
-            d.maxCompletionItems(), d.pluginRegistryUrl(), d.sortDeclarations())
+            d.maxCompletionItems(), d.maxLineLength(), d.pluginRegistryUrl(), d.sortDeclarations())
         def service = new ConfigService(workspaceRootUri())
         service.connect(client)
         service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()))

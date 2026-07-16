@@ -16,16 +16,10 @@
 
 package nextflow.lsp.services.config
 
-import java.nio.file.Files
-import java.nio.file.Path
-
-import nextflow.lsp.TestLanguageClient
-import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.script.formatter.FormattingOptions
-import org.eclipse.lsp4j.DidOpenTextDocumentParams
-import org.eclipse.lsp4j.Position
-import org.eclipse.lsp4j.TextDocumentItem
 import spock.lang.Specification
+
+import static nextflow.lsp.TestUtils.*
 
 /**
  *
@@ -33,46 +27,112 @@ import spock.lang.Specification
  */
 class ConfigFormattingTest extends Specification {
 
-    String openAndFormat(ConfigService service, Path filePath, String contents) {
-        def uri = filePath.toUri()
-        def textDocumentItem = new TextDocumentItem(uri.toString(), 'nextflow-config', 1, contents)
-        service.didOpen(new DidOpenTextDocumentParams(textDocumentItem))
-        def textEdits = service.formatting(uri, new FormattingOptions(4, true))
-        return textEdits.first().getNewText()
+    String openAndFormat(ConfigService service, String uri, String contents) {
+        open(service, uri, contents)
+        def textEdits = service.formatting(URI.create(uri), new FormattingOptions(4, true))
+        // no edits means the document was already formatted
+        return textEdits ? textEdits.first().getNewText() : contents.stripIndent()
+    }
+
+    boolean checkFormat(ConfigService service, String uri, String before, String after) {
+        assert openAndFormat(service, uri, before) == after.stripIndent()
+        return true
+    }
+
+    boolean checkRoundTrip(ConfigService service, String uri, String source) {
+        return checkFormat(service, uri, source, source)
     }
 
     def 'should format a config file' () {
         given:
-        def workspaceRoot = Path.of(System.getProperty('user.dir')).resolve('build/test_workspace/')
-        if( !Files.exists(workspaceRoot) )
-            workspaceRoot.toFile().mkdirs()
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
 
-        def service = new ConfigService(workspaceRoot.toUri().toString())
-        def configuration = LanguageServerConfiguration.defaults()
-        service.connect(new TestLanguageClient())
-        service.initialize(configuration)
-
-        when:
-        def filePath = workspaceRoot.resolve('nextflow.config')
-        def contents = '''\
+        expect:
+        checkFormat(service, uri,
+            '''\
             process.cpus = 2 ; process.memory = 8.GB
-            '''.stripIndent()
-        then:
-        openAndFormat(service, filePath, contents) == '''\
+            ''',
+            '''\
             process.cpus = 2
             process.memory = 8.GB
+            '''
+        )
+        checkRoundTrip(service, uri,
+            '''\
+            process.cpus = 2
+            process.memory = 8.GB
+            '''
+        )
+    }
+
+    def 'should preserve all comments when formatting a config file' () {
+        given:
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
+
+        expect:
+        // trailing comments, dangling comments at the end of a block and at
+        // the end of the file are all preserved
+        checkRoundTrip(service, uri,
+            '''\
+            process {
+                cpus = 2 // trailing comment
+                // comment after the last option
+            }
+
+            // comment at the end of the file
+            '''
+        )
+    }
+
+    def 'should not format config regions excluded with fmt directives' () {
+        given:
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
+
+        expect:
+        checkRoundTrip(service, uri,
+            '''\
+            process.cpus = 2
+
+            // fmt: off
+            env.FOO    = 'one'
+            env.BARBAZ = 'two'
+            // fmt: on
+            '''
+        )
+    }
+
+    def 'should produce identical output when formatting a cached config AST twice' () {
+        given:
+        // formatting the same document repeatedly without a document change
+        // re-derives the comment metadata on the same cached AST -- the
+        // output must not change; the input is deliberately non-canonical
+        // so that every request returns an edit
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
+        def contents = '''\
+            // top comment
+            process {
+                cpus=2 // trailing comment
+                // dangling comment
+            }
             '''.stripIndent()
+        def expected = contents.replace('cpus=2', 'cpus = 2')
 
         when:
-        contents = '''\
-            process.cpus = 2
-            process.memory = 8.GB
-            '''.stripIndent()
+        openOnDisk(service, uri, contents)
+        def texts = (1..3).collect {
+            def edits = service.formatting(URI.create(uri), new FormattingOptions(4, true))
+            edits ? edits.first().getNewText() : contents
+        }
+
         then:
-        openAndFormat(service, filePath, contents) == '''\
-            process.cpus = 2
-            process.memory = 8.GB
-            '''.stripIndent()
+        texts == [expected] * 3
+
+        cleanup:
+        deleteOnDisk(uri)
     }
 
 }

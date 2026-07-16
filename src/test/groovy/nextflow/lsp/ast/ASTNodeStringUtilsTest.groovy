@@ -74,7 +74,7 @@ class ASTNodeStringUtilsTest extends Specification {
 
         then:
         ASTNodeStringUtils.getLabel(ffn) == '(feature flag) nextflow.enable.strict'
-        ASTNodeStringUtils.getDocumentation(ffn) == 'When `true`, the pipeline is executed in [strict mode](https://nextflow.io/docs/latest/reference/feature-flags.html).'
+        ASTNodeStringUtils.getDocumentation(ffn) == 'When `true`, the pipeline is executed in [strict mode](https://docs.seqera.io/nextflow/reference/feature-flags).'
     }
 
     def 'should get the label and docs for a workflow' () {
@@ -180,7 +180,7 @@ class ASTNodeStringUtilsTest extends Specification {
         ASTNodeStringUtils.getDocumentation(node) == '''
             Create a channel that emits each argument.
 
-            [Read more](https://nextflow.io/docs/latest/reference/channel.html#of)
+            [Read more](https://docs.seqera.io/nextflow/reference/channel#of)
             '''.stripIndent(true).trim()
     }
 
@@ -202,7 +202,7 @@ class ASTNodeStringUtilsTest extends Specification {
         ASTNodeStringUtils.getDocumentation(node) == '''
             The `executor` defines the underlying system where tasks are executed.
 
-            [Read more](https://nextflow.io/docs/latest/reference/process.html#executor)
+            [Read more](https://docs.seqera.io/nextflow/reference/process#executor)
             '''.stripIndent(true).trim()
     }
 

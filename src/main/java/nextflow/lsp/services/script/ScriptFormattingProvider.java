@@ -68,9 +68,17 @@ public class ScriptFormattingProvider implements FormattingProvider {
         }
 
         var range = new Range(new Position(0, 0), Positions.getPosition(oldText, oldText.length()));
-        var visitor = new ScriptFormattingVisitor(sourceUnit, options);
+        var visitor = new ScriptFormattingVisitor(sourceUnit, options, oldText);
         visitor.visit();
         var newText = visitor.toString();
+
+        if( newText.equals(oldText) )
+            return Collections.emptyList();
+
+        if( !FormattingProvider.commentsPreserved(oldText, newText, false) ) {
+            log.showError("Refusing to format script because formatting would remove or alter comments (please report this as a bug): " + uri);
+            return Collections.emptyList();
+        }
 
         return List.of( new TextEdit(range, newText) );
     }

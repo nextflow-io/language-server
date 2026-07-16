@@ -34,7 +34,9 @@ configurations {
 }
 
 dependencies {
-  implementation 'io.nextflow:nf-lang:26.04.3'
+  // TEMPORARY: locally-built nf-lang from nextflow-io/nextflow#7346 (via mavenLocal).
+  // Amend this to the released nf-lang version once PR #7346 is merged and released.
+  implementation 'io.nextflow:nf-lang:26.07.0-edge'
   implementation 'org.apache.groovy:groovy:4.0.31'
   implementation 'org.apache.groovy:groovy-json:4.0.31'
   implementation 'org.apache.groovy:groovy-yaml:4.0.31'
