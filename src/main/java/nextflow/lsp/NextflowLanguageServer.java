@@ -378,7 +378,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 params.getOptions().isInsertSpaces(),
                 configuration.harshilAlignment(),
                 configuration.maheshForm(),
-                configuration.sortDeclarations()
+                configuration.sortDeclarations(),
+                configuration.maxLineLength()
             );
             log.debug(String.format("textDocument/formatting %s %s %d", relativePath(uri), options.insertSpaces() ? "spaces" : "tabs", options.tabSize()));
             var service = getLanguageService(uri);
@@ -462,6 +463,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.harshilAlignment"), configuration.harshilAlignment()),
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.maheshForm"), configuration.maheshForm()),
             withDefault(JsonUtils.getInteger(settings, "nextflow.completion.maxItems"), configuration.maxCompletionItems()),
+            withDefault(JsonUtils.getInteger(settings, "nextflow.formatting.maxLineLength"), configuration.maxLineLength()),
             withDefault(JsonUtils.getString(settings, "nextflow.pluginRegistryUrl"), configuration.pluginRegistryUrl()),
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), configuration.sortDeclarations())
         );

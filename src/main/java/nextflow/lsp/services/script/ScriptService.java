@@ -158,7 +158,8 @@ public class ScriptService extends LanguageService {
             true,
             configuration.harshilAlignment(),
             configuration.maheshForm(),
-            configuration.sortDeclarations()
+            configuration.sortDeclarations(),
+            configuration.maxLineLength()
         );
     }
 
