@@ -373,6 +373,13 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var targetType = getType(target);
         var sourceType = getType(source);
 
+        // a call with no return value (e.g. a function with a void return type or a
+        // process/workflow that declares no outputs) cannot be assigned to a variable
+        if( ClassHelper.isPrimitiveVoid(sourceType) ) {
+            addSoftError("Cannot assign the result of a call that does not return a value", node);
+            return;
+        }
+
         // a compound assignment (e.g. `total += 1`) is equivalent to applying the
         // corresponding binary operator and assigning the result (e.g. `total = total + 1`),
         // so resolve the operator result type and use it as the source type
@@ -616,6 +623,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     private static ClassNode workflowOutputType(Statement block) {
         var emits = asBlockStatements(block);
+        if( emits.isEmpty() )
+            return ClassHelper.VOID_TYPE;
         if( emits.size() == 1 ) {
             var first = emits.get(0);
             var emit = ((ExpressionStatement) first).getExpression();
@@ -779,6 +788,8 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     private static ClassNode processOutputType(ClassNode dataflowType, Statement block) {
         var outputs = asBlockStatements(block);
+        if( outputs.isEmpty() )
+            return ClassHelper.VOID_TYPE;
         if( outputs.size() == 1 ) {
             var first = outputs.get(0);
             var output = ((ExpressionStatement) first).getExpression();

@@ -1021,6 +1021,63 @@ class TypeCheckingTest extends Specification {
         )
     }
 
+    def 'should not allow a void call result to be assigned to a variable' () {
+        expect:
+        check(
+            '''\
+            def foo() {
+                println 'hello'
+            }
+
+            workflow {
+                foo()
+                def x = foo()
+            }
+            ''',
+            'Cannot assign the result of a call that does not return a value'
+        )
+
+        and:
+        check(
+            '''\
+            nextflow.enable.types = true
+
+            process foo {
+                input:
+                message: String
+
+                script:
+                ''
+            }
+
+            workflow {
+                def result = foo('hello')
+            }
+            ''',
+            'Cannot assign the result of a call that does not return a value'
+        )
+
+        and:
+        check(
+            '''\
+            nextflow.enable.types = true
+
+            workflow foo {
+                take:
+                message: String
+
+                main:
+                println message
+            }
+
+            workflow {
+                def result = foo( 'hello' )
+            }
+            ''',
+            'Cannot assign the result of a call that does not return a value'
+        )
+    }
+
     def 'should resolve record type' () {
         when:
         def exp = parseExpression(
