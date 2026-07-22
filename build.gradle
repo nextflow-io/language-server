@@ -80,6 +80,9 @@ task buildSpec(type: JavaExec) {
   dependsOn compileSpecGroovy
   classpath = sourceSets.spec.runtimeClasspath
   mainClass.set('nextflow.SpecWriter')
+  // Use our own logback config instead of the DEBUG-level logback-test.xml
+  // bundled in nextflow plugin jars (e.g. nf-google)
+  systemProperty 'logback.configurationFile', file('src/spec/resources/logback.xml').absolutePath
   args "$buildDir/generated/definitions.json"
 
   outputs.file("$buildDir/generated/definitions.json")
