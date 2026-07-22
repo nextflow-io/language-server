@@ -20,6 +20,7 @@ import nextflow.script.ast.ASTNodeMarker
 import nextflow.script.ast.FeatureFlagNode
 import nextflow.script.control.ScriptParser
 import nextflow.script.control.ScriptResolveVisitor
+import nextflow.script.control.SeverityAware
 import nextflow.script.control.TypeCheckingVisitorEx
 import nextflow.script.dsl.Types
 import org.codehaus.groovy.ast.ASTNode
@@ -154,7 +155,8 @@ class TypeCheckingTest extends Specification {
 
             workflow hello {
                 emit:
-                result: String = 42
+                a: String = 42
+                b: Integer = 1
             }
             '''
         )
@@ -171,12 +173,42 @@ class TypeCheckingTest extends Specification {
 
             workflow hello {
                 emit:
-                result: Integer = 42
+                a: Integer = 42
+                b: Integer = 1
             }
             '''
         )
         then:
         errors.size() == 0
+    }
+
+    def 'should warn about a single named output' () {
+        expect:
+        check(
+            '''\
+            nextflow.enable.types = true
+
+            workflow hello {
+                emit:
+                result: Integer = 42
+            }
+            ''',
+            "Name should be omitted for a single emit"
+        )
+        check(
+            '''\
+            nextflow.enable.types = true
+
+            process hello {
+                output:
+                sample: String = 'hi'
+
+                script:
+                ''
+            }
+            ''',
+            "Name should be omitted for a single output"
+        )
     }
 
     def 'should check output path directive' () {
@@ -742,25 +774,6 @@ class TypeCheckingTest extends Specification {
 
             workflow hello {
                 emit:
-                result: Integer = 42
-            }
-
-            workflow {
-                hello()
-            }
-            '''
-        )
-        type = getType(exp)
-        then:
-        TypesEx.getName(type) == 'Value<Integer>'
-
-        when:
-        exp = parseExpression(
-            '''\
-            nextflow.enable.types = true
-
-            workflow hello {
-                emit:
                 foo: String = 'hello'
                 bar: Integer = 42
             }
@@ -932,31 +945,6 @@ class TypeCheckingTest extends Specification {
             '''
         )
         def type = getType(exp)
-        then:
-        TypesEx.getName(type) == 'Value<String>'
-
-        when:
-        exp = parseExpression(
-            '''\
-            nextflow.enable.types = true
-
-            process hello {
-                input:
-                target: String
-
-                output:
-                message: String = "Hello, $target!"
-
-                exec:
-                true
-            }
-
-            workflow {
-                hello( 'World' )
-            }
-            '''
-        )
-        type = getType(exp)
         then:
         TypesEx.getName(type) == 'Value<String>'
 

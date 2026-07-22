@@ -171,10 +171,13 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
         visit(node.main);
 
-        if( node.isEntry() )
+        if( node.isEntry() ) {
             visitWorkflowOutputs(node);
-        else
+        }
+        else {
+            checkSingleNamedOutput(node.emits, "emit");
             visit(node.emits);
+        }
 
         visit(node.onComplete);
         visit(node.onError);
@@ -232,6 +235,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         visit(node.when);
         visit(node.exec);
         visit(node.stub);
+        checkSingleNamedOutput(node.outputs, "output");
         visit(node.outputs);
         visitProcessTopics(node.topics);
     }
@@ -245,6 +249,15 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             }
             visit(call);
         });
+    }
+
+    private void checkSingleNamedOutput(Statement block, String section) {
+        var outputs = asBlockStatements(block);
+        if( outputs.size() != 1 )
+            return;
+        var output = ((ExpressionStatement) outputs.get(0)).getExpression();
+        if( output instanceof AssignmentExpression ae )
+            addSoftError("Name should be omitted for a single " + section, ae);
     }
 
     private void visitProcessTopics(Statement block) {
