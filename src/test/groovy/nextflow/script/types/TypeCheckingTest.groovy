@@ -678,6 +678,19 @@ class TypeCheckingTest extends Specification {
         )
         then:
         checkType(exp, Object)
+
+        when:
+        exp = parseExpression(
+            '''
+            workflow {
+                def meta: Map = [:]
+                meta = meta + [single_end: true]
+                meta.id
+            }
+            '''
+        )
+        then:
+        checkType(exp, Object)
     }
 
     def 'should check a workflow call' () {

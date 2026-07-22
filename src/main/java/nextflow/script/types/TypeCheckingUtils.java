@@ -159,7 +159,7 @@ public class TypeCheckingUtils {
         if( !TypesEx.isAssignableFrom(ClassHelper.MAP_TYPE, cn) )
             return null;
         var gts = cn.getGenericsTypes();
-        if( gts == null )
+        if( gts == null || gts[0].isPlaceholder() )
             return new FieldNode(name, 0xF, ClassHelper.dynamicType(), cn, null);
         var keyType = gts[0].getType();
         if( !TypesEx.isEqual(ClassHelper.STRING_TYPE, keyType) )
@@ -457,7 +457,7 @@ public class TypeCheckingUtils {
     /**
      * Create a "dummy" method node with resolved receiver type,
      * parameters, and return type.
-     * 
+     *
      * @param receiverType
      * @param method
      * @param parameters
@@ -512,7 +512,7 @@ public class TypeCheckingUtils {
                 // TODO: report error if connection already exists with different type
                 // if( result.containsKey(gtn) && result.get(gtn) != gt )
                 //     throw new Exception("...");
-                
+
                 result.putIfAbsent(gtn, gt);
             });
         }
