@@ -18,8 +18,10 @@ package nextflow.lsp.services.script;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -155,6 +157,40 @@ public class ScriptAstCache extends ASTNodeCache {
         }
 
         return changedUris;
+    }
+
+    /**
+     * Expand a set of changed files to include every cached file that
+     * (transitively) includes one of them. Those consumers must be re-parsed
+     * so that their cross-file inferred types (e.g. a process's record output)
+     * are recomputed from fresh AST nodes rather than stale cached metadata.
+     *
+     * @param uris
+     */
+    @Override
+    protected Set<URI> expandInvalidation(Set<URI> uris) {
+        // reverse include graph: module uri -> files that include it
+        var dependents = new HashMap<URI, Set<URI>>();
+        for( var uri : getUris() ) {
+            for( var include : getIncludeNodes(uri) ) {
+                var depUri = localIncludeUri(uri, include.source.getText());
+                if( depUri != null )
+                    dependents.computeIfAbsent(depUri, (k) -> new HashSet<>()).add(uri);
+            }
+        }
+        if( dependents.isEmpty() )
+            return uris;
+
+        var result = new HashSet<>(uris);
+        var queue = new ArrayDeque<>(uris);
+        while( !queue.isEmpty() ) {
+            var uri = queue.poll();
+            for( var consumer : dependents.getOrDefault(uri, Collections.emptySet()) ) {
+                if( result.add(consumer) )
+                    queue.add(consumer);
+            }
+        }
+        return result;
     }
 
     /**
