@@ -497,6 +497,27 @@ class TypeCheckingTest extends Specification {
         "2 in [2]"      | null
         // "[2] == ['2']"  | "The `==` operator is not defined for operands with types List<Integer> and List<String>"
         "[2] == [2]"    | null
+        "['a', 'b', 'c'][0]"        | null
+        "['a', 'b', 'c'][0..-2]"    | null
+        "['a', 'b', 'c'][0..1]"     | null
+        "['a', 'b', 'c'][1..<3]"    | null
+    }
+
+    @Unroll
+    def 'should resolve list slicing to the list type' () {
+        given:
+        def exp = parseExpression(
+            """\
+            workflow { ${SOURCE} }
+            """
+        )
+        expect:
+        TypesEx.getName(getType(exp)) == TYPE
+
+        where:
+        SOURCE                      | TYPE
+        "['a', 'b', 'c'][0]"        | 'String'
+        "['a', 'b', 'c'][0..-2]"    | 'List<String>'
     }
 
     def 'should recognize duration literals' () {

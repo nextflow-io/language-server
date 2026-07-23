@@ -111,6 +111,8 @@ interface ListOps<E> {
 
     E getAt(List<E> a, Integer b);
 
+    List<E> getAt(List<E> a, List<Integer> b);
+
     Boolean isCase(E a, List<E> b);
 
     List<E> multiply(List<E> a, Integer b);
