@@ -44,11 +44,6 @@ public interface List<E> extends Iterable<E> {
     List<List<E>> collate(int size, int step);
 
     @Description("""
-        Returns the first value in the list that satisfies the given condition.
-    """)
-    E find(Predicate<E> condition);
-
-    @Description("""
         Returns the first element in the list. Raises an error if the list is empty.
     """)
     E first();

@@ -65,6 +65,11 @@ public interface Iterable<E> {
     boolean every(Predicate<E> predicate);
 
     @Description("""
+        Returns the first value in the iterable that satisfies the given condition.
+    """)
+    E find(Predicate<E> condition);
+
+    @Description("""
         Returns the elements in the iterable that satisfy the given condition.
     """)
     Iterable<E> findAll(Predicate<E> predicate);
