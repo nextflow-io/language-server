@@ -16,6 +16,7 @@
 package nextflow.lsp.services.script;
 
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -138,11 +139,13 @@ public class ScriptAstCache extends ASTNodeCache {
             new ParameterSchemaVisitor(sourceUnit).visit();
         }
 
-        for( var uri : changedUris ) {
+        // phase 4: type checking -- included modules must be checked before the
+        // files that include them, so that cross-file inferred types (e.g. a
+        // process's record output) are resolved before a consumer reads them
+        for( var uri : orderByDependencies(changedUris) ) {
             var sourceUnit = getSourceUnit(uri);
             if( sourceUnit == null || sourceUnit.getErrorCollector().hasErrors() )
                 continue;
-            // phase 4: type checking
             if( sourceUnit.getAST() instanceof ScriptNode sn ) {
                 if( sn.isTypingEnabled() )
                     new TypeCheckingVisitorEx(sourceUnit).visit();
@@ -152,6 +155,53 @@ public class ScriptAstCache extends ASTNodeCache {
         }
 
         return changedUris;
+    }
+
+    /**
+     * Order the given URIs so that a file appears after every module it
+     * includes (dependencies first), via depth-first post-order traversal.
+     * Only local includes among the given URIs are considered.
+     *
+     * @param uris
+     */
+    private List<URI> orderByDependencies(Set<URI> uris) {
+        var ordered = new ArrayList<URI>(uris.size());
+        var visited = new HashSet<URI>();
+        for( var uri : uris )
+            visitDependencies(uri, uris, visited, ordered);
+        return ordered;
+    }
+
+    private void visitDependencies(URI uri, Set<URI> uris, Set<URI> visited, List<URI> ordered) {
+        if( !visited.add(uri) )
+            return;
+        for( var include : getIncludeNodes(uri) ) {
+            var depUri = localIncludeUri(uri, include.source.getText());
+            if( depUri != null && uris.contains(depUri) )
+                visitDependencies(depUri, uris, visited, ordered);
+        }
+        ordered.add(uri);
+    }
+
+    /**
+     * Resolve a local include source to its module URI, mirroring
+     * ModuleResolver. Returns null for plugin and remote includes.
+     *
+     * @param uri the including file
+     * @param source the include source string
+     */
+    private static URI localIncludeUri(URI uri, String source) {
+        if( source.startsWith("plugin/") )
+            return null;
+        if( !source.startsWith("/") && !source.startsWith("./") && !source.startsWith("../") )
+            return null;
+        var parent = Path.of(uri).getParent();
+        var includePath = parent.resolve(source);
+        if( Files.isDirectory(includePath) )
+            includePath = includePath.resolve("main.nf");
+        else if( !source.endsWith(".nf") )
+            includePath = Path.of(includePath.toString() + ".nf");
+        return includePath.normalize().toUri();
     }
 
     private List<ClassNode> libImports() {

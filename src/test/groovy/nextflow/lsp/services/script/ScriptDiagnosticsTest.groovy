@@ -84,6 +84,66 @@ class ScriptDiagnosticsTest extends Specification {
         diagnostics.any { it.getSeverity() == DiagnosticSeverity.Error }
     }
 
+    def 'should resolve types for included scripts before including scripts' () {
+        given:
+        def client = new TestLanguageClient()
+        def service = getScriptService(client)
+        // filenames chosen so the entry file iterates before its modules in
+        // the unordered change set, exercising the check-ordering bug
+        def mainUri = getUri('workflow.nf')
+        def producerUri = getUri('producer.nf')
+        def consumerUri = getUri('consumer.nf')
+
+        when:
+        open(service, producerUri, '''\
+            nextflow.enable.types = true
+
+            process PRODUCER {
+                input:
+                record(id: String)
+
+                output:
+                record(id: id, data: file('data.txt'))
+
+                script:
+                """
+                echo hello > data.txt
+                """
+            }
+            ''')
+        open(service, consumerUri, '''\
+            nextflow.enable.types = true
+
+            process CONSUMER {
+                input:
+                record(id: String, data: Path)
+
+                output:
+                record(id: id)
+
+                script:
+                """
+                cat ${data}
+                """
+            }
+            ''')
+        open(service, mainUri, '''\
+            nextflow.enable.types = true
+
+            include { PRODUCER } from './producer.nf'
+            include { CONSUMER } from './consumer.nf'
+
+            workflow {
+                ch_produced = PRODUCER(channel.of(record(id: 'sample1')))
+                CONSUMER(ch_produced)
+            }
+            ''')
+        service.updateNow()
+        def diagnostics = client.getDiagnostics(mainUri)
+        then:
+        diagnostics.findAll { it.message.contains('is not compatible with process input') } == []
+    }
+
     def 'should clear diagnostics when an error is fixed' () {
         given:
         def client = new TestLanguageClient()
