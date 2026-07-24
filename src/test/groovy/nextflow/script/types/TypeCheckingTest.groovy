@@ -629,7 +629,6 @@ class TypeCheckingTest extends Specification {
         'channel.fromList(1..10).flatMap { n -> 1..n }' | 'Channel<Integer>'
     }
 
-    @Ignore("todo")
     def 'should resolve generic functional parameter types' () {
         when:
         def exp = parseExpression(

@@ -426,8 +426,9 @@ public class TypeCheckingUtils {
         var context = GenericsUtils.extractPlaceholders(receiverType);
         var methodTypeParameters = applyGenericsContext(context, method.getGenericsTypes());
 
-        // resolve type parameters of method
-        var parameters = method.getParameters();
+        // resolve type parameters of method (clone so the shared method node,
+        // whose parameter array is reused across calls, is never mutated)
+        var parameters = method.getParameters().clone();
 
         if( methodTypeParameters != null ) {
             var resolvedPlaceholders = new HashMap<GenericsTypeName, GenericsType>();
@@ -444,6 +445,17 @@ public class TypeCheckingUtils {
             var expandedParams = expandVargs(parameters, arguments.size());
             var connections = extractGenericsConnectionsFromArguments(methodTypeParameters, expandedParams, arguments);
             applyGenericsConnections(connections, resolvedPlaceholders);
+
+            // resolve the functional-interface parameters, which were left
+            // unresolved above so that method type params could be inferred
+            // from the corresponding closure arguments
+            for( int i = 0; i < parameters.length; i++ ) {
+                if( !TypesEx.isFunctionalInterface(parameters[i].getType()) )
+                    continue;
+                var paramType = applyGenericsContext(context, parameters[i].getType());
+                paramType = applyGenericsContext(resolvedPlaceholders, paramType);
+                parameters[i] = new Parameter(paramType, parameters[i].getName());
+            }
 
             returnType = applyGenericsContext(resolvedPlaceholders, returnType);
         }
