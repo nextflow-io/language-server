@@ -160,10 +160,10 @@ public class ConfigSpecFactory {
             var name = (String) m.get("name");
             var argumentNames = (List) m.get("typeArguments");
             var rawType = rawType(name);
-            var typeArguments = argumentNames.stream()
-                .map(el -> (Type) rawType((String) el))
+            var typeArguments = (Type[]) argumentNames.stream()
+                .map(el -> fromType(el))
                 .toArray(Type[]::new);
-            return new ParameterizedTypeImpl(rawType, (Type[]) typeArguments);
+            return new ParameterizedTypeImpl(rawType, typeArguments);
         }
         throw new IllegalStateException();
     }

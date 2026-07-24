@@ -25,6 +25,7 @@ import nextflow.script.types.MemoryUnit;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
@@ -36,7 +37,7 @@ import org.codehaus.groovy.ast.stmt.EmptyStatement;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class ScriptSpecFactory {
-    
+
     public static List<MethodNode> fromDefinitions(List<Map> definitions, String type) {
         return definitions.stream()
             .filter(node -> type.equals(node.get("type")))
@@ -92,14 +93,24 @@ public class ScriptSpecFactory {
 
     private static ClassNode fromType(Object type) {
         if( type instanceof String s ) {
-            return STANDARD_TYPES.getOrDefault(s, ClassHelper.dynamicType());
+            return rawType(s);
         }
         if( type instanceof Map m ) {
             var name = (String) m.get("name");
-            // TODO: type arguments
-            return STANDARD_TYPES.getOrDefault(name, ClassHelper.dynamicType());
+            var rawType = rawType(name);
+            var argumentNames = (List) m.get("typeArguments");
+            var genericsTypes = (GenericsType[]) argumentNames.stream()
+                .map(el -> new GenericsType(fromType(el)))
+                .toArray(GenericsType[]::new);
+            var result = rawType.getPlainNodeReference();
+            result.setGenericsTypes(genericsTypes);
+            return result;
         }
         throw new IllegalStateException();
+    }
+
+    private static ClassNode rawType(String name) {
+        return STANDARD_TYPES.getOrDefault(name, ClassHelper.dynamicType());
     }
 
 }
