@@ -331,7 +331,7 @@ class TypeCheckingTest extends Specification {
         where:
         SOURCE                              | ERROR
         'def x: String ; x = 42'            | "Assignment target with type String cannot be assigned to value with type Integer"
-        // "def x: List<String> ; x = [42]"    | "Assignment target with type List<String> cannot be assigned to value with type List<Integer>"
+        "def x: List<String> ; x = [42]"    | "Assignment target with type List<String> cannot be assigned to value with type List<Integer>"
         "def x: List<String> ; x = []"      | null
     }
 
@@ -509,7 +509,7 @@ class TypeCheckingTest extends Specification {
         "2 == 2"        | null
         "2 in ['2']"    | "The `in` operator is not defined for operands with types Integer and List<String>"
         "2 in [2]"      | null
-        // "[2] == ['2']"  | "The `==` operator is not defined for operands with types List<Integer> and List<String>"
+        "[2] == ['2']"  | "The `==` operator is not defined for operands with types List<Integer> and List<String>"
         "[2] == [2]"    | null
         "['a', 'b', 'c'][0]"        | null
         "['a', 'b', 'c'][0..-2]"    | null

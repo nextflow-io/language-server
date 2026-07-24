@@ -429,7 +429,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             sourceType = resultType;
         }
 
-        if( TypesEx.isAssignableFrom(targetType, sourceType) ) {
+        if( TypesEx.isAssignableFrom(targetType, sourceType, true) ) {
             if( target instanceof VariableExpression ve && ve.isDynamicTyped() )
                 target.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, sourceType);
             else if( target instanceof TupleExpression te )
@@ -717,7 +717,9 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
      * @param args
      */
     private void checkNamedParams(Parameter param, MapExpression args) {
-        if( !TypesEx.isEqual(param.getType(), ClassHelper.MAP_TYPE) )
+        // compare raw types -- the named-params map carries injected field info as
+        // type arguments, and MAP_TYPE carries its K,V placeholders
+        if( !TypesEx.isEqual(param.getType().getPlainNodeReference(), ClassHelper.MAP_TYPE.getPlainNodeReference()) )
             return;
 
         var namedParams = asNamedParams(param);

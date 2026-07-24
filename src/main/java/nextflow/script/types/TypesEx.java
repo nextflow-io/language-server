@@ -82,10 +82,7 @@ public class TypesEx {
             return true;
         if( isRecordType(target) && (PARAMS_TYPE.equals(source) || isRecordType(source)) )
             return isAssignableFromRecord(target, source);
-        if( target.equals(source) )
-            return true;
-        return target.isResolved() && source.isResolved()
-            && isAssignableFrom(target.getTypeClass(), source.getTypeClass())
+        return isAssignableFrom0(target, source)
             && (!checkGenerics || isAssignableFrom(target.getGenericsTypes(), source.getGenericsTypes()));
     }
 
@@ -104,6 +101,13 @@ public class TypesEx {
         return isAssignableFrom(target, source, false);
     }
 
+    private static boolean isAssignableFrom0(ClassNode target, ClassNode source) {
+        if( target.equals(source) )
+            return true;
+        return target.isResolved() && source.isResolved()
+            && isAssignableFrom(target.getTypeClass(), source.getTypeClass());
+    }
+
     public static boolean isAssignableFrom(Class target, Class source) {
         target = normalize(target);
         source = normalize(source);
@@ -118,7 +122,9 @@ public class TypesEx {
         if( a.length != b.length )
             return false;
         for( int i = 0; i < a.length; i++ ) {
-            if( a[i].isWildcard() )
+            // a wildcard target or an unresolved source element (e.g. the element
+            // type of an empty list literal) matches any element type
+            if( a[i].isWildcard() || b[i].isPlaceholder() )
                 continue;
             if( !isEqual(a[i].getType(), b[i].getType()) )
                 return false;
@@ -135,11 +141,15 @@ public class TypesEx {
     public static boolean isEqual(ClassNode a, ClassNode b) {
         if( a == null || b == null )
             return false;
+        return isEqual0(a, b)
+            && isEqual(a.getGenericsTypes(), b.getGenericsTypes());
+    }
+
+    private static boolean isEqual0(ClassNode a, ClassNode b) {
         if( a.equals(b) )
             return true;
         return a.isResolved() && b.isResolved()
-            && isEqual(a.getTypeClass(), b.getTypeClass())
-            && isEqual(a.getGenericsTypes(), b.getGenericsTypes());
+            && isEqual(a.getTypeClass(), b.getTypeClass());
     }
 
     private static boolean isEqual(Class a, Class b) {
