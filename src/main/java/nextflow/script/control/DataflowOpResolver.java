@@ -25,13 +25,18 @@ import nextflow.script.types.Record;
 import nextflow.script.types.Tuple;
 import nextflow.script.types.TypesEx;
 import nextflow.script.types.Value;
+import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.NamedArgumentListExpression;
+import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
+import org.codehaus.groovy.syntax.SyntaxException;
 
 import static nextflow.script.ast.ASTUtils.*;
 import static nextflow.script.types.TypeCheckingUtils.*;
@@ -48,9 +53,11 @@ class DataflowOpResolver {
     private static final ClassNode VALUE_TYPE = ClassHelper.makeCached(Value.class);
 
     private ClassNode receiverType;
+    private SourceUnit sourceUnit;
 
-    public DataflowOpResolver(ClassNode receiverType) {
+    public DataflowOpResolver(ClassNode receiverType, SourceUnit sourceUnit) {
         this.receiverType = receiverType;
+        this.sourceUnit = sourceUnit;
     }
 
     /**
@@ -174,7 +181,7 @@ class DataflowOpResolver {
      * Resolve the result type of a `join` operation in terms of the left
      * and right operands.
      *
-     * Given two metching records R1 and R2, `join` produces R1 + R2.
+     * Given two matching records R1 and R2, `join` produces R1 + R2.
      *
      * @param lhsType
      * @param arguments
@@ -186,15 +193,55 @@ class DataflowOpResolver {
         var rhsType = dataflowElementType(argType);
         if( !TypesEx.isRecordType(rhsType) )
             return ClassHelper.dynamicType();
-        // TODO: report error if `by` field is not in both records
+        checkJoinByFields(lhsType, rhsType, arguments);
         var elementType = recordSumType(lhsType, rhsType);
         return makeType(CHANNEL_TYPE, elementType);
+    }
+
+    private void checkJoinByFields(ClassNode lhsType, ClassNode rhsType, List<Expression> arguments) {
+        // Report an error if the `by` field of a `join` operation is not present in both records.
+        if( arguments.isEmpty() || !(arguments.get(0) instanceof NamedArgumentListExpression nale) )
+            return;
+        for( var entry : nale.getMapEntryExpressions() ) {
+            if( !"by".equals(entry.getKeyExpression().getText()) )
+                continue;
+            var field = entry.getValueExpression();
+            if( !(field instanceof ConstantExpression ce) || !(ce.getValue() instanceof String name) )
+                continue;
+            if( lhsType.getField(name) == null )
+                addError("Join field `" + name + "` is not present in left-hand side", field);
+            if( rhsType.getField(name) == null )
+                addError("Join field `" + name + "` is not present in right-hand side", field);
+        }
     }
 
     private static ClassNode dataflowElementType(ClassNode type) {
         if( CHANNEL_TYPE.equals(type) || VALUE_TYPE.equals(type) )
             return elementType(type);
         return ClassHelper.dynamicType();
+    }
+
+    private void addError(String message, ASTNode node) {
+        var cause = new TypeError(message, node);
+        var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
+        sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
+    }
+
+    private class TypeError extends SyntaxException implements PhaseAware, SeverityAware {
+
+        public TypeError(String message, ASTNode node) {
+            super(message, node);
+        }
+
+        @Override
+        public int getPhase() {
+            return Phases.TYPE_CHECKING;
+        }
+
+        @Override
+        public boolean isSoftError() {
+            return true;
+        }
     }
 
 }

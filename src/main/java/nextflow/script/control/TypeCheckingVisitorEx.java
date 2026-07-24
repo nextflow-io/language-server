@@ -629,7 +629,7 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
         var lhsType = elementType(receiverType);
         var arguments = asMethodCallArguments(node);
-        var resultType = new DataflowOpResolver(receiverType).apply(lhsType, method, arguments);
+        var resultType = new DataflowOpResolver(receiverType, sourceUnit).apply(lhsType, method, arguments);
         if( ClassHelper.isDynamicTyped(resultType) )
             return;
 
@@ -1019,7 +1019,6 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
                     : resolveOpResultType(lhsType, rhsType, lhsOps, rhsOps, "compareTo");
                 break;
 
-            // TODO: =~: (String, String) -> Matcher
             case Types.FIND_REGEX:
                 resultType = TypesEx.isEqual(ClassHelper.STRING_TYPE, lhsType) && TypesEx.isEqual(ClassHelper.STRING_TYPE, rhsType) ? ClassHelper.dynamicType() : null;
                 break;

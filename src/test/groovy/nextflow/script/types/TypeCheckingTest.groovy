@@ -1335,4 +1335,19 @@ class TypeCheckingTest extends Specification {
         TypesEx.getName(type) == 'Channel<Record {\n    id: Integer\n    name: String\n    alive: Boolean\n}>'
     }
 
+    def 'should report an error for a `join` field that is not in both records' () {
+        when:
+        def errors = getErrors(
+            '''\
+            left  = channel.of( record(id: 42, name: 'hello') )
+            right = channel.of( record(id: 42, alive: true) )
+            left.join(right, by: 'sample_id')
+            '''
+        )
+        then:
+        errors.size() == 2
+        errors[0].getOriginalMessage() == 'Join field `sample_id` is not present in left-hand side'
+        errors[1].getOriginalMessage() == 'Join field `sample_id` is not present in right-hand side'
+    }
+
 }
