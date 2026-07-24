@@ -110,6 +110,20 @@ class TypeCheckingTest extends Specification {
         return true
     }
 
+    @Unroll
+    def 'should report legacy type annotations' () {
+        expect:
+        check(SOURCE, ERROR)
+
+        where:
+        SOURCE                                          | ERROR
+        "String x = 'a'"                                | "Legacy type annotations are not supported with static typing -- use `name: Type` instead"
+        "def String x = 'a'"                            | "Legacy type annotations are not supported with static typing -- use `name: Type` instead"
+        "def hello(String x) { return x }"              | "Legacy type annotations are not supported with static typing -- use `name: Type` instead"
+        "def x: String = 'a'"                           | null
+        "def hello(x: String) { return x }"             | null
+    }
+
     def 'should check a parameter declaration' () {
         when:
         def errors = getErrors(

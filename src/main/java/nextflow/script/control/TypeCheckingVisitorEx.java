@@ -277,8 +277,10 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitFunction(FunctionNode node) {
         // visit parameters and code
-        for( var parameter : node.getParameters() )
+        for( var parameter : node.getParameters() ) {
+            checkLegacyType(parameter.getType(), parameter);
             visitParameter(parameter, false);
+        }
         visit(node.getCode());
 
         // check return statements against declared return type
@@ -373,7 +375,23 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     @Override
     public void visitDeclarationExpression(DeclarationExpression node) {
+        checkLegacyType(node.getLeftExpression());
         applyAssignment(node);
+    }
+
+    private void checkLegacyType(Expression target) {
+        if( target instanceof VariableExpression ve ) {
+            checkLegacyType(ve.getType(), ve);
+        }
+        else if( target instanceof TupleExpression te ) {
+            for( var el : te.getExpressions() )
+                checkLegacyType(el);
+        }
+    }
+
+    private void checkLegacyType(ClassNode type, ASTNode node) {
+        if( type.getNodeMetaData(ASTNodeMarker.LEGACY_TYPE) != null )
+            addError("Legacy type annotations are not supported with static typing -- use `name: Type` instead", node);
     }
 
     private void applyAssignment(BinaryExpression node) {
