@@ -98,10 +98,9 @@ public class JsonUtils {
     }
 
     private static JsonElement getObjectPath(Object json, String path) {
-        if( !(json instanceof JsonObject) )
+        if( !(json instanceof JsonObject object) )
             return null;
 
-        JsonObject object = (JsonObject) json;
         var names = path.split("\\.");
         for( int i = 0; i < names.length - 1; i++ ) {
             var scope = names[i];

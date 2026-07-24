@@ -86,12 +86,12 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     public void visit() {
         var moduleNode = sourceUnit.getAST();
-        if( moduleNode instanceof ConfigNode cn ) {
-            this.spec = getPluginScopes(cn);
-            cn.setSpec(spec);
-            super.visit(cn);
-            this.spec = null;
-        }
+        if( !(moduleNode instanceof ConfigNode cn) )
+            return;
+        this.spec = getPluginScopes(cn);
+        cn.setSpec(spec);
+        super.visit(cn);
+        this.spec = null;
     }
 
     private SpecNode.Scope getPluginScopes(ConfigNode cn) {

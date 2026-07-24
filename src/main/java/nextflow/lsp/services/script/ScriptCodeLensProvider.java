@@ -156,7 +156,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
                 addTextEdit(textEdits, uri, range, newText);
             }
         }
-            
+
         return Map.of("applyEdit", (Object) new WorkspaceEdit(textEdits));
     }
 
@@ -192,7 +192,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             var newText = "nextflow.enable.types = true\n\n";
             addTextEdit(textEdits, uri, range, newText);
         }
-            
+
         return Map.of("applyEdit", (Object) new WorkspaceEdit(textEdits));
     }
 

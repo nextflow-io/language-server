@@ -71,11 +71,11 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
 
     public void visit() {
         var moduleNode = sourceUnit.getAST();
-        if( moduleNode instanceof ScriptNode sn ) {
-            if( sn.getEntry() != null && sn.getParams() == null ) {
-                paramsType = declareParamsFromSchema(sn.getEntry());
-                visitWorkflow(sn.getEntry());
-            }
+        if( !(moduleNode instanceof ScriptNode sn) )
+            return;
+        if( sn.getEntry() != null && sn.getParams() == null ) {
+            this.paramsType = declareParamsFromSchema(sn.getEntry());
+            visitWorkflow(sn.getEntry());
         }
     }
 
@@ -170,15 +170,13 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
     }
 
     private static Optional<Map> asMap(Object value) {
-        return value instanceof Map
-            ? Optional.of((Map) value)
+        return value instanceof Map m
+            ? Optional.of(m)
             : Optional.empty();
     }
 
     private static String asString(Object value) {
-        return value instanceof String
-            ? (String) value
-            : null;
+        return value instanceof String s ? s : null;
     }
 
     private ClassNode getTypeClassFromString(String type) {
@@ -201,9 +199,8 @@ public class ParameterSchemaVisitor extends ScriptVisitorSupport {
         // NOTE: should be incorporated into type-checking visitor
         if( paramsType == null )
             return;
-        if( !(node.getObjectExpression() instanceof VariableExpression) )
+        if( !(node.getObjectExpression() instanceof VariableExpression ve) )
             return;
-        var ve = (VariableExpression) node.getObjectExpression();
         if( !"params".equals(ve.getName()) )
             return;
         var property = node.getPropertyAsString();

@@ -146,12 +146,12 @@ public class ScriptAstCache extends ASTNodeCache {
             var sourceUnit = getSourceUnit(uri);
             if( sourceUnit == null || sourceUnit.getErrorCollector().hasErrors() )
                 continue;
-            if( sourceUnit.getAST() instanceof ScriptNode sn ) {
-                if( sn.isTypingEnabled() )
-                    new TypeCheckingVisitorEx(sourceUnit).visit();
-                else
-                    new TypeCheckingVisitor(sourceUnit).visit();
-            }
+            if( !(sourceUnit.getAST() instanceof ScriptNode sn) )
+                continue;
+            if( sn.isTypingEnabled() )
+                new TypeCheckingVisitorEx(sourceUnit).visit();
+            else
+                new TypeCheckingVisitor(sourceUnit).visit();
         }
 
         return changedUris;

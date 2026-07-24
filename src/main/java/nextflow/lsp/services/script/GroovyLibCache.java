@@ -150,9 +150,8 @@ public class GroovyLibCache {
             var errors = sourceUnit.getErrorCollector().getErrors();
             if( errors != null ) {
                 for( var error : errors ) {
-                    if( !(error instanceof SyntaxErrorMessage) )
+                    if( !(error instanceof SyntaxErrorMessage sem) )
                         continue;
-                    var sem = (SyntaxErrorMessage) error;
                     var cause = sem.getCause();
                     System.err.println(String.format("Groovy syntax error in %s -- %s: %s", uri.getPath(), cause, cause.getMessage()));
                 }

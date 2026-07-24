@@ -93,9 +93,9 @@ class ConfigLinkVisitor extends ConfigVisitorSupport {
 
     @Override
     public void visitConfigInclude(ConfigIncludeNode node) {
-        if( !(node.source instanceof ConstantExpression) )
+        if( !(node.source instanceof ConstantExpression ce) )
             return;
-        var source = node.source.getText();
+        var source = ce.getText();
         var range = LanguageServerUtils.astNodeToRange(node.source);
         var target = getIncludeUri(uri, source).toString();
         links.add(new DocumentLink(range, target));

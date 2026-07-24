@@ -89,11 +89,9 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     public void visit() {
         var moduleNode = sourceUnit.getAST();
-        if( !(moduleNode instanceof ScriptNode) )
+        if( !(moduleNode instanceof ScriptNode sn) )
             return;
-        var scriptNode = (ScriptNode) moduleNode;
-
-        for( var wn : scriptNode.getWorkflows() )
+        for( var wn : sn.getWorkflows() )
             visitWorkflow(wn);
     }
 

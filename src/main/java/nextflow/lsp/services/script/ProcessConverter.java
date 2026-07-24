@@ -251,13 +251,13 @@ class ProcessConverter {
         if( statements.size() != 1 )
             return;
         var es = (ExpressionStatement) statements.get(0);
-        if( es.getExpression() instanceof AssignmentExpression ae ) {
-            var target = (VariableExpression) ae.getLeftExpression();
-            if( !target.getName().startsWith("$out") )
-                return;
-            var source = ae.getRightExpression();
-            es.setExpression(source);
-        }
+        if( !(es.getExpression() instanceof AssignmentExpression ae) )
+            return;
+        var target = (VariableExpression) ae.getLeftExpression();
+        if( !target.getName().startsWith("$out") )
+            return;
+        var source = ae.getRightExpression();
+        es.setExpression(source);
     }
 
     private static final Token RIGHT_SHIFT = Token.newSymbol(Types.RIGHT_SHIFT, -1, -1);
@@ -283,7 +283,7 @@ class ProcessConverter {
             if( !hasEmit )
                 return null;
         }
-        var outputName = hasEmit 
+        var outputName = hasEmit
             ? namedArgs.get("emit").getText()
             : String.format("$out%d", nextOutputId++);
         return stmt(new AssignmentExpression(varX(outputName), outputValue));

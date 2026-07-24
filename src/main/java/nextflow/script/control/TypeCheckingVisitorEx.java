@@ -115,20 +115,20 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
     public void visit() {
         var moduleNode = sourceUnit.getAST();
-        if( moduleNode instanceof ScriptNode sn ) {
-            for( var featureFlag : sn.getFeatureFlags() )
-                visitFeatureFlag(featureFlag);
-            if( sn.getParams() != null )
-                visitParams(sn.getParams());
-            for( var functionNode : sn.getFunctions() )
-                visitFunction(functionNode);
-            for( var processNode : sn.getProcesses() )
-                visitProcess(processNode);
-            for( var workflowNode : sn.getWorkflows() )
-                visitWorkflow(workflowNode);
-            if( sn.getOutputs() != null )
-                visitOutputs(sn.getOutputs());
-        }
+        if( !(moduleNode instanceof ScriptNode sn) )
+            return;
+        for( var featureFlag : sn.getFeatureFlags() )
+            visitFeatureFlag(featureFlag);
+        if( sn.getParams() != null )
+            visitParams(sn.getParams());
+        for( var functionNode : sn.getFunctions() )
+            visitFunction(functionNode);
+        for( var processNode : sn.getProcesses() )
+            visitProcess(processNode);
+        for( var workflowNode : sn.getWorkflows() )
+            visitWorkflow(workflowNode);
+        if( sn.getOutputs() != null )
+            visitOutputs(sn.getOutputs());
     }
 
     // script declarations
@@ -312,12 +312,10 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         if( args.size() != 1 )
             return false;
         var firstArg = args.get(0);
-        if( !(firstArg instanceof ClosureExpression) )
+        if( !(firstArg instanceof ClosureExpression closure) )
             return false;
-        var closure = (ClosureExpression) firstArg;
-        if( closure.getParameters().length == 1 ) {
+        if( closure.getParameters().length == 1 )
             closure.getParameters()[0].setType(elementType);
-        }
         var code = (BlockStatement) closure.getCode();
         boolean checkPublish = code.getStatements().stream().anyMatch(stmt -> (
             asPublishStatement(stmt) != null
@@ -754,12 +752,12 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
         var parameters = method.getParameters();
         for( int i = 0; i < arguments.size(); i++ ) {
             var argument = arguments.get(i);
-            if( argument instanceof ClosureExpression source ) {
-                var target = parameters[i];
-                var resolvedPlaceholders = resolveGenericsConnections(receiverType, method, arguments);
-                var samParameterTypes = resolveClosureParameterTypes(source, target, resolvedPlaceholders);
-                argument.visit(this);
-            }
+            if( !(argument instanceof ClosureExpression source) )
+                continue;
+            var target = parameters[i];
+            var resolvedPlaceholders = resolveGenericsConnections(receiverType, method, arguments);
+            var samParameterTypes = resolveClosureParameterTypes(source, target, resolvedPlaceholders);
+            argument.visit(this);
         }
     }
 
