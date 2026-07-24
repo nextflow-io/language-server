@@ -617,6 +617,10 @@ class TypeCheckingTest extends Specification {
         where:
         SOURCE                              | TYPE
         '[1, 2, 3]'                         | 'List<Integer>'
+        '[x: 1, y: 2]'                      | 'Map<String, Integer>'
+        "[x: '1', y: 2]"                    | 'Map<String, ?>'
+        "([x: '1'] + [y: '2']).keySet()"    | 'Set<String>'
+        "([x: '1'] + [y: '2']).values()"    | 'Bag<String>'
         '[1, 2, 3].first()'                 | 'Integer'
         'channel.value("42")'               | 'Value<String>'
         'channel.of(1, 2, 3)'               | 'Channel<Integer>'

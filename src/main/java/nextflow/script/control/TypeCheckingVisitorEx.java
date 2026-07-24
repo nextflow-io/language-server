@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
@@ -1195,7 +1196,23 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
     @Override
     public void visitMapExpression(MapExpression node) {
         super.visitMapExpression(node);
-        node.setType(ClassHelper.MAP_TYPE.getPlainNodeReference());
+
+        var entries = node.getMapEntryExpressions();
+        if( entries.isEmpty() ) {
+            node.setType(ClassHelper.MAP_TYPE.getPlainNodeReference());
+            return;
+        }
+
+        // infer key and value type args, falling back to `?` when heterogeneous
+        var keyType = commonType(entries.stream().map(e -> getType(e.getKeyExpression())));
+        var valueType = commonType(entries.stream().map(e -> getType(e.getValueExpression())));
+        var resultType = makeType(ClassHelper.MAP_TYPE, keyType, valueType);
+        node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
+    }
+
+    private static ClassNode commonType(Stream<ClassNode> types) {
+        return types.reduce((a, b) -> TypesEx.isEqual(a, b) ? a : ClassHelper.dynamicType())
+            .orElse(ClassHelper.dynamicType());
     }
 
     @Override
