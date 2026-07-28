@@ -473,6 +473,22 @@ class TypeCheckingTest extends Specification {
     }
 
     @Unroll
+    def 'should check call arguments that infer conflicting type arguments' () {
+        expect:
+        check("workflow { ${SOURCE} }", ERROR)
+
+        where:
+        SOURCE                          | ERROR
+        "channel.of(1, 'a')"            | "Argument with type String is not compatible with parameter of type Integer"
+        "channel.of('a', 1)"            | "Argument with type Integer is not compatible with parameter of type String"
+        "channel.of(1, 2, 'a')"         | "Argument with type String is not compatible with parameter of type Integer"
+        "channel.of([1], ['a'])"        | "Argument with type List<String> is not compatible with parameter of type List<Integer>"
+        "channel.of(1, 2)"              | null
+        "channel.of([1], [2])"          | null
+        "channel.of(1).reduce(0) { a, b -> 'x' }" | "Return value with type String does not match the declared return type (Integer)"
+    }
+
+    @Unroll
     def 'should check a namespaced function call' () {
         expect:
         check(SOURCE, ERROR)

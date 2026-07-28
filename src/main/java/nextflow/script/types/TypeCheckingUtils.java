@@ -417,8 +417,9 @@ public class TypeCheckingUtils {
      * @param receiverType
      * @param method
      * @param arguments
+     * @param conflicts
      */
-    public static MethodNode resolveGenericReturnType(ClassNode receiverType, MethodNode method, List<Expression> arguments) {
+    public static MethodNode resolveGenericReturnType(ClassNode receiverType, MethodNode method, List<Expression> arguments, List<GenericsConflict> conflicts) {
         var returnType = method.getReturnType();
         if( !GenericsUtils.hasUnresolvedGenerics(returnType) )
             return method;
@@ -443,7 +444,7 @@ public class TypeCheckingUtils {
             }
 
             var expandedParams = expandVargs(parameters, arguments.size());
-            var connections = extractGenericsConnectionsFromArguments(methodTypeParameters, expandedParams, arguments);
+            var connections = extractGenericsConnectionsFromArguments(methodTypeParameters, expandedParams, arguments, conflicts);
             applyGenericsConnections(connections, resolvedPlaceholders);
 
             // resolve the functional-interface parameters, which were left
@@ -489,13 +490,28 @@ public class TypeCheckingUtils {
     }
 
     /**
+     * A type parameter that was inferred as one type by an earlier call argument
+     * and a different type by a later one. For example, `channel.of(1, 'a')`
+     * infers E as both Integer and String.
+     *
+     * @param argument
+     * @param expectedType
+     * @param actualType
+     */
+    public record GenericsConflict(Expression argument, ClassNode expectedType, ClassNode actualType) {}
+
+    /**
      * Resolve type parameters declared by method from declaring type or call arguments.
+     *
+     * The first argument to infer a given type parameter wins. Any later argument
+     * that infers a different type is reported as a conflict.
      *
      * @param methodTypeParameters
      * @param parameters
      * @param arguments
+     * @param conflicts
      */
-    private static Map<GenericsTypeName, GenericsType> extractGenericsConnectionsFromArguments(GenericsType[] methodTypeParameters, Parameter[] parameters, List<Expression> arguments) {
+    private static Map<GenericsTypeName, GenericsType> extractGenericsConnectionsFromArguments(GenericsType[] methodTypeParameters, Parameter[] parameters, List<Expression> arguments, List<GenericsConflict> conflicts) {
         var result = new HashMap<GenericsTypeName, GenericsType>();
 
         for( int i = 0; i < arguments.size(); i++ ) {
@@ -508,8 +524,9 @@ public class TypeCheckingUtils {
 
             // extract generics connections from argument types
             var connections = new HashMap<GenericsTypeName, GenericsType>();
+            var isClosureArg = argument instanceof ClosureExpression && TypesEx.isFunctionalInterface(paramType);
 
-            if( argument instanceof ClosureExpression && TypesEx.isFunctionalInterface(paramType) ) {
+            if( isClosureArg ) {
                 var samTypeInfo = GenericsUtils.parameterizeSAM(paramType);
                 var samReturnType = samTypeInfo.getV2();
                 var returnType = (ClassNode) argument.getNodeMetaData(ASTNodeMarker.INFERRED_RETURN_TYPE);
@@ -521,15 +538,22 @@ public class TypeCheckingUtils {
 
             // apply connections to placeholders mapping
             connections.forEach((gtn, gt) -> {
-                // TODO: report error if connection already exists with different type
-                // if( result.containsKey(gtn) && result.get(gtn) != gt )
-                //     throw new Exception("...");
-
-                result.putIfAbsent(gtn, gt);
+                var existing = result.putIfAbsent(gtn, gt);
+                // a closure infers a type parameter from its return type, which is
+                // checked against the expected return type separately
+                if( existing != null && !isClosureArg && isConflict(existing, gt) )
+                    conflicts.add(new GenericsConflict(argument, existing.getType(), gt.getType()));
             });
         }
 
         return result;
+    }
+
+    private static boolean isConflict(GenericsType a, GenericsType b) {
+        // a dynamic type is not a witness for anything
+        if( ClassHelper.isObjectType(a.getType()) || ClassHelper.isObjectType(b.getType()) )
+            return false;
+        return !TypesEx.isEqual(a.getType(), b.getType());
     }
 
     /**
@@ -538,8 +562,6 @@ public class TypeCheckingUtils {
      * - When the target is a placeholder, it is simply assigned to
      *   the source type in the mapping. For example, Path and T
      *   yield T -> Path.
-     *
-     * - When the source type is a placeholder... ?
      *
      * - When the target type is assignable from the source type, their
      *   type arguments are compared for possible connections. For example,
@@ -558,10 +580,6 @@ public class TypeCheckingUtils {
         if( target.isGenericsPlaceHolder() ) {
             // given S and T, store T -> S
             storeGenericsConnection(connections, target.getUnresolvedName(), new GenericsType(type));
-        }
-        else if( type.isGenericsPlaceHolder() ) {
-            // given T -> List<S> and List<E>, store E -> S
-            extractGenericsConnections(connections, extractType(new GenericsType(type)), target);
         }
         else if( TypesEx.isAssignableFrom(target, type, false) ) {
             // given List<S> and Iterable<R>, store R -> S
@@ -594,13 +612,6 @@ public class TypeCheckingUtils {
         connections.put(new GenericsTypeName(placeholderName), gt);
     }
 
-    private static ClassNode extractType(GenericsType gt) {
-        // discard the placeholder if present
-        return gt.isPlaceholder()
-            ? gt.getType().redirect()
-            : gt.getType();
-    }
-
     /**
      * Apply generic type connections inferred from call arguments
      * to the given placeholders mapping.
@@ -623,46 +634,13 @@ public class TypeCheckingUtils {
             if( newValue == oldValue )
                 continue;
             if( newValue == null ) {
-                newValue = connections.get(entry.getKey());
-
-                // TODO: is this needed?
-                // if( newValue != null )
-                //     newValue = getCombinedGenericsType(oldValue, newValue);
-            }
-            if( newValue == null ) {
                 newValue = applyGenericsContext(connections, oldValue);
                 entry.setValue(newValue);
             }
             else if( !newValue.isPlaceholder() || newValue != resolvedPlaceholders.get(name) ) {
                 entry.setValue(newValue);
-
-                // TODO: is this needed?
-                // // GROOVY-6787: Don't override the original if the replacement doesn't respect the bounds otherwise
-                // // the original bounds are lost, which can result in accepting an incompatible type as an argument!
-                // var replacementType = extractType(newValue);
-                // var suitabilityType = !replacementType.isGenericsPlaceHolder()
-                //     ? replacementType
-                //     : Optional.ofNullable(replacementType.getGenericsTypes()).map(gts -> extractType(gts[0])).orElse(replacementType.redirect());
-
-                // if( oldValue.isCompatibleWith(suitabilityType) ) {
-                //     if( newValue.isWildcard() ) {
-                //         // GROOVY-9998: apply upper/lower bound for unknown
-                //         entry.setValue(replacementType.asGenericsType());
-                //     }
-                //     else {
-                //         entry.setValue(newValue);
-                //     }
-                // }
             }
         }
-    }
-
-    static GenericsType getCombinedGenericsType(GenericsType gt1, GenericsType gt2) {
-        if( gt1.isWildcard() != gt2.isWildcard() ) return gt2.isWildcard() ? gt1 : gt2;
-        // if( gt2.isPlaceholder() && gt2.getName().startsWith("#") ) return gt1;
-        // if( gt1.isPlaceholder() && gt1.getName().startsWith("#") ) return gt2;
-        // TODO: assert gt1 == gt2 ?
-        return gt1;
     }
 
     /**

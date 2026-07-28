@@ -531,7 +531,9 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             if( hasClosureArgs )
                 visitClosureArguments(receiverType, arguments, target);
 
-            var dummyMethod = resolveGenericReturnType(receiverType, target, arguments);
+            var conflicts = new ArrayList<GenericsConflict>();
+            var dummyMethod = resolveGenericReturnType(receiverType, target, arguments, conflicts);
+            checkGenericsConflicts(conflicts);
             node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, dummyMethod);
             node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, dummyMethod.getReturnType());
 
@@ -597,7 +599,9 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             var arguments = asMethodCallArguments(node);
             visitClosureArguments(elementType, arguments, target);
 
-            var dummyMethod = resolveGenericReturnType(elementType, target, arguments);
+            var conflicts = new ArrayList<GenericsConflict>();
+            var dummyMethod = resolveGenericReturnType(elementType, target, arguments, conflicts);
+            checkGenericsConflicts(conflicts);
             node.putNodeMetaData(ASTNodeMarker.METHOD_TARGET, dummyMethod);
 
             var resultType = makeType(receiverType, dummyMethod.getReturnType());
@@ -702,9 +706,25 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
                 addSoftError("Closure with signature " + TypesEx.getName(parameterTypes, returnType) + " is not compatible with expected signature: " + TypesEx.getName(paramType), argument);
             }
             else {
-                addSoftError("Argument with type " + TypesEx.getName(argType) + " is not compatible with parameter of type " + TypesEx.getName(paramType), argument);
+                addArgumentTypeError(argument, argType, paramType);
             }
         }
+    }
+
+    /**
+     * Report call arguments that inferred conflicting types for the same
+     * type parameter. For example, `channel.of(1, 'a')` infers the element
+     * type as both Integer and String.
+     *
+     * @param conflicts
+     */
+    private void checkGenericsConflicts(List<GenericsConflict> conflicts) {
+        for( var conflict : conflicts )
+            addArgumentTypeError(conflict.argument(), conflict.actualType(), conflict.expectedType());
+    }
+
+    private void addArgumentTypeError(Expression argument, ClassNode argType, ClassNode paramType) {
+        addSoftError("Argument with type " + TypesEx.getName(argType) + " is not compatible with parameter of type " + TypesEx.getName(paramType), argument);
     }
 
     /**
