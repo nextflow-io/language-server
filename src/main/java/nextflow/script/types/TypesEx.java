@@ -126,7 +126,7 @@ public class TypesEx {
             // `E` in `List<E>`) matches any element type
             if( a[i].isWildcard() || b[i].isWildcard() || b[i].isPlaceholder() )
                 continue;
-            if( !isEqual(a[i].getType(), b[i].getType()) )
+            if( !isAssignableFrom(a[i].getType(), b[i].getType(), true) )
                 return false;
         }
         return true;

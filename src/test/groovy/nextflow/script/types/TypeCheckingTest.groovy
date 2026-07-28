@@ -724,6 +724,36 @@ class TypeCheckingTest extends Specification {
         )
     }
 
+    def 'should check a record channel assignment' () {
+        expect:
+        check(
+            '''\
+            workflow {
+                def ch: Channel<Sample> = channel.of( record(id: '1', fastq: '1.fastq') )
+            }
+
+            record Sample {
+                id: String
+                fastq: String
+            }
+            ''',
+            null
+        )
+        check(
+            '''\
+            workflow {
+                def ch: Channel<Sample> = channel.of( record(id: '1') )
+            }
+
+            record Sample {
+                id: String
+                fastq: String
+            }
+            ''',
+            'Assignment target with type Channel<Sample> cannot be assigned to value with type Channel<Record {\n    id: String\n}>'
+        )
+    }
+
     @Unroll
     def 'should check a property expression' () {
         expect:
