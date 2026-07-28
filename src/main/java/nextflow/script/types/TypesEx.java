@@ -122,9 +122,9 @@ public class TypesEx {
         if( a.length != b.length )
             return false;
         for( int i = 0; i < a.length; i++ ) {
-            // a wildcard target or an unresolved source element (e.g. the element
-            // type of an empty list literal) matches any element type
-            if( a[i].isWildcard() || b[i].isPlaceholder() )
+            // a wildcard target or an unresolved source (e.g. `?` in `Channel<?>`,
+            // `E` in `List<E>`) matches any element type
+            if( a[i].isWildcard() || b[i].isWildcard() || b[i].isPlaceholder() )
                 continue;
             if( !isEqual(a[i].getType(), b[i].getType()) )
                 return false;

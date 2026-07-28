@@ -333,6 +333,7 @@ class TypeCheckingTest extends Specification {
         'def x: String ; x = 42'            | "Assignment target with type String cannot be assigned to value with type Integer"
         "def x: List<String> ; x = [42]"    | "Assignment target with type List<String> cannot be assigned to value with type List<Integer>"
         "def x: List<String> ; x = []"      | null
+        "def ch: Channel<Path> = channel.empty()" | null
     }
 
     @Unroll
