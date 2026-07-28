@@ -1138,6 +1138,14 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             resultType = trueType;
             nullable = isNullable(trueType) || isNullable(falseType);
         }
+        else if( isEmptyListOrMap(falseExpr) && TypesEx.isAssignableFrom(trueType, falseType) ) {
+            resultType = trueType;
+            nullable = isNullable(trueType);
+        }
+        else if( isEmptyListOrMap(trueExpr) && TypesEx.isAssignableFrom(falseType, trueType) ) {
+            resultType = falseType;
+            nullable = isNullable(falseType);
+        }
         else {
             addSoftError(String.format("Conditional expression has inconsistent types -- true branch has type %s but false branch has type %s", TypesEx.getName(trueType), TypesEx.getName(falseType)), node);
             return;
@@ -1148,6 +1156,14 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             resultType.putNodeMetaData(ASTNodeMarker.NULLABLE, Boolean.TRUE);
         }
         node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, resultType);
+    }
+
+    private static boolean isEmptyListOrMap(Expression node) {
+        if( node instanceof ListExpression le )
+            return le.getExpressions().isEmpty();
+        if( node instanceof MapExpression me )
+            return me.getMapEntryExpressions().isEmpty();
+        return false;
     }
 
     private static boolean isNullable(ClassNode cn) {

@@ -561,22 +561,29 @@ class TypeCheckingTest extends Specification {
         check(SOURCE, ERROR)
 
         where:
-        SOURCE              | ERROR
-        "true ? 42 : '42'"  | "Conditional expression has inconsistent types -- true branch has type Integer but false branch has type String"
-        "true ? 42 : null"  | null
+        SOURCE                  | ERROR
+        "true ? 42 : '42'"      | "Conditional expression has inconsistent types -- true branch has type Integer but false branch has type String"
+        "true ? ['v'] : [:]"    | "Conditional expression has inconsistent types -- true branch has type List<String> but false branch has type Map"
+        "true ? 42 : null"      | null
     }
 
     def 'should resolve a ternary expression' () {
         when:
         def exp = parseExpression(
-            '''
-            workflow {
-                true ? 42 : null
-            }
-            '''
+            """\
+            workflow { ${SOURCE} }
+            """
         )
         then:
-        checkType(exp, Integer)
+        TypesEx.getName(getType(exp)) == TYPE
+
+        where:
+        SOURCE                  | TYPE
+        "true ? 42 : null"      | 'Integer?'
+        "true ? [k: 'v'] : [:]" | 'Map<String, String>'
+        "true ? [:] : [k: 'v']" | 'Map<String, String>'
+        "true ? ['v'] : []"     | 'List<String>'
+        "true ? [] : ['v']"     | 'List<String>'
     }
 
     def 'should check an elvis expression' () {
