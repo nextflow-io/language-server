@@ -101,7 +101,7 @@ interface IntegerOps {
 
     Boolean compareTo(Integer a, Float b);
 
-    Integer div(Integer a, Integer b);
+    Float div(Integer a, Integer b);
 
     Integer leftShift(Integer a, Integer b);
 
