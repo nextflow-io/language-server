@@ -1350,6 +1350,20 @@ class TypeCheckingTest extends Specification {
         TypesEx.getName(type) == 'Value<Record {\n    id: Integer\n    fastq: Path\n    single_end: Boolean\n    index: Path\n}>'
     }
 
+    def 'should report an error for a `combine` named argument that is a channel' () {
+        when:
+        def errors = getErrors(
+            '''\
+            samples = channel.of( record(id: 1, fastq: file('1.fq')) )
+            index = channel.of( file('index.fa') )
+            samples.combine( index: index )
+            '''
+        )
+        then:
+        errors.size() == 1
+        errors[0].getOriginalMessage() == 'Named argument of a `combine` operation cannot be a channel -- it must be a dataflow value or plain value'
+    }
+
     def 'should resolve a `groupBy` operation' () {
         when:
         def exp = parseExpression(

@@ -116,7 +116,7 @@ class DataflowOpResolver {
         for( var entry : nale.getMapEntryExpressions() ) {
             var name = entry.getKeyExpression().getText();
             var value = entry.getValueExpression();
-            var valueType = dataflowValueType(getType(value));
+            var valueType = dataflowValueType(getType(value), value);
             var fn = new FieldNode(name, Modifier.PUBLIC, valueType, rhsType, null);
             fn.setDeclaringClass(rhsType);
             rhsType.addField(fn);
@@ -125,11 +125,14 @@ class DataflowOpResolver {
         return makeType(receiverType, elementType);
     }
 
-    private static ClassNode dataflowValueType(ClassNode type) {
-        if( CHANNEL_TYPE.equals(type) )
+    private ClassNode dataflowValueType(ClassNode type, ASTNode node) {
+        if( CHANNEL_TYPE.equals(type) ) {
+            addError("Named argument of a `combine` operation cannot be a channel -- it must be a dataflow value or plain value", node);
             return ClassHelper.dynamicType();
-        if( VALUE_TYPE.equals(type) )
+        }
+        if( VALUE_TYPE.equals(type) ) {
             return elementType(type);
+        }
         return type;
     }
 
