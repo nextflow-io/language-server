@@ -105,7 +105,7 @@ build_native_image() {
     log_info "Building native image (this includes JAR build and tracing agent)..."
     ./gradlew nativeCompile --no-configuration-cache --no-daemon
 
-    local BINARY_PATH="build/native/nativeCompile/nlsp${BINARY_EXT}"
+    local BINARY_PATH="build/native/nativeCompile/nextflow-lsp${BINARY_EXT}"
     if [[ -f "$BINARY_PATH" ]]; then
         log_info "Native image built successfully: $BINARY_PATH"
         ls -lh "$BINARY_PATH"
@@ -119,18 +119,41 @@ build_native_image() {
 test_native_binary() {
     log_info "Testing native binary..."
 
-    local BINARY_PATH="build/native/nativeCompile/nlsp${BINARY_EXT}"
+    local BINARY_PATH="build/native/nativeCompile/nextflow-lsp${BINARY_EXT}"
     local OUTPUT
 
-    OUTPUT=$(./lsp-simulator.sh | "$BINARY_PATH" 2>&1 | head -20)
+    OUTPUT=$(./lsp-simulator.sh | "$BINARY_PATH" 2>&1) || true
 
-    if echo "$OUTPUT" | grep -q '"id":1,"result"'; then
-        log_info "Native binary test passed - LSP initialize succeeded"
-    else
+    # A binary missing reflection metadata still answers `initialize` -- it
+    # fails later, when lsp4j tries to deserialize a request it was never
+    # traced with. So check for those failures, and for a request that only
+    # succeeds once the language services are actually running.
+    local FAILED=false
+
+    if ! echo "$OUTPUT" | grep -q '"id":1,"result"'; then
+        log_error "LSP initialize did not succeed"
+        FAILED=true
+    fi
+
+    if echo "$OUTPUT" | grep -q 'was never registered'; then
+        log_error "Missing reflection metadata:"
+        echo "$OUTPUT" | grep 'was never registered' | sort -u
+        FAILED=true
+    fi
+
+    if ! echo "$OUTPUT" | grep -q '"id":6,"result":\[{'; then
+        log_error "textDocument/documentSymbol returned no symbols -- the"
+        log_error "language services are not working in the native binary"
+        FAILED=true
+    fi
+
+    if [[ "$FAILED" == "true" ]]; then
         log_error "Native binary test failed"
-        echo "$OUTPUT"
+        echo "$OUTPUT" | head -60
         exit 1
     fi
+
+    log_info "Native binary test passed"
 }
 
 
@@ -179,7 +202,7 @@ main() {
 
     echo ""
     log_info "Build completed successfully!"
-    log_info "Binary: build/native/nativeCompile/nlsp${BINARY_EXT}"
+    log_info "Binary: build/native/nativeCompile/nextflow-lsp${BINARY_EXT}"
 }
 
 main "$@"
