@@ -1,11 +1,6 @@
 name: Build Native Image
 
 on:
-  push:
-    branches:
-      - 'main'
-  pull_request:
-    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 env:

@@ -86,8 +86,6 @@ The JAR is the only available oracle. Unit tests run on the JVM and say nothing 
 
 - **The registered package set is a judgment call.** It derives from call sites we read, so a future feature reflecting over a new package will not be registered automatically. The mitigation is `native/verify.py`: such a gap surfaces as a response divergence rather than as a user report.
 
-- **Nothing consumes the binary yet.** Until that changes, the native build earns its CI cost as a regression check on the metadata rather than as a shipping artifact.
-
 - **A macOS-specific regression would go unnoticed**, since CI builds Linux only.
 
 ## Links
