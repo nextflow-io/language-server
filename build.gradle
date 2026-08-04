@@ -316,7 +316,7 @@ tasks.named('nativeCompile') {
   // registers their outputs and creates the task dependency.
   inputs.files(tasks.named('generateNativeImageMetadata'))
   inputs.files(tasks.named('generateNativeImageConfig'))
-  inputs.dir("$projectDir/conf/native-image")
+  inputs.dir("$projectDir/native/conf")
 }
 
 graalvmNative {
@@ -341,7 +341,7 @@ graalvmNative {
         '--initialize-at-build-time=com.sun.beans',
         // static metadata first, then the traced metadata for the tail that
         // genuinely cannot be enumerated (Groovy indy call sites, JDK internals)
-        "-H:ConfigurationFileDirectories=$buildDir/native-image-static,$buildDir/native-image-agent,$projectDir/conf/native-image"
+        "-H:ConfigurationFileDirectories=$buildDir/native-image-static,$buildDir/native-image-agent,$projectDir/native/conf"
       ])
     }
   }
