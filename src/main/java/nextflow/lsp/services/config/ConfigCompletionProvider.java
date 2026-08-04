@@ -15,11 +15,11 @@
  */
 package nextflow.lsp.services.config;
 
-import java.lang.reflect.Type;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
@@ -184,7 +184,7 @@ public class ConfigCompletionProvider implements CompletionProvider {
             return;
         scope.children().forEach((name, child) -> {
             if( child instanceof SpecNode.Option option )
-                ch.addItem(configOption(name, option.description(), option.types().get(0)));
+                ch.addItem(configOption(name, option.description(), typeNames(option)));
             else
                 ch.addItem(configScope(name, child.description()));
         });
@@ -194,7 +194,7 @@ public class ConfigCompletionProvider implements CompletionProvider {
         var result = new ArrayList<CompletionItem>();
         spec.children().forEach((name, child) -> {
             if( child instanceof SpecNode.Option option ) {
-                result.add(configOption(name, option.description(), option.types().get(0)));
+                result.add(configOption(name, option.description(), typeNames(option)));
             }
             else {
                 result.add(configScope(name, child.description()));
@@ -228,11 +228,19 @@ public class ConfigCompletionProvider implements CompletionProvider {
         return item;
     }
 
-    private static CompletionItem configOption(String name, String description, Type type) {
+    private static String typeNames(SpecNode.Option option) {
+        return option.types().stream()
+            .map(type -> Types.getName(type))
+            .distinct()
+            .sorted()
+            .collect(Collectors.joining(" | "));
+    }
+
+    private static CompletionItem configOption(String name, String description, String types) {
         var documentation = StringGroovyMethods.stripIndent(description, true).trim();
         var item = new CompletionItem(name);
         item.setKind(CompletionItemKind.Property);
-        item.setDetail(String.format("%s: %s", name, Types.getName(type)));
+        item.setDetail(String.format("%s: %s", name, types));
         item.setDocumentation(new MarkupContent(MarkupKind.MARKDOWN, documentation));
         item.setInsertText(String.format("%s = $1", name));
         item.setInsertTextFormat(InsertTextFormat.Snippet);

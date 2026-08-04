@@ -43,7 +43,7 @@ public class ConfigSpecFactory {
     /**
      * Load config scopes from core definitions.
      */
-    public static Map<String,SpecNode> defaultScopes() {
+    public static synchronized Map<String,SpecNode> defaultScopes() {
         if( defaultScopes == null ) {
             var scope = SpecNode.ROOT;
             scope.children().putAll(fromCoreDefinitions());

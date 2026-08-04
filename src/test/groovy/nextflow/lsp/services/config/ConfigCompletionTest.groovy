@@ -74,6 +74,20 @@ class ConfigCompletionTest extends Specification {
         cpus.getDetail() == 'cpus: Integer'
     }
 
+    def 'should show every accepted type for an option with multiple types' () {
+        given:
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
+
+        when:
+        open(service, uri, 'process.\n')
+        def completions = getCompletions(service, uri, new Position(0, 8))
+        def byLabel = completions.collectEntries { [(it.getLabel()): it] }
+        then: 'the types are shown in sorted order, since `types()` is not ordered'
+        byLabel['arch']?.getDetail() == 'arch: Map | String'
+        byLabel['accelerator']?.getDetail() == 'accelerator: Integer | Map'
+    }
+
     def 'should provide option completions inside a profile, ignoring the profile scope' () {
         given:
         def service = getConfigService()

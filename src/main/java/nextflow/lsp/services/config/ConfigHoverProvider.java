@@ -18,6 +18,7 @@ package nextflow.lsp.services.config;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import nextflow.config.ast.ConfigApplyBlockNode;
 import nextflow.config.ast.ConfigAssignNode;
@@ -104,7 +105,7 @@ public class ConfigHoverProvider implements HoverProvider {
             if( option != null ) {
                 var description = StringGroovyMethods.stripIndent(option.description(), true).trim();
                 var builder = new StringBuilder();
-                builder.append(String.format("`%s (%s)`", fqName, Types.getName(option.types().get(0))));
+                builder.append(String.format("`%s (%s)`", fqName, typeNames(option)));
                 builder.append("\n\n");
                 builder.append(description);
                 return builder.toString();
@@ -138,7 +139,7 @@ public class ConfigHoverProvider implements HoverProvider {
                 builder.append(label);
                 builder.append("\n```");
             }
-    
+
             var documentation = ASTNodeStringUtils.getDocumentation(defNode);
             if( documentation != null ) {
                 builder.append("\n\n---\n\n");
@@ -164,6 +165,14 @@ public class ConfigHoverProvider implements HoverProvider {
             names.remove(0);
         }
         return names;
+    }
+
+    private static String typeNames(SpecNode.Option option) {
+        return option.types().stream()
+            .map(type -> Types.getName(type))
+            .distinct()
+            .sorted()
+            .collect(Collectors.joining(" | "));
     }
 
 }

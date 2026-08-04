@@ -178,6 +178,8 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         if( !isAnyAssignableFrom(expectedTypes, actualType) ) {
             var validTypes = expectedTypes.stream()
                 .map(cn -> TypesEx.getName(cn))
+                .distinct()
+                .sorted()
                 .collect(Collectors.joining(", "));
             var message = expectedTypes.size() == 1
                 ? "Config option '" + fqName + "' with type " + TypesEx.getName(expectedTypes.get(0)) + " cannot be assigned to value with type " + TypesEx.getName(actualType)
