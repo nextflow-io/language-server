@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-verify-native.py - check that the native binary behaves like the JVM build.
+verify.py - check that the native binary behaves like the JVM build.
 
 The native image only contains the reflection metadata it was told about, and a
 binary missing some of it does not crash: it answers `initialize`, then quietly
@@ -14,7 +14,7 @@ answer is whatever the JVM says. So this runs the same LSP session against both
 builds and diffs the responses.
 
 Usage:
-  ./verify-native.py <jar> <binary>
+  ./native/verify.py <jar> <binary>
 
 Exits non-zero on any divergence, on a missing response, or on an error logged
 by either server.
@@ -26,9 +26,9 @@ import subprocess
 import sys
 import tempfile
 
-SIMULATOR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lsp-simulator.sh')
+SIMULATOR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'simulate.sh')
 
-# ids sent by lsp-simulator.sh; a missing one means the server never answered
+# ids sent by simulate.sh; a missing one means the server never answered
 EXPECTED_IDS = set(range(1, 18)) | {99}
 
 

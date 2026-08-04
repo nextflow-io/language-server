@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# lsp-simulator.sh - LSP Client Simulation Script
+# simulate.sh - LSP Client Simulation Script
 #
 # PURPOSE:
 #   This script simulates an LSP (Language Server Protocol) client by sending
@@ -16,15 +16,15 @@
 #
 # USAGE:
 #   # Direct execution (for testing)
-#   ./lsp-simulator.sh | java -jar language-server.jar
+#   ./native/simulate.sh | java -jar language-server.jar
 #
 #   # With GraalVM tracing agent (for native-image config generation)
-#   ./lsp-simulator.sh | java \
+#   ./native/simulate.sh | java \
 #       -agentlib:native-image-agent=config-output-dir=build/native-image-agent \
 #       -jar language-server.jar
 #
 #   # Testing the native binary
-#   ./lsp-simulator.sh | ./build/native/nativeCompile/nextflow-lsp
+#   ./native/simulate.sh | ./build/native/nativeCompile/nextflow-lsp
 #
 # LSP OPERATIONS COVERED:
 #   This script exercises the following LSP methods to ensure comprehensive
@@ -97,7 +97,7 @@ send_message() {
 # A throwaway workspace holding the test document. The server scans the
 # workspace root, so this must be a real directory containing a real script.
 #
-# Set LSP_SIM_WORKSPACE to pin the location. verify-native.py needs this: the
+# Set LSP_SIM_WORKSPACE to pin the location. verify.py needs this: the
 # document URI appears in the responses, so two servers can only be compared
 # when they were given the same workspace path.
 #
@@ -324,7 +324,7 @@ sleep 0.5
 # whole server that reads a classpath resource: ConfigSpecFactory loads
 # spec/definitions.json to resolve config options. A session that only opens
 # .nf files never touches that path -- so without these requests neither the
-# tracing agent nor verify-native.py would notice the resource missing from
+# tracing agent nor verify.py would notice the resource missing from
 # the image.
 #
 send_message '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"'"$CONFIG_URI"'","languageId":"nextflow-config","version":1,"text":"'"$CONFIG_TEXT"'"}}}'
@@ -335,11 +335,12 @@ send_message '{"jsonrpc":"2.0","id":15,"method":"textDocument/hover","params":{"
 
 sleep 0.5
 
-# NOTE: probe the `docker` scope, not `process`. The server's overload
-# resolution for process directives is nondeterministic -- across repeated JVM
-# runs `arch` alternates between String and Map, and so do accelerator,
-# clusterOptions and pod. Comparing those would make verify-native.py flaky
-# for a reason that has nothing to do with the native image.
+# Probe the `docker` scope, not `process`. Process directives with several
+# overloads return a description only when the annotated overload happens to be
+# enumerated first, which varies between runs (#173) -- comparing them would
+# make verify.py flaky for a reason unrelated to the native image. The hover
+# above still covers the directive path: `process.cpus` has a single annotated
+# overload, so its description is stable.
 send_message '{"jsonrpc":"2.0","id":16,"method":"textDocument/completion","params":{"textDocument":{"uri":"'"$CONFIG_URI"'"},"position":{"line":7,"character":4},"context":{"triggerKind":1}}}'
 
 sleep 0.5

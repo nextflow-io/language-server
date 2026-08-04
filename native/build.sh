@@ -6,15 +6,15 @@ set -euo pipefail
 # Supports: linux/amd64, linux/arm64, macos/amd64, macos/arm64 (Apple Silicon)
 #
 # Usage:
-#   ./build-native.sh [options]
+#   ./native/build.sh [options]
 #
 # Options:
 #   --skip-test      Skip testing the native binary
 #   --help, -h       Show this help message
 #
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_DIR"
 
 # Colors for output (disabled in CI)
 if [[ -t 1 ]] && [[ -z "${CI:-}" ]]; then
@@ -119,7 +119,7 @@ build_native_image() {
 #
 # Checking the binary in isolation is not enough. A binary missing reflection
 # metadata answers `initialize` and then returns empty -- or plausible but
-# WRONG -- results, so the only reliable oracle is the JVM build. verify-native.py
+# WRONG -- results, so the only reliable oracle is the JVM build. verify.py
 # runs the same LSP session against both and diffs the responses.
 test_native_binary() {
     log_info "Testing native binary against the JVM build..."
@@ -128,7 +128,7 @@ test_native_binary() {
     local JAR_PATH="build/libs/language-server-all.jar"
 
     if ! command -v python3 &> /dev/null; then
-        log_error "python3 is required to run verify-native.py"
+        log_error "python3 is required to run native/verify.py"
         exit 1
     fi
 
@@ -137,7 +137,7 @@ test_native_binary() {
         exit 1
     fi
 
-    if ! ./verify-native.py "$JAR_PATH" "$BINARY_PATH"; then
+    if ! ./native/verify.py "$JAR_PATH" "$BINARY_PATH"; then
         log_error "Native binary test failed"
         exit 1
     fi

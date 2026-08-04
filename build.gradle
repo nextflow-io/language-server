@@ -290,7 +290,7 @@ task generateNativeImageConfig(type: Exec) {
   dependsOn shadowJar
 
   def agentOutputDir = file("$buildDir/native-image-agent")
-  def simulateScript = file("$projectDir/lsp-simulator.sh")
+  def simulateScript = file("$projectDir/native/simulate.sh")
 
   inputs.file(shadowJar.archiveFile)
   inputs.file(simulateScript)

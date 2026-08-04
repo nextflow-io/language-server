@@ -10,7 +10,7 @@ Technical Story: https://github.com/nextflow-io/language-server/pull/146
 
 ## Summary
 
-The language server ships as a fat JAR that the client launches with `java -jar`, costing ~400 ms of JVM startup on every editor session and requiring a JRE on the user's machine. We add a GraalVM `native-image` build producing prebuilt `nextflow-lsp` binaries for four platforms, which start in ~10 ms and need no JRE. The JAR remains the primary artifact; the binaries are additive.
+The language server ships as a fat JAR that the client launches with `java -jar`, costing ~400 ms of JVM startup on every editor session and requiring a JRE on the user's machine. We add a GraalVM `native-image` build producing a `nextflow-lsp` binary for linux-amd64 and linux-arm64, which starts in ~10 ms and needs no JRE. The JAR remains the primary artifact; the binary is additive and CI-only for now.
 
 ## Problem Statement
 
@@ -31,17 +31,17 @@ So the decision is not only "should we ship a binary" but "can we produce a bina
 - **Behavioural equivalence with the JAR.** A binary that differs from the JAR is worse than no binary, because the difference is invisible to whoever ships it.
 - **No silent failure.** A metadata gap must fail the build or the test, not degrade the binary in production.
 - **Metadata derived from the code, not from a script's behaviour.** Adding a request to a test script must not be a prerequisite for a class being registered.
-- **CI cost proportionate to value.** Four native builds per commit is expensive, and one of the four runs on a billed runner.
+- **CI cost proportionate to value.** A native build per platform per commit is expensive, and macOS runners are billed per minute.
 - **Don't disturb the existing distribution.** The JAR and its release process must keep working unchanged.
 
 ## Non-goals
 
-- **Replacing the JAR.** It remains the primary artifact and the thing `make install` and the README describe. The binaries are additional release assets.
-- **Wiring the binaries into a client.** Nothing consumes them yet; teaching the VS Code extension to prefer a native binary is separate work.
-- **Windows support.** `build-native.sh` and the matrix cover Linux and macOS only.
+- **Replacing the JAR.** It remains the primary artifact and the thing `make install`, the README and the release process describe. The native build is a CI check; publishing binaries as release assets is deliberately not part of this change.
+- **Distributing or consuming the binary.** Nothing publishes or consumes it yet; attaching binaries to releases and teaching the VS Code extension to prefer one are separate decisions.
+- **Windows and macOS builds.** `native/build.sh` runs on macOS, but CI builds Linux only (see Rationale).
 - **Minimising binary size.** 78 MB is accepted.
 - **Runtime performance tuning.** `native-image` recommends G1GC, PGO and `-march=native`; none are applied, since startup was the objective and steady-state throughput is already adequate.
-- **Fixing the config-option type nondeterminism found while testing.** Filed as #172; a pre-existing display bug, unrelated to the image.
+- **Fixing the config-spec bugs found while testing.** Filed as #172 (fixed) and #173; pre-existing display bugs, unrelated to the image.
 
 ## Considered Options
 
@@ -64,7 +64,7 @@ So the decision is not only "should we ship a binary" but "can we produce a bina
 - Good, because it removes essentially all startup cost (~400 ms → ~10 ms) and the JRE dependency.
 - Good, because a single self-contained file is the simplest thing for a client to launch.
 - Bad, because correctness now depends on reflection metadata declared ahead of time, and the failure mode is silent.
-- Bad, because it needs a build per platform, including a billed macOS runner for Intel.
+- Bad, because it needs a build per platform, so each additional platform costs CI time, and macOS costs money.
 - Bad, because it depends on `--report-unsupported-elements-at-runtime`, which is deprecated upstream (see Rationale).
 - Bad, because the binary is 78 MB against a 15 MB JAR, per platform.
 
@@ -84,21 +84,23 @@ So the decision is not only "should we ship a binary" but "can we produce a bina
 
 ## Solution or decision outcome
 
-Add a GraalVM 21 `native-image` build producing `nextflow-lsp` for linux-amd64, linux-arm64, macos-intel and macos-silicon; derive the reflection metadata from the resolved classpath rather than from a traced session; and gate the build on a JAR-versus-binary response equivalence check. The JAR remains the primary artifact.
+Add a GraalVM 21 `native-image` build producing `nextflow-lsp` for linux-amd64 and linux-arm64; derive the reflection metadata from the resolved classpath rather than from a traced session; and gate the build on a JAR-versus-binary response equivalence check. The JAR remains the primary artifact, and the binary is not published yet.
 
 ## Rationale & discussion
 
 ### Toolchain and build entry point
 
-GraalVM 21 (Oracle distribution) via `graalvm/setup-graalvm`, driven by the `org.graalvm.buildtools.native` Gradle plugin with `toolchainDetection = false`, so the build uses the GraalVM JDK it was invoked with. The project still compiles to Java 17 bytecode with a 21 toolchain. `build-native.sh` is the entry point for both CI and local use: it checks for `native-image`, invokes `nativeCompile`, and runs the equivalence test.
+GraalVM 21 (Oracle distribution) via `graalvm/setup-graalvm`, driven by the `org.graalvm.buildtools.native` Gradle plugin with `toolchainDetection = false`, so the build uses the GraalVM JDK it was invoked with. The project still compiles to Java 17 bytecode with a 21 toolchain. `native/build.sh` is the entry point for both CI and local use: it checks for `native-image`, invokes `nativeCompile`, and runs the equivalence test.
 
 `--initialize-at-build-time` is set for the Groovy, SLF4J and `java.beans` packages, which is what makes the Groovy runtime usable in an image at all.
+
+The three helper scripts live together under `native/`: `build.sh` (entry point), `simulate.sh` (the LSP session, used both for tracing and for the comparison) and `verify.py` (the comparison itself).
 
 ### How reflection metadata is obtained
 
 This is the crux of the approach, and the original PR got it wrong in a way worth recording.
 
-The metadata came from running the tracing agent against one scripted LSP session (`lsp-simulator.sh`), which makes it a function of the script rather than of the code. The script never sent `workspace/didChangeConfiguration`, which is what `NextflowLanguageServer.initializeWorkspaces()` responds to, so the language services were never initialized during tracing and the agent observed almost nothing beyond lsp4j plumbing: 2 of its 198 entries were under `nextflow.*`. Two failures were then confirmed against the built binary:
+The metadata came from running the tracing agent against one scripted LSP session (`native/simulate.sh`), which makes it a function of the script rather than of the code. The script never sent `workspace/didChangeConfiguration`, which is what `NextflowLanguageServer.initializeWorkspaces()` responds to, so the language services were never initialized during tracing and the agent observed almost nothing beyond lsp4j plumbing: 2 of its 198 entries were under `nextflow.*`. Two failures were then confirmed against the built binary:
 
 - Missing `DidChangeConfigurationParams` — the server answered `initialize` and returned empty results for every language feature.
 - Missing `nextflow.script.dsl.*` — the server reported `Unrecognized process input qualifier 'val'` on a valid script. A well-formed, non-empty, wrong answer that a user would file as a language bug.
@@ -124,21 +126,23 @@ Tracing is kept as a secondary source for three categories that resist enumerati
 
 Unit tests run on the JVM and say nothing about the binary, and no self-contained assertion catches the failure that matters: the `Unrecognized process input qualifier` binary returned well-formed, non-empty, plausible responses. The correct answer is whatever the JAR says, which makes the JAR the only available oracle.
 
-`verify-native.py` therefore runs the same LSP session against both builds and diffs 27 messages order-insensitively (`references` and `rename` legitimately differ in ordering). It was validated in both directions — it passes on a correct binary and fails on a deliberately under-registered one, reporting the missing-metadata error, the unanswered request ids, and the response diff. It replaced the grep-based checks in `build-native.sh`, which it subsumes, and it is what turns "no silent failure" from an aspiration into a gate.
+`native/verify.py` therefore runs the same LSP session against both builds and diffs 27 messages order-insensitively (`references` and `rename` legitimately differ in ordering). It was validated in both directions — it passes on a correct binary and fails on a deliberately under-registered one, reporting the missing-metadata error, the unanswered request ids, and the response diff. It replaced the grep-based checks in `build.sh`, which it subsumes, and it is what turns "no silent failure" from an aspiration into a gate.
 
-Its config probe deliberately targets the `docker` scope rather than `process`, because the server's overload resolution for process directives varies between runs (#172). Holding the binary to a value the JAR does not reproduce would make the check flaky for reasons unrelated to the image.
+The comparison is strict — no fields are excluded — which means the probes have to avoid areas where the JAR disagrees with itself. The config completion probe targets the `docker` scope rather than `process`, because process directives with several overloads return a description only when the annotated overload is enumerated first, which varies between runs (#173). Directive coverage is retained through hover on `process.cpus`, which has a single annotated overload and is stable. Weakening the diff instead was considered and rejected: excluding a field to accommodate a server bug would also hide a native-image regression in that field.
 
-### Platform matrix and CI cost
+### Platform matrix
 
-Four platforms: `ubuntu-latest`, `ubuntu-24.04-arm`, `macos-latest-large` (Intel), `macos-latest` (Apple Silicon). Since `macos-13` was retired there is no free Intel macOS runner, so `macos-intel` is billed per minute; the alternative is dropping that platform, which is a product call rather than a build one. `macos-latest` is free and Apple Silicon, so the original `macos-latest-xlarge` was replaced.
+Two platforms: `ubuntu-latest` and `ubuntu-24.04-arm`, both free for public repositories.
 
-Builds run on pushes to `main`, on `v*` tags, and on pull requests — not on pushes to every branch, which duplicated all four builds on every PR commit for eight native builds per push. `timeout-minutes` bounds a hung compile, matching the existing `build.yml`.
+macOS was in the original matrix and has been dropped. Since `macos-13` was retired there is no free Intel macOS runner, so `macos-intel` could only run on the per-minute `macos-latest-large`, and Apple Silicon adds a second build. Paying for two macOS builds on every commit is not justified while nothing consumes the binaries. `native/build.sh` still detects and builds on macOS, so a local build works; only CI coverage is Linux-only. Restoring macOS is a matter of adding matrix entries, and the cost question should be revisited if and when the binaries are actually shipped.
 
-### Release packaging
+Builds run on pushes to `main`, on pull requests, and on demand — not on pushes to every branch, which duplicated every platform build on each PR commit. `timeout-minutes` bounds a hung compile, matching the existing `build.yml`.
 
-Each job tars its binary as `nextflow-lsp-<platform>.tar.gz`; the release job collects them, writes `checksums.txt`, and attaches everything to the release for the tag. This aligns with the repository's existing convention — releases already exist as `v*` tags matching Nextflow versions (`v26.04.3` and so on), cut from `STABLE-*` branches, and tags fire independently of the branch they point at.
+### Artifacts, and no release step
 
-The original release job could not have worked: it collected `*.tar.gz` while the build uploaded a bare binary, and read the version from `refs/tags/` while the workflow set `tags-ignore: '*'`.
+Each job tars its binary as `nextflow-lsp-<platform>.tar.gz` and uploads it with a 7-day retention. The tar is not incidental: `actions/upload-artifact` does not preserve the executable bit, so an uploaded bare binary is not runnable when downloaded.
+
+There is deliberately **no release job**. The original PR had one, and it could not have worked — it collected `*.tar.gz` while the build uploaded a bare binary, and read the version from `refs/tags/` while the workflow set `tags-ignore: '*'`. Rather than fix it, it is removed: attaching native binaries to releases is a distribution decision that should be taken on its own, once something consumes them. The existing release process, which publishes the JAR by hand from `STABLE-*` branches, is untouched. This also removes the risk that an automated release action would overwrite hand-written release notes.
 
 ### Gradle wiring
 
@@ -150,21 +154,23 @@ Separately, the `jar` task carried `duplicatesStrategy = EXCLUDE` masking a real
 
 - Binary 78 MB per platform, against a 15 MB JAR.
 - ~2 minutes of `native-image` compilation per platform, ~3 minutes per job, plus ~40 s for the two LSP sessions the equivalence test runs.
-- One billed macOS runner per build.
+- Two extra CI jobs on every push to `main` and every PR commit.
 - A second execution model to keep working, which is what the equivalence test exists to make cheap.
+- No macOS coverage in CI, so a macOS-only image failure would not be caught until someone builds locally.
 
 ### Residual risks and open questions
 
 - **`--report-unsupported-elements-at-runtime` is load-bearing and deprecated.** Removing it fails the build with `DeletedElementException` on `MethodHandleNatives.setCallSiteTargetNormal`, reached from Groovy's indy call sites. A future GraalVM that drops the flag will need a different answer; this is the largest strategic risk to the approach.
-- **The registered package set is a judgement call.** It derives from call sites we read, so a future feature reflecting over a new package will not be registered automatically. The mitigation is `verify-native.py`: such a gap surfaces as a response divergence rather than a user report.
+- **The registered package set is a judgement call.** It derives from call sites we read, so a future feature reflecting over a new package will not be registered automatically. The mitigation is `native/verify.py`: such a gap surfaces as a response divergence rather than a user report.
 - **~99 Groovy AST-transformation annotation and transformation classes** were flagged as possibly needed. They are left unregistered because nothing in the server's parse-only path was shown to reach them.
-- **The release action may overwrite manually authored release notes.** `softprops/action-gh-release` with `generate_release_notes: true` updates the existing release for a tag, and the current process writes those notes by hand. Worth checking on the first real tagged run.
-- **Nothing consumes the binaries yet.** They are published but unused until a client selects them.
+- **Nothing consumes the binary yet.** It is built and checked, but not published anywhere a client could fetch it. Until that changes, the native build earns its CI cost as a regression check on the metadata rather than as a shipping artifact.
+- **A macOS-specific regression would go unnoticed** now that CI builds Linux only.
 
 ## Links
 
 - Implemented in [PR #146](https://github.com/nextflow-io/language-server/pull/146)
-- Uncovered [issue #172](https://github.com/nextflow-io/language-server/issues/172) — config completion and hover show an arbitrary type for options with multiple accepted types
+- Uncovered [issue #172](https://github.com/nextflow-io/language-server/issues/172) — config completion and hover show an arbitrary type for options with multiple accepted types (fixed in `fd0be65`)
+- Uncovered [issue #173](https://github.com/nextflow-io/language-server/issues/173) — config options with multiple overloads lose their description, or gain it only intermittently
 
 ## More information
 

@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - 'main'
-    tags:
-      - 'v*'
   pull_request:
     types: [opened, reopened, synchronize]
   workflow_dispatch:
@@ -27,11 +25,6 @@ jobs:
             platform: linux-amd64
           - os: ubuntu-24.04-arm
             platform: linux-arm64
-          # NOTE: there is no free Intel macOS runner; this one is billed per minute
-          - os: macos-latest-large
-            platform: macos-intel
-          - os: macos-latest
-            platform: macos-silicon
 
     steps:
       - name: Checkout repository
@@ -49,8 +42,8 @@ jobs:
 
       - name: Build native image
         run: |
-          chmod +x ./gradlew ./lsp-simulator.sh ./build-native.sh ./verify-native.py
-          ./build-native.sh
+          chmod +x ./gradlew ./native/build.sh ./native/simulate.sh ./native/verify.py
+          ./native/build.sh
 
       - name: Package binary
         run: |
@@ -63,38 +56,3 @@ jobs:
           name: nextflow-lsp-${{ matrix.platform }}
           path: nextflow-lsp-${{ matrix.platform }}.tar.gz
           retention-days: 7
-
-  release:
-    name: Create Release
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare release assets
-        run: |
-          mkdir -p release
-          find artifacts -name '*.tar.gz' -exec cp {} release/ \;
-          cd release
-          sha256sum *.tar.gz > checksums.txt
-          cat checksums.txt
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
-          generate_release_notes: true
-          files: |
-            release/*.tar.gz
-            release/checksums.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
