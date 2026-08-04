@@ -283,6 +283,24 @@ tasks.register('generateNativeImageMetadata') {
   }
 }
 
+// native-image and the tracing agent only exist in a GraalVM JDK. Prefer the
+// JDK the build is running on when it is one -- that covers CI and any GraalVM
+// distribution -- and otherwise have Gradle locate an installation, so a local
+// build does not have to be invoked with GraalVM as its JAVA_HOME.
+def currentJavaHome = file(System.getProperty('java.home'))
+def currentJdkIsGraalvm = new File(currentJavaHome, 'bin/native-image').exists()
+
+def graalvmLauncher = javaToolchains.launcherFor {
+  languageVersion = JavaLanguageVersion.of(21)
+  vendor = JvmVendorSpec.matching('Oracle Corporation')
+}
+
+def graalvmJava = {
+  currentJdkIsGraalvm
+    ? new File(currentJavaHome, 'bin/java').absolutePath
+    : graalvmLauncher.get().executablePath.asFile.absolutePath
+}
+
 task generateNativeImageConfig(type: Exec) {
   description = 'Generate native-image configuration using tracing agent'
   group = 'native'
@@ -298,25 +316,13 @@ task generateNativeImageConfig(type: Exec) {
 
   doFirst {
     agentOutputDir.mkdirs()
+    commandLine 'bash', '-c', """
+      ${simulateScript.absolutePath} | ${graalvmJava()} \\
+        -agentlib:native-image-agent=config-output-dir=${agentOutputDir.absolutePath} \\
+        -cp ${shadowJar.archiveFile.get().asFile.absolutePath} \\
+        nextflow.lsp.NextflowLanguageServer
+    """
   }
-
-  commandLine 'bash', '-c', """
-    ${simulateScript.absolutePath} | java \\
-      -agentlib:native-image-agent=config-output-dir=${agentOutputDir.absolutePath} \\
-      -cp ${shadowJar.archiveFile.get().asFile.absolutePath} \\
-      nextflow.lsp.NextflowLanguageServer
-  """
-}
-
-tasks.named('nativeCompile') {
-  // native-image reads all three config directories via
-  // -H:ConfigurationFileDirectories, which Gradle cannot see. Without these
-  // declarations a metadata change reports UP-TO-DATE and silently ships the
-  // previously built binary. Passing the producing tasks as file inputs both
-  // registers their outputs and creates the task dependency.
-  inputs.files(tasks.named('generateNativeImageMetadata'))
-  inputs.files(tasks.named('generateNativeImageConfig'))
-  inputs.dir("$projectDir/native/conf")
 }
 
 graalvmNative {
@@ -324,6 +330,19 @@ graalvmNative {
     main {
       imageName = 'nextflow-lsp'
       mainClass = 'nextflow.lsp.NextflowLanguageServer'
+
+      // static metadata first, then the traced metadata for the tail that
+      // genuinely cannot be enumerated (Groovy indy call sites, JDK internals).
+      // Declared through the plugin rather than as a raw
+      // -H:ConfigurationFileDirectories so that Gradle tracks the directories
+      // as task inputs -- otherwise a metadata change reports nativeCompile
+      // UP-TO-DATE and silently ships the previously built binary.
+      configurationFileDirectories.from(
+        tasks.named('generateNativeImageMetadata'),
+        tasks.named('generateNativeImageConfig'),
+        file("$projectDir/native/conf"),
+      )
+
       buildArgs.addAll([
         '--no-fallback',
         '--enable-url-protocols=http,https',
@@ -339,11 +358,19 @@ graalvmNative {
         '--initialize-at-build-time=groovyjarjarantlr4',
         '--initialize-at-build-time=java.beans',
         '--initialize-at-build-time=com.sun.beans',
-        // static metadata first, then the traced metadata for the tail that
-        // genuinely cannot be enumerated (Groovy indy call sites, JDK internals)
-        "-H:ConfigurationFileDirectories=$buildDir/native-image-static,$buildDir/native-image-agent,$projectDir/native/conf"
       ])
+
+      // native-image defaults to -march=x86-64-v3 on AMD64, which requires
+      // AVX2 and faults with an illegal instruction on anything older than
+      // Haswell. AArch64 already defaults to the armv8-a baseline.
+      if( System.getProperty('os.arch') in ['amd64', 'x86_64'] )
+        buildArgs.add('-march=compatibility')
+
+      if( !currentJdkIsGraalvm )
+        javaLauncher = graalvmLauncher
     }
   }
-  toolchainDetection = false
+  // when the current JDK is GraalVM the plugin uses it directly; detection is
+  // only needed for the fallback above
+  toolchainDetection = !currentJdkIsGraalvm
 }

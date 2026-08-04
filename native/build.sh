@@ -57,29 +57,25 @@ check_requirements() {
         exit 1
     fi
 
-    # Check for native-image
+    # Check for native-image. Not fatal if missing: the build resolves a GraalVM
+    # toolchain through Gradle, which detects installations that are not on PATH
+    # (SDKMAN candidates, GRAALVM_HOME, ...). Gradle reports its own error if it
+    # finds none.
     if ! command -v native-image &> /dev/null; then
-        # Try to find it in JAVA_HOME
         if [[ -n "${JAVA_HOME:-}" ]] && [[ -x "$JAVA_HOME/bin/native-image" ]]; then
             export PATH="$JAVA_HOME/bin:$PATH"
         elif [[ -n "${GRAALVM_HOME:-}" ]] && [[ -x "$GRAALVM_HOME/bin/native-image" ]]; then
             export PATH="$GRAALVM_HOME/bin:$PATH"
             export JAVA_HOME="$GRAALVM_HOME"
         else
-            log_error "native-image not found. Please install GraalVM with native-image support."
-            log_error "You can use SDKMAN: sdk install java 21.0.1-graal && sdk use java 21.0.1-graal"
-            exit 1
+            log_warn "native-image not on PATH -- relying on Gradle toolchain detection"
         fi
     fi
 
-    # Verify native-image works
-    if ! native-image --version &> /dev/null; then
-        log_error "native-image is not working correctly"
-        exit 1
-    fi
-
     log_info "Using Java: $(java -version 2>&1 | head -1)"
-    log_info "Using native-image: $(native-image --version 2>&1 | head -1)"
+    if command -v native-image &> /dev/null; then
+        log_info "Using native-image: $(native-image --version 2>&1 | head -1)"
+    fi
 }
 
 # Detect platform
