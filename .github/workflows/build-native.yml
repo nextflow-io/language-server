@@ -42,7 +42,6 @@ jobs:
 
       - name: Build native image
         run: |
-          chmod +x ./gradlew ./native/build.sh ./native/simulate.sh ./native/verify.py
           ./native/build.sh
 
       - name: Package binary
