@@ -97,8 +97,17 @@ send_message() {
 # A throwaway workspace holding the test document. The server scans the
 # workspace root, so this must be a real directory containing a real script.
 #
-WORKSPACE=$(mktemp -d)
-trap 'rm -rf "$WORKSPACE"' EXIT
+# Set LSP_SIM_WORKSPACE to pin the location. verify-native.py needs this: the
+# document URI appears in the responses, so two servers can only be compared
+# when they were given the same workspace path.
+#
+if [[ -n "${LSP_SIM_WORKSPACE:-}" ]]; then
+    WORKSPACE="$LSP_SIM_WORKSPACE"
+    mkdir -p "$WORKSPACE"
+else
+    WORKSPACE=$(mktemp -d)
+    trap 'rm -rf "$WORKSPACE"' EXIT
+fi
 
 cat > "$WORKSPACE/main.nf" <<'EOF'
 process FOO {
@@ -121,10 +130,29 @@ workflow {
 }
 EOF
 
+cat > "$WORKSPACE/nextflow.config" <<'EOF'
+process {
+    cpus = 4
+    memory = '8 GB'
+}
+
+docker {
+    enabled = true
+
+}
+EOF
+
 WORKSPACE_URI="file://$WORKSPACE"
 DOC_URI="$WORKSPACE_URI/main.nf"
-# JSON-escape the document so didOpen carries the same text that is on disk
-DOC_TEXT=$(sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' "$WORKSPACE/main.nf" | awk '{printf "%s\\n", $0}')
+CONFIG_URI="$WORKSPACE_URI/nextflow.config"
+
+# JSON-escape a document so didOpen carries the same text that is on disk
+json_text() {
+    sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' "$1" | awk '{printf "%s\\n", $0}'
+}
+
+DOC_TEXT=$(json_text "$WORKSPACE/main.nf")
+CONFIG_TEXT=$(json_text "$WORKSPACE/nextflow.config")
 
 # =============================================================================
 # STEP 1: Initialize Connection
@@ -290,7 +318,38 @@ send_message '{"jsonrpc":"2.0","id":13,"method":"textDocument/prepareCallHierarc
 sleep 0.5
 
 # =============================================================================
-# STEP 16: Execute Command
+# STEP 16: Config File
+# =============================================================================
+# Config files go through a separate service, and it is the only thing in the
+# whole server that reads a classpath resource: ConfigSpecFactory loads
+# spec/definitions.json to resolve config options. A session that only opens
+# .nf files never touches that path -- so without these requests neither the
+# tracing agent nor verify-native.py would notice the resource missing from
+# the image.
+#
+send_message '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"'"$CONFIG_URI"'","languageId":"nextflow-config","version":1,"text":"'"$CONFIG_TEXT"'"}}}'
+
+sleep 5
+
+send_message '{"jsonrpc":"2.0","id":15,"method":"textDocument/hover","params":{"textDocument":{"uri":"'"$CONFIG_URI"'"},"position":{"line":1,"character":6}}}'
+
+sleep 0.5
+
+# NOTE: probe the `docker` scope, not `process`. The server's overload
+# resolution for process directives is nondeterministic -- across repeated JVM
+# runs `arch` alternates between String and Map, and so do accelerator,
+# clusterOptions and pod. Comparing those would make verify-native.py flaky
+# for a reason that has nothing to do with the native image.
+send_message '{"jsonrpc":"2.0","id":16,"method":"textDocument/completion","params":{"textDocument":{"uri":"'"$CONFIG_URI"'"},"position":{"line":7,"character":4},"context":{"triggerKind":1}}}'
+
+sleep 0.5
+
+send_message '{"jsonrpc":"2.0","id":17,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"'"$CONFIG_URI"'"}}}'
+
+sleep 0.5
+
+# =============================================================================
+# STEP 17: Execute Command
 # =============================================================================
 # Invoke a server-side command. Exercises ExecuteCommandParams, which is
 # deserialized on a code path no other message reaches.
@@ -300,7 +359,7 @@ send_message '{"jsonrpc":"2.0","id":14,"method":"workspace/executeCommand","para
 sleep 0.5
 
 # =============================================================================
-# STEP 17: Close Document
+# STEP 18: Close Document
 # =============================================================================
 # Notify server that the document is being closed.
 # Server can release associated resources.
@@ -310,7 +369,7 @@ send_message '{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textD
 sleep 0.5
 
 # =============================================================================
-# STEP 18: Shutdown Request
+# STEP 19: Shutdown Request
 # =============================================================================
 # Request the server to shut down. Server should return success and
 # prepare for exit but not terminate yet.
@@ -325,7 +384,7 @@ send_message '{"jsonrpc":"2.0","id":99,"method":"shutdown","params":null}'
 sleep 2
 
 # =============================================================================
-# STEP 19: Exit Notification
+# STEP 20: Exit Notification
 # =============================================================================
 # Notify server to exit. This should be sent after shutdown response
 # is received. Server terminates after receiving this.

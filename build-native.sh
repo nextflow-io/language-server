@@ -115,45 +115,32 @@ build_native_image() {
     fi
 }
 
-# Test the native binary
+# Test the native binary against the JVM build
+#
+# Checking the binary in isolation is not enough. A binary missing reflection
+# metadata answers `initialize` and then returns empty -- or plausible but
+# WRONG -- results, so the only reliable oracle is the JVM build. verify-native.py
+# runs the same LSP session against both and diffs the responses.
 test_native_binary() {
-    log_info "Testing native binary..."
+    log_info "Testing native binary against the JVM build..."
 
     local BINARY_PATH="build/native/nativeCompile/nextflow-lsp${BINARY_EXT}"
-    local OUTPUT
+    local JAR_PATH="build/libs/language-server-all.jar"
 
-    OUTPUT=$(./lsp-simulator.sh | "$BINARY_PATH" 2>&1) || true
-
-    # A binary missing reflection metadata still answers `initialize` -- it
-    # fails later, when lsp4j tries to deserialize a request it was never
-    # traced with. So check for those failures, and for a request that only
-    # succeeds once the language services are actually running.
-    local FAILED=false
-
-    if ! echo "$OUTPUT" | grep -q '"id":1,"result"'; then
-        log_error "LSP initialize did not succeed"
-        FAILED=true
-    fi
-
-    if echo "$OUTPUT" | grep -q 'was never registered'; then
-        log_error "Missing reflection metadata:"
-        echo "$OUTPUT" | grep 'was never registered' | sort -u
-        FAILED=true
-    fi
-
-    if ! echo "$OUTPUT" | grep -q '"id":6,"result":\[{'; then
-        log_error "textDocument/documentSymbol returned no symbols -- the"
-        log_error "language services are not working in the native binary"
-        FAILED=true
-    fi
-
-    if [[ "$FAILED" == "true" ]]; then
-        log_error "Native binary test failed"
-        echo "$OUTPUT" | head -60
+    if ! command -v python3 &> /dev/null; then
+        log_error "python3 is required to run verify-native.py"
         exit 1
     fi
 
-    log_info "Native binary test passed"
+    if [[ ! -f "$JAR_PATH" ]]; then
+        log_error "$JAR_PATH not found -- run ./gradlew shadowJar first"
+        exit 1
+    fi
+
+    if ! ./verify-native.py "$JAR_PATH" "$BINARY_PATH"; then
+        log_error "Native binary test failed"
+        exit 1
+    fi
 }
 
 

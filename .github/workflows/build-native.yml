@@ -49,7 +49,7 @@ jobs:
 
       - name: Build native image
         run: |
-          chmod +x ./gradlew ./lsp-simulator.sh ./build-native.sh
+          chmod +x ./gradlew ./lsp-simulator.sh ./build-native.sh ./verify-native.py
           ./build-native.sh
 
       - name: Package binary
