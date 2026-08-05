@@ -19,5 +19,14 @@ endif
 	@cp build/libs/language-server-all.jar ~/.nextflow/lsp/$(STABLE)/v$(VERSION).jar
 	@echo "installed at: ~/.nextflow/lsp/$(STABLE)/v$(VERSION).jar"
 
+.PHONY: native
+native:
+	./native/build.sh
+
+install-native:
+	@mkdir -p ~/.local/bin
+	@cp build/native/nativeCompile/nextflow-lsp ~/.local/bin
+	@echo "installed at: ~/.local/bin/nextflow-lsp"
+
 clean:
 	./gradlew clean

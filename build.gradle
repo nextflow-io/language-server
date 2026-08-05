@@ -1,5 +1,6 @@
 plugins {
   id 'com.gradleup.shadow' version '8.3.5'
+  id 'org.graalvm.buildtools.native' version '0.10.4'
   id 'application'
   id 'groovy'
   id 'java'
@@ -107,3 +108,5 @@ application {
 shadowJar {
   archiveVersion = ''
 }
+
+apply from: "$projectDir/native/native.gradle"
