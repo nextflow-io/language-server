@@ -75,6 +75,18 @@ def reflectionGroups = [
       'java.util.function.Consumer',
       'java.util.function.Function',
       'java.util.function.Predicate',
+      // Groovy configures the java.nio.file.Path class node for the Path shim
+      // type, which enumerates Path.register(WatchService, Kind[], Modifier...).
+      // Nothing calls that method, so without these the watch types are absent
+      // from the image and configuring Path fails with a NoClassDefFoundError
+      // -- surfacing as an internal error on the first completion request that
+      // resolves a Path.
+      'java.nio.file.Path',
+      'java.nio.file.WatchEvent',
+      'java.nio.file.WatchEvent$Kind',
+      'java.nio.file.WatchEvent$Modifier',
+      'java.nio.file.WatchKey',
+      'java.nio.file.WatchService',
     ],
     flags: ['allDeclaredFields', 'queryAllDeclaredMethods', 'queryAllDeclaredConstructors'],
   ],

@@ -29,7 +29,7 @@ import tempfile
 SIMULATOR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'simulate.sh')
 
 # ids sent by simulate.sh; a missing one means the server never answered
-EXPECTED_IDS = set(range(1, 18)) | {99}
+EXPECTED_IDS = set(range(1, 27)) | {99}
 
 
 def run(cmd, workspace):

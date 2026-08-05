@@ -38,6 +38,7 @@
 #
 #   Document Synchronization:
 #     - textDocument/didOpen   : Open a document for editing
+#     - textDocument/didChange : Apply an incremental edit
 #     - textDocument/didClose  : Close a document
 #
 #   Language Features:
@@ -52,18 +53,27 @@
 #     - textDocument/documentLink       : Get clickable links in document
 #     - textDocument/rename             : Rename a symbol
 #     - textDocument/prepareCallHierarchy: Prepare call hierarchy
+#     - callHierarchy/incomingCalls     : Resolve callers
+#     - callHierarchy/outgoingCalls     : Resolve callees
 #
 #   Workspace Features:
 #     - workspace/symbol           : Search for symbols across workspace
 #     - workspace/didChangeConfiguration : Push client settings (this is what
 #                                    initializes the language services)
-#     - workspace/executeCommand   : Invoke a server-side command
+#     - workspace/executeCommand   : All four server commands
 #
-# TEST DOCUMENT:
-#   The script opens a sample Nextflow script containing:
-#     - A process definition (FOO) with input/output declarations
-#     - A workflow block that invokes the process
-#   This exercises parsing, symbol resolution, and most LSP features.
+#   Handlers deliberately left out because they only log: didSave,
+#   didChangeWatchedFiles, didCreateFiles, didDeleteFiles, didRenameFiles,
+#   $/setTrace. Also left out: didChangeWorkspaceFolders, and plugin includes
+#   (`from 'plugin/...'`), which would make the session depend on reaching the
+#   plugin registry over the network.
+#
+# TEST WORKSPACE:
+#   - main.nf           : a process (FOO) and an entry workflow that calls it
+#   - nextflow.config   : process and docker scopes
+#   - usage.nf          : includes module.nf and calls BAR
+#   - module.nf         : the included process (BAR)
+#   - lib/Helper.groovy : compiled by the Groovy compiler, not the Nextflow one
 #
 # NOTE:
 #   The sleep delays between messages ensure the server has time to process
@@ -142,9 +152,52 @@ docker {
 }
 EOF
 
+# A second script plus the module it includes. This is the only thing that
+# exercises include resolution, cross-file definition, and the document link
+# provider -- links come from include statements, so a single-file workspace
+# leaves that provider returning nothing.
+cat > "$WORKSPACE/module.nf" <<'EOF'
+process BAR {
+    input:
+    val y
+
+    output:
+    stdout
+
+    script:
+    """
+    echo ${y}
+    """
+}
+EOF
+
+cat > "$WORKSPACE/usage.nf" <<'EOF'
+include { BAR } from './module.nf'
+
+workflow NAMED {
+    ch = channel.of(1)
+    BAR(ch)
+}
+EOF
+
+# lib/*.groovy is compiled by GroovyLibCache through the Groovy compiler rather
+# than the Nextflow parser, which is a distinct code path -- and the one that
+# would reach Groovy's AST transformation machinery if anything does.
+mkdir -p "$WORKSPACE/lib"
+cat > "$WORKSPACE/lib/Helper.groovy" <<'EOF'
+class Helper {
+
+    static String greet(String name) {
+        return "hello ${name}"
+    }
+
+}
+EOF
+
 WORKSPACE_URI="file://$WORKSPACE"
 DOC_URI="$WORKSPACE_URI/main.nf"
 CONFIG_URI="$WORKSPACE_URI/nextflow.config"
+USAGE_URI="$WORKSPACE_URI/usage.nf"
 
 # JSON-escape a document so didOpen carries the same text that is on disk
 json_text() {
@@ -153,6 +206,16 @@ json_text() {
 
 DOC_TEXT=$(json_text "$WORKSPACE/main.nf")
 CONFIG_TEXT=$(json_text "$WORKSPACE/nextflow.config")
+USAGE_TEXT=$(json_text "$WORKSPACE/usage.nf")
+
+# The call hierarchy item that prepareCallHierarchy returns for `process FOO`.
+# incomingCalls/outgoingCalls take an item back as input, so it has to match
+# what the server produced -- these are the ranges of the process definition.
+FOO_ITEM='{"name":"FOO","kind":6,"uri":"'"$DOC_URI"'","range":{"start":{"line":0,"character":0},"end":{"line":11,"character":1}},"selectionRange":{"start":{"line":0,"character":0},"end":{"line":11,"character":1}}}'
+
+# The entry workflow, used for outgoingCalls: it calls FOO, whereas FOO itself
+# calls nothing, so asking for FOO's callees only ever returns an empty list.
+ENTRY_ITEM='{"name":"<entry>","kind":6,"uri":"'"$DOC_URI"'","range":{"start":{"line":13,"character":0},"end":{"line":17,"character":1}},"selectionRange":{"start":{"line":13,"character":0},"end":{"line":17,"character":1}}}'
 
 # =============================================================================
 # STEP 1: Initialize Connection
@@ -209,11 +272,24 @@ send_message '{"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"t
 sleep 0.5
 
 # =============================================================================
-# STEP 5: Completion Request
+# STEP 5: Completion Requests
 # =============================================================================
-# Request code completion suggestions after the `.` in `FOO.out.view()`.
+# On `Channel` in `ch = Channel.of(1, 2, 3)`, which resolves the channel type
+# and returns ~70 items -- the DSL and value-type class registrations are what
+# produce them, so this is the probe most likely to catch a metadata gap.
 #
-send_message '{"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":"'"$DOC_URI"'"},"position":{"line":16,"character":12},"context":{"triggerKind":2,"triggerCharacter":"."}}}'
+# Member completion on a complete expression (`FOO.out.view()`) returns nothing,
+# so do not probe there: it compares empty to empty and proves the two builds
+# agree about having no answer.
+#
+send_message '{"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":"'"$DOC_URI"'"},"position":{"line":14,"character":9},"context":{"triggerKind":1}}}'
+
+sleep 0.5
+
+# At the top level (blank line 12), which offers declaration keywords and
+# snippets instead -- a different branch of the completion provider.
+#
+send_message '{"jsonrpc":"2.0","id":17,"method":"textDocument/completion","params":{"textDocument":{"uri":"'"$DOC_URI"'"},"position":{"line":12,"character":0},"context":{"triggerKind":1}}}'
 
 sleep 0.5
 
@@ -318,6 +394,20 @@ send_message '{"jsonrpc":"2.0","id":13,"method":"textDocument/prepareCallHierarc
 sleep 0.5
 
 # =============================================================================
+# STEP 15b: Resolve the Call Hierarchy
+# =============================================================================
+# prepareCallHierarchy on its own only locates the item; these two requests are
+# what run ScriptCallHierarchyProvider and OutgoingCallsVisitor.
+#
+send_message '{"jsonrpc":"2.0","id":18,"method":"callHierarchy/incomingCalls","params":{"item":'"$FOO_ITEM"'}}'
+
+sleep 0.5
+
+send_message '{"jsonrpc":"2.0","id":19,"method":"callHierarchy/outgoingCalls","params":{"item":'"$ENTRY_ITEM"'}}'
+
+sleep 0.5
+
+# =============================================================================
 # STEP 16: Config File
 # =============================================================================
 # Config files go through a separate service, and it is the only thing in the
@@ -345,17 +435,84 @@ send_message '{"jsonrpc":"2.0","id":16,"method":"textDocument/completion","param
 
 sleep 0.5
 
-send_message '{"jsonrpc":"2.0","id":17,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"'"$CONFIG_URI"'"}}}'
+# There is deliberately no documentSymbol probe for the config file: the config
+# service has no symbol provider, so it can only ever answer with an empty list.
+
+# =============================================================================
+# STEP 17: Execute Commands
+# =============================================================================
+# All four server commands. The second previewDag argument is the workflow name,
+# and `null` means the entry workflow -- which is exactly what the code lens
+# returned at id 9. Passing a process name instead matches no workflow, so the
+# command returns null and neither DataflowVisitor nor MermaidRenderer runs.
+#
+send_message '{"jsonrpc":"2.0","id":14,"method":"workspace/executeCommand","params":{"command":"nextflow.server.previewDag","arguments":["'"$DOC_URI"'",null]}}'
+
+sleep 0.5
+
+# previewWorkspace and convertPipelineToTyped take the workspace folder name.
+#
+send_message '{"jsonrpc":"2.0","id":20,"method":"workspace/executeCommand","params":{"command":"nextflow.server.previewWorkspace","arguments":["main"]}}'
+
+sleep 0.5
+
+send_message '{"jsonrpc":"2.0","id":21,"method":"workspace/executeCommand","params":{"command":"nextflow.server.convertPipelineToTyped","arguments":["main"]}}'
+
+sleep 1
+
+# The convert commands build a WorkspaceEdit and hand it to client.applyEdit,
+# so this also drives an outbound server-to-client request.
+#
+send_message '{"jsonrpc":"2.0","id":22,"method":"workspace/executeCommand","params":{"command":"nextflow.server.convertScriptToTyped","arguments":["'"$DOC_URI"'"]}}'
+
+sleep 1
+
+# =============================================================================
+# STEP 17b: Cross-file Include
+# =============================================================================
+# usage.nf includes module.nf, so these two requests cover include resolution:
+# the document link points at the included file, and the definition of `BAR`
+# resolves into it.
+#
+send_message '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"'"$USAGE_URI"'","languageId":"nextflow","version":1,"text":"'"$USAGE_TEXT"'"}}}'
+
+sleep 3
+
+send_message '{"jsonrpc":"2.0","id":23,"method":"textDocument/documentLink","params":{"textDocument":{"uri":"'"$USAGE_URI"'"}}}'
+
+sleep 0.5
+
+send_message '{"jsonrpc":"2.0","id":24,"method":"textDocument/definition","params":{"textDocument":{"uri":"'"$USAGE_URI"'"},"position":{"line":4,"character":5}}}'
+
+sleep 0.5
+
+# Member completion, after the dot in `channel.of(1)`. This is a different
+# branch from the two completion probes above, which complete an identifier.
+# It must be the lowercase `channel` namespace: the deprecated uppercase
+# `Channel`, and channel-typed values such as `ch.` or `FOO.out.`, both return
+# nothing. Results are filtered by the prefix under the cursor, so this answers
+# with `of` rather than the whole member list.
+#
+send_message '{"jsonrpc":"2.0","id":26,"method":"textDocument/completion","params":{"textDocument":{"uri":"'"$USAGE_URI"'"},"position":{"line":3,"character":17},"context":{"triggerKind":2,"triggerCharacter":"."}}}'
 
 sleep 0.5
 
 # =============================================================================
-# STEP 17: Execute Command
+# STEP 17c: Edit a Document
 # =============================================================================
-# Invoke a server-side command. Exercises ExecuteCommandParams, which is
-# deserialized on a code path no other message reaches.
+# Sync kind is Incremental, so this is the message a real editor sends on every
+# keystroke, and nothing else here ever mutates a document: it exercises the
+# ranged patch, the re-parse, and the re-published diagnostics. The edit stays
+# valid, and the documentSymbol below observes the result.
 #
-send_message '{"jsonrpc":"2.0","id":14,"method":"workspace/executeCommand","params":{"command":"nextflow.server.previewDag","arguments":["'"$DOC_URI"'","FOO"]}}'
+# It comes after every other main.nf probe on purpose -- their positions are
+# fixed, and this shifts the lines below the insertion point.
+#
+send_message '{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"'"$DOC_URI"'","version":2},"contentChanges":[{"range":{"start":{"line":16,"character":18},"end":{"line":16,"character":18}},"text":"\n    ch.view()"}]}}'
+
+sleep 3
+
+send_message '{"jsonrpc":"2.0","id":25,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"'"$DOC_URI"'"}}}'
 
 sleep 0.5
 

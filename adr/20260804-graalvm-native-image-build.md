@@ -70,7 +70,7 @@ Add a GraalVM 21 `native-image` build producing `nextflow-lsp` for linux-amd64 a
 
 ### Extracting reflection metadata
 
-`generateNativeImageMetadata` scans the resolved runtime classpath and emits `reflect-config.json`, `resource-config.json` and `proxy-config.json`, registering ~630 classes. Registration flags are set per group rather than uniformly, since image size is driven by reachability; the per-group reasoning lives in comments in `build.gradle`. The tracing agent remains a secondary source, for the tail that resists enumeration: Groovy indy call sites reaching `MethodHandleNatives`, JDK-internal resources with version-specific paths, and the JSSE provider graph loaded reflectively for the plugin-registry HTTPS call. `native-image` merges the two, static config first.
+`generateNativeImageMetadata` scans the resolved runtime classpath and emits `reflect-config.json`, `resource-config.json` and `proxy-config.json`, registering ~630 classes. Registration flags are set per group rather than uniformly, since image size is driven by reachability; the per-group reasoning lives in comments in `build.gradle`. The tracing agent remains a secondary source, for the tail that resists enumeration: the reflective entries behind Groovy's indy call sites, and the `META-INF/services` files that the JDK and Groovy load through `ServiceLoader`. `native-image` merges the two, static config first.
 
 A scan is exhaustive where a traced session is accidental. The reflected-over sets are *closed* — Gson reflects over every type in `org.eclipse.lsp4j`, and Groovy's `configureClassNode` over every class handed to `ClassHelper.makeCached` — and those are properties of the jars, so scanning enumerates them completely and picks up dependency upgrades automatically. Traced coverage is instead a function of the script: the session used here reaches 2 of the 35 `nextflow.script.types.**` classes, and whatever it misses is not reported at build time, because the `--report-unsupported-elements-at-runtime` that Groovy's indy call sites force turns what would be build errors into runtime no-ops.
 
@@ -87,6 +87,8 @@ The JAR is the only available oracle. Unit tests run on the JVM and say nothing 
 - **The registered package set is a judgment call.** It derives from call sites we read, so a future feature reflecting over a new package will not be registered automatically. The mitigation is `native/verify.py`: such a gap surfaces as a response divergence rather than as a user report.
 
 - **A macOS-specific regression would go unnoticed**, since CI builds Linux only.
+
+- **The plugin registry is not covered.** Resolving `include { ... } from 'plugin/...'` fetches over HTTPS, which brings in `HttpClient` and the JSSE provider graph — reflection-heavy territory, and no config directory registers anything for it today. The session deliberately stays offline, so this would first fail for a user rather than in CI.
 
 ## Links
 
