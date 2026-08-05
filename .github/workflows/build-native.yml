@@ -32,9 +32,6 @@ jobs:
           distribution: ${{ env.GRAALVM_DISTRIBUTION }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
       - name: Build native image
         run: |
           ./native/build.sh
