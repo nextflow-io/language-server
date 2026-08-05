@@ -98,10 +98,6 @@ processResources {
 
 jar {
   dependsOn buildSpec
-  from("$buildDir/generated") {
-    include 'definitions.json'
-    into 'spec'
-  }
 }
 
 application {
