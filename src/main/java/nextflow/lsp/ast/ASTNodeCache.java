@@ -88,6 +88,10 @@ public abstract class ASTNodeCache {
      * @param fileCache
      */
     public Set<URI> update(Set<URI> uris, FileCache fileCache) {
+        // expand the invalidation set to include dependents (e.g. files that
+        // include a changed module) so their cached analysis is recomputed
+        uris = expandInvalidation(uris);
+
         // invalidate cache for each source file
         for( var uri : uris ) {
             var nodes = nodesByURI.remove(uri);
@@ -156,6 +160,17 @@ public abstract class ASTNodeCache {
         result.addAll(uris);
         result.addAll(changedUris);
         return result;
+    }
+
+    /**
+     * Expand a set of changed files to include any cached files whose analysis
+     * depends on them (e.g. files that include a changed module). The default
+     * implementation returns the set unchanged.
+     *
+     * @param uris
+     */
+    protected Set<URI> expandInvalidation(Set<URI> uris) {
+        return uris;
     }
 
     /**
