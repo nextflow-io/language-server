@@ -24,9 +24,13 @@ native:
 	./native/build.sh
 
 install-native:
-	@mkdir -p ~/.local/bin
-	@cp build/native/nativeCompile/nextflow-lsp ~/.local/bin
-	@echo "installed at: ~/.local/bin/nextflow-lsp"
+ifndef VERSION
+	$(error VERSION is required, e.g. `VERSION=<version> make install-native`)
+endif
+	$(eval STABLE := v$(shell echo $(VERSION)))
+	@mkdir -p ~/.nextflow/lsp/$(STABLE)
+	@cp build/native/nativeCompile/nextflow-lsp ~/.nextflow/lsp/$(STABLE)
+	@echo "installed at: ~/.nextflow/lsp/$(STABLE)/nextflow-lsp"
 
 clean:
 	./gradlew clean
