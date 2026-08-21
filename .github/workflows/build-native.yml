@@ -1,0 +1,49 @@
+name: Build Native Image
+
+on:
+  workflow_dispatch:
+
+env:
+  GRAALVM_DISTRIBUTION: 'graalvm'
+  JAVA_VERSION: '21'
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-amd64
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.GRAALVM_DISTRIBUTION }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build native image
+        run: |
+          ./native/build.sh
+
+      - name: Package binary
+        run: |
+          tar -czf nextflow-lsp-${{ matrix.platform }}.tar.gz \
+            -C build/native/nativeCompile nextflow-lsp
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextflow-lsp-${{ matrix.platform }}
+          path: nextflow-lsp-${{ matrix.platform }}.tar.gz
+          retention-days: 7

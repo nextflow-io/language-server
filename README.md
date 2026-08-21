@@ -56,8 +56,8 @@ A separate branch is maintained for each stable release, starting with `STABLE-2
 To make a new release of the language server:
 
 1. Checkout the appropriate `STABLE-*` branch for Nextflow.
-2. Build the language server locally.
-3. Create a new GitHub release with the language server JAR and a list of notable changes.
+2. Build the language server JAR and native image.
+3. Create a new GitHub release with the JAR, native binary, and a list of notable changes.
 
 ## Troubleshooting
 
