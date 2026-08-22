@@ -68,7 +68,7 @@ public class ConfigFormattingProvider implements FormattingProvider {
         }
 
         var range = new Range(new Position(0, 0), Positions.getPosition(oldText, oldText.length()));
-        var visitor = new ConfigFormattingVisitor(sourceUnit, options, oldText);
+        var visitor = new ConfigFormattingVisitor(sourceUnit, options);
         visitor.visit();
         var newText = visitor.toString();
 

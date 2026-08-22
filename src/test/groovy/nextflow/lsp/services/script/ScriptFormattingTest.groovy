@@ -107,87 +107,6 @@ class ScriptFormattingTest extends Specification {
         )
     }
 
-    def 'should format if-else statements in K&R style' () {
-        given:
-        def service = getScriptService()
-        def uri = getUri('main.nf')
-
-        expect:
-        checkFormat(service, uri,
-            '''\
-            workflow {
-                if( params.a ) {
-                    run_a()
-                }
-                else if( params.b ) {
-                    run_b()
-                }
-                else {
-                    run_c()
-                }
-            }
-            ''',
-            '''\
-            workflow {
-                if (params.a) {
-                    run_a()
-                } else if (params.b) {
-                    run_b()
-                } else {
-                    run_c()
-                }
-            }
-            '''
-        )
-    }
-
-    def 'should normalize blank lines' () {
-        given:
-        def service = getScriptService()
-        def uri = getUri('main.nf')
-
-        expect:
-        checkFormat(service, uri,
-            '''\
-            include { A } from './a.nf'
-            include { B } from './b.nf'
-            params.x = 1
-            workflow {
-                A()
-            }
-            ''',
-            '''\
-            include { A } from './a.nf'
-            include { B } from './b.nf'
-
-            params.x = 1
-
-            workflow {
-                A()
-            }
-            '''
-        )
-        checkFormat(service, uri,
-            '''\
-            workflow {
-
-                x = 1
-
-
-
-                y = 2
-            }
-            ''',
-            '''\
-            workflow {
-                x = 1
-
-                y = 2
-            }
-            '''
-        )
-    }
-
     def 'should preserve all comments when formatting' () {
         given:
         def service = getScriptService()
@@ -226,118 +145,11 @@ class ScriptFormattingTest extends Specification {
         )
     }
 
-    def 'should wrap lines that exceed the maximum line length' () {
-        given:
-        def service = getScriptService()
-        def uri = getUri('main.nf')
-        def options = new FormattingOptions(4, true, false, false, false, 60)
-
-        expect:
-        checkFormat(service, uri, options,
-            '''\
-            workflow {
-                ALIGN_AND_SORT(samples_channel, reference_genome, annotation_file, params.threads)
-            }
-            ''',
-            '''\
-            workflow {
-                ALIGN_AND_SORT(
-                    samples_channel,
-                    reference_genome,
-                    annotation_file,
-                    params.threads,
-                )
-            }
-            '''
-        )
-    }
-
-    def 'should not wrap lines when the maximum line length is zero' () {
-        given:
-        def service = getScriptService()
-        def uri = getUri('main.nf')
-        def options = new FormattingOptions(4, true, false, false, false, 0)
-
-        expect:
-        checkRoundTrip(service, uri, options,
-            '''\
-            workflow {
-                ALIGN_AND_SORT(samples_channel, reference_genome, annotation_file, params.threads, extra_arg_one, extra_arg_two, extra_arg_three)
-            }
-            '''
-        )
-    }
-
-    def 'should not format regions excluded with fmt directives' () {
-        given:
-        def service = getScriptService()
-        def uri = getUri('main.nf')
-
-        expect:
-        checkFormat(service, uri,
-            '''\
-            workflow {
-                x  =  [1,  2,   3] // fmt: skip
-                y = [4,5]
-            }
-            ''',
-            '''\
-            workflow {
-                x  =  [1,  2,   3] // fmt: skip
-                y = [4, 5]
-            }
-            '''
-        )
-        // a fmt: off / fmt: on region round-trips unchanged
-        checkRoundTrip(service, uri,
-            '''\
-            workflow {
-                a = 1
-
-                // fmt: off
-                matrix = [
-                    [1, 0],
-                    [0, 1] ]
-                // fmt: on
-
-                b = 2
-            }
-            '''
-        )
-    }
-
-    def 'should sort includes when sorting is enabled' () {
-        given:
-        def service = getScriptService()
-        def uri = getUri('main.nf')
-        def options = new FormattingOptions(4, true, false, false, true, 120)
-
-        expect:
-        checkFormat(service, uri, options,
-            '''\
-            include { ZULU } from './modules/zulu.nf'
-            include { ALPHA } from './modules/alpha.nf'
-
-            workflow {
-                ALPHA()
-            }
-            ''',
-            '''\
-            include { ALPHA } from './modules/alpha.nf'
-            include { ZULU } from './modules/zulu.nf'
-
-            workflow {
-                ALPHA()
-            }
-            '''
-        )
-    }
-
     def 'should re-indent multi-line strings' () {
         given:
         def service = getScriptService()
         def uri = getUri('main.nf')
-        def options = new FormattingOptions(2, true, false, false, false, 120)
+        def options = new FormattingOptions(2, true)
 
         expect:
         checkFormat(service, uri, options,
@@ -380,10 +192,9 @@ class ScriptFormattingTest extends Specification {
     def 'should produce identical output when formatting a cached AST twice' () {
         given:
         // formatting the same document repeatedly without a document change
-        // re-derives the comment metadata on the same cached AST -- the
-        // output must not change, including for comments inside wrapped
-        // expressions; the input is deliberately non-canonical so that
-        // every request returns an edit
+        // reuses the same cached AST -- the output must not change, including
+        // for comments inside wrapped expressions; the input is deliberately
+        // non-canonical so that every request returns an edit
         def service = getScriptService()
         def uri = getUri('main.nf')
         def contents = '''\

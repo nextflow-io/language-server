@@ -24,6 +24,7 @@ import groovy.lang.GroovyClassLoader;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.control.ConfigResolveVisitor;
 import nextflow.config.control.ResolveIncludeVisitor;
+import nextflow.config.parser.ConfigAstBuilder;
 import nextflow.config.parser.ConfigParserPluginFactory;
 import nextflow.config.spec.SpecNode;
 import nextflow.lsp.ast.ASTNodeCache;
@@ -64,6 +65,9 @@ public class ConfigAstCache extends ASTNodeCache {
         var config = new CompilerConfiguration();
         config.setPluginFactory(new ConfigParserPluginFactory());
         config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
+        // collect comments during the parse so that the formatter can
+        // preserve them
+        config.getOptimizationOptions().put(ConfigAstBuilder.COMMENTS_OPTION, true);
         return config;
     }
 

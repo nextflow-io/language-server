@@ -86,24 +86,6 @@ class ConfigFormattingTest extends Specification {
         )
     }
 
-    def 'should not format config regions excluded with fmt directives' () {
-        given:
-        def service = getConfigService()
-        def uri = getUri('nextflow.config')
-
-        expect:
-        checkRoundTrip(service, uri,
-            '''\
-            process.cpus = 2
-
-            // fmt: off
-            env.FOO    = 'one'
-            env.BARBAZ = 'two'
-            // fmt: on
-            '''
-        )
-    }
-
     def 'should produce identical output when formatting a cached config AST twice' () {
         given:
         // formatting the same document repeatedly without a document change

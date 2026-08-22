@@ -180,7 +180,7 @@ class ASTNodeStringUtilsTest extends Specification {
         ASTNodeStringUtils.getDocumentation(node) == '''
             Create a channel that emits each argument.
 
-            [Read more](https://docs.seqera.io/nextflow/reference/channel#of)
+            [Read more](https://docs.seqera.io/nextflow/reference/stdlib-namespaces/channel#of)
             '''.stripIndent(true).trim()
     }
 

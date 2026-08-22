@@ -27,12 +27,10 @@ import nextflow.lsp.services.script.dag.DataflowVisitor;
 import nextflow.lsp.services.script.dag.MermaidRenderer;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.LanguageServerUtils;
-import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.ParamBlockNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.dsl.Constant;
-import nextflow.script.dsl.Description;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.script.formatter.ScriptFormattingVisitor;
 import org.codehaus.groovy.ast.Parameter;
@@ -223,13 +221,7 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             .map((fn) -> {
                 var name = fn.getName();
                 var defaultValue = legacyDefaults.getOrDefault(name, fn.getInitialExpression());
-                var param = new Parameter(fn.getType(), name, (Expression) defaultValue);
-                var comments = findAnnotation(fn, Description.class)
-                    .map(an -> an.getMember("value").getText())
-                    .map(description -> List.of("// " + description + "\n", "\n"))
-                    .orElse(List.of("\n"));
-                param.putNodeMetaData(ASTNodeMarker.LEADING_COMMENTS, comments);
-                return param;
+                return new Parameter(fn.getType(), name, (Expression) defaultValue);
             })
             .toArray(Parameter[]::new);
         if( declarations.length == 0 )

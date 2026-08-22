@@ -68,7 +68,7 @@ public class ScriptFormattingProvider implements FormattingProvider {
         }
 
         var range = new Range(new Position(0, 0), Positions.getPosition(oldText, oldText.length()));
-        var visitor = new ScriptFormattingVisitor(sourceUnit, options, oldText);
+        var visitor = new ScriptFormattingVisitor(sourceUnit, options);
         visitor.visit();
         var newText = visitor.toString();
 

@@ -18,7 +18,7 @@ package nextflow.lsp.services;
 import java.net.URI;
 import java.util.List;
 
-import nextflow.script.formatter.CommentReattacher;
+import nextflow.script.formatter.Comments;
 import nextflow.script.formatter.FormattingOptions;
 import org.eclipse.lsp4j.TextEdit;
 
@@ -36,8 +36,8 @@ public interface FormattingProvider {
      * @param configFile whether to lex as a config file instead of a script
      */
     static boolean commentsPreserved(String oldText, String newText, boolean configFile) {
-        return CommentReattacher.commentTexts(oldText, configFile)
-            .equals(CommentReattacher.commentTexts(newText, configFile));
+        return Comments.textsOf(oldText, configFile)
+            .equals(Comments.textsOf(newText, configFile));
     }
 
 }

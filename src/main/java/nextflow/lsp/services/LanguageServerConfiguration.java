@@ -18,8 +18,6 @@ package nextflow.lsp.services;
 import java.util.Collections;
 import java.util.List;
 
-import nextflow.script.formatter.FormattingOptions;
-
 public record LanguageServerConfiguration(
     String dagDirection,
     boolean dagVerbose,
@@ -29,7 +27,6 @@ public record LanguageServerConfiguration(
     boolean harshilAlignment,
     boolean maheshForm,
     int maxCompletionItems,
-    int maxLineLength,
     String pluginRegistryUrl,
     boolean sortDeclarations
 ) {
@@ -44,7 +41,6 @@ public record LanguageServerConfiguration(
             false,
             false,
             100,
-            FormattingOptions.DEFAULT_MAX_LINE_LENGTH,
             "https://registry.nextflow.io/api/",
             false
         );
