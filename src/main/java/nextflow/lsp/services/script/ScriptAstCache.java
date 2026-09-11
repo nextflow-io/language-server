@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.services.script;
 
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -47,6 +48,7 @@ import nextflow.script.control.TypeCheckingVisitor;
 import nextflow.script.control.TypeCheckingVisitorEx;
 import nextflow.script.dsl.Types;
 import nextflow.script.parser.ScriptParserPluginFactory;
+import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -62,27 +64,49 @@ public class ScriptAstCache extends ASTNodeCache {
 
     private Path projectDir;
 
-    private GroovyLibCache libCache;
-
     private PluginSpecCache pluginSpecCache;
 
     public ScriptAstCache(String rootUri) {
-        super(createCompiler());
+        super(createCompiler(rootUri));
         this.projectDir = rootUri != null ? Path.of(URI.create(rootUri)) : null;
-        this.libCache = createLibCache(rootUri);
     }
 
-    private static GroovyLibCache createLibCache(String rootUri) {
-        if( rootUri == null )
-            return null;
-        var libDir = Path.of(URI.create(rootUri)).resolve("lib");
-        return new GroovyLibCache(libDir);
-    }
-
-    private static LanguageServerCompiler createCompiler() {
+    private static LanguageServerCompiler createCompiler(String rootUri) {
         var config = createConfiguration();
         var classLoader = new GroovyClassLoader();
+        if( rootUri != null )
+            addLibToClasspath(classLoader, Path.of(URI.create(rootUri)).resolve("lib"));
         return new LanguageServerCompiler(config, classLoader);
+    }
+
+    /**
+     * Add the `lib` directory and any JARs within it to the classpath,
+     * the same way that Nextflow does. Groovy source files are compiled
+     * on demand when a script refers to them.
+     *
+     * Source files are resolved against the lib directory on every lookup
+     * rather than through the classpath, so that files (or the lib directory
+     * itself) can be added while the language server is running. New JARs
+     * still require a restart.
+     *
+     * @param classLoader
+     * @param libDir
+     */
+    private static void addLibToClasspath(GroovyClassLoader classLoader, Path libDir) {
+        classLoader.setResourceLoader((name) -> {
+            var source = libDir.resolve(name.replace('.', '/') + ".groovy");
+            return Files.exists(source) ? source.toUri().toURL() : null;
+        });
+        if( !Files.isDirectory(libDir) )
+            return;
+        try( var files = Files.list(libDir) ) {
+            files
+                .filter(path -> path.toString().endsWith(".jar"))
+                .forEach(path -> classLoader.addClasspath(path.toString()));
+        }
+        catch( IOException e ) {
+            System.err.println(String.format("Failed to read JAR files in lib directory: %s -- %s", libDir, e));
+        }
     }
 
     private static CompilerConfiguration createConfiguration() {
@@ -128,14 +152,18 @@ public class ScriptAstCache extends ASTNodeCache {
             }
         }
 
-        var libImports = libImports();
-
         for( var uri : changedUris ) {
             var sourceUnit = getSourceUnit(uri);
             if( sourceUnit == null )
                 continue;
             // phase 3: name checking
-            new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, libImports).visit();
+            try {
+                new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, Collections.emptyList()).visit();
+            }
+            catch( GroovyBugError | Exception e ) {
+                // a Groovy class in the lib directory failed to compile
+                System.err.println("Unexpected exception while resolving " + uri.getPath() + ": " + e.toString());
+            }
             new ParameterSchemaVisitor(sourceUnit).visit();
         }
 
@@ -202,10 +230,6 @@ public class ScriptAstCache extends ASTNodeCache {
         else if( !source.endsWith(".nf") )
             includePath = Path.of(includePath.toString() + ".nf");
         return includePath.normalize().toUri();
-    }
-
-    private List<ClassNode> libImports() {
-        return libCache != null ? libCache.refresh() : Collections.emptyList();
     }
 
     @Override
