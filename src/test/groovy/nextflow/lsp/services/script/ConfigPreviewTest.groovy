@@ -115,7 +115,7 @@ class ConfigPreviewTest extends Specification {
         layers(response, 'cpus') == [
             ['withLabel:big', '8', true],
             ['process body', '2', false],
-            ['process', '1', false],
+            ['process config', '1', false],
         ]
     }
 
@@ -149,7 +149,7 @@ class ConfigPreviewTest extends Specification {
             ['withName:ALIGN', '64', true],
             ['withLabel:big', '8', false],
             ['process body', '2', false],
-            ['process', '1', false],
+            ['process config', '1', false],
         ]
         and:
         'the profile layer records where it came from'
@@ -219,7 +219,7 @@ class ConfigPreviewTest extends Specification {
         response.result.profiles == ['all-reads']
         layers(response, 'cpus') == [
             ['process body', '2', true],
-            ['process', '99', false],
+            ['process config', '99', false],
         ]
     }
 
@@ -250,7 +250,7 @@ class ConfigPreviewTest extends Specification {
         'a closure is shown as written, since the language server cannot evaluate it'
         layers(response, 'memory') == [
             ['process body', '{ 4.GB * task.attempt }', true],
-            ['process', "'2.GB'", false],
+            ['process config', "'2.GB'", false],
         ]
     }
 

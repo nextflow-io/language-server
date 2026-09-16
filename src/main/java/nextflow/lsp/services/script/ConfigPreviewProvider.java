@@ -456,7 +456,7 @@ public class ConfigPreviewProvider {
             String source;
             if( selector == null ) {
                 rank = RANK_PROCESS_SCOPE;
-                source = "process";
+                source = "process config";
             }
             else if( selector.startsWith("withLabel:") ) {
                 rank = RANK_WITH_LABEL;
