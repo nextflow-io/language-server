@@ -51,13 +51,16 @@ Protocol messages are exchanged using standard input/output.
 
 The Nextflow language server follows the versioning scheme of Nextflow. For each stable release of Nextflow, there is a corresponding stable release of the language server. There is no correlation between patch releases of Nextflow and the language server -- they are patched independently of each other.
 
-A separate branch is maintained for each stable release, starting with `STABLE-24.10.x`. The `main` branch corresponds to the upcoming stable release. Updates to `main` should be backported as needed to maintain a consistent user experience, for example, when a new configuration option is added.
+A separate branch is maintained for each stable release, starting with `STABLE-24.10.x`. The `main` branch corresponds to the upcoming stable release. Updates to `main` should be backported as needed to maintain a consistent user experience, for example, when a new LSP configuration option is added.
+
+When updating the nf-lang version in `build.gradle`, make sure to also update the `nextflowRuntime` dependencies, which can be retrieved from `plugins-info.txt` in the Nextflow repo.
 
 To make a new release of the language server:
 
-1. Checkout the appropriate `STABLE-*` branch for Nextflow.
-2. Build the language server locally.
-3. Create a new GitHub release with the language server JAR and a list of notable changes.
+1. Checkout the appropriate branch of the language server (`main` or `STABLE-*`).
+2. Checkout the appropriate branch of Nextflow (`master` or  `STABLE-*`).
+3. Build the language server locally.
+4. Create a new GitHub release with the language server JAR and a list of notable changes. No release commit.
 
 ## Troubleshooting
 
