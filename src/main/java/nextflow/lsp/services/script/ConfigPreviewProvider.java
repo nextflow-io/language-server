@@ -26,6 +26,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -94,8 +95,11 @@ public class ConfigPreviewProvider {
      * @param processName
      * @param profiles
      *      The config profiles to apply, in order of increasing precedence.
+     * @param qualifiedName
+     *      The name of the invocation to preview, including the scope of the
+     *      enclosing workflows, or null to preview the process on its own.
      */
-    public Map<String,Object> previewConfig(String documentUri, String processName, List<String> profiles) {
+    public Map<String,Object> previewConfig(String documentUri, String processName, List<String> profiles, String qualifiedName) {
         var uri = URI.create(documentUri);
         if( !scriptAst.hasAST(uri) || scriptAst.hasErrors(uri) )
             return Map.of("error", "Config preview cannot be shown because the script has errors.");
@@ -112,6 +116,7 @@ public class ConfigPreviewProvider {
             return Map.of("error", "Config preview cannot be shown because the workspace has no nextflow.config file.");
         var activeProfiles = profiles != null ? profiles : List.<String>of();
         var labels = labels(processNode);
+        var names = selectorNames(processName, qualifiedName);
 
         if( !configAst.hasAST(rootConfig) )
             return Map.of("error", "Config preview cannot be shown because nextflow.config has errors.");
@@ -128,12 +133,12 @@ public class ConfigPreviewProvider {
 
         var applied = entries.stream()
             .filter(entry -> matchesProfile(entry, activeProfiles))
-            .filter(entry -> matchesProcess(entry, processName, labels))
+            .filter(entry -> matchesProcess(entry, names, labels))
             .sorted(strength(activeProfiles))
             .toList();
 
         var result = new LinkedHashMap<String,Object>();
-        result.put("process", processName);
+        result.put("process", qualifiedName != null ? qualifiedName : processName);
         result.put("labels", labels);
         result.put("profiles", List.copyOf(collector.profileNames));
         result.put("activeProfiles", activeProfiles);
@@ -195,11 +200,26 @@ public class ConfigPreviewProvider {
         return entry.profile == null || activeProfiles.contains(entry.profile);
     }
 
-    private static boolean matchesProcess(Entry entry, String processName, List<String> labels) {
+    /**
+     * Collect the names that a `withName` selector can match: the process
+     * name, the include alias, and the fully qualified name. See applyConfig
+     * in ProcessConfigBuilder in the Nextflow runtime.
+     *
+     * @param processName
+     * @param qualifiedName
+     */
+    private static List<String> selectorNames(String processName, String qualifiedName) {
+        if( qualifiedName == null )
+            return List.of(processName);
+        var alias = qualifiedName.substring(qualifiedName.lastIndexOf(':') + 1);
+        return Stream.of(processName, alias, qualifiedName).distinct().toList();
+    }
+
+    private static boolean matchesProcess(Entry entry, List<String> names, List<String> labels) {
         if( entry.rank == RANK_WITH_LABEL )
             return matchesLabels(labels, selectorPattern(entry.source));
         if( entry.rank == RANK_WITH_NAME )
-            return matchesSelector(processName, selectorPattern(entry.source));
+            return names.stream().anyMatch(name -> matchesSelector(name, selectorPattern(entry.source)));
         return true;
     }
 

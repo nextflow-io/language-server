@@ -18,6 +18,11 @@ package nextflow.lsp.services.script
 
 import nextflow.lsp.TestLanguageClient
 import nextflow.lsp.services.LanguageServerConfiguration
+import org.eclipse.lsp4j.CodeActionContext
+import org.eclipse.lsp4j.CodeActionParams
+import org.eclipse.lsp4j.Position
+import org.eclipse.lsp4j.Range
+import org.eclipse.lsp4j.TextDocumentIdentifier
 import spock.lang.Specification
 
 import static nextflow.lsp.TestUtils.*
@@ -89,7 +94,7 @@ class ConfigPreviewTest extends Specification {
 
         def uri = getUri('main.nf')
         open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson(profiles) ]
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson(profiles), asJson(null) ]
         return scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
     }
 
@@ -169,7 +174,7 @@ class ConfigPreviewTest extends Specification {
         when:
         def uri = getUri('main.nf')
         open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]) ]
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson(null) ]
         def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
 
         then:
@@ -185,7 +190,7 @@ class ConfigPreviewTest extends Specification {
         when:
         def uri = getUri('main.nf')
         open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('NOPE'), asJson([]) ]
+        def arguments = [ asJson(uri), asJson('NOPE'), asJson([]), asJson(null) ]
         def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
 
         then:
@@ -207,7 +212,7 @@ class ConfigPreviewTest extends Specification {
         when:
         def uri = getUri('main.nf')
         open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson(['all-reads']) ]
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson(['all-reads']), asJson(null) ]
         def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
 
         then:
@@ -238,7 +243,7 @@ class ConfigPreviewTest extends Specification {
                 """
             }
             '''.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]) ]
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson(null) ]
         def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
 
         then:
@@ -258,7 +263,7 @@ class ConfigPreviewTest extends Specification {
         when:
         def uri = getUri('main.nf')
         open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]) ]
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson(null) ]
         def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
 
         then:
@@ -277,6 +282,86 @@ class ConfigPreviewTest extends Specification {
                               '''
     }
 
+    def 'should offer a code action for each qualified name of an invocation' () {
+        given:
+        def (scriptService, configService) = getScriptAndConfigServices()
+        def uri = getUri('main.nf')
+        open(scriptService, uri, '''\
+            process ALIGN {
+                script:
+                """
+                echo align
+                """
+            }
+
+            workflow SUB {
+                ALIGN()
+            }
+
+            workflow SUB2 {
+                SUB()
+            }
+
+            workflow {
+                SUB()
+                SUB2()
+            }
+            '''.stripIndent())
+
+        when:
+        def position = new Position(line, character)
+        def params = new CodeActionParams(new TextDocumentIdentifier(uri), new Range(position, position), new CodeActionContext([]))
+        def actions = scriptService.codeAction(params)
+
+        then:
+        actions*.title == expected
+
+        where:
+        location                | line  | character | expected
+        'a process invocation'  | 8     | 4         | ['Preview config for SUB:ALIGN', 'Preview config for SUB2:SUB:ALIGN']
+        'a workflow invocation' | 12    | 4         | []
+        'the definition'        | 0     | 8         | []
+    }
+
+    def 'should match a selector against the qualified name and the alias' () {
+        given:
+        def (scriptService, configService) = getScriptAndConfigServices()
+        open(configService, getUri('nextflow.config'), '''\
+            process {
+                withName: 'SUB:ALIGN_DNA' {
+                    cpus = 16
+                }
+                withName: ALIGN_DNA {
+                    cpus = 8
+                }
+                withName: ALIGN {
+                    cpus = 4
+                }
+                withName: OTHER {
+                    cpus = 32
+                }
+            }
+            '''.stripIndent())
+        configService.updateNow()
+
+        when:
+        def uri = getUri('main.nf')
+        open(scriptService, uri, SCRIPT.stripIndent())
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson('SUB:ALIGN_DNA') ]
+        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+
+        then:
+        response.result.process == 'SUB:ALIGN_DNA'
+        and:
+        'the process name, the alias, and the qualified name all select the process'
+        layers(response, 'cpus')*.first() as Set == [
+            'withName:SUB:ALIGN_DNA',
+            'withName:ALIGN_DNA',
+            'withName:ALIGN',
+            'process body',
+        ] as Set
+    }
+
     def 'should not pick a winner for a repeatable directive' () {
         given:
         def (scriptService, configService) = getScriptAndConfigServices()
@@ -292,7 +377,7 @@ class ConfigPreviewTest extends Specification {
         when:
         def uri = getUri('main.nf')
         open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]) ]
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson(null) ]
         def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
 
         then:

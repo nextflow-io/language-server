@@ -21,6 +21,7 @@ import com.google.gson.JsonPrimitive;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.services.config.ConfigService;
 import nextflow.lsp.services.CallHierarchyProvider;
+import nextflow.lsp.services.CodeActionProvider;
 import nextflow.lsp.services.CodeLensProvider;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.services.DefinitionProvider;
@@ -74,6 +75,11 @@ public class ScriptService extends LanguageService {
     @Override
     protected CallHierarchyProvider getCallHierarchyProvider() {
         return new ScriptCallHierarchyProvider(astCache);
+    }
+
+    @Override
+    protected CodeActionProvider getCodeActionProvider() {
+        return new ScriptCodeActionProvider(astCache);
     }
 
     @Override
@@ -135,16 +141,17 @@ public class ScriptService extends LanguageService {
             var provider = new ScriptCodeLensProvider(astCache);
             return provider.previewDag(uri, name, configuration.dagDirection(), configuration.dagVerbose());
         }
-        if( "nextflow.server.previewConfig".equals(command) && arguments.size() == 3 ) {
+        if( "nextflow.server.previewConfig".equals(command) && arguments.size() == 4 ) {
             var uri = getJsonString(arguments.get(0));
             var name = getJsonString(arguments.get(1));
             var profiles = JsonUtils.getStringArray(arguments.get(2));
+            var qualifiedName = getJsonString(arguments.get(3));
             // the config service scans the workspace on its first update, which
             // has not happened yet if no config file has been opened
             if( configService != null )
                 configService.updateNow();
             var provider = new ConfigPreviewProvider(astCache, configService != null ? configService.getConfigAstCache() : null);
-            return provider.previewConfig(uri, name, profiles);
+            return provider.previewConfig(uri, name, profiles, qualifiedName);
         }
         if( "nextflow.server.previewWorkspace".equals(command) ) {
             var provider = new WorkspacePreviewProvider(astCache);

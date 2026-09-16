@@ -31,7 +31,7 @@ Precedence is not a property of a single config file. It comes from `ProcessConf
 
 - Evaluating config expressions. Closures, `params` references and environment lookups are shown as source text.
 - Config sources outside the workspace: `$HOME/.nextflow/config`, `-c` files, `-params-file`.
-- Invocation-site preview, and with it fully qualified process names.
+- Ranking the three rounds of `withName` matching. Nextflow matches the process name, then the include alias, then the qualified name, each round overriding the last. The preview treats every `withName` selector as one layer, so two selectors that match the same process under different names are ordered by declaration rather than by strength.
 - Merge semantics for `ext` maps. Directives that accumulate rather than overwrite (`label`, `module`, `pod`, `publishDir`) are shown as layers without a winner, but nothing models the resulting combined value.
 
 ## Considered Options
@@ -45,7 +45,18 @@ The process definition, or each process invocation inside a workflow.
 - Bad, because a process called from three workflows yields three different answers, which needs the call-hierarchy machinery to compute.
 - Good, because the definition site covers the common case with the base process name and no extra machinery.
 
-The definition wins for the first version. If invocation-site preview is wanted later, a code action carries it without the layout cost.
+The definition wins for the first version, and the invocation site follows as a code action rather than a second lens.
+
+### How an invocation is reached
+
+Once the panel exists, the user still has to name the invocation they care about. A text box for the qualified name, a dropdown of every call path the server can find, or a code action on the call itself.
+
+- Bad, because a text box asks the user to type an answer the server already knows, and a typo yields an empty cascade with no indication that anything went wrong.
+- Bad, because a dropdown lists every call path in the workspace, which on a widely reused nf-core module runs to dozens of entries that have nothing to do with the file being edited.
+- Good, because a code action starts from the call the cursor is already on, so the list is at most the handful of paths that reach that one call.
+- Bad, because a code action is only found by pressing `Ctrl+.`, where a lens is visible without being asked for.
+
+The code action wins. It costs no vertical space, and starting from a call site rather than a process narrows the answer without any UI for choosing.
 
 ### Where profile selection is resolved
 
@@ -77,6 +88,8 @@ Values are source text, not values. This follows from having no evaluator, but i
 Profile selection travels as a command argument and the editor re-invokes on every toggle. This is the decision that keeps precedence in one language. The cost is a round trip per click on cached data, which is not a cost worth optimizing.
 
 The command takes an ordered list of profiles because profile order decides the winner, the same way `-profile docker,test` lets `test` win. The first version applies them in declaration order and says so in the UI; ordered selection is a later refinement that does not change this design.
+
+A single call site can carry more than one qualified name, because the workflow containing it may itself be invoked from more than one place. The server walks the call graph from each entry workflow and returns every chain that reaches the call, and the editor offers one code action per chain. Names come from the call site rather than the definition, since an include alias replaces the process name in the chain.
 
 Returning structured data rather than rendered markup diverges from the DAG preview. The divergence is forced by the toggle UI, and it puts the presentation where presentation belongs. The DAG preview stays as it is.
 
