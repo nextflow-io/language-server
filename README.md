@@ -57,8 +57,8 @@ When updating the nf-lang version in `build.gradle`, make sure to also update th
 
 To make a new release of the language server:
 
-1. Checkout the appropriate branch of the language server (`main` or `STABLE-*`).
-2. Checkout the appropriate branch of Nextflow (`master` or  `STABLE-*`).
+1. Checkout the appropriate branch of Nextflow (`STABLE-*` if present, otherwise `master`).
+2. Checkout the appropriate branch of the language server (`STABLE-*` if present, otherwise `main`).
 3. Build the language server locally.
 4. Create a new GitHub release with the language server JAR and a list of notable changes. No release commit.
 
