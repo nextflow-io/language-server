@@ -89,6 +89,16 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
             result.add(new CodeLens(range, command, null));
         }
 
+        // add "Preview config" code lens for each process
+        for( var pn : ast.getProcessNodes(uri) ) {
+            var range = LanguageServerUtils.astNodeToRange(pn);
+            if( range == null )
+                continue;
+            var arguments = List.of(asJson(uri.toString()), asJson(pn.getName()));
+            var command = new Command("Preview config", "nextflow.previewConfig", arguments);
+            result.add(new CodeLens(range, command, null));
+        }
+
         return result;
     }
 

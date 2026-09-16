@@ -250,7 +250,7 @@ class ScriptLibDirTest extends Specification {
         def configuration = LanguageServerConfiguration.defaults()
         def service = new ScriptService(null)
         service.connect(client)
-        service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()))
+        service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()), null)
         def uri = getUri('main.nf')
 
         when:

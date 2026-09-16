@@ -298,7 +298,12 @@ public abstract class LanguageService {
         updateExecutor.executeLater();
     }
 
-    protected void updateNow() {
+    /**
+     * Compile any pending changes immediately, scanning the workspace first
+     * if it has not been scanned yet. Public so that a service can bring
+     * another service up to date before reading its AST cache.
+     */
+    public void updateNow() {
         updateExecutor.executeNow();
     }
 

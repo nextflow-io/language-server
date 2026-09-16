@@ -19,6 +19,7 @@ import java.util.List;
 
 import com.google.gson.JsonPrimitive;
 import nextflow.lsp.ast.ASTNodeCache;
+import nextflow.lsp.services.config.ConfigService;
 import nextflow.lsp.services.CallHierarchyProvider;
 import nextflow.lsp.services.CodeLensProvider;
 import nextflow.lsp.services.CompletionProvider;
@@ -32,6 +33,7 @@ import nextflow.lsp.services.ReferenceProvider;
 import nextflow.lsp.services.RenameProvider;
 import nextflow.lsp.services.SemanticTokensProvider;
 import nextflow.lsp.services.SymbolProvider;
+import nextflow.lsp.util.JsonUtils;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.lsp.spec.PluginSpecCache;
 
@@ -44,6 +46,8 @@ public class ScriptService extends LanguageService {
 
     private ScriptAstCache astCache;
 
+    private ConfigService configService;
+
     public ScriptService(String rootUri) {
         super(rootUri);
         astCache = new ScriptAstCache(rootUri);
@@ -54,9 +58,10 @@ public class ScriptService extends LanguageService {
         return uri.endsWith(".nf");
     }
 
-    public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {
+    public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache, ConfigService configService) {
         synchronized (this) {
             astCache.initialize(configuration, pluginSpecCache);
+            this.configService = configService;
         }
         super.initialize(configuration);
     }
@@ -129,6 +134,17 @@ public class ScriptService extends LanguageService {
             var name = getJsonString(arguments.get(1));
             var provider = new ScriptCodeLensProvider(astCache);
             return provider.previewDag(uri, name, configuration.dagDirection(), configuration.dagVerbose());
+        }
+        if( "nextflow.server.previewConfig".equals(command) && arguments.size() == 3 ) {
+            var uri = getJsonString(arguments.get(0));
+            var name = getJsonString(arguments.get(1));
+            var profiles = JsonUtils.getStringArray(arguments.get(2));
+            // the config service scans the workspace on its first update, which
+            // has not happened yet if no config file has been opened
+            if( configService != null )
+                configService.updateNow();
+            var provider = new ConfigPreviewProvider(astCache, configService != null ? configService.getConfigAstCache() : null);
+            return provider.previewConfig(uri, name, profiles);
         }
         if( "nextflow.server.previewWorkspace".equals(command) ) {
             var provider = new WorkspacePreviewProvider(astCache);

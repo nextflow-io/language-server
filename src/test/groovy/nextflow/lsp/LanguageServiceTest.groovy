@@ -260,7 +260,7 @@ class LanguageServiceTest extends Specification {
 
         when: 're-initializing the service'
         def configuration = LanguageServerConfiguration.defaults()
-        service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()))
+        service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()), null)
         then: 'diagnostics for the previously-open file are cleared'
         client.getDiagnostics(uri).isEmpty()
 
