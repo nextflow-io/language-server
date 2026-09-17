@@ -6,7 +6,7 @@
 
 ## Summary 
 
-Quick description of the problem and the context. Should not take more than 2-3 lines.
+Quick description of the problem and the context. Should not take more than 2-3 sentences.
 
 ## Problem Statement
 
