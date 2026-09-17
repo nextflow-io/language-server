@@ -409,6 +409,38 @@ class ConfigPreviewTest extends Specification {
         ]
     }
 
+    def 'should match a name selector as a regular expression' () {
+        given:
+        def (scriptService, configService) = getScriptAndConfigServices()
+        open(configService, getUri('nextflow.config'), """\
+            process {
+                withName: '${pattern}' {
+                    queue = 'long'
+                }
+            }
+            """.stripIndent())
+        configService.updateNow()
+
+        when:
+        def uri = getUri('main.nf')
+        open(scriptService, uri, SCRIPT.stripIndent())
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson('SUB2:SUB:ALIGN_DNA') ]
+        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+
+        then:
+        (layers(response, 'queue') != null) == applies
+
+        where:
+        description                                     | pattern              | applies
+        'a wildcard over the process name'              | 'ALIGN.*'            | true
+        'a prefix of the process name'                  | 'ALI'                | false
+        'a wildcard over the enclosing scope'           | '.*:SUB:ALIGN_DNA'   | true
+        'an exact selector for a nested invocation'     | 'SUB:ALIGN_DNA'      | false
+        'a negated selector matching another name'      | '!ALIGN_DNA'         | true
+        'a pattern that differs only in case'           | '!align.*'           | true
+        'an alternation'                                | 'ALIGN|REPORT'       | true
+    }
+
     def 'should rank a name selector by the name that it matched' () {
         given:
         def (scriptService, configService) = getScriptAndConfigServices()
