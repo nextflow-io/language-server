@@ -79,6 +79,9 @@ class ConfigPreviewTest extends Specification {
     def cleanup() {
         deleteWorkspaceFile('nextflow.config')
         deleteWorkspaceFile('conf/extra.config')
+        deleteWorkspaceFile('modules/align.nf')
+        deleteWorkspaceFile('subworkflows/sub.nf')
+        deleteWorkspaceFile('main.nf')
     }
 
     /**
@@ -323,6 +326,50 @@ class ConfigPreviewTest extends Specification {
         'the definition'        | 0     | 8         | []
     }
 
+    def 'should qualify an invocation with the include alias' () {
+        given:
+        writeWorkspaceFile('modules/align.nf', '''\
+            process ALIGN {
+                script:
+                """
+                echo align
+                """
+            }
+            ''')
+        writeWorkspaceFile('subworkflows/sub.nf', '''\
+            include { ALIGN as ALIGN_DNA } from '../modules/align.nf'
+
+            workflow SUB {
+                main:
+                ALIGN_DNA()
+            }
+            ''')
+        def main = '''\
+            include { SUB } from './subworkflows/sub.nf'
+
+            workflow {
+                SUB()
+            }
+            '''
+        // the workspace scan reads from disk and drops in-memory documents
+        writeWorkspaceFile('main.nf', main)
+        def scriptService = getScriptService()
+        // getScriptService opens main.nf as an empty stub, so restore it
+        open(scriptService, getUri('main.nf'), main.stripIndent())
+        scriptService.updateNow()
+        // the first update defers the workspace scan
+        scriptService.updateNow()
+
+        when:
+        def position = new Position(4, 4)
+        def params = new CodeActionParams(new TextDocumentIdentifier(getUri('subworkflows/sub.nf')), new Range(position, position), new CodeActionContext([]))
+        def actions = scriptService.codeAction(params)
+
+        then:
+        'the qualified name uses the alias at the call site, not the process name'
+        actions*.title == ['Preview config for SUB:ALIGN_DNA']
+    }
+
     def 'should match a selector against the qualified name and the alias' () {
         given:
         def (scriptService, configService) = getScriptAndConfigServices()
@@ -353,13 +400,48 @@ class ConfigPreviewTest extends Specification {
         then:
         response.result.process == 'SUB:ALIGN_DNA'
         and:
-        'the process name, the alias, and the qualified name all select the process'
-        layers(response, 'cpus')*.first() as Set == [
+        'the qualified name outranks the alias, which outranks the process name'
+        layers(response, 'cpus')*.first() == [
             'withName:SUB:ALIGN_DNA',
             'withName:ALIGN_DNA',
             'withName:ALIGN',
             'process body',
-        ] as Set
+        ]
+    }
+
+    def 'should rank a name selector by the name that it matched' () {
+        given:
+        def (scriptService, configService) = getScriptAndConfigServices()
+        open(configService, getUri('nextflow.config'), '''\
+            process {
+                withName: 'SUB:ALIGN_DNA' {
+                    cpus = 128
+                }
+                withName: ALIGN {
+                    cpus = 16
+                }
+                withName: 'ALIGN.*' {
+                    memory = '64.GB'
+                }
+                withName: ALIGN {
+                    memory = '8.GB'
+                }
+            }
+            '''.stripIndent())
+        configService.updateNow()
+
+        when:
+        def uri = getUri('main.nf')
+        open(scriptService, uri, SCRIPT.stripIndent())
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson('SUB:ALIGN_DNA') ]
+        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+
+        then:
+        'the qualified selector wins even though the weaker one is declared later'
+        layers(response, 'cpus').first() == ['withName:SUB:ALIGN_DNA', '128', true]
+        and:
+        'a selector that matches several names is ranked by the strongest one'
+        layers(response, 'memory').first() == ['withName:ALIGN.*', "'64.GB'", true]
     }
 
     def 'should not pick a winner for a repeatable directive' () {

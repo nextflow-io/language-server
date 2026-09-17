@@ -25,8 +25,8 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Stream;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -63,9 +63,11 @@ public class ConfigPreviewProvider {
     private static final FormattingOptions FORMATTING_OPTIONS = new FormattingOptions(4, true);
 
     /**
-     * Precedence layers, weakest first. See ProcessConfigBuilder in the
-     * Nextflow runtime: label selectors are applied first, then name
-     * selectors, then the process scope fills in whatever is still unset.
+     * Precedence layers, weakest first. See "Selector priority" in the
+     * Nextflow config docs: the process scope fills in whatever is still
+     * unset, then the process body, then label selectors, then name
+     * selectors. A name selector is ranked by the name it matched, so
+     * RANK_WITH_NAME is the weakest of three adjacent layers.
      */
     private static final int RANK_PROCESS_SCOPE = 0;
     private static final int RANK_PROCESS_BODY = 1;
@@ -133,7 +135,8 @@ public class ConfigPreviewProvider {
 
         var applied = entries.stream()
             .filter(entry -> matchesProfile(entry, activeProfiles))
-            .filter(entry -> matchesProcess(entry, names, labels))
+            .map(entry -> rank(entry, names, labels))
+            .filter(Objects::nonNull)
             .sorted(strength(activeProfiles))
             .toList();
 
@@ -201,9 +204,10 @@ public class ConfigPreviewProvider {
     }
 
     /**
-     * Collect the names that a `withName` selector can match: the process
-     * name, the include alias, and the fully qualified name. See applyConfig
-     * in ProcessConfigBuilder in the Nextflow runtime.
+     * Collect the names that a `withName` selector can match, in increasing
+     * order of precedence: the process name, the include alias, and the
+     * fully qualified name. The names are not de-duplicated, because the
+     * position of a name is its rank.
      *
      * @param processName
      * @param qualifiedName
@@ -212,15 +216,30 @@ public class ConfigPreviewProvider {
         if( qualifiedName == null )
             return List.of(processName);
         var alias = qualifiedName.substring(qualifiedName.lastIndexOf(':') + 1);
-        return Stream.of(processName, alias, qualifiedName).distinct().toList();
+        return List.of(processName, alias, qualifiedName);
     }
 
-    private static boolean matchesProcess(Entry entry, List<String> names, List<String> labels) {
+    /**
+     * Rank an entry against a process, or return null if it does not apply.
+     *
+     * @param entry
+     * @param names
+     * @param labels
+     */
+    private static Entry rank(Entry entry, List<String> names, List<String> labels) {
         if( entry.rank == RANK_WITH_LABEL )
-            return matchesLabels(labels, selectorPattern(entry.source));
-        if( entry.rank == RANK_WITH_NAME )
-            return names.stream().anyMatch(name -> matchesSelector(name, selectorPattern(entry.source)));
-        return true;
+            return matchesLabels(labels, selectorPattern(entry.source)) ? entry : null;
+        if( entry.rank != RANK_WITH_NAME )
+            return entry;
+        // a selector can match more than one name, and the strongest name it
+        // matches is the one that decides the winner
+        var pattern = selectorPattern(entry.source);
+        int matched = -1;
+        for( int i = 0; i < names.size(); i++ ) {
+            if( matchesSelector(names.get(i), pattern) )
+                matched = i;
+        }
+        return matched < 0 ? null : entry.withRank(RANK_WITH_NAME + matched);
     }
 
     private static String selectorPattern(String source) {
@@ -367,7 +386,11 @@ public class ConfigPreviewProvider {
         URI uri,
         int line,
         int seq
-    ) {}
+    ) {
+        Entry withRank(int rank) {
+            return new Entry(name, value, source, rank, profile, uri, line, seq);
+        }
+    }
 
     /**
      * Collect the settings in the `process` scope across a config file and

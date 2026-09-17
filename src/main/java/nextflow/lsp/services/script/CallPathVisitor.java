@@ -21,7 +21,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import nextflow.script.ast.ASTNodeMarker;
+import nextflow.lsp.ast.LanguageServerASTUtils;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.MethodNode;
@@ -74,7 +74,7 @@ class CallPathVisitor {
             return;
         stack.push(node);
         for( var call : new OutgoingCallsVisitor().apply(node) ) {
-            var callee = (MethodNode) call.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
+            var callee = LanguageServerASTUtils.getDefinition(call);
             // the name at the call site is the include alias, which is what
             // the runtime uses to build the qualified name
             var name = call.getMethodAsString();

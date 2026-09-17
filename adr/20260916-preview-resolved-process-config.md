@@ -31,7 +31,6 @@ Precedence is not a property of a single config file. It comes from `ProcessConf
 
 - Evaluating config expressions. Closures, `params` references and environment lookups are shown as source text.
 - Config sources outside the workspace: `$HOME/.nextflow/config`, `-c` files, `-params-file`.
-- Ranking the three rounds of `withName` matching. Nextflow matches the process name, then the include alias, then the qualified name, each round overriding the last. The preview treats every `withName` selector as one layer, so two selectors that match the same process under different names are ordered by declaration rather than by strength.
 - Merge semantics for `ext` maps. Directives that accumulate rather than overwrite (`label`, `module`, `pod`, `publishDir`) are shown as layers without a winner, but nothing models the resulting combined value.
 
 ## Considered Options
@@ -88,6 +87,8 @@ Values are source text, not values. This follows from having no evaluator, but i
 Profile selection travels as a command argument and the editor re-invokes on every toggle. This is the decision that keeps precedence in one language. The cost is a round trip per click on cached data, which is not a cost worth optimizing.
 
 The command takes an ordered list of profiles because profile order decides the winner, the same way `-profile docker,test` lets `test` win. The first version applies them in declaration order and says so in the UI; ordered selection is a later refinement that does not change this design.
+
+A `withName` selector is ranked by the name it matched rather than by where it was declared. The config docs give six priority levels, and the last three are `withName` against the process name, then the include alias, then the qualified name. A selector can match in more than one of those rounds, and the strongest match is the one that decides the winner, so the rank cannot be assigned while the config tree is being collected. It is assigned per request, once the name of the invocation is known.
 
 A single call site can carry more than one qualified name, because the workflow containing it may itself be invoked from more than one place. The server walks the call graph from each entry workflow and returns every chain that reaches the call, and the editor offers one code action per chain. Names come from the call site rather than the definition, since an include alias replaces the process name in the chain.
 
