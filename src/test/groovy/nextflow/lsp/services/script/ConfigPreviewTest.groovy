@@ -112,6 +112,30 @@ class ConfigPreviewTest extends Specification {
         return scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
     }
 
+    /**
+     * Open a config file and a script, then preview the config for a process
+     * in the script.
+     *
+     * @param opts
+     *      script, process, profiles, qualifiedName
+     * @param config
+     */
+    def preview(Map opts = [:], String config) {
+        def (scriptService, configService) = getScriptAndConfigServices()
+        open(configService, getUri('nextflow.config'), config.stripIndent())
+        configService.updateNow()
+
+        def uri = getUri('main.nf')
+        open(scriptService, uri, (opts.script ?: SCRIPT).stripIndent())
+        def arguments = [
+            asJson(uri),
+            asJson(opts.process ?: 'ALIGN'),
+            asJson(opts.containsKey('profiles') ? opts.profiles : []),
+            asJson(opts.qualifiedName)
+        ]
+        return scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+    }
+
     def layers(Map response, String directive) {
         def entry = response.result.directives.find { it.name == directive }
         return entry?.layers?.collect { [ it.source, it.value, it.active ] }
@@ -171,9 +195,8 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should not apply a selector that does not match the process' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), '''\
+        when:
+        def response = preview('''\
             process {
                 withName: OTHER {
                     cpus = 16
@@ -182,14 +205,7 @@ class ConfigPreviewTest extends Specification {
                     cpus = 32
                 }
             }
-            '''.stripIndent())
-        configService.updateNow()
-
-        when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson(null) ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+            ''')
 
         then:
         layers(response, 'cpus') == [
@@ -198,22 +214,14 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should match a label selector against an empty label' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), """\
+        when:
+        def response = preview("""\
             process {
                 withLabel: '${selector}' {
                     cpus = 32
                 }
             }
-            """.stripIndent())
-        configService.updateNow()
-
-        when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, UNLABELED.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson(null) ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+            """, script: UNLABELED)
 
         then:
         layers(response, 'cpus').first() == expected
@@ -227,9 +235,8 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should not promote a selector that a profile overrides in place' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), '''\
+        when:
+        def response = preview('''\
             process {
                 withName: 'ALIGN' {
                     cpus = 1
@@ -248,14 +255,7 @@ class ConfigPreviewTest extends Specification {
                     }
                 }
             }
-            '''.stripIndent())
-        configService.updateNow()
-
-        when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson(['docker']), asJson(null) ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+            ''', profiles: ['docker'])
 
         then:
         // a profile overrides `withName: ALIGN` where it is declared, so
@@ -264,21 +264,13 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should treat a missing profile argument as no profiles' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), '''\
+        when:
+        def response = preview('''\
             process {
                 cpus = 1
                 memory = '4.GB'
             }
-            '''.stripIndent())
-        configService.updateNow()
-
-        when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson(null), asJson(null) ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+            ''', profiles: null)
 
         then:
         layers(response, 'memory') == [
@@ -287,36 +279,24 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should report an error when the process does not exist' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-
         when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('NOPE'), asJson([]), asJson(null) ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+        def response = preview('''\
+            process.cpus = 1
+            ''', process: 'NOPE')
 
         then:
         response.error == "Process 'NOPE' was not found."
     }
 
     def 'should handle a quoted profile name' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), '''\
+        when:
+        def response = preview('''\
             profiles {
                 'all-reads' {
                     process.cpus = 99
                 }
             }
-            '''.stripIndent())
-        configService.updateNow()
-
-        when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson(['all-reads']), asJson(null) ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+            ''', profiles: ['all-reads'])
 
         then:
         response.result.profiles == ['all-reads']
@@ -327,16 +307,10 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should show a dynamic value as source text' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), '''\
-            process.memory = '2.GB'
-            '''.stripIndent())
-        configService.updateNow()
-
         when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, '''\
+        def response = preview('''\
+            process.memory = '2.GB'
+            ''', script: '''\
             process ALIGN {
                 memory { 4.GB * task.attempt }
 
@@ -345,9 +319,7 @@ class ConfigPreviewTest extends Specification {
                 echo align
                 """
             }
-            '''.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson(null) ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+            ''')
 
         then:
         'a closure is shown as written, since the language server cannot evaluate it'
@@ -358,16 +330,8 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should block the preview when a config file has errors' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), config.stripIndent())
-        configService.updateNow()
-
         when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson(null) ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+        def response = preview(config)
 
         then:
         response.error == "Config preview cannot be shown because ${file} has errors."
@@ -471,9 +435,8 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should match a selector against the qualified name and the alias' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), '''\
+        when:
+        def response = preview('''\
             process {
                 withName: 'SUB:ALIGN_DNA' {
                     cpus = 16
@@ -488,14 +451,7 @@ class ConfigPreviewTest extends Specification {
                     cpus = 32
                 }
             }
-            '''.stripIndent())
-        configService.updateNow()
-
-        when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson('SUB:ALIGN_DNA') ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+            ''', qualifiedName: 'SUB:ALIGN_DNA')
 
         then:
         response.result.process == 'SUB:ALIGN_DNA'
@@ -510,22 +466,14 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should match a name selector as a regular expression' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), """\
+        when:
+        def response = preview("""\
             process {
                 withName: '${pattern}' {
                     queue = 'long'
                 }
             }
-            """.stripIndent())
-        configService.updateNow()
-
-        when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson('SUB2:SUB:ALIGN_DNA') ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+            """, qualifiedName: 'SUB2:SUB:ALIGN_DNA')
 
         then:
         (layers(response, 'queue') != null) == applies
@@ -542,9 +490,8 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should rank a name selector by the name that it matched' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), '''\
+        when:
+        def response = preview('''\
             process {
                 withName: 'SUB:ALIGN_DNA' {
                     cpus = 128
@@ -559,14 +506,7 @@ class ConfigPreviewTest extends Specification {
                     memory = '8.GB'
                 }
             }
-            '''.stripIndent())
-        configService.updateNow()
-
-        when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson('SUB:ALIGN_DNA') ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+            ''', qualifiedName: 'SUB:ALIGN_DNA')
 
         then:
         'the qualified selector wins even though the weaker one is declared later'
@@ -577,22 +517,14 @@ class ConfigPreviewTest extends Specification {
     }
 
     def 'should not pick a winner for a repeatable directive' () {
-        given:
-        def (scriptService, configService) = getScriptAndConfigServices()
-        open(configService, getUri('nextflow.config'), '''\
+        when:
+        def response = preview('''\
             process {
                 withLabel: big {
                     label = 'retry_high'
                 }
             }
-            '''.stripIndent())
-        configService.updateNow()
-
-        when:
-        def uri = getUri('main.nf')
-        open(scriptService, uri, SCRIPT.stripIndent())
-        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson(null) ]
-        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+            ''')
 
         then:
         'Nextflow appends labels rather than overriding them, so every layer applies'

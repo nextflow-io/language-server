@@ -121,9 +121,6 @@ public class ConfigPreviewProvider {
         var labels = labels(processNode);
         var names = selectorNames(processName, qualifiedName);
 
-        if( !configAst.hasAST(rootConfig) )
-            return Map.of("error", "Config preview cannot be shown because nextflow.config has errors.");
-
         var collector = new ConfigCollector();
         collector.walk(rootConfig, null, List.of(), null);
         // an unresolved include leaves out settings that may well be the ones
@@ -446,10 +443,15 @@ public class ConfigPreviewProvider {
         private URI errored;
 
         void walk(URI uri, String profile, List<String> scope, String selector) {
-            if( !configAst.hasAST(uri) || including.contains(uri) )
+            if( including.contains(uri) )
                 return;
-            if( errored == null && (configAst.hasSyntaxErrors(uri) || configAst.hasIncludeErrors(uri)) )
+            // a config file that cannot be parsed is an error in its own right,
+            // not a file with no settings in it
+            var hasAST = configAst.hasAST(uri);
+            if( errored == null && (!hasAST || configAst.hasSyntaxErrors(uri) || configAst.hasIncludeErrors(uri)) )
                 errored = uri;
+            if( !hasAST )
+                return;
             including.push(uri);
             visit(configAst.getConfigNode(uri).getConfigStatements(), uri, profile, scope, selector);
             including.pop();
