@@ -114,7 +114,7 @@ public class ConfigPreviewProvider {
         if( processNode == null )
             return Map.of("error", "Process '" + processName + "' was not found.");
 
-        var rootConfig = configAst != null ? rootConfigUri() : null;
+        var rootConfig = rootConfigUri();
         if( rootConfig == null )
             return Map.of("error", "Config preview cannot be shown because the workspace has no nextflow.config file.");
         var activeProfiles = profiles != null ? profiles : List.<String>of();

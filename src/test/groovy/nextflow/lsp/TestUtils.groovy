@@ -23,7 +23,6 @@ import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.lsp.services.LanguageService
 import nextflow.lsp.services.config.ConfigService
 import nextflow.lsp.services.script.ScriptService
-import nextflow.lsp.spec.PluginSpecCache
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.TextDocumentItem
 
@@ -68,7 +67,7 @@ class TestUtils {
         def configuration = opts.config ?: LanguageServerConfiguration.defaults()
         def service = new RecordingLanguageService(rootUri)
         service.connect(client)
-        service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()), null)
+        service.initialize(configuration, newConfigService(client))
         return service
     }
 
@@ -124,9 +123,8 @@ class TestUtils {
     static ScriptService getScriptService(TestLanguageClient client, ConfigService configService = null) {
         def service = new ScriptService(workspaceRoot.toUri().toString())
         def configuration = LanguageServerConfiguration.defaults()
-        def pluginSpecCache = new PluginSpecCache(configuration.pluginRegistryUrl())
         service.connect(client)
-        service.initialize(configuration, pluginSpecCache, configService)
+        service.initialize(configuration, configService ?: newConfigService())
         // skip workspace scan
         open(service, getUri('main.nf'), '')
         service.updateNow()

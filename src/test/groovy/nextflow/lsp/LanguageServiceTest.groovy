@@ -17,7 +17,6 @@
 package nextflow.lsp
 
 import nextflow.lsp.services.LanguageServerConfiguration
-import nextflow.lsp.spec.PluginSpecCache
 import org.eclipse.lsp4j.CodeLensParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
@@ -260,7 +259,7 @@ class LanguageServiceTest extends Specification {
 
         when: 're-initializing the service'
         def configuration = LanguageServerConfiguration.defaults()
-        service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()), null)
+        service.initialize(configuration, newConfigService())
         then: 'diagnostics for the previously-open file are cleared'
         client.getDiagnostics(uri).isEmpty()
 

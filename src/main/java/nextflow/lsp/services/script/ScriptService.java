@@ -36,7 +36,6 @@ import nextflow.lsp.services.SemanticTokensProvider;
 import nextflow.lsp.services.SymbolProvider;
 import nextflow.lsp.util.JsonUtils;
 import nextflow.script.formatter.FormattingOptions;
-import nextflow.lsp.spec.PluginSpecCache;
 
 /**
  * Implementation of language services for Nextflow scripts.
@@ -59,9 +58,9 @@ public class ScriptService extends LanguageService {
         return uri.endsWith(".nf");
     }
 
-    public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache, ConfigService configService) {
+    public void initialize(LanguageServerConfiguration configuration, ConfigService configService) {
         synchronized (this) {
-            astCache.initialize(configuration, pluginSpecCache);
+            astCache.initialize(configuration, configService.getPluginSpecCache());
             this.configService = configService;
         }
         super.initialize(configuration);
@@ -148,9 +147,8 @@ public class ScriptService extends LanguageService {
             var qualifiedName = getJsonString(arguments.get(3));
             // the config service scans the workspace on its first update, which
             // has not happened yet if no config file has been opened
-            if( configService != null )
-                configService.updateNow();
-            var provider = new ConfigPreviewProvider(astCache, configService != null ? configService.getConfigAstCache() : null);
+            configService.updateNow();
+            var provider = new ConfigPreviewProvider(astCache, configService.getConfigAstCache());
             return provider.previewConfig(uri, name, profiles, qualifiedName);
         }
         if( "nextflow.server.previewWorkspace".equals(command) ) {

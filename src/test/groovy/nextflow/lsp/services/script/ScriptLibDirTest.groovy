@@ -21,7 +21,6 @@ import java.nio.file.Path
 
 import nextflow.lsp.TestLanguageClient
 import nextflow.lsp.services.LanguageServerConfiguration
-import nextflow.lsp.spec.PluginSpecCache
 import spock.lang.Specification
 
 import static nextflow.lsp.TestUtils.*
@@ -250,7 +249,7 @@ class ScriptLibDirTest extends Specification {
         def configuration = LanguageServerConfiguration.defaults()
         def service = new ScriptService(null)
         service.connect(client)
-        service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()), null)
+        service.initialize(configuration, newConfigService())
         def uri = getUri('main.nf')
 
         when:

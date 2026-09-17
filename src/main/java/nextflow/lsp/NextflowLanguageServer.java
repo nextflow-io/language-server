@@ -522,7 +522,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             count++;
 
             configServices.get(name).initialize(configuration);
-            scriptServices.get(name).initialize(configuration, configServices.get(name).getPluginSpecCache(), configServices.get(name));
+            scriptServices.get(name).initialize(configuration, configServices.get(name));
         }
 
         progress.end();
@@ -549,7 +549,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
             addWorkspaceFolder(name, uri);
             configServices.get(name).initialize(configuration);
-            scriptServices.get(name).initialize(configuration, configServices.get(name).getPluginSpecCache(), configServices.get(name));
+            scriptServices.get(name).initialize(configuration, configServices.get(name));
         }
     }
 
