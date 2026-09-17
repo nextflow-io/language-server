@@ -21,6 +21,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -133,11 +134,13 @@ public class ConfigPreviewProvider {
         var entries = new ArrayList<>(collector.entries);
         entries.addAll(bodyEntries(processNode));
 
-        var applied = entries.stream()
+        var ranked = entries.stream()
             .filter(entry -> matchesProfile(entry, activeProfiles))
             .map(entry -> rank(entry, names, labels))
             .filter(Objects::nonNull)
-            .sorted(strength(activeProfiles))
+            .toList();
+        var applied = ranked.stream()
+            .sorted(strength(ranked, activeProfiles))
             .toList();
 
         var result = new LinkedHashMap<String,Object>();
@@ -248,16 +251,48 @@ public class ConfigPreviewProvider {
 
     /**
      * Order entries from weakest to strongest: by precedence layer, then by
-     * profile (profiles override the base config, and later profiles override
-     * earlier ones), then by the order in which they were declared.
+     * the order in which the setting was declared, then by profile (later
+     * profiles override earlier ones).
      *
+     * A profile is merged into the config before the selectors are applied,
+     * so a profile overrides a setting in place rather than moving it to the
+     * end of the config. Entries that overwrite each other are therefore
+     * ordered by where the setting first appears, not by where the profile
+     * that overrides it appears.
+     *
+     * @param entries
      * @param activeProfiles
      */
-    private static Comparator<Entry> strength(List<String> activeProfiles) {
+    private static Comparator<Entry> strength(List<Entry> entries, List<String> activeProfiles) {
+        var positions = new HashMap<String,Integer>();
+        for( var entry : entries )
+            positions.merge(position(entry), entry.seq, Math::min);
         return Comparator
             .comparingInt((Entry entry) -> entry.rank)
-            .thenComparingInt(entry -> activeProfiles.indexOf(entry.profile))
+            .thenComparingInt(entry -> positions.get(position(entry)))
+            .thenComparingInt(entry -> profileIndex(entry, activeProfiles))
             .thenComparingInt(entry -> entry.seq);
+    }
+
+    /**
+     * Rank an entry by the profile that declared it. A setting from the base
+     * config comes before any profile.
+     *
+     * @param entry
+     * @param activeProfiles
+     */
+    private static int profileIndex(Entry entry, List<String> activeProfiles) {
+        return entry.profile != null ? activeProfiles.indexOf(entry.profile) : -1;
+    }
+
+    /**
+     * Identify the setting that an entry overwrites, i.e. the selector that
+     * contains it and the directive that it sets.
+     *
+     * @param entry
+     */
+    private static String position(Entry entry) {
+        return entry.rank + " " + entry.source + " " + entry.name;
     }
 
     /**
@@ -331,7 +366,8 @@ public class ConfigPreviewProvider {
         var regex = compile(isNegated ? pattern.substring(1).trim() : pattern);
         if( regex == null )
             return false;
-        for( var label : labels ) {
+        // a process with no labels is matched against a single empty label
+        for( var label : labels.isEmpty() ? List.of("") : labels ) {
             if( regex.matcher(label).matches() )
                 return !isNegated;
         }

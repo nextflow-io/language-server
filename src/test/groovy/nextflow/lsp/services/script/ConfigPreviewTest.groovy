@@ -46,6 +46,17 @@ class ConfigPreviewTest extends Specification {
         }
         '''
 
+    static final String UNLABELED = '''\
+        process ALIGN {
+            cpus 2
+
+            script:
+            """
+            echo align
+            """
+        }
+        '''
+
     static final String CONFIG = '''\
         includeConfig 'conf/extra.config'
 
@@ -183,6 +194,95 @@ class ConfigPreviewTest extends Specification {
         then:
         layers(response, 'cpus') == [
             ['process body', '2', true],
+        ]
+    }
+
+    def 'should match a label selector against an empty label' () {
+        given:
+        def (scriptService, configService) = getScriptAndConfigServices()
+        open(configService, getUri('nextflow.config'), """\
+            process {
+                withLabel: '${selector}' {
+                    cpus = 32
+                }
+            }
+            """.stripIndent())
+        configService.updateNow()
+
+        when:
+        def uri = getUri('main.nf')
+        open(scriptService, uri, UNLABELED.stripIndent())
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson([]), asJson(null) ]
+        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+
+        then:
+        layers(response, 'cpus').first() == expected
+
+        where:
+        selector | expected
+        '.*'     | ['withLabel:.*', '32', true]
+        '!.*'    | ['process body', '2', true]
+        'big'    | ['process body', '2', true]
+        '!big'   | ['withLabel:!big', '32', true]
+    }
+
+    def 'should not promote a selector that a profile overrides in place' () {
+        given:
+        def (scriptService, configService) = getScriptAndConfigServices()
+        open(configService, getUri('nextflow.config'), '''\
+            process {
+                withName: 'ALIGN' {
+                    cpus = 1
+                }
+                withName: 'A.*' {
+                    cpus = 9
+                }
+            }
+
+            profiles {
+                docker {
+                    process {
+                        withName: 'ALIGN' {
+                            cpus = 4
+                        }
+                    }
+                }
+            }
+            '''.stripIndent())
+        configService.updateNow()
+
+        when:
+        def uri = getUri('main.nf')
+        open(scriptService, uri, SCRIPT.stripIndent())
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson(['docker']), asJson(null) ]
+        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+
+        then:
+        // a profile overrides `withName: ALIGN` where it is declared, so
+        // `withName: A.*` is still applied after it
+        layers(response, 'cpus').first() == ['withName:A.*', '9', true]
+    }
+
+    def 'should treat a missing profile argument as no profiles' () {
+        given:
+        def (scriptService, configService) = getScriptAndConfigServices()
+        open(configService, getUri('nextflow.config'), '''\
+            process {
+                cpus = 1
+                memory = '4.GB'
+            }
+            '''.stripIndent())
+        configService.updateNow()
+
+        when:
+        def uri = getUri('main.nf')
+        open(scriptService, uri, SCRIPT.stripIndent())
+        def arguments = [ asJson(uri), asJson('ALIGN'), asJson(null), asJson(null) ]
+        def response = scriptService.executeCommand('nextflow.server.previewConfig', arguments, LanguageServerConfiguration.defaults())
+
+        then:
+        layers(response, 'memory') == [
+            ['process config', "'4.GB'", true],
         ]
     }
 
