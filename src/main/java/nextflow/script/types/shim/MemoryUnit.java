@@ -55,7 +55,7 @@ public interface MemoryUnit {
 
 interface MemoryUnitOps {
 
-    Boolean compareTo(MemoryUnit a, MemoryUnit b);
+    Integer compareTo(MemoryUnit a, MemoryUnit b);
 
     MemoryUnit div(MemoryUnit a, Float b);
 

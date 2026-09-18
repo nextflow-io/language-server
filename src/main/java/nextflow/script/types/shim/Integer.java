@@ -97,9 +97,9 @@ interface IntegerOps {
 
     Integer bitwiseNegate();
 
-    Boolean compareTo(Integer a, Integer b);
+    Integer compareTo(Integer a, Integer b);
 
-    Boolean compareTo(Integer a, Float b);
+    Integer compareTo(Integer a, Float b);
 
     Float div(Integer a, Integer b);
 

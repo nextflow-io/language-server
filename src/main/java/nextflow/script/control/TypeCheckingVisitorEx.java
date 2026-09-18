@@ -1017,12 +1017,15 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
             case Types.COMPARE_NOT_INSTANCEOF:
                 return;
 
+            case Types.COMPARE_TO:
+                resultType = resolveOpResultType(lhsType, rhsType, lhsOps, rhsOps, "compareTo");
+                break;
+
             case Types.COMPARE_LESS_THAN:
             case Types.COMPARE_LESS_THAN_EQUAL:
             case Types.COMPARE_GREATER_THAN:
             case Types.COMPARE_GREATER_THAN_EQUAL:
-            case Types.COMPARE_TO:
-                resultType = resolveOpResultType(lhsType, rhsType, lhsOps, rhsOps, "compareTo");
+                resultType = resolveOpResultType(lhsType, rhsType, lhsOps, rhsOps, "compareTo") != null ? ClassHelper.Boolean_TYPE : null;
                 break;
 
             case Types.KEYWORD_IN:
@@ -1032,9 +1035,9 @@ public class TypeCheckingVisitorEx extends ScriptVisitorSupport {
 
             case Types.COMPARE_EQUAL:
             case Types.COMPARE_NOT_EQUAL:
-                resultType = TypesEx.isEqual(lhsType, rhsType)
+                resultType = TypesEx.isEqual(lhsType, rhsType) || resolveOpResultType(lhsType, rhsType, lhsOps, rhsOps, "compareTo") != null
                     ? ClassHelper.Boolean_TYPE
-                    : resolveOpResultType(lhsType, rhsType, lhsOps, rhsOps, "compareTo");
+                    : null;
                 break;
 
             case Types.FIND_REGEX:

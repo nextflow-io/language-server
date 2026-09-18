@@ -107,7 +107,7 @@ public interface List<E> extends Iterable<E> {
 
 interface ListOps<E> {
 
-    Boolean compareTo(List<E> a, List<E> b);
+    Integer compareTo(List<E> a, List<E> b);
 
     E getAt(List<E> a, Integer b);
 

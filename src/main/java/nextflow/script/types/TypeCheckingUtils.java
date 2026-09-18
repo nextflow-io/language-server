@@ -421,7 +421,7 @@ public class TypeCheckingUtils {
      */
     public static MethodNode resolveGenericReturnType(ClassNode receiverType, MethodNode method, List<Expression> arguments, List<GenericsConflict> conflicts) {
         var returnType = method.getReturnType();
-        if( !GenericsUtils.hasUnresolvedGenerics(returnType) )
+        if( !GenericsUtils.hasUnresolvedGenerics(returnType) && !hasUnresolvedParameters(method) )
             return method;
 
         var context = GenericsUtils.extractPlaceholders(receiverType);
@@ -460,11 +460,20 @@ public class TypeCheckingUtils {
 
             returnType = applyGenericsContext(resolvedPlaceholders, returnType);
         }
+        else {
+            for( int i = 0; i < parameters.length; i++ )
+                parameters[i] = new Parameter(applyGenericsContext(context, parameters[i].getType()), parameters[i].getName());
+        }
 
         // resolve type parameters of declaring type
         returnType = applyGenericsContext(context, returnType);
 
         return asDummyMethod(receiverType, method, parameters, returnType);
+    }
+
+    private static boolean hasUnresolvedParameters(MethodNode method) {
+        return Arrays.stream(method.getParameters())
+            .anyMatch(p -> GenericsUtils.hasUnresolvedGenerics(p.getType()));
     }
 
     /**

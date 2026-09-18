@@ -209,7 +209,7 @@ interface StringOps {
 
     Pattern bitwiseNegate();
 
-    Boolean compareTo(String a, String b);
+    Integer compareTo(String a, String b);
 
     String getAt(String a, Integer b);
 

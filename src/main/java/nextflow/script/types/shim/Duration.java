@@ -55,7 +55,7 @@ public interface Duration {
 
 interface DurationOps {
 
-    Boolean compareTo(Duration a, Duration b);
+    Integer compareTo(Duration a, Duration b);
 
     Duration div(Duration a, Float b);
 
