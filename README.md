@@ -12,6 +12,7 @@ The following language features are currently supported:
 - rename
 - semantic highlighting
 - DAG preview for workflows
+- config preview for processes
 
 ## Requirements
 
