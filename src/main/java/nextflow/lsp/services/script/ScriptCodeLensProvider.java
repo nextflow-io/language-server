@@ -130,45 +130,6 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
     }
 
     /**
-     * Convert all scripts in a workspace to static types.
-     *
-     * @param options
-     */
-    public Map<String,Object> convertPipelineToTyped(FormattingOptions options) {
-        for( var uri : ast.getUris() ) {
-            if( !ast.hasAST(uri) || ast.hasErrors(uri) )
-                return Map.of("error", "Pipeline cannot be converted due to script errors.");
-        }
-
-        var textEdits = new HashMap<String,List<TextEdit>>();
-
-        for( var uri : ast.getUris() ) {
-            var sn = ast.getScriptNode(uri);
-
-            // convert legacy parameters to params definition
-            convertParamsToTyped(sn, options, textEdits);
-
-            // convert legacy processes to typed processes
-            for( var pn : sn.getProcesses() ) {
-                if( !(pn instanceof ProcessNodeV1) )
-                    continue;
-                convertProcessToTyped((ProcessNodeV1) pn, options, textEdits);
-            }
-
-            // add preview flag if needed
-            if( !sn.getProcesses().isEmpty() ) {
-                var firstProcess = sn.getProcesses().get(0);
-                var start = LanguageServerUtils.astNodeToRange(firstProcess).getStart();
-                var range = new Range(start, start);
-                var newText = "nextflow.enable.types = true\n\n";
-                addTextEdit(textEdits, uri, range, newText);
-            }
-        }
-
-        return Map.of("applyEdit", (Object) new WorkspaceEdit(textEdits));
-    }
-
-    /**
      * Convert a script to static types.
      *
      * @param documentUri

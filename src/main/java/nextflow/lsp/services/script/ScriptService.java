@@ -155,11 +155,6 @@ public class ScriptService extends LanguageService {
             var provider = new WorkspacePreviewProvider(astCache);
             return provider.preview();
         }
-        if( "nextflow.server.convertPipelineToTyped".equals(command) ) {
-            var provider = new ScriptCodeLensProvider(astCache);
-            var options = formattingOptions(configuration);
-            return provider.convertPipelineToTyped(options);
-        }
         if( "nextflow.server.convertScriptToTyped".equals(command) ) {
             var uri = getJsonString(arguments.get(0));
             var provider = new ScriptCodeLensProvider(astCache);
