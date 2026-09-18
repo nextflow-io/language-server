@@ -168,7 +168,9 @@ public abstract class LanguageService {
         if( provider == null )
             return Collections.emptyList();
 
-        return provider.prepare(params.getTextDocument(), params.getPosition());
+        synchronized (this) {
+            return provider.prepare(params.getTextDocument(), params.getPosition());
+        }
     }
 
     public List<CallHierarchyIncomingCall> callHierarchyIncomingCalls(CallHierarchyItem item) {
@@ -176,7 +178,9 @@ public abstract class LanguageService {
         if( provider == null )
             return Collections.emptyList();
 
-        return provider.incomingCalls(item);
+        synchronized (this) {
+            return provider.incomingCalls(item);
+        }
     }
 
     public List<CallHierarchyOutgoingCall> callHierarchyOutgoingCalls(CallHierarchyItem item) {
@@ -184,7 +188,9 @@ public abstract class LanguageService {
         if( provider == null )
             return Collections.emptyList();
 
-        return provider.outgoingCalls(item);
+        synchronized (this) {
+            return provider.outgoingCalls(item);
+        }
     }
 
     public List<CodeLens> codeLens(CodeLensParams params) {
@@ -193,7 +199,9 @@ public abstract class LanguageService {
             return Collections.emptyList();
 
         awaitUpdate();
-        return provider.codeLens(params.getTextDocument());
+        synchronized (this) {
+            return provider.codeLens(params.getTextDocument());
+        }
     }
 
     public Either<List<CompletionItem>, CompletionList> completion(CompletionParams params, int maxItems, boolean extended) {
@@ -202,7 +210,9 @@ public abstract class LanguageService {
             return Either.forLeft(Collections.emptyList());
 
         updateNow();
-        return provider.completion(params.getTextDocument(), params.getPosition());
+        synchronized (this) {
+            return provider.completion(params.getTextDocument(), params.getPosition());
+        }
     }
 
     public Either<List<? extends Location>, List<? extends LocationLink>> definition(DefinitionParams params) {
@@ -210,7 +220,9 @@ public abstract class LanguageService {
         if( provider == null )
             return Either.forLeft(Collections.emptyList());
 
-        return provider.definition(params.getTextDocument(), params.getPosition());
+        synchronized (this) {
+            return provider.definition(params.getTextDocument(), params.getPosition());
+        }
     }
 
     public List<DocumentLink> documentLink(DocumentLinkParams params) {
@@ -219,7 +231,9 @@ public abstract class LanguageService {
             return Collections.emptyList();
 
         awaitUpdate();
-        return provider.documentLink(params.getTextDocument());
+        synchronized (this) {
+            return provider.documentLink(params.getTextDocument());
+        }
     }
 
     public List<Either<SymbolInformation, DocumentSymbol>> documentSymbol(DocumentSymbolParams params) {
@@ -228,7 +242,9 @@ public abstract class LanguageService {
             return Collections.emptyList();
 
         awaitUpdate();
-        return provider.documentSymbol(params.getTextDocument());
+        synchronized (this) {
+            return provider.documentSymbol(params.getTextDocument());
+        }
     }
 
     public Object executeCommand(String command, List<Object> arguments, LanguageServerConfiguration configuration) {
@@ -241,7 +257,9 @@ public abstract class LanguageService {
             return Collections.emptyList();
 
         updateNow();
-        return provider.formatting(uri, options);
+        synchronized (this) {
+            return provider.formatting(uri, options);
+        }
     }
 
     public Hover hover(HoverParams params) {
@@ -249,7 +267,9 @@ public abstract class LanguageService {
         if( provider == null )
             return null;
 
-        return provider.hover(params.getTextDocument(), params.getPosition());
+        synchronized (this) {
+            return provider.hover(params.getTextDocument(), params.getPosition());
+        }
     }
 
     public List<? extends Location> references(ReferenceParams params) {
@@ -257,7 +277,9 @@ public abstract class LanguageService {
         if( provider == null )
             return Collections.emptyList();
 
-        return provider.references(params.getTextDocument(), params.getPosition(), params.getContext().isIncludeDeclaration());
+        synchronized (this) {
+            return provider.references(params.getTextDocument(), params.getPosition(), params.getContext().isIncludeDeclaration());
+        }
     }
 
     public WorkspaceEdit rename(RenameParams params) {
@@ -265,7 +287,9 @@ public abstract class LanguageService {
         if( provider == null )
             return null;
 
-        return provider.rename(params.getTextDocument(), params.getPosition(), params.getNewName());
+        synchronized (this) {
+            return provider.rename(params.getTextDocument(), params.getPosition(), params.getNewName());
+        }
     }
 
     public SemanticTokens semanticTokensFull(SemanticTokensParams params) {
@@ -274,7 +298,9 @@ public abstract class LanguageService {
             return null;
 
         awaitUpdate();
-        return provider.semanticTokensFull(params.getTextDocument());
+        synchronized (this) {
+            return provider.semanticTokensFull(params.getTextDocument());
+        }
     }
 
     public List<? extends WorkspaceSymbol> symbol(WorkspaceSymbolParams params) {
@@ -282,7 +308,9 @@ public abstract class LanguageService {
         if( provider == null )
             return Collections.emptyList();
 
-        return provider.symbol(params.getQuery());
+        synchronized (this) {
+            return provider.symbol(params.getQuery());
+        }
     }
 
     // --- INTERNAL

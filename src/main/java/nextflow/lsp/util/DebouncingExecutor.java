@@ -58,8 +58,12 @@ public class DebouncingExecutor {
      * Execute the action immediately, cancelling the currently
      * scheduled task if present.
      */
-    public synchronized void executeNow() {
-        cancelExisting();
+    public void executeNow() {
+        synchronized (this) {
+            cancelExisting();
+        }
+        // the action is run outside the lock, otherwise a caller could hold it
+        // while waiting on a scheduled update that is trying to reschedule itself
         action.run();
     }
 
