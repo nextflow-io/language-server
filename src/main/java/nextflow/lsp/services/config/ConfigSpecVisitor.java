@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.services.config;
 
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -34,19 +35,24 @@ import nextflow.config.spec.SpecNode;
 import nextflow.lsp.spec.ConfigSpecFactory;
 import nextflow.lsp.spec.PluginRef;
 import nextflow.lsp.spec.PluginSpecCache;
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ReturnStatementVisitor;
 import nextflow.script.control.TypeCheckingVisitorEx;
+import nextflow.script.types.ParamsMap;
 import nextflow.script.types.TypeCheckingUtils;
 import nextflow.script.types.TypesEx;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.CodeVisitorSupport;
+import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -84,14 +90,23 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private SpecNode.Scope spec;
 
+    /**
+     * Synthetic type for the params declared by this config file. Fields are
+     * added as param assignments are visited, so a params reference is typed
+     * by the declarations above it.
+     */
+    private ClassNode paramsType;
+
     public void visit() {
         var moduleNode = sourceUnit.getAST();
         if( !(moduleNode instanceof ConfigNode cn) )
             return;
         this.spec = getPluginScopes(cn);
+        this.paramsType = new ClassNode(ParamsMap.class);
         cn.setSpec(spec);
         super.visit(cn);
         this.spec = null;
+        this.paramsType = null;
     }
 
     private SpecNode.Scope getPluginScopes(ConfigNode cn) {
@@ -147,6 +162,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
     public void visitConfigAssign(ConfigAssignNode node) {
         var names = new ArrayList<>(scopes);
         names.addAll(node.names);
+        applyParamsType(node.value);
 
         // validate dynamic scopes (env, params, etc)
         var scope = names.get(0);
@@ -157,6 +173,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             return;
         }
         if( "params".equals(scope) ) {
+            declareParam(names, node.value);
             return;
         }
 
@@ -186,6 +203,45 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
                 : "Config option '" + fqName + "' cannot be assigned to value with type " + TypesEx.getName(actualType) + " -- valid types are: " + validTypes;
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
         }
+    }
+
+    /**
+     * Declare a param from a config assignment. A param assigned at a nested
+     * name (`params.foo.bar`) or assigned twice with different types is
+     * declared as dynamic so that references to it are not type-checked.
+     */
+    private void declareParam(List<String> names, Expression value) {
+        if( names.size() < 2 )
+            return;
+        var name = names.get(1);
+        var type = names.size() == 2
+            ? inferredType(value, names)
+            : ClassHelper.dynamicType();
+        var existing = paramsType.getDeclaredField(name);
+        if( existing != null ) {
+            if( !TypesEx.isEqual(existing.getType(), type) )
+                existing.setType(ClassHelper.dynamicType());
+            return;
+        }
+        var fn = new FieldNode(name, Modifier.PUBLIC, type, paramsType, null);
+        fn.setHasNoRealSourcePosition(true);
+        fn.setDeclaringClass(paramsType);
+        fn.setSynthetic(true);
+        paramsType.addField(fn);
+    }
+
+    /**
+     * Type every `params` reference in an expression with the params declared
+     * so far, instead of the generic map type from the config DSL.
+     */
+    private void applyParamsType(Expression value) {
+        value.visit(new CodeVisitorSupport() {
+            @Override
+            public void visitVariableExpression(VariableExpression node) {
+                if( "params".equals(node.getName()) )
+                    node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, paramsType);
+            }
+        });
     }
 
     private ClassNode fromType(Type type) {

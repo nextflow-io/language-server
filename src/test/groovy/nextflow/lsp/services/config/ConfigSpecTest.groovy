@@ -126,6 +126,55 @@ class ConfigSpecTest extends Specification {
         warnings.size() == 0
     }
 
+    def 'should infer param types from param declarations' () {
+        when:
+        def warnings = getWarnings(
+            '''\
+            params.cpus = 'two'
+            process.cpus = params.cpus
+            '''
+        )
+        then:
+        warnings.size() == 1
+        warnings[0].getMessage().contains("Config option 'process.cpus'")
+
+        when:
+        warnings = getWarnings(
+            '''\
+            params.cpus = 2
+            process.cpus = params.cpus
+            '''
+        )
+        then:
+        warnings.size() == 0
+
+        when:
+        warnings = getWarnings(
+            '''\
+            process.cpus = params.cpus
+            '''
+        )
+        then:
+        warnings.size() == 0
+    }
+
+    def 'should not infer the type of a param declared twice with different types' () {
+        when:
+        def warnings = getWarnings(
+            '''\
+            params.cpus = 2
+            profiles {
+                big {
+                    params.cpus = 'many'
+                }
+            }
+            process.cpus = params.cpus
+            '''
+        )
+        then:
+        warnings.size() == 0
+    }
+
     def 'should not check process ext settings' () {
         when:
         def warnings = getWarnings(
