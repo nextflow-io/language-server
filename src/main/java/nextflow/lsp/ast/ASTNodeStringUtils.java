@@ -16,6 +16,7 @@
 package nextflow.lsp.ast;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -29,6 +30,7 @@ import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
 import nextflow.script.ast.RecordNode;
+import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.TupleParameter;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
@@ -113,7 +115,7 @@ public class ASTNodeStringUtils {
 
     private static String workflowToLabel(WorkflowNode node) {
         if( node.isEntry() )
-            return "workflow <entry>";
+            return pipelineToLabel(node);
         var fmt = new Formatter(new FormattingOptions(2, true));
         fmt.append("workflow ");
         fmt.append(node.getName());
@@ -148,6 +150,49 @@ public class ASTNodeStringUtils {
         fmt.decIndent();
         fmt.append('}');
         return fmt.toString();
+    }
+
+    /**
+     * An entry workflow is rendered as a pipeline: the params and output
+     * blocks of its script are its inputs and outputs, since that is how it
+     * is called when another pipeline includes it.
+     *
+     * @param node
+     */
+    private static String pipelineToLabel(WorkflowNode node) {
+        var pipeline = ScriptNode.getPipeline(node);
+        var params = pipeline != null ? pipeline.getParams() : null;
+        var outputs = pipeline != null ? pipeline.getOutputs() : null;
+        if( params == null && outputs == null )
+            return "workflow <entry>";
+
+        var fmt = new Formatter(new FormattingOptions(2, true));
+        fmt.append("pipeline {\n");
+        fmt.incIndent();
+        fmt.appendIndent();
+        fmt.append("params:\n");
+        var declarations = params != null ? Arrays.asList(params.declarations) : List.<Parameter>of();
+        appendDeclarations(declarations, fmt);
+        fmt.appendNewLine();
+        fmt.appendIndent();
+        fmt.append("output:\n");
+        appendDeclarations(outputs != null ? outputs.declarations : List.of(), fmt);
+        fmt.decIndent();
+        fmt.append('}');
+        return fmt.toString();
+    }
+
+    private static void appendDeclarations(List<? extends Parameter> declarations, Formatter fmt) {
+        if( declarations.isEmpty() ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+            return;
+        }
+        for( var declaration : declarations ) {
+            fmt.appendIndent();
+            typedInput(declaration, fmt);
+            fmt.appendNewLine();
+        }
     }
 
     private static void typedOutput(Expression output, Formatter fmt) {
