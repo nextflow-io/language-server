@@ -124,6 +124,12 @@ public class ScriptService extends LanguageService {
     @Override
     public Object executeCommand(String command, List<Object> arguments, LanguageServerConfiguration configuration) {
         updateNow();
+        synchronized (this) {
+            return executeCommand0(command, arguments, configuration);
+        }
+    }
+
+    private Object executeCommand0(String command, List<Object> arguments, LanguageServerConfiguration configuration) {
         if( "nextflow.server.previewDag".equals(command) && arguments.size() == 2 ) {
             var uri = getJsonString(arguments.get(0));
             var name = getJsonString(arguments.get(1));
