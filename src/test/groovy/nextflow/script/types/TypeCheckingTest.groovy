@@ -34,7 +34,6 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.codehaus.groovy.syntax.SyntaxException
 import spock.lang.Ignore
-import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -46,16 +45,11 @@ import static nextflow.script.types.TypeCheckingUtils.*
  */
 class TypeCheckingTest extends Specification {
 
-    @Shared
-    ScriptParser scriptParser
-
-    def setupSpec() {
-        scriptParser = new ScriptParser()
-    }
-
     SourceUnit parse(String contents) {
+        def scriptParser = new ScriptParser()
         def source = scriptParser.parse('main.nf', contents.stripIndent())
-        source.getAST()?.addFeatureFlag(new FeatureFlagNode("nextflow.enable.types", new ConstantExpression(true)))
+        assert source.getAST() != null
+        source.getAST().addFeatureFlag(new FeatureFlagNode("nextflow.enable.types", new ConstantExpression(true)))
         new ScriptResolveVisitor(source, scriptParser.compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, Collections.emptyList()).visit()
         new TypeCheckingVisitorEx(source).visit()
         return source
@@ -475,7 +469,7 @@ class TypeCheckingTest extends Specification {
     @Unroll
     def 'should check call arguments that infer conflicting type arguments' () {
         expect:
-        check("workflow { ${SOURCE} }", ERROR)
+        check(SOURCE, ERROR)
 
         where:
         SOURCE                          | ERROR
@@ -537,11 +531,7 @@ class TypeCheckingTest extends Specification {
     @Unroll
     def 'should resolve a binary expression' () {
         given:
-        def exp = parseExpression(
-            """\
-            workflow { ${SOURCE} }
-            """
-        )
+        def exp = parseExpression(SOURCE)
         expect:
         TypesEx.getName(getType(exp)) == TYPE
 
@@ -555,11 +545,7 @@ class TypeCheckingTest extends Specification {
     @Unroll
     def 'should resolve list slicing to the list type' () {
         given:
-        def exp = parseExpression(
-            """\
-            workflow { ${SOURCE} }
-            """
-        )
+        def exp = parseExpression(SOURCE)
         expect:
         TypesEx.getName(getType(exp)) == TYPE
 
@@ -603,11 +589,7 @@ class TypeCheckingTest extends Specification {
 
     def 'should resolve a ternary expression' () {
         when:
-        def exp = parseExpression(
-            """\
-            workflow { ${SOURCE} }
-            """
-        )
+        def exp = parseExpression(SOURCE)
         then:
         TypesEx.getName(getType(exp)) == TYPE
 
@@ -648,11 +630,7 @@ class TypeCheckingTest extends Specification {
     @Unroll
     def 'should resolve generic types' () {
         given:
-        def exp = parseExpression(
-            """\
-            workflow { ${SOURCE} }
-            """
-        )
+        def exp = parseExpression(SOURCE)
         expect:
         TypesEx.getName(getType(exp)) == TYPE
 
