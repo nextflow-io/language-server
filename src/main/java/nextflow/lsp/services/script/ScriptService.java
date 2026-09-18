@@ -19,7 +19,9 @@ import java.util.List;
 
 import com.google.gson.JsonPrimitive;
 import nextflow.lsp.ast.ASTNodeCache;
+import nextflow.lsp.services.config.ConfigService;
 import nextflow.lsp.services.CallHierarchyProvider;
+import nextflow.lsp.services.CodeActionProvider;
 import nextflow.lsp.services.CodeLensProvider;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.services.DefinitionProvider;
@@ -32,8 +34,8 @@ import nextflow.lsp.services.ReferenceProvider;
 import nextflow.lsp.services.RenameProvider;
 import nextflow.lsp.services.SemanticTokensProvider;
 import nextflow.lsp.services.SymbolProvider;
+import nextflow.lsp.util.JsonUtils;
 import nextflow.script.formatter.FormattingOptions;
-import nextflow.lsp.spec.PluginSpecCache;
 
 /**
  * Implementation of language services for Nextflow scripts.
@@ -43,6 +45,8 @@ import nextflow.lsp.spec.PluginSpecCache;
 public class ScriptService extends LanguageService {
 
     private ScriptAstCache astCache;
+
+    private ConfigService configService;
 
     public ScriptService(String rootUri) {
         super(rootUri);
@@ -54,9 +58,10 @@ public class ScriptService extends LanguageService {
         return uri.endsWith(".nf");
     }
 
-    public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {
+    public void initialize(LanguageServerConfiguration configuration, ConfigService configService) {
         synchronized (this) {
-            astCache.initialize(configuration, pluginSpecCache);
+            astCache.initialize(configuration, configService.getPluginSpecCache());
+            this.configService = configService;
         }
         super.initialize(configuration);
     }
@@ -69,6 +74,11 @@ public class ScriptService extends LanguageService {
     @Override
     protected CallHierarchyProvider getCallHierarchyProvider() {
         return new ScriptCallHierarchyProvider(astCache);
+    }
+
+    @Override
+    protected CodeActionProvider getCodeActionProvider() {
+        return new ScriptCodeActionProvider(astCache);
     }
 
     @Override
@@ -129,6 +139,17 @@ public class ScriptService extends LanguageService {
             var name = getJsonString(arguments.get(1));
             var provider = new ScriptCodeLensProvider(astCache);
             return provider.previewDag(uri, name, configuration.dagDirection(), configuration.dagVerbose());
+        }
+        if( "nextflow.server.previewConfig".equals(command) && arguments.size() == 4 ) {
+            var uri = getJsonString(arguments.get(0));
+            var name = getJsonString(arguments.get(1));
+            var profiles = JsonUtils.getStringArray(arguments.get(2));
+            var qualifiedName = getJsonString(arguments.get(3));
+            // the config service scans the workspace on its first update, which
+            // has not happened yet if no config file has been opened
+            configService.updateNow();
+            var provider = new ConfigPreviewProvider(astCache, configService.getConfigAstCache());
+            return provider.previewConfig(uri, name, profiles, qualifiedName);
         }
         if( "nextflow.server.previewWorkspace".equals(command) ) {
             var provider = new WorkspacePreviewProvider(astCache);

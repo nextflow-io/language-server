@@ -59,6 +59,10 @@ public class ConfigService extends LanguageService {
         super.initialize(configuration);
     }
 
+    public ConfigAstCache getConfigAstCache() {
+        return astCache;
+    }
+
     public PluginSpecCache getPluginSpecCache() {
         return pluginSpecCache;
     }

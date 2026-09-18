@@ -23,7 +23,6 @@ import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.lsp.services.LanguageService
 import nextflow.lsp.services.config.ConfigService
 import nextflow.lsp.services.script.ScriptService
-import nextflow.lsp.spec.PluginSpecCache
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.TextDocumentItem
 
@@ -68,7 +67,7 @@ class TestUtils {
         def configuration = opts.config ?: LanguageServerConfiguration.defaults()
         def service = new RecordingLanguageService(rootUri)
         service.connect(client)
-        service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()))
+        service.initialize(configuration, newConfigService(client))
         return service
     }
 
@@ -86,13 +85,25 @@ class TestUtils {
      * @param client
      */
     static ConfigService getConfigService(TestLanguageClient client) {
-        def service = new ConfigService(workspaceRoot.toUri().toString())
-        def configuration = LanguageServerConfiguration.defaults()
-        service.connect(client)
-        service.initialize(configuration)
-        // skip workspace scan
+        def service = newConfigService(client)
+        // scan the (empty) workspace up front, so that later updates compile
+        // changed files directly instead of re-triggering the scan
+        service.updateNow()
         open(service, getUri('nextflow.config'), '')
         service.updateNow()
+        return service
+    }
+
+    /**
+     * Get a language service instance for Nextflow config files which has not
+     * scanned the workspace yet, for testing against files on disk.
+     *
+     * @param client
+     */
+    static ConfigService newConfigService(TestLanguageClient client = new TestLanguageClient()) {
+        def service = new ConfigService(workspaceRoot.toUri().toString())
+        service.connect(client)
+        service.initialize(LanguageServerConfiguration.defaults())
         return service
     }
 
@@ -109,16 +120,47 @@ class TestUtils {
      *
      * @param client
      */
-    static ScriptService getScriptService(TestLanguageClient client) {
+    static ScriptService getScriptService(TestLanguageClient client, ConfigService configService = null) {
         def service = new ScriptService(workspaceRoot.toUri().toString())
         def configuration = LanguageServerConfiguration.defaults()
-        def pluginSpecCache = new PluginSpecCache(configuration.pluginRegistryUrl())
         service.connect(client)
-        service.initialize(configuration, pluginSpecCache)
+        service.initialize(configuration, configService ?: newConfigService())
         // skip workspace scan
         open(service, getUri('main.nf'), '')
         service.updateNow()
         return service
+    }
+
+    /**
+     * Get a script service and a config service that share a config AST cache,
+     * so that script features which read the config (e.g. config preview) can
+     * be tested.
+     */
+    static List getScriptAndConfigServices() {
+        def configService = getConfigService()
+        def scriptService = getScriptService(new TestLanguageClient(), configService)
+        return [ scriptService, configService ]
+    }
+
+    /**
+     * Write a file into the test workspace.
+     *
+     * @param path
+     * @param contents
+     */
+    static void writeWorkspaceFile(String path, String contents) {
+        def target = workspaceRoot.resolve(path)
+        Files.createDirectories(target.getParent())
+        Files.writeString(target, contents.stripIndent())
+    }
+
+    /**
+     * Delete a file from the test workspace.
+     *
+     * @param path
+     */
+    static void deleteWorkspaceFile(String path) {
+        Files.deleteIfExists(workspaceRoot.resolve(path))
     }
 
     /**

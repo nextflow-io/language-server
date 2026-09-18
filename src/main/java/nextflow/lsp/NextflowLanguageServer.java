@@ -44,9 +44,12 @@ import org.eclipse.lsp4j.CallHierarchyItem;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCall;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams;
 import org.eclipse.lsp4j.CallHierarchyPrepareParams;
+import org.eclipse.lsp4j.CodeAction;
+import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensOptions;
 import org.eclipse.lsp4j.CodeLensParams;
+import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionOptions;
@@ -157,6 +160,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         result.setWorkspace(workspaceCapabilities);
 
         result.setCallHierarchyProvider(true);
+        result.setCodeActionProvider(true);
         var codeLensOptions = new CodeLensOptions(false);
         result.setCodeLensProvider(codeLensOptions);
         var completionOptions = new CompletionOptions(false, List.of("."));
@@ -167,6 +171,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         result.setDocumentLinkProvider(documentLinkOptions);
         result.setDocumentSymbolProvider(true);
         var commands = List.of(
+            "nextflow.server.previewConfig",
             "nextflow.server.previewDag",
             "nextflow.server.previewWorkspace",
             "nextflow.server.convertPipelineToTyped",
@@ -298,6 +303,21 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             if( service == null )
                 return null;
             return service.callHierarchyOutgoingCalls(item);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var uri = params.getTextDocument().getUri();
+            log.debug("textDocument/codeAction " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return Collections.emptyList();
+            return service.codeAction(params).stream()
+                .map(action -> Either.<Command,CodeAction>forRight(action))
+                .toList();
         });
     }
 
@@ -502,7 +522,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             count++;
 
             configServices.get(name).initialize(configuration);
-            scriptServices.get(name).initialize(configuration, configServices.get(name).getPluginSpecCache());
+            scriptServices.get(name).initialize(configuration, configServices.get(name));
         }
 
         progress.end();
@@ -529,7 +549,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
             addWorkspaceFolder(name, uri);
             configServices.get(name).initialize(configuration);
-            scriptServices.get(name).initialize(configuration, configServices.get(name).getPluginSpecCache());
+            scriptServices.get(name).initialize(configuration, configServices.get(name));
         }
     }
 
@@ -556,6 +576,13 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var arguments = params.getArguments();
             if( "nextflow.server.previewDag".equals(command) && arguments.size() == 2 ) {
                 log.debug(String.format("textDocument/previewDag %s", arguments.toString()));
+                var uri = JsonUtils.getString(arguments.get(0));
+                var service = getLanguageService(uri);
+                if( service != null )
+                    return service.executeCommand(command, arguments, configuration);
+            }
+            if( "nextflow.server.previewConfig".equals(command) && arguments.size() == 4 ) {
+                log.debug(String.format("textDocument/previewConfig %s", arguments.toString()));
                 var uri = JsonUtils.getString(arguments.get(0));
                 var service = getLanguageService(uri);
                 if( service != null )

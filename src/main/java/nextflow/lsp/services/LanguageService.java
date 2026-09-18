@@ -48,6 +48,8 @@ import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyItem;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCall;
 import org.eclipse.lsp4j.CallHierarchyPrepareParams;
+import org.eclipse.lsp4j.CodeAction;
+import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.CompletionItem;
@@ -110,6 +112,7 @@ public abstract class LanguageService {
     public abstract boolean matchesFile(String uri);
     protected abstract ASTNodeCache getAstCache();
     protected CallHierarchyProvider getCallHierarchyProvider() { return null; }
+    protected CodeActionProvider getCodeActionProvider() { return null; }
     protected CodeLensProvider getCodeLensProvider() { return null; }
     protected CompletionProvider getCompletionProvider(int maxItems, boolean extended) { return null; }
     protected DefinitionProvider getDefinitionProvider() { return null; }
@@ -185,6 +188,15 @@ public abstract class LanguageService {
             return Collections.emptyList();
 
         return provider.outgoingCalls(item);
+    }
+
+    public List<CodeAction> codeAction(CodeActionParams params) {
+        var provider = getCodeActionProvider();
+        if( provider == null )
+            return Collections.emptyList();
+
+        awaitUpdate();
+        return provider.codeAction(params.getTextDocument(), params.getRange());
     }
 
     public List<CodeLens> codeLens(CodeLensParams params) {
@@ -298,7 +310,12 @@ public abstract class LanguageService {
         updateExecutor.executeLater();
     }
 
-    protected void updateNow() {
+    /**
+     * Compile any pending changes immediately, scanning the workspace first
+     * if it has not been scanned yet. Public so that a service can bring
+     * another service up to date before reading its AST cache.
+     */
+    public void updateNow() {
         updateExecutor.executeNow();
     }
 

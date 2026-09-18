@@ -18,6 +18,7 @@ package nextflow.lsp.util;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
@@ -38,12 +39,21 @@ public class JsonUtils {
             return new JsonPrimitive(n);
         if( value instanceof String s )
             return new JsonPrimitive(s);
+        if( value instanceof List<?> list ) {
+            var result = new JsonArray();
+            for( var el : list )
+                result.add((JsonElement) asJson(el));
+            return result;
+        }
         return value;
     }
 
     public static List<String> getStringArray(Object json, String path) {
-        var value = getObjectPath(json, path);
-        if( value == null || !value.isJsonArray() )
+        return getStringArray(getObjectPath(json, path));
+    }
+
+    public static List<String> getStringArray(Object json) {
+        if( !(json instanceof JsonElement value) || !value.isJsonArray() )
             return null;
         var result = new ArrayList<String>();
         for( var el : value.getAsJsonArray() ) {

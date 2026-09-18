@@ -16,6 +16,7 @@
 package nextflow.lsp.services.config;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -118,6 +119,42 @@ public class ConfigAstCache extends ASTNodeCache {
             .filter(error -> error instanceof PhaseAware pa ? pa.getPhase() == Phases.SYNTAX : true)
             .findFirst()
             .isPresent();
+    }
+
+    /**
+     * Resolve the URI of an include source against the including file.
+     *
+     * @param uri
+     * @param source
+     * @return the resolved URI, or null if it cannot be resolved
+     */
+    public static URI resolveIncludeUri(URI uri, String source) {
+        // return the source URI if it is already absolute (e.g. an http URL)
+        try {
+            var sourceUri = new URI(source);
+            if( sourceUri.getScheme() != null )
+                return sourceUri;
+        }
+        catch( Exception e ) {
+            // ignore
+        }
+        // otherwise, resolve the source path against the including URI
+        try {
+            return Path.of(uri).getParent().resolve(source).normalize().toUri();
+        }
+        catch( Exception e ) {
+            return null;
+        }
+    }
+
+    /**
+     * Check whether a source file has any unresolved includes.
+     *
+     * @param uri
+     */
+    public boolean hasIncludeErrors(URI uri) {
+        return getErrors(uri).stream()
+            .anyMatch(error -> error instanceof PhaseAware pa && pa.getPhase() == Phases.INCLUDE_RESOLUTION);
     }
 
     public ConfigNode getConfigNode(URI uri) {
