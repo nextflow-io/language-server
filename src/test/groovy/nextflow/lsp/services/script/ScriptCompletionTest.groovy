@@ -135,4 +135,30 @@ class ScriptCompletionTest extends Specification {
         completions.find { it.getLabel() == "cpus" } != null
     }
 
+    def 'should not complete inside a comment' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+
+        when:
+        open(service, uri, '''\
+            workflow {
+                // foo.
+            }
+            ''')
+        def completions = getCompletions(service, uri, new Position(1, 10))
+        then:
+        completions.isEmpty()
+
+        when:
+        open(service, uri, '''\
+            // foo.
+            workflow {
+            }
+            ''')
+        completions = getCompletions(service, uri, new Position(0, 7))
+        then:
+        completions.isEmpty()
+    }
+
 }

@@ -214,6 +214,9 @@ public abstract class LanguageService {
             return Either.forLeft(Collections.emptyList());
 
         updateNow();
+        var uri = URI.create(params.getTextDocument().getUri());
+        if( getAstCache().isCommentPosition(uri, params.getPosition()) )
+            return Either.forLeft(Collections.emptyList());
         return provider.completion(params.getTextDocument(), params.getPosition());
     }
 
