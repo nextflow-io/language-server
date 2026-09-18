@@ -119,6 +119,11 @@ public interface Iterable<E> {
     <R> E max(Function<E,R> comparator);
 
     @Description("""
+        Returns the maximum element in the iterable according to the given closure. The closure should follow the same semantics as the closure parameter of `toSorted()`.
+    """)
+    E max(BiFunction<E,E,Integer> comparator);
+
+    @Description("""
         Returns the maximum element in the iterable.
     """)
     E min();
@@ -127,6 +132,11 @@ public interface Iterable<E> {
         Returns the maximum element in the iterable according to the given closure. The closure should follow the same semantics as the closure parameter of `toSorted()`.
     """)
     <R> E min(Function<E,R>  comparator);
+
+    @Description("""
+        Returns the minimum element in the iterable according to the given closure. The closure should follow the same semantics as the closure parameter of `toSorted()`.
+    """)
+    E min(BiFunction<E,E,Integer> comparator);
 
     @Description("""
         Returns the number of elements in the iterable.
@@ -164,6 +174,11 @@ public interface Iterable<E> {
     <R> List<E> toSorted(Function<E,R> comparator);
 
     @Description("""
+        Returns the iterable as a list sorted according to the given closure. The closure should accept two parameters and return a negative integer, zero, or a positive integer to denote whether the first argument is less than, equal to, or greater than the second.
+    """)
+    List<E> toSorted(BiFunction<E,E,Integer> comparator);
+
+    @Description("""
         Returns a shallow copy of the iterable with duplicate elements excluded.
     """)
     Iterable<E> toUnique();
@@ -172,5 +187,10 @@ public interface Iterable<E> {
         Returns a shallow copy of the iterable with duplicate elements excluded. The closure should follow the same semantics as the closure parameter of `toSorted()`.
     """)
     <R> Iterable<E> toUnique(Function<E,R> comparator);
+
+    @Description("""
+        Returns a shallow copy of the iterable with duplicate elements excluded. The closure should follow the same semantics as the closure parameter of `toSorted()`.
+    """)
+    Iterable<E> toUnique(BiFunction<E,E,Integer> comparator);
 
 }

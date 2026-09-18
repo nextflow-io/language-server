@@ -535,6 +535,24 @@ class TypeCheckingTest extends Specification {
     }
 
     @Unroll
+    def 'should resolve a binary expression' () {
+        given:
+        def exp = parseExpression(
+            """\
+            workflow { ${SOURCE} }
+            """
+        )
+        expect:
+        TypesEx.getName(getType(exp)) == TYPE
+
+        where:
+        SOURCE          | TYPE
+        '1 <=> 2'       | 'Integer'
+        "'a' <=> 'b'"   | 'Integer'
+        '1 < 2'         | 'Boolean'
+    }
+
+    @Unroll
     def 'should resolve list slicing to the list type' () {
         given:
         def exp = parseExpression(
@@ -675,6 +693,30 @@ class TypeCheckingTest extends Specification {
         param = method.getParameters().last()
         then:
         TypesEx.getName(param.getType()) == '(Integer) -> Integer'
+    }
+
+    def 'should resolve the closure variants of toSorted' () {
+        when: 'a transform closure'
+        def exp = parseExpression(
+            """\
+            [1, 2, 3].toSorted { v -> -v }
+            """
+        )
+        def method = exp.getNodeMetaData(ASTNodeMarker.METHOD_TARGET)
+        then:
+        TypesEx.getName(method.getParameters().last().getType()) == '(Integer) -> Integer'
+        TypesEx.getName(getType(exp)) == 'List<Integer>'
+
+        when: 'a comparator closure'
+        exp = parseExpression(
+            """\
+            [1, 2, 3].toSorted { a, b -> a <=> b }
+            """
+        )
+        method = exp.getNodeMetaData(ASTNodeMarker.METHOD_TARGET)
+        then:
+        TypesEx.getName(method.getParameters().last().getType()) == '(Integer, Integer) -> Integer'
+        TypesEx.getName(getType(exp)) == 'List<Integer>'
     }
 
     @Unroll

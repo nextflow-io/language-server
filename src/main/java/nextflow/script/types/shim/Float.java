@@ -32,9 +32,9 @@ interface FloatOps {
 
     Float and(Float a, Float b);
 
-    Boolean compareTo(Float a, Float b);
+    Integer compareTo(Float a, Float b);
 
-    Boolean compareTo(Float a, Integer b);
+    Integer compareTo(Float a, Integer b);
 
     Float div(Float a, Float b);
 
