@@ -44,7 +44,7 @@ tasks.withType(GroovyCompile).configureEach {
 dependencies {
   groovyCompiler 'org.apache.groovy:groovy:4.0.31'
 
-  implementation 'io.nextflow:nf-lang:26.04.6'
+  implementation 'io.nextflow:nf-lang:26.08.0-edge'
   implementation 'org.apache.groovy:groovy:4.0.31'
   implementation 'org.apache.groovy:groovy-json:4.0.31'
   implementation 'org.apache.groovy:groovy-yaml:4.0.31'

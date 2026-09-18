@@ -47,6 +47,7 @@ import nextflow.script.control.ScriptResolveVisitor;
 import nextflow.script.control.TypeCheckingVisitor;
 import nextflow.script.control.TypeCheckingVisitorEx;
 import nextflow.script.dsl.Types;
+import nextflow.script.parser.ScriptAstBuilder;
 import nextflow.script.parser.ScriptParserPluginFactory;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ASTNode;
@@ -116,6 +117,7 @@ public class ScriptAstCache extends ASTNodeCache {
 
         var optimizationOptions = config.getOptimizationOptions();
         optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true);
+        optimizationOptions.put(ScriptAstBuilder.COMMENTS_OPTION, true);
 
         return config;
     }
