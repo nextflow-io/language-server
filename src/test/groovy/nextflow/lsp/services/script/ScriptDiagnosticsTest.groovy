@@ -144,6 +144,79 @@ class ScriptDiagnosticsTest extends Specification {
         diagnostics.findAll { it.message.contains('is not compatible with process input') } == []
     }
 
+    def 'should re-check a consumer when an included module changes' () {
+        given:
+        def client = new TestLanguageClient()
+        def service = getScriptService(client)
+        def mainUri = getUri('workflow.nf')
+        def producerUri = getUri('producer.nf')
+        def consumerUri = getUri('consumer.nf')
+
+        def producer = { String outputExtra -> """\
+            nextflow.enable.types = true
+
+            process PRODUCER {
+                input:
+                record(id: String)
+
+                output:
+                record(id: id${outputExtra})
+
+                script:
+                \"\"\"
+                echo hello > data.txt
+                \"\"\"
+            }
+            """ }
+        def consumer = '''\
+            nextflow.enable.types = true
+
+            process CONSUMER {
+                input:
+                record(id: String, data: Path)
+
+                output:
+                record(id: id)
+
+                script:
+                """
+                cat ${data}
+                """
+            }
+            '''
+        def main = '''\
+            nextflow.enable.types = true
+
+            include { PRODUCER } from './producer.nf'
+            include { CONSUMER } from './consumer.nf'
+
+            workflow {
+                ch_produced = PRODUCER(channel.of(record(id: 'sample1')))
+                CONSUMER(ch_produced)
+            }
+            '''
+
+        when: 'producer emits a compatible record { id, data }'
+        open(service, producerUri, producer(", data: file('data.txt')"))
+        open(service, consumerUri, consumer)
+        open(service, mainUri, main)
+        service.updateNow()
+        then:
+        client.getDiagnostics(mainUri).findAll { it.message.contains('is not compatible with process input') } == []
+
+        when: 'only the producer module is edited to emit an incompatible record { id }'
+        open(service, producerUri, producer(''))
+        service.updateNow()
+        then: 'the consumer call is re-checked and now reports the mismatch'
+        client.getDiagnostics(mainUri).findAll { it.message.contains('is not compatible with process input') }.size() == 1
+
+        when: 'the producer module is restored'
+        open(service, producerUri, producer(", data: file('data.txt')"))
+        service.updateNow()
+        then: 'the stale warning is cleared'
+        client.getDiagnostics(mainUri).findAll { it.message.contains('is not compatible with process input') } == []
+    }
+
     def 'should clear diagnostics when an error is fixed' () {
         given:
         def client = new TestLanguageClient()
