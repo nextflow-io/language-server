@@ -72,6 +72,10 @@ public class ScriptAstCache extends ASTNodeCache {
         this.projectDir = rootUri != null ? Path.of(URI.create(rootUri)) : null;
     }
 
+    public Path getProjectDir() {
+        return projectDir;
+    }
+
     private static LanguageServerCompiler createCompiler(String rootUri) {
         var config = createConfiguration();
         var classLoader = new GroovyClassLoader();
@@ -206,32 +210,11 @@ public class ScriptAstCache extends ASTNodeCache {
         if( !visited.add(uri) )
             return;
         for( var include : getIncludeNodes(uri) ) {
-            var depUri = localIncludeUri(uri, include.source.getText());
+            var depUri = ModuleResolver.getLocalIncludeUri(uri, include.source.getText());
             if( depUri != null && uris.contains(depUri) )
                 visitDependencies(depUri, uris, visited, ordered);
         }
         ordered.add(uri);
-    }
-
-    /**
-     * Resolve a local include source to its module URI, mirroring
-     * ModuleResolver. Returns null for plugin and remote includes.
-     *
-     * @param uri the including file
-     * @param source the include source string
-     */
-    private static URI localIncludeUri(URI uri, String source) {
-        if( source.startsWith("plugin/") )
-            return null;
-        if( !source.startsWith("/") && !source.startsWith("./") && !source.startsWith("../") )
-            return null;
-        var parent = Path.of(uri).getParent();
-        var includePath = parent.resolve(source);
-        if( Files.isDirectory(includePath) )
-            includePath = includePath.resolve("main.nf");
-        else if( !source.endsWith(".nf") )
-            includePath = Path.of(includePath.toString() + ".nf");
-        return includePath.normalize().toUri();
     }
 
     @Override

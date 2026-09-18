@@ -16,8 +16,6 @@
 package nextflow.lsp.services.script;
 
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +23,7 @@ import java.util.List;
 import nextflow.lsp.services.LinkProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.LanguageServerUtils;
+import nextflow.script.control.ModuleResolver;
 import org.eclipse.lsp4j.DocumentLink;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 
@@ -59,21 +58,19 @@ public class ScriptLinkProvider implements LinkProvider {
             var source = node.source.getText();
             if( source.startsWith("plugin/") )
                 continue;
+            URI includeUri;
+            try {
+                includeUri = ModuleResolver.getIncludeUri(uri, source, ast.getProjectDir());
+            }
+            catch( Exception e ) {
+                // an invalid module reference is reported by the include resolver
+                continue;
+            }
             var range = LanguageServerUtils.astNodeToRange(node.source);
-            var target = getIncludeUri(uri, source).toString();
-            result.add(new DocumentLink(range, target));
+            result.add(new DocumentLink(range, includeUri.toString()));
         }
 
         return result;
-    }
-
-    protected static URI getIncludeUri(URI uri, String source) {
-        Path includePath = Path.of(uri).getParent().resolve(source);
-        if( Files.isDirectory(includePath) )
-            includePath = includePath.resolve("main.nf");
-        else if( !source.endsWith(".nf") )
-            includePath = Path.of(includePath.toString() + ".nf");
-        return includePath.normalize().toUri();
     }
 
 }
