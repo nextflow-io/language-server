@@ -39,7 +39,7 @@ import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ReturnStatementVisitor;
-import nextflow.script.control.TypeCheckingVisitorEx;
+import nextflow.script.control.TypeCheckingVisitor;
 import nextflow.script.types.ParamsMap;
 import nextflow.script.types.TypeCheckingUtils;
 import nextflow.script.types.TypesEx;
@@ -262,10 +262,10 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
     }
 
     private ClassNode inferredType(Expression node, List<String> scopes) {
-        new TypeCheckingVisitorEx(sourceUnit).visit(node);
+        new TypeCheckingVisitor(sourceUnit).visit(node);
         var type = TypeCheckingUtils.getType(node);
         if( node instanceof ClosureExpression ce && "process".equals(scopes.get(0)) ) {
-            var visitor = new ReturnStatementVisitor(sourceUnit);
+            var visitor = new ReturnStatementVisitor(sourceUnit, sourceUnit.getErrorCollector());
             visitor.visit(ClassHelper.dynamicType(), ce.getCode());
             var inferredReturnType = visitor.getInferredReturnType();
             return inferredReturnType != null ? inferredReturnType : ClassHelper.dynamicType();

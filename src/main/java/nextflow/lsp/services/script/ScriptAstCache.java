@@ -39,13 +39,13 @@ import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.control.CallArityVisitor;
 import nextflow.script.control.ModuleResolver;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.control.ScriptResolveVisitor;
 import nextflow.script.control.TypeCheckingVisitor;
-import nextflow.script.control.TypeCheckingVisitorEx;
 import nextflow.script.dsl.Types;
 import nextflow.script.parser.ScriptAstBuilder;
 import nextflow.script.parser.ScriptParserPluginFactory;
@@ -183,9 +183,9 @@ public class ScriptAstCache extends ASTNodeCache {
             if( !(sourceUnit.getAST() instanceof ScriptNode sn) )
                 continue;
             if( sn.isTypingEnabled() )
-                new TypeCheckingVisitorEx(sourceUnit).visit();
-            else
                 new TypeCheckingVisitor(sourceUnit).visit();
+            else
+                new CallArityVisitor(sourceUnit).visit();
         }
 
         return changedUris;
