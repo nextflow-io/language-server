@@ -39,7 +39,7 @@ import nextflow.script.dsl.Namespace;
 import nextflow.script.dsl.ProcessDsl;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.script.formatter.Formatter;
-import nextflow.script.types.TypesEx;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -166,12 +166,12 @@ public class ASTNodeStringUtils {
     }
 
     private static void typedOutputType(ClassNode type, Formatter fmt) {
-        if( TypesEx.isRecordType(type) ) {
+        if( Types.isRecordType(type) ) {
             fmt.append(type.getNameWithoutPackage());
             recordBody(type, fmt);
         }
         else {
-            fmt.append(TypesEx.getName(type));
+            fmt.append(Types.getName(type));
         }
     }
 
@@ -238,7 +238,7 @@ public class ASTNodeStringUtils {
             fmt.append(p.getName());
             if( fmt.hasType(p) ) {
                 fmt.append(": ");
-                fmt.append(TypesEx.getName(p.getType()));
+                fmt.append(Types.getName(p.getType()));
             }
             fmt.appendNewLine();
         }
@@ -254,7 +254,7 @@ public class ASTNodeStringUtils {
             fmt.append(p.getName());
             if( fmt.hasType(p) ) {
                 fmt.append(": ");
-                fmt.append(TypesEx.getName(p.getType()));
+                fmt.append(Types.getName(p.getType()));
             }
             if( i < tp.components.length - 1 )
                 fmt.append(", ");
@@ -273,7 +273,7 @@ public class ASTNodeStringUtils {
             fmt.appendIndent();
             fmt.append(fn.getName());
             fmt.append(": ");
-            fmt.append(TypesEx.getName(fn.getType()));
+            fmt.append(Types.getName(fn.getType()));
             fmt.appendNewLine();
         }
         fmt.decIndent();
@@ -323,7 +323,7 @@ public class ASTNodeStringUtils {
         var an = findAnnotation(node, Constant.class);
         if( an.isPresent() ) {
             var name = an.get().getMember("value").getText();
-            if( TypesEx.isNamespace(node) )
+            if( Types.isNamespace(node) )
                 return "(namespace) " + name;
             var fn = new FieldNode(name, 0xF, node.getReturnType(), node.getDeclaringClass(), null);
             return parameterToLabel(fn);
@@ -345,21 +345,21 @@ public class ASTNodeStringUtils {
             builder.append("def ");
         }
         else if( isDeclaringTypeVisible(declaringType) ) {
-            builder.append(TypesEx.getName(declaringType));
+            builder.append(Types.getName(declaringType));
             builder.append(' ');
         }
         else if( Logger.isDebugEnabled() ) {
             builder.append('[');
-            builder.append(TypesEx.getName(declaringType));
+            builder.append(Types.getName(declaringType));
             builder.append("] ");
         }
         builder.append(node.getName());
         builder.append('(');
         builder.append(parametersToLabel(node.getParameters()));
         builder.append(')');
-        if( TypesEx.hasReturnType(node) ) {
+        if( Types.hasReturnType(node) ) {
             builder.append(" -> ");
-            builder.append(TypesEx.getName(node.getReturnType()));
+            builder.append(Types.getName(node.getReturnType()));
         }
         return builder.toString();
     }
@@ -411,7 +411,7 @@ public class ASTNodeStringUtils {
             builder.append("...");
         if( !ClassHelper.isObjectType(type) || type.isGenericsPlaceHolder() ) {
             builder.append(": ");
-            builder.append(TypesEx.getName(type));
+            builder.append(Types.getName(type));
         }
         return builder.toString();
     }
@@ -422,7 +422,7 @@ public class ASTNodeStringUtils {
         var type = getType(variable);
         if( !ClassHelper.isObjectType(type) || type.isGenericsPlaceHolder() ) {
             builder.append(": ");
-            builder.append(TypesEx.getName(type));
+            builder.append(Types.getName(type));
         }
         return builder.toString();
     }
@@ -485,7 +485,7 @@ public class ASTNodeStringUtils {
         if( parameters.length == 0 )
             return null;
         var param = parameters[0];
-        if( !TypesEx.isEqual(param.getType(), ClassHelper.MAP_TYPE) )
+        if( !Types.isEqual(param.getType(), ClassHelper.MAP_TYPE) )
             return null;
         var namedParams = asNamedParams(param);
         if( namedParams.isEmpty() )
@@ -498,7 +498,7 @@ public class ASTNodeStringUtils {
             builder.append(name);
             if( !ClassHelper.isObjectType(namedParam.getType()) ) {
                 builder.append(": ");
-                builder.append(TypesEx.getName(namedParam.getType()));
+                builder.append(Types.getName(namedParam.getType()));
             }
             builder.append("`\n");
         });

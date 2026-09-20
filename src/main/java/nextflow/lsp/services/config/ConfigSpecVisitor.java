@@ -42,7 +42,7 @@ import nextflow.script.control.ReturnStatementVisitor;
 import nextflow.script.control.TypeCheckingVisitor;
 import nextflow.script.types.ParamsMap;
 import nextflow.script.types.TypeCheckingUtils;
-import nextflow.script.types.TypesEx;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -194,13 +194,13 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         var actualType = inferredType(node.value, names);
         if( !isAnyAssignableFrom(expectedTypes, actualType) ) {
             var validTypes = expectedTypes.stream()
-                .map(cn -> TypesEx.getName(cn))
+                .map(cn -> Types.getName(cn))
                 .distinct()
                 .sorted()
                 .collect(Collectors.joining(", "));
             var message = expectedTypes.size() == 1
-                ? "Config option '" + fqName + "' with type " + TypesEx.getName(expectedTypes.get(0)) + " cannot be assigned to value with type " + TypesEx.getName(actualType)
-                : "Config option '" + fqName + "' cannot be assigned to value with type " + TypesEx.getName(actualType) + " -- valid types are: " + validTypes;
+                ? "Config option '" + fqName + "' with type " + Types.getName(expectedTypes.get(0)) + " cannot be assigned to value with type " + Types.getName(actualType)
+                : "Config option '" + fqName + "' cannot be assigned to value with type " + Types.getName(actualType) + " -- valid types are: " + validTypes;
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
         }
     }
@@ -219,7 +219,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             : ClassHelper.dynamicType();
         var existing = paramsType.getDeclaredField(name);
         if( existing != null ) {
-            if( !TypesEx.isEqual(existing.getType(), type) )
+            if( !Types.isEqual(existing.getType(), type) )
                 existing.setType(ClassHelper.dynamicType());
             return;
         }
@@ -277,7 +277,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         if( targetTypes.isEmpty() || ClassHelper.isObjectType(sourceType) )
             return true;
         for( var targetType : targetTypes ) {
-            if( TypesEx.isAssignableFrom(targetType, sourceType) )
+            if( Types.isAssignableFrom(targetType, sourceType) )
                 return true;
         }
         return false;

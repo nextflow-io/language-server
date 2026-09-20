@@ -21,7 +21,7 @@ import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.OutputDsl;
 import nextflow.script.dsl.ProcessDsl;
-import nextflow.script.types.TypesEx;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -87,7 +87,7 @@ public class CompletionUtils {
         else if( node instanceof WorkflowNode pn ) {
             result.setDescription("workflow");
         }
-        else if( node instanceof MethodNode mn && TypesEx.isNamespace(mn) ) {
+        else if( node instanceof MethodNode mn && Types.isNamespace(mn) ) {
             result.setDescription("namespace");
         }
         else if( node instanceof MethodNode mn ) {
@@ -96,14 +96,14 @@ public class CompletionUtils {
         }
         else if( node instanceof Variable variable ) {
             var type = getType(variable);
-            result.setDescription(TypesEx.getName(type));
+            result.setDescription(Types.getName(type));
         }
         return result;
     }
 
     private static String methodDescription(MethodNode mn) {
-        if( TypesEx.hasReturnType(mn) )
-            return TypesEx.getName(mn.getReturnType());
+        if( Types.hasReturnType(mn) )
+            return Types.getName(mn.getReturnType());
         var cn = mn.getDeclaringClass();
         if( cn.isPrimaryClassNode() )
             return null;
