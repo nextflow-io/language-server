@@ -103,7 +103,7 @@ public class CompletionUtils {
 
     private static String methodDescription(MethodNode mn) {
         if( Types.hasReturnType(mn) )
-            return Types.getName(mn.getReturnType());
+            return Types.getName(getReturnType(mn));
         var cn = mn.getDeclaringClass();
         if( cn.isPrimaryClassNode() )
             return null;

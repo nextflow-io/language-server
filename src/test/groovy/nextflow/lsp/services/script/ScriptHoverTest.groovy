@@ -60,6 +60,29 @@ class ScriptHoverTest extends Specification {
         value == '```nextflow\ndef greet(name)\n```\n\n---\n\nGreet someone.'
     }
 
+    def 'should show the inferred return type when hovering over an untyped function call' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+
+        when:
+        open(service, uri, '''\
+            nextflow.enable.types = true
+
+            def make() {
+                return channel.of(1, 2, 3)
+            }
+
+            workflow {
+                make()
+            }
+            ''')
+        service.updateNow()
+        def value = getHoverHint(service, uri, new Position(7, 5))
+        then:
+        value == '```nextflow\ndef make() -> Channel<Integer>\n```'
+    }
+
     def 'should show the label when hovering over a workflow invocation' () {
         given:
         def service = getScriptService()

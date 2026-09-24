@@ -359,7 +359,7 @@ public class ASTNodeStringUtils {
         builder.append(')');
         if( Types.hasReturnType(node) ) {
             builder.append(" -> ");
-            builder.append(Types.getName(node.getReturnType()));
+            builder.append(Types.getName(getReturnType(node)));
         }
         return builder.toString();
     }
