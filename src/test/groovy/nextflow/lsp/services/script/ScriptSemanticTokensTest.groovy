@@ -79,6 +79,24 @@ class ScriptSemanticTokensTest extends Specification {
         service.semanticTokensFull(new SemanticTokensParams(new TextDocumentIdentifier(uri))).getData().size() % 5 == 0
     }
 
+    def 'should not emit negative values for a GString with interpolated values' () {
+        given:
+        def service = getScriptService()
+        def uri = getUri('main.nf')
+
+        when:
+        open(service, uri, '''\
+            workflow {
+                def x = 1
+                println "${x}${x}"
+            }
+            ''')
+        service.updateNow()
+        def data = service.semanticTokensFull(new SemanticTokensParams(new TextDocumentIdentifier(uri))).getData()
+        then:
+        data.every { it >= 0 }
+    }
+
     def 'should return null for a file that has no AST' () {
         given:
         def service = getScriptService()
