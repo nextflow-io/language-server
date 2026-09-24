@@ -79,6 +79,9 @@ public class SemanticTokensVisitor extends CodeVisitorSupport {
     }
 
     public void append(int line, int character, int length, String type) {
+        // skip synthetic nodes, e.g. empty strings inserted into a GString
+        if( line < 0 || character < 0 || length <= 0 )
+            return;
         tokens.add(new SemanticToken(
             new Position(line, character),
             length,
