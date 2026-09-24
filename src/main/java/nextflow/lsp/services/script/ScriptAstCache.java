@@ -39,13 +39,13 @@ import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.control.CallArityVisitor;
 import nextflow.script.control.ModuleResolver;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.control.ScriptResolveVisitor;
 import nextflow.script.control.TypeCheckingVisitor;
-import nextflow.script.control.TypeCheckingVisitorEx;
 import nextflow.script.dsl.Types;
 import nextflow.script.parser.ScriptAstBuilder;
 import nextflow.script.parser.ScriptParserPluginFactory;
@@ -135,9 +135,10 @@ public class ScriptAstCache extends ASTNodeCache {
         // recursively load included modules
         var changedUris = new HashSet<>(uris);
 
+        var moduleResolver = new ModuleResolver(projectDir, compiler());
         for( var uri : uris ) {
             var source = compiler().getSource(uri);
-            new ModuleResolver(projectDir, compiler()).resolve(source, (newUri) -> {
+            moduleResolver.resolve(source, (newUri) -> {
                 changedUris.add(newUri);
                 return compiler().createSourceUnit(newUri, fileCache);
             });
@@ -176,45 +177,28 @@ public class ScriptAstCache extends ASTNodeCache {
         // phase 4: type checking -- included modules must be checked before the
         // files that include them, so that cross-file inferred types (e.g. a
         // process's record output) are resolved before a consumer reads them
-        for( var uri : orderByDependencies(changedUris) ) {
-            var sourceUnit = getSourceUnit(uri);
-            if( sourceUnit == null || sourceUnit.getErrorCollector().hasErrors() )
+        for( var sourceUnit : moduleResolver.orderByDependencies(changedSourceUnits(changedUris)) ) {
+            if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;
             if( !(sourceUnit.getAST() instanceof ScriptNode sn) )
                 continue;
             if( sn.isTypingEnabled() )
-                new TypeCheckingVisitorEx(sourceUnit).visit();
-            else
                 new TypeCheckingVisitor(sourceUnit).visit();
+            else
+                new CallArityVisitor(sourceUnit).visit();
         }
 
         return changedUris;
     }
 
-    /**
-     * Order the given URIs so that a file appears after every module it
-     * includes (dependencies first), via depth-first post-order traversal.
-     * Only local includes among the given URIs are considered.
-     *
-     * @param uris
-     */
-    private List<URI> orderByDependencies(Set<URI> uris) {
-        var ordered = new ArrayList<URI>(uris.size());
-        var visited = new HashSet<URI>();
-        for( var uri : uris )
-            visitDependencies(uri, uris, visited, ordered);
-        return ordered;
-    }
-
-    private void visitDependencies(URI uri, Set<URI> uris, Set<URI> visited, List<URI> ordered) {
-        if( !visited.add(uri) )
-            return;
-        for( var include : getIncludeNodes(uri) ) {
-            var depUri = ModuleResolver.getLocalIncludeUri(uri, include.source.getText());
-            if( depUri != null && uris.contains(depUri) )
-                visitDependencies(depUri, uris, visited, ordered);
+    private List<SourceUnit> changedSourceUnits(Set<URI> uris) {
+        var result = new ArrayList<SourceUnit>(uris.size());
+        for( var uri : uris ) {
+            var sourceUnit = getSourceUnit(uri);
+            if( sourceUnit != null )
+                result.add(sourceUnit);
         }
-        ordered.add(uri);
+        return result;
     }
 
     @Override
