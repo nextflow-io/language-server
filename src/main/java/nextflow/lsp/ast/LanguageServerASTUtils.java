@@ -23,6 +23,7 @@ import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.IncludeEntryNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -54,6 +55,18 @@ public class LanguageServerASTUtils {
      * @param node
      */
     public static ASTNode getDefinition(ASTNode node) {
+        var result = getDefinition0(node);
+        // the params or output block of an included pipeline is a record type
+        // synthesized for the include, so navigate to the block instead
+        if( result instanceof ClassNode cn ) {
+            var block = ResolveIncludeVisitor.getPipelineBlock(cn);
+            if( block != null )
+                return block;
+        }
+        return result;
+    }
+
+    private static ASTNode getDefinition0(ASTNode node) {
         if( node instanceof VariableExpression ve )
             return getDefinitionFromVariable(ve.getAccessedVariable());
 

@@ -69,8 +69,10 @@ public class WorkspacePreviewProvider {
             .map(call -> resolveMethodCall(call))
             .filter(mn -> mn instanceof ProcessNode || mn instanceof WorkflowNode)
             .distinct()
+            .filter(mn -> ast.getURI(mn) != null)
             .map(mn -> Map.of(
-                "name", mn.getName(),
+                // an included pipeline has no name of its own
+                "name", mn.getName() != null ? mn.getName() : "<entry>",
                 "path", ast.getURI(mn).getPath()
             ))
             .toList();
