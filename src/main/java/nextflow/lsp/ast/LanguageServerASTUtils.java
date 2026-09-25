@@ -22,8 +22,8 @@ import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.IncludeEntryNode;
 import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -59,7 +59,7 @@ public class LanguageServerASTUtils {
         // the params or output block of an included pipeline is a record type
         // synthesized for the include, so navigate to the block instead
         if( result instanceof ClassNode cn ) {
-            var block = ResolveIncludeVisitor.getPipelineBlock(cn);
+            var block = ScriptNode.getPipelineBlock(cn);
             if( block != null )
                 return block;
         }
@@ -91,7 +91,7 @@ public class LanguageServerASTUtils {
             return cce.getType().redirect();
 
         if( node instanceof MapEntryExpression ) {
-            var namedParam = (Parameter) node.getNodeMetaData("_NAMED_PARAM");
+            var namedParam = (Parameter) node.getNodeMetaData(ASTNodeMarker.NAMED_PARAM);
             if( namedParam != null )
                 return namedParam;
         }
