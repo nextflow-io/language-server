@@ -16,6 +16,7 @@
 package nextflow.lsp.ast;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -29,6 +30,7 @@ import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
 import nextflow.script.ast.RecordNode;
+import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.TupleParameter;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
@@ -113,7 +115,7 @@ public class ASTNodeStringUtils {
 
     private static String workflowToLabel(WorkflowNode node) {
         if( node.isEntry() )
-            return "workflow <entry>";
+            return entryWorkflowToLabel(node, null);
         var fmt = new Formatter(new FormattingOptions(2, true));
         fmt.append("workflow ");
         fmt.append(node.getName());
@@ -145,6 +147,54 @@ public class ASTNodeStringUtils {
             typedOutput(emit, fmt);
             fmt.appendNewLine();
         });
+        fmt.decIndent();
+        fmt.append('}');
+        return fmt.toString();
+    }
+
+    /**
+     * An entry workflow is rendered with the params and output blocks
+     * of its script as its inputs and outputs, since that is how it is
+     * called when another pipeline includes it.
+     *
+     * @param node
+     * @param name the alias of an included pipeline, or null
+     */
+    public static String entryWorkflowToLabel(WorkflowNode node, String name) {
+        var pipeline = ScriptNode.getPipeline(node);
+        var params = pipeline.getParams();
+        var outputs = pipeline.getOutputs();
+        var fmt = new Formatter(new FormattingOptions(2, true));
+        fmt.append("workflow ");
+        fmt.append(name != null ? name : "<entry>");
+        if( params == null && outputs == null )
+            return fmt.toString();
+
+        fmt.append(" {\n");
+        fmt.incIndent();
+        fmt.appendIndent();
+        fmt.append("params:\n");
+        if( params == null || params.declarations.length == 0 ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+        }
+        for( var param : params != null ? params.declarations : new Parameter[0] ) {
+            fmt.appendIndent();
+            typedInput(param, fmt);
+            fmt.appendNewLine();
+        }
+        fmt.appendNewLine();
+        fmt.appendIndent();
+        fmt.append("output:\n");
+        if( outputs == null || outputs.declarations.isEmpty() ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+        }
+        for( var output : outputs != null ? outputs.declarations : List.<Parameter>of() ) {
+            fmt.appendIndent();
+            typedInput(output, fmt);
+            fmt.appendNewLine();
+        }
         fmt.decIndent();
         fmt.append('}');
         return fmt.toString();

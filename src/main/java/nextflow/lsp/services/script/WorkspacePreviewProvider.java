@@ -70,7 +70,7 @@ public class WorkspacePreviewProvider {
             .filter(mn -> mn instanceof ProcessNode || mn instanceof WorkflowNode)
             .distinct()
             .map(mn -> Map.of(
-                "name", mn.getName(),
+                "name", mn.getName() != null ? mn.getName() : "<entry>",
                 "path", ast.getURI(mn).getPath()
             ))
             .toList();

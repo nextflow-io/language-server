@@ -78,7 +78,7 @@ public class LanguageServerASTUtils {
             return cce.getType().redirect();
 
         if( node instanceof MapEntryExpression ) {
-            var namedParam = (Parameter) node.getNodeMetaData("_NAMED_PARAM");
+            var namedParam = (Parameter) node.getNodeMetaData(ASTNodeMarker.NAMED_PARAM);
             if( namedParam != null )
                 return namedParam;
         }

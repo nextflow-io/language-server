@@ -42,17 +42,17 @@ tasks.withType(GroovyCompile).configureEach {
 }
 
 dependencies {
-  groovyCompiler 'org.apache.groovy:groovy:4.0.31'
+  groovyCompiler 'org.apache.groovy:groovy:4.0.33'
 
-  implementation 'io.nextflow:nf-lang:26.09.0-edge'
-  implementation 'org.apache.groovy:groovy:4.0.31'
-  implementation 'org.apache.groovy:groovy-json:4.0.31'
-  implementation 'org.apache.groovy:groovy-yaml:4.0.31'
+  implementation 'io.nextflow:nf-lang:26.09.1-edge'
+  implementation 'org.apache.groovy:groovy:4.0.33'
+  implementation 'org.apache.groovy:groovy-json:4.0.33'
+  implementation 'org.apache.groovy:groovy-yaml:4.0.33'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.23.0'
 
   // runtime dependencies for Nextflow scripts
-  runtimeOnly 'org.apache.groovy:groovy-templates:4.0.31'
+  runtimeOnly 'org.apache.groovy:groovy-templates:4.0.33'
   runtimeOnly 'org.yaml:snakeyaml:2.2'
 
   // include Nextflow runtime at build-time to extract language definitions

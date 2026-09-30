@@ -17,9 +17,11 @@
 package nextflow.lsp.ast
 
 import groovy.lang.groovydoc.Groovydoc
+import nextflow.script.ast.ASTNodeMarker
 import nextflow.script.ast.FeatureFlagNode
 import nextflow.script.ast.FunctionNode
 import nextflow.script.ast.ProcessNodeV1
+import nextflow.script.ast.ScriptNode
 import nextflow.script.ast.WorkflowNode
 import nextflow.script.dsl.FeatureFlagDsl
 import nextflow.script.dsl.ProcessDsl
@@ -81,6 +83,7 @@ class ASTNodeStringUtilsTest extends Specification {
         when:
         def entry = Mock(WorkflowNode) {
             isEntry() >> true
+            getNodeMetaData(ASTNodeMarker.PIPELINE_SCRIPT) >> Mock(ScriptNode)
         }
         then:
         ASTNodeStringUtils.getLabel(entry) == 'workflow <entry>'
