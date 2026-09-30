@@ -28,6 +28,7 @@ import java.util.Set;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.ast.ASTNodeCache;
+import nextflow.lsp.ast.LanguageServerASTUtils;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
 import nextflow.lsp.file.FileCache;
@@ -150,6 +151,7 @@ public class ScriptAstCache extends ASTNodeCache {
             visitor.visit();
 
             new ResolvePluginIncludeVisitor(sourceUnit, pluginSpecCache).visit();
+            linkPipelineParams(sourceUnit);
 
             var uri = sourceUnit.getSource().getURI();
             if( visitor.isChanged() ) {
@@ -189,6 +191,31 @@ public class ScriptAstCache extends ASTNodeCache {
         }
 
         return changedUris;
+    }
+
+    /**
+     * Link the record type synthesized for an included params block
+     * to the block, so that it can be used as a definition.
+     *
+     * @param sourceUnit
+     */
+    private void linkPipelineParams(SourceUnit sourceUnit) {
+        if( !(sourceUnit.getAST() instanceof ScriptNode sn) )
+            return;
+        var uri = sourceUnit.getSource().getURI();
+        for( var node : sn.getIncludes() ) {
+            for( var entry : node.entries ) {
+                if( !(entry.getTarget() instanceof ClassNode cn) || !ScriptNode.isPipelineParams(cn) )
+                    continue;
+                try {
+                    var includeUri = ModuleResolver.getIncludeUri(uri, node.source.getText(), projectDir);
+                    cn.putNodeMetaData(LanguageServerASTUtils.PIPELINE_PARAMS_BLOCK, getScriptNode(includeUri).getParams());
+                }
+                catch( Exception e ) {
+                    // an invalid module reference is reported by the include resolver
+                }
+            }
+        }
     }
 
     private List<SourceUnit> changedSourceUnits(Set<URI> uris) {

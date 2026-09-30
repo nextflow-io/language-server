@@ -56,15 +56,21 @@ public class LanguageServerASTUtils {
      */
     public static ASTNode getDefinition(ASTNode node) {
         var result = getDefinition0(node);
-        // the params or output block of an included pipeline is a record type
+        // the params block of an included pipeline is a record type
         // synthesized for the include, so navigate to the block instead
-        if( result instanceof ClassNode cn ) {
-            var block = ScriptNode.getPipelineBlock(cn);
+        if( result instanceof ClassNode cn && ScriptNode.isPipelineParams(cn) ) {
+            var block = (ASTNode) cn.getNodeMetaData(PIPELINE_PARAMS_BLOCK);
             if( block != null )
                 return block;
         }
         return result;
     }
+
+    /**
+     * Node metadata key for the params block of an included pipeline,
+     * set on the record type synthesized for the include.
+     */
+    public static final String PIPELINE_PARAMS_BLOCK = "_PIPELINE_PARAMS_BLOCK";
 
     private static ASTNode getDefinition0(ASTNode node) {
         if( node instanceof VariableExpression ve )

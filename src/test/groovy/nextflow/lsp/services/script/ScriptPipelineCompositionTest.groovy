@@ -79,8 +79,7 @@ class ScriptPipelineCompositionTest extends Specification {
 
             include {
                 params as RnaseqParams ;
-                workflow as RNASEQ ;
-                output as RnaseqOutput
+                workflow as RNASEQ
             } from './rnaseq.nf'
 
             params {
@@ -92,7 +91,7 @@ class ScriptPipelineCompositionTest extends Specification {
                 rnaseq = RNASEQ( params.rnaseq )
 
                 publish:
-                bams = rnaseq.bams
+                bams = rnaseq
             }
 
             output {
@@ -143,7 +142,7 @@ class ScriptPipelineCompositionTest extends Specification {
 
             workflow {
                 main:
-                RNASEQ( input: file('sample.fq') )
+                RNASEQ( record(input: file('sample.fq')) )
             }
             ''')
         service.updateNow()
@@ -167,7 +166,7 @@ class ScriptPipelineCompositionTest extends Specification {
 
             workflow {
                 main:
-                RNASEQ( input: file('sample.fq'), foo: 'bar' )
+                RNASEQ( record(input: file('sample.fq'), foo: 'bar') )
             }
             ''')
         service.updateNow()
@@ -190,7 +189,7 @@ class ScriptPipelineCompositionTest extends Specification {
 
             workflow {
                 main:
-                RNASEQ( aligner: 'star' )
+                RNASEQ( record(aligner: 'star') )
             }
             ''')
         service.updateNow()
@@ -213,7 +212,7 @@ class ScriptPipelineCompositionTest extends Specification {
 
             workflow {
                 main:
-                rnaseq = RNASEQ( input: file('sample.fq') )
+                rnaseq = RNASEQ( record(input: file('sample.fq')) )
                 rnaseq.counts.view()
             }
             ''')
