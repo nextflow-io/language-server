@@ -277,7 +277,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         if( targetTypes.isEmpty() || ClassHelper.isObjectType(sourceType) )
             return true;
         for( var targetType : targetTypes ) {
-            if( Types.isAssignableFrom(targetType, sourceType) )
+            if( Types.isAssignableFrom(targetType, sourceType, false) )
                 return true;
         }
         return false;
