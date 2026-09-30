@@ -115,7 +115,7 @@ public class ASTNodeStringUtils {
 
     private static String workflowToLabel(WorkflowNode node) {
         if( node.isEntry() )
-            return pipelineToLabel(node);
+            return entryWorkflowToLabel(node, null);
         var fmt = new Formatter(new FormattingOptions(2, true));
         fmt.append("workflow ");
         fmt.append(node.getName());
@@ -153,46 +153,51 @@ public class ASTNodeStringUtils {
     }
 
     /**
-     * An entry workflow is rendered as a pipeline: the params and output
-     * blocks of its script are its inputs and outputs, since that is how it
-     * is called when another pipeline includes it.
+     * An entry workflow is rendered with the params and output blocks
+     * of its script as its inputs and outputs, since that is how it is
+     * called when another pipeline includes it.
      *
      * @param node
+     * @param name the alias of an included pipeline, or null
      */
-    private static String pipelineToLabel(WorkflowNode node) {
+    public static String entryWorkflowToLabel(WorkflowNode node, String name) {
         var pipeline = ScriptNode.getPipeline(node);
-        var params = pipeline != null ? pipeline.getParams() : null;
-        var outputs = pipeline != null ? pipeline.getOutputs() : null;
-        if( params == null && outputs == null )
-            return "workflow <entry>";
-
+        var params = pipeline.getParams();
+        var outputs = pipeline.getOutputs();
         var fmt = new Formatter(new FormattingOptions(2, true));
-        fmt.append("pipeline {\n");
+        fmt.append("workflow ");
+        fmt.append(name != null ? name : "<entry>");
+        if( params == null && outputs == null )
+            return fmt.toString();
+
+        fmt.append(" {\n");
         fmt.incIndent();
         fmt.appendIndent();
         fmt.append("params:\n");
-        var declarations = params != null ? Arrays.asList(params.declarations) : List.<Parameter>of();
-        appendDeclarations(declarations, fmt);
+        if( params == null || params.declarations.length == 0 ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+        }
+        for( var param : params != null ? params.declarations : new Parameter[0] ) {
+            fmt.appendIndent();
+            typedInput(param, fmt);
+            fmt.appendNewLine();
+        }
         fmt.appendNewLine();
         fmt.appendIndent();
         fmt.append("output:\n");
-        appendDeclarations(outputs != null ? outputs.declarations : List.of(), fmt);
+        if( outputs == null || outputs.declarations.isEmpty() ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+        }
+        for( var output : outputs != null ? outputs.declarations : List.<Parameter>of() ) {
+            fmt.appendIndent();
+            typedInput(output, fmt);
+            fmt.appendNewLine();
+        }
         fmt.decIndent();
         fmt.append('}');
         return fmt.toString();
-    }
-
-    private static void appendDeclarations(List<? extends Parameter> declarations, Formatter fmt) {
-        if( declarations.isEmpty() ) {
-            fmt.appendIndent();
-            fmt.append("<none>\n");
-            return;
-        }
-        for( var declaration : declarations ) {
-            fmt.appendIndent();
-            typedInput(declaration, fmt);
-            fmt.appendNewLine();
-        }
     }
 
     private static void typedOutput(Expression output, Formatter fmt) {

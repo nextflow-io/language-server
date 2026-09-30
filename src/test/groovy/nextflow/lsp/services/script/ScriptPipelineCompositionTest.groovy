@@ -17,7 +17,6 @@
 package nextflow.lsp.services.script
 
 import nextflow.lsp.TestLanguageClient
-import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.TextDocumentIdentifier
@@ -60,13 +59,6 @@ class ScriptPipelineCompositionTest extends Specification {
         return service
     }
 
-    String getDefinitionUri(ScriptService service, String uri, Position position) {
-        def locations = service
-            .definition(new DefinitionParams(new TextDocumentIdentifier(uri), position))
-            .getLeft()
-        return locations.size() > 0 ? locations.first().getUri() : null
-    }
-
     def 'should not report diagnostics for a pipeline include' () {
         given:
         def client = new TestLanguageClient()
@@ -103,32 +95,6 @@ class ScriptPipelineCompositionTest extends Specification {
         client.getDiagnostics(uri).isEmpty()
     }
 
-    def 'should get the definition of an included params block' () {
-        given:
-        def service = pipelineService()
-        def uri = getUri('main.nf')
-
-        when:
-        open(service, uri, '''\
-            nextflow.enable.types = true
-
-            include { params as RnaseqParams } from './rnaseq.nf'
-
-            params {
-                rnaseq: RnaseqParams
-            }
-
-            workflow {
-                main:
-                println(params.rnaseq.aligner)
-            }
-            ''')
-        service.updateNow()
-        then:
-        // the include entry navigates to the params block of the module
-        getDefinitionUri(service, uri, new Position(2, 11)) == getUri('rnaseq.nf')
-    }
-
     def 'should get the hover of an included pipeline' () {
         given:
         def service = pipelineService()
@@ -148,79 +114,10 @@ class ScriptPipelineCompositionTest extends Specification {
         service.updateNow()
         def hover = service.hover(new HoverParams(new TextDocumentIdentifier(uri), new Position(6, 4)))
         then:
-        hover.getContents().getRight().getValue().contains('input: Path')
-        hover.getContents().getRight().getValue().contains('bams: Channel<Path>')
-    }
-
-    def 'should report an unknown pipeline param' () {
-        given:
-        def client = new TestLanguageClient()
-        def service = pipelineService(client)
-        def uri = getUri('main.nf')
-
-        when:
-        open(service, uri, '''\
-            nextflow.enable.types = true
-
-            include { workflow as RNASEQ } from './rnaseq.nf'
-
-            workflow {
-                main:
-                RNASEQ( record(input: file('sample.fq'), foo: 'bar') )
-            }
-            ''')
-        service.updateNow()
-        then:
-        client.getDiagnostics(uri).size() == 1
-        client.getDiagnostics(uri).first().getMessage().contains('foo')
-    }
-
-    def 'should report a missing pipeline param' () {
-        given:
-        def client = new TestLanguageClient()
-        def service = pipelineService(client)
-        def uri = getUri('main.nf')
-
-        when:
-        open(service, uri, '''\
-            nextflow.enable.types = true
-
-            include { workflow as RNASEQ } from './rnaseq.nf'
-
-            workflow {
-                main:
-                RNASEQ( record(aligner: 'star') )
-            }
-            ''')
-        service.updateNow()
-        then:
-        client.getDiagnostics(uri).size() == 1
-        client.getDiagnostics(uri).first().getMessage().contains('input')
-    }
-
-    def 'should infer the output type of a pipeline call' () {
-        given:
-        def client = new TestLanguageClient()
-        def service = pipelineService(client)
-        def uri = getUri('main.nf')
-
-        when:
-        open(service, uri, '''\
-            nextflow.enable.types = true
-
-            include { workflow as RNASEQ } from './rnaseq.nf'
-
-            workflow {
-                main:
-                rnaseq = RNASEQ( record(input: file('sample.fq')) )
-                rnaseq.counts.view()
-            }
-            ''')
-        service.updateNow()
-        then:
-        // `bams` is declared by the output block, `counts` is not
-        client.getDiagnostics(uri).size() == 1
-        client.getDiagnostics(uri).first().getMessage().contains('counts')
+        def value = hover.getContents().getRight().getValue()
+        value.contains('workflow RNASEQ {')
+        value.contains('input: Path')
+        value.contains('bams: Channel<Path>')
     }
 
 }

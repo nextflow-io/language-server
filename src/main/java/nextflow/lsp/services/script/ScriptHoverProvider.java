@@ -22,6 +22,7 @@ import nextflow.lsp.ast.LanguageServerASTUtils;
 import nextflow.lsp.services.HoverProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.script.ast.FunctionNode;
+import nextflow.script.ast.IncludeEntryNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Types;
@@ -29,6 +30,7 @@ import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
@@ -79,7 +81,9 @@ public class ScriptHoverProvider implements HoverProvider {
 
         var builder = new StringBuilder();
 
-        var label = ASTNodeStringUtils.getLabel(defNode);
+        var label = defNode instanceof WorkflowNode wn && wn.isEntry()
+            ? ASTNodeStringUtils.entryWorkflowToLabel(wn, getAlias(offsetNode))
+            : ASTNodeStringUtils.getLabel(defNode);
         if( label != null ) {
             builder.append("```nextflow\n");
             builder.append(label);
@@ -122,6 +126,21 @@ public class ScriptHoverProvider implements HoverProvider {
         if( value.isEmpty() )
             return null;
         return new Hover(new MarkupContent(MarkupKind.MARKDOWN, value));
+    }
+
+    /**
+     * Get the name by which an included pipeline is referenced.
+     *
+     * @param node
+     */
+    private static String getAlias(ASTNode node) {
+        if( node instanceof MethodCallExpression mce )
+            return mce.getMethodAsString();
+        if( node instanceof VariableExpression ve )
+            return ve.getName();
+        if( node instanceof IncludeEntryNode entry )
+            return entry.getNameOrAlias();
+        return null;
     }
 
 }

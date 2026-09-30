@@ -290,7 +290,6 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         if( rhs instanceof VariableExpression ve ) {
             var defNode = asMethodVariable(ve.getAccessedVariable());
             if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
-                // an included pipeline has no name of its own -- use the alias
                 var label = ve.getName();
                 var preds = visitWithPreds(lhs);
                 var dn = addNode(label, Node.Type.OPERATOR, defNode, preds);
