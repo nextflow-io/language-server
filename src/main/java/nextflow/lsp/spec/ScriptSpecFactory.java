@@ -16,6 +16,7 @@
 package nextflow.lsp.spec;
 
 import java.lang.reflect.Modifier;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -86,7 +87,9 @@ public class ScriptSpecFactory {
         Map.entry("Integer", ClassHelper.Integer_TYPE),
         Map.entry("int", ClassHelper.Integer_TYPE),
         Map.entry("List", ClassHelper.LIST_TYPE),
+        Map.entry("Map", ClassHelper.MAP_TYPE),
         Map.entry("MemoryUnit", ClassHelper.makeCached(MemoryUnit.class)),
+        Map.entry("Path", ClassHelper.makeCached(Path.class)),
         Map.entry("Set", ClassHelper.SET_TYPE),
         Map.entry("String", ClassHelper.STRING_TYPE)
     );
