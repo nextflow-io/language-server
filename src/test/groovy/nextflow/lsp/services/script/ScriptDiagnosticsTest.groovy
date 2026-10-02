@@ -169,4 +169,57 @@ class ScriptDiagnosticsTest extends Specification {
         client.getDiagnostics(uri).isEmpty()
     }
 
+
+    def pluginErrors(String plugin, String script) {
+        def configService = newConfigService()
+        open(configService, getUri('nextflow.config'), "plugins { id '${plugin}' }")
+        configService.updateNow()
+        def client = new TestLanguageClient()
+        def service = getScriptService(client, configService)
+        def uri = getUri('main.nf')
+        open(service, uri, script)
+        service.updateNow()
+        return client.getDiagnostics(uri)
+            .findAll { it.getSeverity() == DiagnosticSeverity.Error }
+            .collect { it.getMessage() }
+    }
+
+    def 'should resolve overloaded plugin functions in a typed script' () {
+        when:
+        def errors = pluginErrors('nf-schema@2.7.3', """\
+            nextflow.enable.types = true
+
+            include { samplesheetToList ; paramsHelp ; validateParameters ; paramsSummaryMap } from 'plugin/nf-schema'
+
+            workflow {
+                def rows: List = samplesheetToList('s.csv', 'schema.json')
+                samplesheetToList(file('s.csv'), file('schema.json'))
+                def help: String = paramsHelp()
+                paramsHelp([:])
+                paramsHelp('nextflow run main.nf')
+                validateParameters()
+                validateParameters([:])
+                paramsSummaryMap(workflow)
+                println rows
+                println help
+            }
+            """)
+        then:
+        errors == []
+    }
+
+    def 'should not check plugin function arguments in an untyped script' () {
+        when:
+        def errors = pluginErrors('nf-schema@2.7.3', """\
+            include { samplesheetToList ; paramsHelp } from 'plugin/nf-schema'
+
+            workflow {
+                samplesheetToList('s.csv')
+                println paramsHelp()
+            }
+            """)
+        then:
+        errors == []
+    }
+
 }
