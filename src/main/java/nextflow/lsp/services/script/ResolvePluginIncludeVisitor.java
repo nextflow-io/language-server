@@ -80,7 +80,7 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
             }
             if( functions.size() > 1 ) {
                 // an include can only have one target, so overloads are resolved
-                // per call by PluginOverloadVisitor
+                // per call by PluginCallVisitor
                 var target = new FunctionNode(entry.getNameOrAlias());
                 target.setSynthetic(true);
                 target.putNodeMetaData(ASTNodeMarker.METHOD_OVERLOADS, functions);

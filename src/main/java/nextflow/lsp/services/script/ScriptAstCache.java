@@ -172,7 +172,7 @@ public class ScriptAstCache extends ASTNodeCache {
                 System.err.println("Unexpected exception while resolving " + uri.getPath() + ": " + e.toString());
             }
             new ParameterSchemaVisitor(sourceUnit).visit();
-            new PluginOverloadVisitor(sourceUnit).visit();
+            new PluginCallVisitor(sourceUnit).visit();
         }
 
         // phase 4: type checking -- included modules must be checked before the

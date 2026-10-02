@@ -29,11 +29,11 @@ import org.codehaus.groovy.control.SourceUnit;
  *
  * @see ResolvePluginIncludeVisitor
  */
-public class PluginOverloadVisitor extends ScriptVisitorSupport {
+public class PluginCallVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    public PluginOverloadVisitor(SourceUnit sourceUnit) {
+    public PluginCallVisitor(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
     }
 
