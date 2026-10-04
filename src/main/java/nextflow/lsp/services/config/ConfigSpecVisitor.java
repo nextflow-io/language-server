@@ -266,7 +266,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         var type = TypeCheckingUtils.getType(node);
         if( node instanceof ClosureExpression ce && "process".equals(scopes.get(0)) ) {
             var visitor = new ReturnStatementVisitor(sourceUnit, sourceUnit.getErrorCollector());
-            visitor.visit(ClassHelper.dynamicType(), ce.getCode());
+            visitor.visit(ce, ClassHelper.dynamicType(), ce.getCode());
             var inferredReturnType = visitor.getInferredReturnType();
             return inferredReturnType != null ? inferredReturnType : ClassHelper.dynamicType();
         }
