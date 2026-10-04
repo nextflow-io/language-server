@@ -35,7 +35,6 @@ import nextflow.lsp.services.RenameProvider;
 import nextflow.lsp.services.SemanticTokensProvider;
 import nextflow.lsp.services.SymbolProvider;
 import nextflow.lsp.util.JsonUtils;
-import nextflow.script.formatter.FormattingOptions;
 
 /**
  * Implementation of language services for Nextflow scripts.
@@ -155,27 +154,11 @@ public class ScriptService extends LanguageService {
             var provider = new WorkspacePreviewProvider(astCache);
             return provider.preview();
         }
-        if( "nextflow.server.convertScriptToTyped".equals(command) ) {
-            var uri = getJsonString(arguments.get(0));
-            var provider = new ScriptCodeLensProvider(astCache);
-            var options = formattingOptions(configuration);
-            return provider.convertScriptToTyped(uri, options);
-        }
         return null;
     }
 
     private String getJsonString(Object json) {
         return json instanceof JsonPrimitive jp ? jp.getAsString() : null;
-    }
-
-    private static FormattingOptions formattingOptions(LanguageServerConfiguration configuration) {
-        return new FormattingOptions(
-            4,
-            true,
-            configuration.harshilAlignment(),
-            configuration.maheshForm(),
-            configuration.sortDeclarations()
-        );
     }
 
 }

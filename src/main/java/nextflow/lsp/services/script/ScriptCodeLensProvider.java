@@ -18,7 +18,6 @@ package nextflow.lsp.services.script;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,24 +26,11 @@ import nextflow.lsp.services.script.dag.DataflowVisitor;
 import nextflow.lsp.services.script.dag.MermaidRenderer;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.LanguageServerUtils;
-import nextflow.script.ast.ParamBlockNode;
-import nextflow.script.ast.ProcessNodeV1;
-import nextflow.script.ast.ScriptNode;
-import nextflow.script.dsl.Constant;
-import nextflow.script.formatter.FormattingOptions;
-import nextflow.script.formatter.ScriptFormattingVisitor;
-import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.ast.expr.Expression;
-import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.Command;
-import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
-import org.eclipse.lsp4j.TextEdit;
-import org.eclipse.lsp4j.WorkspaceEdit;
 
 import static nextflow.lsp.util.JsonUtils.asJson;
-import static nextflow.script.ast.ASTUtils.*;
 
 /**
  *
@@ -127,110 +113,6 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
                 return Map.of("result", result);
             })
             .orElse(null);
-    }
-
-    /**
-     * Convert a script to static types.
-     *
-     * @param documentUri
-     * @param options
-     */
-    public Map<String,Object> convertScriptToTyped(String documentUri, FormattingOptions options) {
-        var uri = URI.create(documentUri);
-        if( !ast.hasAST(uri) || ast.hasErrors(uri) )
-            return Map.of("error", "Script cannot be converted because it has errors.");
-
-        var sn = ast.getScriptNode(uri);
-        var textEdits = new HashMap<String,List<TextEdit>>();
-
-        // convert legacy parameters to params definition
-        convertParamsToTyped(sn, options, textEdits);
-
-        // convert legacy processes to typed processes
-        for( var pn : sn.getProcesses() ) {
-            if( !(pn instanceof ProcessNodeV1) )
-                continue;
-            convertProcessToTyped((ProcessNodeV1) pn, options, textEdits);
-        }
-
-        // add preview flag if needed
-        if( !sn.getProcesses().isEmpty() ) {
-            var firstProcess = sn.getProcesses().get(0);
-            var start = LanguageServerUtils.astNodeToRange(firstProcess).getStart();
-            var range = new Range(start, start);
-            var newText = "nextflow.enable.types = true\n\n";
-            addTextEdit(textEdits, uri, range, newText);
-        }
-
-        return Map.of("applyEdit", (Object) new WorkspaceEdit(textEdits));
-    }
-
-    private void convertParamsToTyped(ScriptNode sn, FormattingOptions options, Map<String,List<TextEdit>> textEdits) {
-        // construct params block from schema, legacy parameters
-        var entry = sn.getEntry();
-        if( entry == null || sn.getParams() != null )
-            return;
-        var classScope = entry.getVariableScope().getClassScope();
-        var type = classScope.getMethods().stream()
-            .filter((mn) -> {
-                var an = findAnnotation(mn, Constant.class);
-                return an.isPresent() && "params".equals(an.get().getMember("value").getText());
-            })
-            .map(mn -> mn.getReturnType())
-            .findFirst().orElse(null);
-        if( type == null )
-            return;
-        var legacyDefaults = Map.ofEntries(
-            sn.getParamsV1().stream()
-                .map((param) -> {
-                    var name = param.target instanceof PropertyExpression pe ? pe.getPropertyAsString() : "";
-                    return Map.entry(name, param.value);
-                })
-                .toArray(Map.Entry[]::new)
-        );
-        var declarations = type.getFields().stream()
-            .map((fn) -> {
-                var name = fn.getName();
-                var defaultValue = legacyDefaults.getOrDefault(name, fn.getInitialExpression());
-                return new Parameter(fn.getType(), name, (Expression) defaultValue);
-            })
-            .toArray(Parameter[]::new);
-        if( declarations.length == 0 )
-            return;
-        var newParams = new ParamBlockNode(declarations);
-
-        // insert params block before entry workflow
-        var sourceUnit = sn.getContext();
-        var uri = sourceUnit.getSource().getURI();
-
-        var entryStart = LanguageServerUtils.astNodeToRange(entry).getStart();
-        var range = new Range(entryStart, entryStart);
-        var formatter = new ScriptFormattingVisitor(sourceUnit, options);
-        formatter.visitParams(newParams);
-        var newText = formatter.toString() + "\n";
-        addTextEdit(textEdits, uri, range, newText);
-
-        // delete legacy parameter declarations
-        for( var param : sn.getParamsV1() ) {
-            addTextEdit(textEdits, uri, LanguageServerUtils.astNodeToRange(param), "");
-        }
-    }
-
-    private void convertProcessToTyped(ProcessNodeV1 pn, FormattingOptions options, Map<String,List<TextEdit>> textEdits) {
-        var uri = ast.getURI(pn);
-        var sourceUnit = ast.getSourceUnit(uri);
-        var range = LanguageServerUtils.astNodeToRange(pn);
-        var newPn = new ProcessConverter(uri).apply(pn);
-        var formatter = new ScriptFormattingVisitor(sourceUnit, options);
-        formatter.visitProcess(newPn);
-        var newText = formatter.toString().trim();
-        addTextEdit(textEdits, uri, range, newText);
-    }
-
-    private static void addTextEdit(Map<String,List<TextEdit>> textEdits, URI uri, Range range, String newText) {
-        textEdits
-            .computeIfAbsent(uri.toString(), (k) -> new ArrayList<>())
-            .add(new TextEdit(range, newText));
     }
 
 }

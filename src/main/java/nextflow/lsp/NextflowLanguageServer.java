@@ -37,7 +37,6 @@ import nextflow.lsp.services.script.ScriptService;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.util.PathUtils;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
-import org.eclipse.lsp4j.ApplyWorkspaceEditParams;
 import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams;
 import org.eclipse.lsp4j.CallHierarchyItem;
@@ -173,8 +172,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var commands = List.of(
             "nextflow.server.previewConfig",
             "nextflow.server.previewDag",
-            "nextflow.server.previewWorkspace",
-            "nextflow.server.convertScriptToTyped"
+            "nextflow.server.previewWorkspace"
         );
         var executeCommandOptions = new ExecuteCommandOptions(commands);
         result.setExecuteCommandProvider(executeCommandOptions);
@@ -593,22 +591,6 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 var service = scriptServices.get(name);
                 if( service != null )
                     return service.executeCommand(command, arguments, configuration);
-            }
-            if( "nextflow.server.convertScriptToTyped".equals(command) && arguments.size() == 1 ) {
-                log.debug(String.format("textDocument/convertScriptToTyped %s", arguments.toString()));
-                var uri = JsonUtils.getString(arguments.get(0));
-                var service = getLanguageService(uri);
-                if( service != null ) {
-                    var result = (Map) service.executeCommand(command, arguments, configuration);
-                    var workspaceEdit = (WorkspaceEdit) result.get("applyEdit");
-                    if( workspaceEdit != null ) {
-                        client.applyEdit(new ApplyWorkspaceEditParams(workspaceEdit));
-                        return Collections.emptyMap();
-                    }
-                    else {
-                        return result;
-                    }
-                }
             }
             return null;
         });
