@@ -137,7 +137,7 @@ public class ScriptService extends LanguageService {
             var uri = getJsonString(arguments.get(0));
             var name = getJsonString(arguments.get(1));
             var provider = new ScriptCodeLensProvider(astCache);
-            return provider.previewDag(uri, name, configuration.dagDirection(), configuration.dagVerbose());
+            return provider.previewDag(uri, name, configuration.dagDirection(), configuration.dagVerbose(), false);
         }
         if( "nextflow.server.previewConfig".equals(command) && arguments.size() == 4 ) {
             var uri = getJsonString(arguments.get(0));

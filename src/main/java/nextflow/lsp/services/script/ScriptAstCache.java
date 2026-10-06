@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashMap;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.ast.ASTNodeCache;
@@ -63,9 +64,22 @@ import org.codehaus.groovy.control.messages.WarningMessage;
  */
 public class ScriptAstCache extends ASTNodeCache {
 
+    private GroovyLibCache libCache;
+
+    private LanguageServerConfiguration configuration;
+    private final Map<String, Map<Integer, String>> controlConditions = new HashMap<>();
+
     private Path projectDir;
 
     private PluginSpecCache pluginSpecCache;
+
+    public void putControlConditions(String documentUri, Map<Integer, String> conditions) {
+        controlConditions.put(documentUri, conditions);
+    }
+
+    public Map<Integer, String> getControlConditions(String documentUri) {
+        return controlConditions.get(documentUri);
+    }
 
     public ScriptAstCache(String rootUri) {
         super(createCompiler(rootUri));
