@@ -16,11 +16,15 @@
 
 package nextflow.lsp.file
 
+import java.nio.file.Files
+
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
+import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.TextDocumentContentChangeEvent
+import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.TextDocumentItem
 import org.eclipse.lsp4j.VersionedTextDocumentIdentifier
 import spock.lang.Specification
@@ -68,6 +72,85 @@ class FileCacheTest extends Specification {
         ))
         then:
         'hello there, friend' == fileCache.getContents(URI.create('file.txt'))
+    }
+
+    def 'should track and reset the set of changed files' () {
+        given:
+        def fileCache = new FileCache()
+        def a = URI.create('a.txt')
+        def b = URI.create('b.txt')
+
+        when: 'two files are opened'
+        fileCache.didOpen(new DidOpenTextDocumentParams(new TextDocumentItem('a.txt', 'plaintext', 1, 'a')))
+        fileCache.didOpen(new DidOpenTextDocumentParams(new TextDocumentItem('b.txt', 'plaintext', 1, 'b')))
+        then: 'both are reported as changed'
+        fileCache.removeChangedFiles() == [a, b] as Set
+
+        and: 'the changed set is reset after being drained'
+        fileCache.removeChangedFiles().isEmpty()
+
+        when: 'a file is explicitly marked changed'
+        fileCache.markChanged(a)
+        then:
+        fileCache.removeChangedFiles() == [a] as Set
+    }
+
+    def 'should track open files and close them' () {
+        given:
+        def fileCache = new FileCache()
+        def uri = URI.create('file.txt')
+
+        when:
+        fileCache.didOpen(new DidOpenTextDocumentParams(new TextDocumentItem('file.txt', 'plaintext', 1, 'hello')))
+        then:
+        fileCache.isOpen(uri)
+        fileCache.getOpenFiles() == [uri] as Set
+
+        when: 'the file is closed'
+        fileCache.removeChangedFiles()
+        fileCache.didClose(new DidCloseTextDocumentParams(new TextDocumentIdentifier('file.txt')))
+        then: 'it is no longer open and is marked changed'
+        !fileCache.isOpen(uri)
+        fileCache.getOpenFiles().isEmpty()
+        fileCache.removeChangedFiles() == [uri] as Set
+    }
+
+    def 'should not mark an unopened file changed on close' () {
+        given:
+        def fileCache = new FileCache()
+
+        when: 'closing a file that was never opened'
+        fileCache.didClose(new DidCloseTextDocumentParams(new TextDocumentIdentifier('ghost.txt')))
+        then:
+        fileCache.removeChangedFiles().isEmpty()
+    }
+
+    def 'should read unopened file contents from the filesystem' () {
+        given:
+        def fileCache = new FileCache()
+        def file = Files.createTempFile('filecache', '.txt')
+        file.toFile().deleteOnExit()
+        Files.writeString(file, 'on disk')
+
+        expect: 'an unopened file is read from disk'
+        fileCache.getContents(file.toUri()) == 'on disk'
+
+        and: 'a missing file returns null'
+        fileCache.getContents(URI.create('file:///no/such/file.txt')) == null
+    }
+
+    def 'should prefer open contents over the filesystem' () {
+        given:
+        def fileCache = new FileCache()
+        def file = Files.createTempFile('filecache', '.txt')
+        file.toFile().deleteOnExit()
+        Files.writeString(file, 'on disk')
+        def uri = file.toUri()
+
+        when: 'the file is opened with different in-memory contents'
+        fileCache.didOpen(new DidOpenTextDocumentParams(new TextDocumentItem(uri.toString(), 'plaintext', 1, 'in memory')))
+        then:
+        fileCache.getContents(uri) == 'in memory'
     }
 
 }

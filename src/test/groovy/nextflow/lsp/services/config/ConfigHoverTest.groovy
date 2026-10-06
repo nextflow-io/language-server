@@ -58,6 +58,23 @@ class ConfigHoverTest extends Specification {
         value == 'The `executor` scope controls various executor behaviors.\n'
     }
 
+    def 'should get hover hint for a config option with multiple types' () {
+        given:
+        def service = getConfigService()
+        def uri = getUri('nextflow.config')
+
+        when:
+        open(service, uri, '''\
+            process {
+                arch = 'linux/x86_64'
+            }
+            ''')
+        service.updateNow()
+        def value = getHoverHint(service, uri, new Position(1, 4))
+        then:
+        value.startsWith('`process.arch (Map | String)`')
+    }
+
     def 'should get hover hint for a plugin config scope' () {
         given:
         def uri = getUri('nextflow.config')

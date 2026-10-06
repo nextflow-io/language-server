@@ -15,7 +15,11 @@
  */
 package nextflow.lsp.services.config;
 
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,18 +35,24 @@ import nextflow.config.spec.SpecNode;
 import nextflow.lsp.spec.ConfigSpecFactory;
 import nextflow.lsp.spec.PluginRef;
 import nextflow.lsp.spec.PluginSpecCache;
+import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ReturnStatementVisitor;
-import nextflow.script.control.TypeCheckingVisitorEx;
+import nextflow.script.control.TypeCheckingVisitor;
+import nextflow.script.types.ParamsMap;
 import nextflow.script.types.TypeCheckingUtils;
-import nextflow.script.types.TypesEx;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.CodeVisitorSupport;
+import org.codehaus.groovy.ast.FieldNode;
+import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -66,14 +76,11 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private PluginSpecCache pluginSpecCache;
 
-    private boolean typeChecking;
-
     private Stack<String> scopes = new Stack<>();
 
-    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache, boolean typeChecking) {
+    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache) {
         this.sourceUnit = sourceUnit;
         this.pluginSpecCache = pluginSpecCache;
-        this.typeChecking = typeChecking;
     }
 
     @Override
@@ -83,14 +90,23 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private SpecNode.Scope spec;
 
+    /**
+     * Synthetic type for the params declared by this config file. Fields are
+     * added as param assignments are visited, so a params reference is typed
+     * by the declarations above it.
+     */
+    private ClassNode paramsType;
+
     public void visit() {
         var moduleNode = sourceUnit.getAST();
-        if( moduleNode instanceof ConfigNode cn ) {
-            this.spec = getPluginScopes(cn);
-            cn.setSpec(spec);
-            super.visit(cn);
-            this.spec = null;
-        }
+        if( !(moduleNode instanceof ConfigNode cn) )
+            return;
+        this.spec = getPluginScopes(cn);
+        this.paramsType = new ClassNode(ParamsMap.class);
+        cn.setSpec(spec);
+        super.visit(cn);
+        this.spec = null;
+        this.paramsType = null;
     }
 
     private SpecNode.Scope getPluginScopes(ConfigNode cn) {
@@ -131,8 +147,9 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             .map(spec -> spec.configScopes())
             .toList();
 
-        // set current versions in plugin spec cache
-        pluginSpecCache.setCurrentVersions(refs);
+        // save current versions to plugin cache
+        var uri = sourceUnit.getSource().getURI();
+        pluginSpecCache.setCurrentVersions(uri, refs);
 
         // collect config scopes from plugin specs
         var result = new HashMap<String, SpecNode>();
@@ -145,6 +162,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
     public void visitConfigAssign(ConfigAssignNode node) {
         var names = new ArrayList<>(scopes);
         names.addAll(node.names);
+        applyParamsType(node.value);
 
         // validate dynamic scopes (env, params, etc)
         var scope = names.get(0);
@@ -155,6 +173,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             return;
         }
         if( "params".equals(scope) ) {
+            declareParam(names, node.value);
             return;
         }
 
@@ -169,40 +188,96 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             return;
         }
         // validate type
-        if( !typeChecking )
-            return;
         var expectedTypes = option.types().stream()
-            .map(t -> ClassHelper.makeCached(t).getPlainNodeReference())
+            .map(t -> fromType(t))
             .toList();
         var actualType = inferredType(node.value, names);
-        if( !isAssignableFromAny(expectedTypes, actualType) ) {
+        if( !isAnyAssignableFrom(expectedTypes, actualType) ) {
             var validTypes = expectedTypes.stream()
-                .map(cn -> TypesEx.getName(cn))
+                .map(cn -> Types.getName(cn))
+                .distinct()
+                .sorted()
                 .collect(Collectors.joining(", "));
             var message = expectedTypes.size() == 1
-                ? "Config option '" + fqName + "' with type " + TypesEx.getName(expectedTypes.get(0)) + " cannot be assigned to value with type " + TypesEx.getName(actualType)
-                : "Config option '" + fqName + "' cannot be assigned to value with type " + TypesEx.getName(actualType) + " -- valid types are: " + validTypes;
+                ? "Config option '" + fqName + "' with type " + Types.getName(expectedTypes.get(0)) + " cannot be assigned to value with type " + Types.getName(actualType)
+                : "Config option '" + fqName + "' cannot be assigned to value with type " + Types.getName(actualType) + " -- valid types are: " + validTypes;
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
         }
     }
 
+    /**
+     * Declare a param from a config assignment. A param assigned at a nested
+     * name (`params.foo.bar`) or assigned twice with different types is
+     * declared as dynamic so that references to it are not type-checked.
+     */
+    private void declareParam(List<String> names, Expression value) {
+        if( names.size() < 2 )
+            return;
+        var name = names.get(1);
+        var type = names.size() == 2
+            ? inferredType(value, names)
+            : ClassHelper.dynamicType();
+        var existing = paramsType.getDeclaredField(name);
+        if( existing != null ) {
+            if( !Types.isEqual(existing.getType(), type) )
+                existing.setType(ClassHelper.dynamicType());
+            return;
+        }
+        var fn = new FieldNode(name, Modifier.PUBLIC, type, paramsType, null);
+        fn.setHasNoRealSourcePosition(true);
+        fn.setDeclaringClass(paramsType);
+        fn.setSynthetic(true);
+        paramsType.addField(fn);
+    }
+
+    /**
+     * Type every `params` reference in an expression with the params declared
+     * so far, instead of the generic map type from the config DSL.
+     */
+    private void applyParamsType(Expression value) {
+        value.visit(new CodeVisitorSupport() {
+            @Override
+            public void visitVariableExpression(VariableExpression node) {
+                if( "params".equals(node.getName()) )
+                    node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, paramsType);
+            }
+        });
+    }
+
+    private ClassNode fromType(Type type) {
+        if( type instanceof Class c ) {
+            return ClassHelper.makeCached(c).getPlainNodeReference();
+        }
+
+        if( type instanceof ParameterizedType pt ) {
+            var cn = fromType(pt.getRawType());
+            var gts = Arrays.stream(pt.getActualTypeArguments())
+                .map(t -> new GenericsType(fromType(t)))
+                .toArray(GenericsType[]::new);
+            cn.setGenericsTypes(gts);
+            return cn;
+        }
+
+        return ClassHelper.dynamicType();
+    }
+
     private ClassNode inferredType(Expression node, List<String> scopes) {
-        new TypeCheckingVisitorEx(sourceUnit, true).visit(node);
+        new TypeCheckingVisitor(sourceUnit).visit(node);
         var type = TypeCheckingUtils.getType(node);
         if( node instanceof ClosureExpression ce && "process".equals(scopes.get(0)) ) {
-            var visitor = new ReturnStatementVisitor(sourceUnit);
-            visitor.visit(ClassHelper.dynamicType(), ce.getCode());
+            var visitor = new ReturnStatementVisitor(sourceUnit, sourceUnit.getErrorCollector());
+            visitor.visit(ce, ClassHelper.dynamicType(), ce.getCode());
             var inferredReturnType = visitor.getInferredReturnType();
             return inferredReturnType != null ? inferredReturnType : ClassHelper.dynamicType();
         }
         return type;
     }
 
-    private boolean isAssignableFromAny(List<ClassNode> targetTypes, ClassNode sourceType) {
-        if( targetTypes.isEmpty() )
+    private boolean isAnyAssignableFrom(List<ClassNode> targetTypes, ClassNode sourceType) {
+        if( targetTypes.isEmpty() || ClassHelper.isObjectType(sourceType) )
             return true;
         for( var targetType : targetTypes ) {
-            if( TypesEx.isAssignableFrom(targetType, sourceType) )
+            if( Types.isAssignableFrom(targetType, sourceType, false) )
                 return true;
         }
         return false;

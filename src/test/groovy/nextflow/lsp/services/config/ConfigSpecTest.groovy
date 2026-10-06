@@ -20,7 +20,7 @@ import nextflow.config.control.ConfigParser
 import nextflow.config.control.ConfigResolveVisitor
 import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.lsp.spec.PluginSpecCache
-import nextflow.script.types.Types
+import nextflow.script.dsl.Types
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.codehaus.groovy.control.messages.WarningMessage
@@ -48,7 +48,7 @@ class ConfigSpecTest extends Specification {
         def pluginSpecCache = new PluginSpecCache(configuration.pluginRegistryUrl())
         def source = configParser.parse('nextflow.config', contents.stripIndent())
         new ConfigResolveVisitor(source, configParser.compiler().compilationUnit(), Types.DEFAULT_CONFIG_IMPORTS).visit()
-        new ConfigSpecVisitor(source, pluginSpecCache, true).visit()
+        new ConfigSpecVisitor(source, pluginSpecCache).visit()
         return source
     }
 
@@ -120,6 +120,55 @@ class ConfigSpecTest extends Specification {
             params {
                 publish_mode = 'copy'
             }
+            '''
+        )
+        then:
+        warnings.size() == 0
+    }
+
+    def 'should infer param types from param declarations' () {
+        when:
+        def warnings = getWarnings(
+            '''\
+            params.cpus = 'two'
+            process.cpus = params.cpus
+            '''
+        )
+        then:
+        warnings.size() == 1
+        warnings[0].getMessage().contains("Config option 'process.cpus'")
+
+        when:
+        warnings = getWarnings(
+            '''\
+            params.cpus = 2
+            process.cpus = params.cpus
+            '''
+        )
+        then:
+        warnings.size() == 0
+
+        when:
+        warnings = getWarnings(
+            '''\
+            process.cpus = params.cpus
+            '''
+        )
+        then:
+        warnings.size() == 0
+    }
+
+    def 'should not infer the type of a param declared twice with different types' () {
+        when:
+        def warnings = getWarnings(
+            '''\
+            params.cpus = 2
+            profiles {
+                big {
+                    params.cpus = 'many'
+                }
+            }
+            process.cpus = params.cpus
             '''
         )
         then:
@@ -241,7 +290,7 @@ class ConfigSpecTest extends Specification {
         warnings.size() == 1
         warnings[0].getContext().getStartLine() == 1
         warnings[0].getContext().getStartColumn() == 1
-        warnings[0].getMessage() == "Config option 'trace.fields' cannot be assigned to value with type Boolean -- valid types are: List, String"
+        warnings[0].getMessage() == "Config option 'trace.fields' cannot be assigned to value with type Boolean -- valid types are: List<String>, String"
     }
 
     def 'should check return type for dynamic config settings' () {

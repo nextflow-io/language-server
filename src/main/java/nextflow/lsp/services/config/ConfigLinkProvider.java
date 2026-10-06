@@ -16,7 +16,6 @@
 package nextflow.lsp.services.config;
 
 import java.net.URI;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -93,26 +92,13 @@ class ConfigLinkVisitor extends ConfigVisitorSupport {
 
     @Override
     public void visitConfigInclude(ConfigIncludeNode node) {
-        if( !(node.source instanceof ConstantExpression) )
+        if( !(node.source instanceof ConstantExpression ce) )
             return;
-        var source = node.source.getText();
+        var source = ce.getText();
         var range = LanguageServerUtils.astNodeToRange(node.source);
-        var target = getIncludeUri(uri, source).toString();
-        links.add(new DocumentLink(range, target));
-    }
-
-    protected static URI getIncludeUri(URI uri, String source) {
-        // return source URI if it is already an absolute URI (e.g. http URL)
-        try {
-            var sourceUri = new URI(source);
-            if( sourceUri.getScheme() != null )
-                return sourceUri;
-        }
-        catch( Exception e ) {
-            // ignore
-        }
-        // otherwise, resolve the source path against the including URI
-        return Path.of(uri).getParent().resolve(source).normalize().toUri();
+        var target = ConfigAstCache.resolveIncludeUri(uri, source);
+        if( target != null )
+            links.add(new DocumentLink(range, target.toString()));
     }
 
     public List<DocumentLink> getLinks() {

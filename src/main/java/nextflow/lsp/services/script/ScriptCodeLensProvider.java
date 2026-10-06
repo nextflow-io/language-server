@@ -18,7 +18,6 @@ package nextflow.lsp.services.script;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,26 +26,11 @@ import nextflow.lsp.services.script.dag.DataflowVisitor;
 import nextflow.lsp.services.script.dag.MermaidRenderer;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.LanguageServerUtils;
-import nextflow.script.ast.ASTNodeMarker;
-import nextflow.script.ast.ParamBlockNode;
-import nextflow.script.ast.ProcessNodeV1;
-import nextflow.script.ast.ScriptNode;
-import nextflow.script.dsl.Constant;
-import nextflow.script.dsl.Description;
-import nextflow.script.formatter.FormattingOptions;
-import nextflow.script.formatter.ScriptFormattingVisitor;
-import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.ast.expr.Expression;
-import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.Command;
-import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
-import org.eclipse.lsp4j.TextEdit;
-import org.eclipse.lsp4j.WorkspaceEdit;
 
 import static nextflow.lsp.util.JsonUtils.asJson;
-import static nextflow.script.ast.ASTUtils.*;
 
 /**
  *
@@ -86,6 +70,16 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
                 continue;
             var arguments = List.of(asJson(uri.toString()), asJson(wn.getName()));
             var command = new Command("Preview DAG", "nextflow.previewDag", arguments);
+            result.add(new CodeLens(range, command, null));
+        }
+
+        // add "Preview config" code lens for each process
+        for( var pn : ast.getProcessNodes(uri) ) {
+            var range = LanguageServerUtils.astNodeToRange(pn);
+            if( range == null )
+                continue;
+            var arguments = List.of(asJson(uri.toString()), asJson(pn.getName()));
+            var command = new Command("Preview config", "nextflow.previewConfig", arguments);
             result.add(new CodeLens(range, command, null));
         }
 

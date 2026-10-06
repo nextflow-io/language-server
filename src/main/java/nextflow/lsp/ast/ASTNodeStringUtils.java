@@ -16,6 +16,7 @@
 package nextflow.lsp.ast;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -28,6 +29,8 @@ import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
+import nextflow.script.ast.RecordNode;
+import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.TupleParameter;
 import nextflow.script.ast.WorkflowNode;
 import nextflow.script.dsl.Constant;
@@ -38,7 +41,7 @@ import nextflow.script.dsl.Namespace;
 import nextflow.script.dsl.ProcessDsl;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.script.formatter.Formatter;
-import nextflow.script.types.TypesEx;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -57,7 +60,7 @@ import static nextflow.script.ast.ASTUtils.*;
 import static nextflow.script.types.TypeCheckingUtils.*;
 
 /**
- * Utility methods for retreiving text information for ast nodes.
+ * Utility methods for retrieving text information for ast nodes.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -93,7 +96,9 @@ public class ASTNodeStringUtils {
 
     private static String classToLabel(ClassNode node) {
         var builder = new StringBuilder();
-        if( node.isEnum() )
+        if( node instanceof RecordNode )
+            builder.append("record ");
+        else if( node.isEnum() )
             builder.append("enum ");
         else
             builder.append("class ");
@@ -110,7 +115,7 @@ public class ASTNodeStringUtils {
 
     private static String workflowToLabel(WorkflowNode node) {
         if( node.isEntry() )
-            return "workflow <entry>";
+            return entryWorkflowToLabel(node, null);
         var fmt = new Formatter(new FormattingOptions(2, true));
         fmt.append("workflow ");
         fmt.append(node.getName());
@@ -125,11 +130,7 @@ public class ASTNodeStringUtils {
         }
         for( var take : takes ) {
             fmt.appendIndent();
-            fmt.append(take.getName());
-            if( fmt.hasType(take) ) {
-                fmt.append(": ");
-                fmt.visitTypeAnnotation(take.getType());
-            }
+            typedInput(take, fmt);
             fmt.appendNewLine();
         }
         fmt.appendNewLine();
@@ -151,6 +152,54 @@ public class ASTNodeStringUtils {
         return fmt.toString();
     }
 
+    /**
+     * An entry workflow is rendered with the params and output blocks
+     * of its script as its inputs and outputs, since that is how it is
+     * called when another pipeline includes it.
+     *
+     * @param node
+     * @param name the alias of an included pipeline, or null
+     */
+    public static String entryWorkflowToLabel(WorkflowNode node, String name) {
+        var pipeline = ScriptNode.getPipeline(node);
+        var params = pipeline.getParams();
+        var outputs = pipeline.getOutputs();
+        var fmt = new Formatter(new FormattingOptions(2, true));
+        fmt.append("workflow ");
+        fmt.append(name != null ? name : "<entry>");
+        if( params == null && outputs == null )
+            return fmt.toString();
+
+        fmt.append(" {\n");
+        fmt.incIndent();
+        fmt.appendIndent();
+        fmt.append("params:\n");
+        if( params == null || params.declarations.length == 0 ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+        }
+        for( var param : params != null ? params.declarations : new Parameter[0] ) {
+            fmt.appendIndent();
+            typedInput(param, fmt);
+            fmt.appendNewLine();
+        }
+        fmt.appendNewLine();
+        fmt.appendIndent();
+        fmt.append("output:\n");
+        if( outputs == null || outputs.declarations.isEmpty() ) {
+            fmt.appendIndent();
+            fmt.append("<none>\n");
+        }
+        for( var output : outputs != null ? outputs.declarations : List.<Parameter>of() ) {
+            fmt.appendIndent();
+            typedInput(output, fmt);
+            fmt.appendNewLine();
+        }
+        fmt.decIndent();
+        fmt.append('}');
+        return fmt.toString();
+    }
+
     private static void typedOutput(Expression output, Formatter fmt) {
         if( output instanceof AssignmentExpression assign ) {
             var target = assign.getLeftExpression();
@@ -158,11 +207,21 @@ public class ASTNodeStringUtils {
             var type = getType(target);
             if( fmt.hasType(type) ) {
                 fmt.append(": ");
-                fmt.visitTypeAnnotation(type);
+                typedOutputType(type, fmt);
             }
         }
         else {
-            fmt.visitTypeAnnotation(getType(output));
+            typedOutputType(getType(output), fmt);
+        }
+    }
+
+    private static void typedOutputType(ClassNode type, Formatter fmt) {
+        if( Types.isRecordType(type) ) {
+            fmt.append(type.getNameWithoutPackage());
+            recordBody(type, fmt);
+        }
+        else {
+            fmt.append(Types.getName(type));
         }
     }
 
@@ -180,22 +239,7 @@ public class ASTNodeStringUtils {
         }
         for( var input : node.inputs ) {
             fmt.appendIndent();
-            if( input instanceof TupleParameter tp ) {
-                fmt.append('(');
-                fmt.append(
-                    Arrays.stream(tp.components)
-                        .map(p -> p.getName())
-                        .collect(Collectors.joining(", "))
-                );
-                fmt.append(')');
-            }
-            else {
-                fmt.append(input.getName());
-            }
-            if( fmt.hasType(input) ) {
-                fmt.append(": ");
-                fmt.visitTypeAnnotation(input.getType());
-            }
+            typedInput(input, fmt);
             fmt.appendNewLine();
         }
         fmt.appendNewLine();
@@ -215,6 +259,76 @@ public class ASTNodeStringUtils {
         fmt.decIndent();
         fmt.append('}');
         return fmt.toString();
+    }
+
+    private static void typedInput(Parameter input, Formatter fmt) {
+        if( input instanceof TupleParameter tp ) {
+            if( "Record".equals(tp.getType().getNameWithoutPackage()) )
+                processRecordInput(tp, fmt);
+            else
+                processTupleInput(tp, fmt);
+        }
+        else {
+            fmt.append(input.getName());
+            if( fmt.hasType(input) ) {
+                fmt.append(": ");
+                fmt.visitTypeAnnotation(input.getType());
+                if( input.getType().redirect() instanceof RecordNode )
+                    recordBody(input.getType(), fmt);
+            }
+        }
+    }
+
+    private static void processRecordInput(TupleParameter tp, Formatter fmt) {
+        fmt.append("Record {");
+        fmt.appendNewLine();
+        fmt.incIndent();
+        for( var p : tp.components ) {
+            fmt.appendIndent();
+            fmt.append(p.getName());
+            if( fmt.hasType(p) ) {
+                fmt.append(": ");
+                fmt.append(Types.getName(p.getType()));
+            }
+            fmt.appendNewLine();
+        }
+        fmt.decIndent();
+        fmt.appendIndent();
+        fmt.append('}');
+    }
+
+    private static void processTupleInput(TupleParameter tp, Formatter fmt) {
+        fmt.append("Tuple<");
+        for( int i = 0; i < tp.components.length; i++ ) {
+            var p = tp.components[i];
+            fmt.append(p.getName());
+            if( fmt.hasType(p) ) {
+                fmt.append(": ");
+                fmt.append(Types.getName(p.getType()));
+            }
+            if( i < tp.components.length - 1 )
+                fmt.append(", ");
+        }
+        fmt.append(">");
+    }
+
+    private static void recordBody(ClassNode type, Formatter fmt) {
+        var fields = type.redirect().getFields();
+        if( fields.isEmpty() )
+            return;
+        fmt.append(" {");
+        fmt.appendNewLine();
+        fmt.incIndent();
+        for( var fn : fields ) {
+            fmt.appendIndent();
+            fmt.append(fn.getName());
+            fmt.append(": ");
+            fmt.append(Types.getName(fn.getType()));
+            fmt.appendNewLine();
+        }
+        fmt.decIndent();
+        fmt.appendIndent();
+        fmt.append('}');
     }
 
     private static String processToLabel(ProcessNodeV1 node) {
@@ -259,7 +373,7 @@ public class ASTNodeStringUtils {
         var an = findAnnotation(node, Constant.class);
         if( an.isPresent() ) {
             var name = an.get().getMember("value").getText();
-            if( TypesEx.isNamespace(node) )
+            if( Types.isNamespace(node) )
                 return "(namespace) " + name;
             var fn = new FieldNode(name, 0xF, node.getReturnType(), node.getDeclaringClass(), null);
             return parameterToLabel(fn);
@@ -281,21 +395,21 @@ public class ASTNodeStringUtils {
             builder.append("def ");
         }
         else if( isDeclaringTypeVisible(declaringType) ) {
-            builder.append(TypesEx.getName(declaringType));
+            builder.append(Types.getName(declaringType));
             builder.append(' ');
         }
         else if( Logger.isDebugEnabled() ) {
             builder.append('[');
-            builder.append(TypesEx.getName(declaringType));
+            builder.append(Types.getName(declaringType));
             builder.append("] ");
         }
         builder.append(node.getName());
         builder.append('(');
         builder.append(parametersToLabel(node.getParameters()));
         builder.append(')');
-        if( TypesEx.hasReturnType(node) ) {
+        if( Types.hasReturnType(node) ) {
             builder.append(" -> ");
-            builder.append(TypesEx.getName(node.getReturnType()));
+            builder.append(Types.getName(getReturnType(node)));
         }
         return builder.toString();
     }
@@ -347,7 +461,7 @@ public class ASTNodeStringUtils {
             builder.append("...");
         if( !ClassHelper.isObjectType(type) || type.isGenericsPlaceHolder() ) {
             builder.append(": ");
-            builder.append(TypesEx.getName(type));
+            builder.append(Types.getName(type));
         }
         return builder.toString();
     }
@@ -358,7 +472,7 @@ public class ASTNodeStringUtils {
         var type = getType(variable);
         if( !ClassHelper.isObjectType(type) || type.isGenericsPlaceHolder() ) {
             builder.append(": ");
-            builder.append(TypesEx.getName(type));
+            builder.append(Types.getName(type));
         }
         return builder.toString();
     }
@@ -421,7 +535,7 @@ public class ASTNodeStringUtils {
         if( parameters.length == 0 )
             return null;
         var param = parameters[0];
-        if( !TypesEx.isEqual(param.getType(), ClassHelper.MAP_TYPE) )
+        if( !Types.isEqual(param.getType(), ClassHelper.MAP_TYPE) )
             return null;
         var namedParams = asNamedParams(param);
         if( namedParams.isEmpty() )
@@ -434,7 +548,7 @@ public class ASTNodeStringUtils {
             builder.append(name);
             if( !ClassHelper.isObjectType(namedParam.getType()) ) {
                 builder.append(": ");
-                builder.append(TypesEx.getName(namedParam.getType()));
+                builder.append(Types.getName(namedParam.getType()));
             }
             builder.append("`\n");
         });

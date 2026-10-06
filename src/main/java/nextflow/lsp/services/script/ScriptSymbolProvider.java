@@ -25,6 +25,7 @@ import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -88,8 +89,6 @@ public class ScriptSymbolProvider implements SymbolProvider {
         }
 
         var result = new ArrayList<WorkspaceSymbol>();
-        for( var node : ast.getTypeNodes() )
-            addWorkspaceSymbol(node, query, result);
         for( var node : ast.getDefinitions() )
             addWorkspaceSymbol(node, query, result);
 
@@ -108,6 +107,8 @@ public class ScriptSymbolProvider implements SymbolProvider {
     }
 
     private static String getSymbolName(ASTNode node) {
+        if( node instanceof RecordNode rn )
+            return "record " + rn.getName();
         if( node instanceof ClassNode cn && cn.isEnum() )
             return "enum " + cn.getName();
         if( node instanceof FunctionNode fn )
@@ -122,9 +123,11 @@ public class ScriptSymbolProvider implements SymbolProvider {
     }
 
     private static SymbolKind getSymbolKind(ASTNode node) {
+        if( node instanceof RecordNode )
+            return SymbolKind.Struct;
         if( node instanceof ClassNode cn && cn.isEnum() )
             return SymbolKind.Enum;
-        if( node instanceof MethodNode mn )
+        if( node instanceof MethodNode )
             return SymbolKind.Function;
         return null;
     }

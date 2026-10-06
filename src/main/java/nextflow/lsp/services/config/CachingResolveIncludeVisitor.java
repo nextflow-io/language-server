@@ -44,9 +44,9 @@ public class CachingResolveIncludeVisitor extends ResolveIncludeVisitor {
 
     @Override
     public void visitConfigInclude(ConfigIncludeNode node) {
-        if( !(node.source instanceof ConstantExpression) )
+        if( !(node.source instanceof ConstantExpression ce) )
             return;
-        var source = node.source.getText();
+        var source = ce.getText();
         var includeUri = getIncludeUri(uri(), source);
         if( !isIncludeLocal(includeUri) || !isIncludeStale(includeUri) )
             return;

@@ -115,8 +115,10 @@ public class FileCache {
      */
     public void didClose(DidCloseTextDocumentParams params) {
         var uri = URI.create(params.getTextDocument().getUri());
-        openFiles.remove(uri);
-        changedFiles.add(uri);
+        if( openFiles.containsKey(uri) ) {
+            openFiles.remove(uri);
+            changedFiles.add(uri);
+        }
     }
 
     /**

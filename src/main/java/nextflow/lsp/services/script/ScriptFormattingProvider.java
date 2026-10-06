@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 
 import nextflow.lsp.services.FormattingProvider;
+import nextflow.lsp.services.FormattingUtils;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
 import nextflow.script.formatter.FormattingOptions;
@@ -71,6 +72,14 @@ public class ScriptFormattingProvider implements FormattingProvider {
         var visitor = new ScriptFormattingVisitor(sourceUnit, options);
         visitor.visit();
         var newText = visitor.toString();
+
+        if( newText.equals(oldText) )
+            return Collections.emptyList();
+
+        if( !FormattingUtils.commentsPreserved(oldText, newText, false) ) {
+            log.showError("Refusing to format script because formatting would remove or alter comments (please report this as a bug): " + uri);
+            return Collections.emptyList();
+        }
 
         return List.of( new TextEdit(range, newText) );
     }

@@ -1,5 +1,5 @@
 plugins {
-  id 'com.gradleup.shadow' version '8.3.5'
+  id 'com.gradleup.shadow' version '9.4.3'
   id 'application'
   id 'groovy'
   id 'java'
@@ -9,6 +9,7 @@ repositories {
   mavenLocal()
   mavenCentral()
   maven { url = "https://s3-eu-west-1.amazonaws.com/maven.seqera.io/releases" }
+  maven { url = "https://s3-eu-west-1.amazonaws.com/maven.seqera.io/snapshots" }
 }
 
 java {
@@ -21,7 +22,7 @@ java {
 
 compileJava {
   options.release.set(17)
-  options.compilerArgs << '-parameters' 
+  options.compilerArgs << '-parameters'
 }
 
 test {
@@ -29,33 +30,44 @@ test {
 }
 
 configurations {
+  groovyCompiler
   nextflowRuntime
 }
 
+// Pin the Groovy compiler classpath: the Groovy plugin otherwise infers a full
+// groovy-all classpath, dragging in Ant (groovy-ant) and javaparser/qdox
+// (groovy-groovydoc), none of which this build uses
+tasks.withType(GroovyCompile).configureEach {
+  groovyClasspath = configurations.groovyCompiler
+}
+
 dependencies {
-  implementation 'io.nextflow:nf-lang:25.12.0-edge'
-  implementation 'org.apache.groovy:groovy:4.0.28'
-  implementation 'org.apache.groovy:groovy-json:4.0.28'
-  implementation 'org.apache.groovy:groovy-yaml:4.0.28'
+  groovyCompiler 'org.apache.groovy:groovy:4.0.33'
+
+  implementation 'io.nextflow:nf-lang:26.09.1-edge'
+  implementation 'org.apache.groovy:groovy:4.0.33'
+  implementation 'org.apache.groovy:groovy-json:4.0.33'
+  implementation 'org.apache.groovy:groovy-yaml:4.0.33'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.23.0'
 
   // runtime dependencies for Nextflow scripts
-  runtimeOnly 'org.apache.groovy:groovy-templates:4.0.28'
+  runtimeOnly 'org.apache.groovy:groovy-templates:4.0.33'
   runtimeOnly 'org.yaml:snakeyaml:2.2'
 
   // include Nextflow runtime at build-time to extract language definitions
-  nextflowRuntime 'io.nextflow:nextflow:25.12.0-edge'
-  nextflowRuntime 'io.nextflow:nf-amazon:3.6.0'
-  nextflowRuntime 'io.nextflow:nf-azure:1.21.0'
-  nextflowRuntime 'io.nextflow:nf-google:1.25.0'
-  nextflowRuntime 'io.nextflow:nf-k8s:1.4.0'
-  nextflowRuntime 'io.nextflow:nf-tower:1.19.0'
-  nextflowRuntime 'io.nextflow:nf-wave:1.18.0'
+  nextflowRuntime 'io.nextflow:nextflow:26.04.6'
+  nextflowRuntime 'io.nextflow:nf-amazon:3.9.2'
+  nextflowRuntime 'io.nextflow:nf-azure:1.22.6'
+  nextflowRuntime 'io.nextflow:nf-google:1.27.3'
+  nextflowRuntime 'io.nextflow:nf-k8s:1.5.4'
+  nextflowRuntime 'io.nextflow:nf-seqera:0.21.1'
+  nextflowRuntime 'io.nextflow:nf-tower:1.28.2'
+  nextflowRuntime 'io.nextflow:nf-wave:1.21.0'
 
   testImplementation ('org.objenesis:objenesis:3.4')
   testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
-  testImplementation ('org.spockframework:spock-core:2.3-groovy-4.0') { exclude group: 'org.apache.groovy' }
+  testImplementation ('org.spockframework:spock-core:2.4-groovy-4.0') { exclude group: 'org.apache.groovy' }
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -78,6 +90,9 @@ task buildSpec(type: JavaExec) {
   dependsOn compileSpecGroovy
   classpath = sourceSets.spec.runtimeClasspath
   mainClass.set('nextflow.SpecWriter')
+  // Use our own logback config instead of the DEBUG-level logback-test.xml
+  // bundled in nextflow plugin jars (e.g. nf-google)
+  systemProperty 'logback.configurationFile', file('src/spec/resources/logback.xml').absolutePath
   args "$buildDir/generated/definitions.json"
 
   outputs.file("$buildDir/generated/definitions.json")
@@ -93,10 +108,6 @@ processResources {
 
 jar {
   dependsOn buildSpec
-  from("$buildDir/generated") {
-    include 'definitions.json'
-    into 'spec'
-  }
 }
 
 application {

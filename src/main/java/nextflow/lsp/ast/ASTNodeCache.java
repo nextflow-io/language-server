@@ -31,6 +31,9 @@ import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.file.FileCache;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Positions;
+import nextflow.script.ast.ASTNodeMarker;
+import nextflow.script.formatter.Comment;
+import nextflow.script.formatter.Comments;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
@@ -271,6 +274,26 @@ public abstract class ASTNodeCache {
     public URI getURI(ASTNode node) {
         var lookupData = lookup.get(node);
         return lookupData != null ? lookupData.uri : null;
+    }
+
+    /**
+     * Determine whether a position is inside a comment. Comments are not
+     * part of the AST, so a position in a comment otherwise resolves to
+     * the enclosing declaration.
+     *
+     * @param uri
+     * @param position
+     */
+    public boolean isCommentPosition(URI uri, Position position) {
+        var sourceUnit = getSourceUnit(uri);
+        var moduleNode = sourceUnit != null ? sourceUnit.getAST() : null;
+        if( moduleNode == null )
+            return false;
+        var comments = (Comments) moduleNode.getNodeMetaData(ASTNodeMarker.COMMENTS);
+        if( comments == null )
+            return false;
+        var offset = Comment.position(position.getLine() + 1, position.getCharacter() + 1);
+        return comments.getComments().stream().anyMatch(c -> c.start() <= offset && offset <= c.end());
     }
 
     /**

@@ -100,11 +100,9 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     public void visit() {
         var moduleNode = sourceUnit.getAST();
-        if( !(moduleNode instanceof ScriptNode) )
+        if( !(moduleNode instanceof ScriptNode sn) )
             return;
-        var scriptNode = (ScriptNode) moduleNode;
-
-        for( var wn : scriptNode.getWorkflows() )
+        for( var wn : sn.getWorkflows() )
             visitWorkflow(wn);
     }
 
@@ -404,7 +402,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         if( rhs instanceof VariableExpression ve ) {
             var defNode = asMethodVariable(ve.getAccessedVariable());
             if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
-                var label = defNode.getName();
+                var label = ve.getName();
                 var preds = visitWithPreds(lhs);
                 var dn = addNode(label, Node.Type.OPERATOR, defNode, preds);
                 vc.putSymbol(label, dn);

@@ -42,8 +42,9 @@ public class ProgressNotification {
         client.createProgress(new WorkDoneProgressCreateParams(Either.forLeft(token)));
     }
 
-    public void begin(String message) {
+    public void begin(String title, String message) {
         var progress = new WorkDoneProgressBegin();
+        progress.setTitle(title);
         progress.setMessage(message);
         progress.setPercentage(0);
         client.notifyProgress(new ProgressParams(Either.forLeft(token), Either.forLeft(progress)));

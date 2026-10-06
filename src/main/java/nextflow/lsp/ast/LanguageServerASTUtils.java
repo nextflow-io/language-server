@@ -23,7 +23,7 @@ import nextflow.script.ast.FeatureFlagNode;
 import nextflow.script.ast.IncludeEntryNode;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
-import nextflow.script.types.Types;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -78,7 +78,7 @@ public class LanguageServerASTUtils {
             return cce.getType().redirect();
 
         if( node instanceof MapEntryExpression ) {
-            var namedParam = (Parameter) node.getNodeMetaData("_NAMED_PARAM");
+            var namedParam = (Parameter) node.getNodeMetaData(ASTNodeMarker.NAMED_PARAM);
             if( namedParam != null )
                 return namedParam;
         }

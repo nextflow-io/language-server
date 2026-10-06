@@ -41,12 +41,15 @@ import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.Positions;
 import nextflow.script.control.ParanoidWarning;
 import nextflow.script.control.RelatedInformationAware;
+import nextflow.script.control.SeverityAware;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.util.PathUtils;
 import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyItem;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCall;
 import org.eclipse.lsp4j.CallHierarchyPrepareParams;
+import org.eclipse.lsp4j.CodeAction;
+import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.CompletionItem;
@@ -109,6 +112,7 @@ public abstract class LanguageService {
     public abstract boolean matchesFile(String uri);
     protected abstract ASTNodeCache getAstCache();
     protected CallHierarchyProvider getCallHierarchyProvider() { return null; }
+    protected CodeActionProvider getCodeActionProvider() { return null; }
     protected CodeLensProvider getCodeLensProvider() { return null; }
     protected CompletionProvider getCompletionProvider(int maxItems, boolean extended) { return null; }
     protected DefinitionProvider getDefinitionProvider() { return null; }
@@ -186,6 +190,15 @@ public abstract class LanguageService {
         return provider.outgoingCalls(item);
     }
 
+    public List<CodeAction> codeAction(CodeActionParams params) {
+        var provider = getCodeActionProvider();
+        if( provider == null )
+            return Collections.emptyList();
+
+        awaitUpdate();
+        return provider.codeAction(params.getTextDocument(), params.getRange());
+    }
+
     public List<CodeLens> codeLens(CodeLensParams params) {
         var provider = getCodeLensProvider();
         if( provider == null )
@@ -201,6 +214,9 @@ public abstract class LanguageService {
             return Either.forLeft(Collections.emptyList());
 
         updateNow();
+        var uri = URI.create(params.getTextDocument().getUri());
+        if( getAstCache().isCommentPosition(uri, params.getPosition()) )
+            return Either.forLeft(Collections.emptyList());
         return provider.completion(params.getTextDocument(), params.getPosition());
     }
 
@@ -297,7 +313,12 @@ public abstract class LanguageService {
         updateExecutor.executeLater();
     }
 
-    protected void updateNow() {
+    /**
+     * Compile any pending changes immediately, scanning the workspace first
+     * if it has not been scanned yet. Public so that a service can bring
+     * another service up to date before reading its AST cache.
+     */
+    public void updateNow() {
         updateExecutor.executeNow();
     }
 
@@ -419,7 +440,10 @@ public abstract class LanguageService {
                     continue;
                 }
 
-                var diagnostic = new Diagnostic(range, message, DiagnosticSeverity.Error, "nextflow");
+                var severity = error instanceof SeverityAware sa && sa.isSoftError()
+                    ? DiagnosticSeverity.Warning
+                    : DiagnosticSeverity.Error;
+                var diagnostic = new Diagnostic(range, message, severity, "nextflow");
                 if( error instanceof RelatedInformationAware ria )
                     diagnostic.setRelatedInformation(relatedInformation(ria, uri));
                 diagnostics.add(diagnostic);

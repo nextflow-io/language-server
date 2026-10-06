@@ -16,6 +16,7 @@
 package nextflow.lsp.services.config;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -24,6 +25,7 @@ import groovy.lang.GroovyClassLoader;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.control.ConfigResolveVisitor;
 import nextflow.config.control.ResolveIncludeVisitor;
+import nextflow.config.parser.ConfigAstBuilder;
 import nextflow.config.parser.ConfigParserPluginFactory;
 import nextflow.config.spec.SpecNode;
 import nextflow.lsp.ast.ASTNodeCache;
@@ -34,7 +36,7 @@ import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
-import nextflow.script.types.Types;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
@@ -64,6 +66,7 @@ public class ConfigAstCache extends ASTNodeCache {
         var config = new CompilerConfiguration();
         config.setPluginFactory(new ConfigParserPluginFactory());
         config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
+        config.getOptimizationOptions().put(ConfigAstBuilder.COMMENTS_OPTION, true);
         return config;
     }
 
@@ -95,7 +98,7 @@ public class ConfigAstCache extends ASTNodeCache {
                 continue;
             // phase 3: name checking
             new ConfigResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_CONFIG_IMPORTS).visit();
-            new ConfigSpecVisitor(sourceUnit, pluginSpecCache, configuration.typeChecking()).visit();
+            new ConfigSpecVisitor(sourceUnit, pluginSpecCache).visit();
         }
 
         return changedUris;
@@ -118,6 +121,42 @@ public class ConfigAstCache extends ASTNodeCache {
             .filter(error -> error instanceof PhaseAware pa ? pa.getPhase() == Phases.SYNTAX : true)
             .findFirst()
             .isPresent();
+    }
+
+    /**
+     * Resolve the URI of an include source against the including file.
+     *
+     * @param uri
+     * @param source
+     * @return the resolved URI, or null if it cannot be resolved
+     */
+    public static URI resolveIncludeUri(URI uri, String source) {
+        // return the source URI if it is already absolute (e.g. an http URL)
+        try {
+            var sourceUri = new URI(source);
+            if( sourceUri.getScheme() != null )
+                return sourceUri;
+        }
+        catch( Exception e ) {
+            // ignore
+        }
+        // otherwise, resolve the source path against the including URI
+        try {
+            return Path.of(uri).getParent().resolve(source).normalize().toUri();
+        }
+        catch( Exception e ) {
+            return null;
+        }
+    }
+
+    /**
+     * Check whether a source file has any unresolved includes.
+     *
+     * @param uri
+     */
+    public boolean hasIncludeErrors(URI uri) {
+        return getErrors(uri).stream()
+            .anyMatch(error -> error instanceof PhaseAware pa && pa.getPhase() == Phases.INCLUDE_RESOLUTION);
     }
 
     public ConfigNode getConfigNode(URI uri) {

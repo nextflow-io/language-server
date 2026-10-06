@@ -15,7 +15,9 @@
  */
 package nextflow.lsp.services.script;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,19 +37,23 @@ import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.ProcessNode;
+import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.WorkflowNode;
+import nextflow.script.control.CallArityVisitor;
 import nextflow.script.control.ModuleResolver;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.control.ScriptResolveVisitor;
-import nextflow.script.control.TypeCheckingVisitorEx;
+import nextflow.script.control.TypeCheckingVisitor;
+import nextflow.script.dsl.Types;
+import nextflow.script.parser.ScriptAstBuilder;
 import nextflow.script.parser.ScriptParserPluginFactory;
-import nextflow.script.types.Types;
+import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -63,6 +69,7 @@ public class ScriptAstCache extends ASTNodeCache {
     private LanguageServerConfiguration configuration;
     private final Map<String, Map<Integer, String>> controlConditions = new HashMap<>();
 
+    private Path projectDir;
 
     private PluginSpecCache pluginSpecCache;
 
@@ -75,21 +82,50 @@ public class ScriptAstCache extends ASTNodeCache {
     }
 
     public ScriptAstCache(String rootUri) {
-        super(createCompiler());
-        this.libCache = createLibCache(rootUri);
+        super(createCompiler(rootUri));
+        this.projectDir = rootUri != null ? Path.of(URI.create(rootUri)) : null;
     }
 
-    private static GroovyLibCache createLibCache(String rootUri) {
-        if( rootUri == null )
-            return null;
-        var libDir = Path.of(URI.create(rootUri)).resolve("lib");
-        return new GroovyLibCache(libDir);
+    public Path getProjectDir() {
+        return projectDir;
     }
 
-    private static LanguageServerCompiler createCompiler() {
+    private static LanguageServerCompiler createCompiler(String rootUri) {
         var config = createConfiguration();
         var classLoader = new GroovyClassLoader();
+        if( rootUri != null )
+            addLibToClasspath(classLoader, Path.of(URI.create(rootUri)).resolve("lib"));
         return new LanguageServerCompiler(config, classLoader);
+    }
+
+    /**
+     * Add the `lib` directory and any JARs within it to the classpath,
+     * the same way that Nextflow does. Groovy source files are compiled
+     * on demand when a script refers to them.
+     *
+     * Source files are resolved against the lib directory on every lookup
+     * rather than through the classpath, so that files (or the lib directory
+     * itself) can be added while the language server is running. New JARs
+     * still require a restart.
+     *
+     * @param classLoader
+     * @param libDir
+     */
+    private static void addLibToClasspath(GroovyClassLoader classLoader, Path libDir) {
+        classLoader.setResourceLoader((name) -> {
+            var source = libDir.resolve(name.replace('.', '/') + ".groovy");
+            return Files.exists(source) ? source.toUri().toURL() : null;
+        });
+        if( !Files.isDirectory(libDir) )
+            return;
+        try( var files = Files.list(libDir) ) {
+            files
+                .filter(path -> path.toString().endsWith(".jar"))
+                .forEach(path -> classLoader.addClasspath(path.toString()));
+        }
+        catch( IOException e ) {
+            System.err.println(String.format("Failed to read JAR files in lib directory: %s -- %s", libDir, e));
+        }
     }
 
     private static CompilerConfiguration createConfiguration() {
@@ -99,12 +135,12 @@ public class ScriptAstCache extends ASTNodeCache {
 
         var optimizationOptions = config.getOptimizationOptions();
         optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true);
+        optimizationOptions.put(ScriptAstBuilder.COMMENTS_OPTION, true);
 
         return config;
     }
 
     public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {
-        this.configuration = configuration;
         this.pluginSpecCache = pluginSpecCache;
     }
 
@@ -113,9 +149,10 @@ public class ScriptAstCache extends ASTNodeCache {
         // recursively load included modules
         var changedUris = new HashSet<>(uris);
 
+        var moduleResolver = new ModuleResolver(projectDir, compiler());
         for( var uri : uris ) {
             var source = compiler().getSource(uri);
-            new ModuleResolver(compiler()).resolve(source, (newUri) -> {
+            moduleResolver.resolve(source, (newUri) -> {
                 changedUris.add(newUri);
                 return compiler().createSourceUnit(newUri, fileCache);
             });
@@ -123,7 +160,7 @@ public class ScriptAstCache extends ASTNodeCache {
 
         // phase 2: include checking
         for( var sourceUnit : getSourceUnits() ) {
-            var visitor = new ResolveIncludeVisitor(sourceUnit, compiler(), uris);
+            var visitor = new ResolveIncludeVisitor(sourceUnit, projectDir, compiler(), uris);
             visitor.visit();
 
             new ResolvePluginIncludeVisitor(sourceUnit, pluginSpecCache).visit();
@@ -136,26 +173,47 @@ public class ScriptAstCache extends ASTNodeCache {
             }
         }
 
-        var libImports = libImports();
-
         for( var uri : changedUris ) {
             var sourceUnit = getSourceUnit(uri);
             if( sourceUnit == null )
                 continue;
             // phase 3: name checking
-            new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, libImports).visit();
+            try {
+                new ScriptResolveVisitor(sourceUnit, compiler().compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, Collections.emptyList()).visit();
+            }
+            catch( GroovyBugError | Exception e ) {
+                // a Groovy class in the lib directory failed to compile
+                System.err.println("Unexpected exception while resolving " + uri.getPath() + ": " + e.toString());
+            }
             new ParameterSchemaVisitor(sourceUnit).visit();
+            new PluginCallVisitor(sourceUnit).visit();
+        }
+
+        // phase 4: type checking -- included modules must be checked before the
+        // files that include them, so that cross-file inferred types (e.g. a
+        // process's record output) are resolved before a consumer reads them
+        for( var sourceUnit : moduleResolver.orderByDependencies(changedSourceUnits(changedUris)) ) {
             if( sourceUnit.getErrorCollector().hasErrors() )
                 continue;
-            // phase 4: type checking
-            new TypeCheckingVisitorEx(sourceUnit, configuration.typeChecking()).visit();
+            if( !(sourceUnit.getAST() instanceof ScriptNode sn) )
+                continue;
+            if( sn.isTypingEnabled() )
+                new TypeCheckingVisitor(sourceUnit).visit();
+            else
+                new CallArityVisitor(sourceUnit).visit();
         }
 
         return changedUris;
     }
 
-    private List<ClassNode> libImports() {
-        return libCache != null ? libCache.refresh() : Collections.emptyList();
+    private List<SourceUnit> changedSourceUnits(Set<URI> uris) {
+        var result = new ArrayList<SourceUnit>(uris.size());
+        for( var uri : uris ) {
+            var sourceUnit = getSourceUnit(uri);
+            if( sourceUnit != null )
+                result.add(sourceUnit);
+        }
+        return result;
     }
 
     @Override
@@ -197,19 +255,21 @@ public class ScriptAstCache extends ASTNodeCache {
         return scriptNode.getIncludes();
     }
 
-    public List<MethodNode> getDefinitions() {
-        var result = new ArrayList<MethodNode>();
+    public List<AnnotatedNode> getDefinitions() {
+        var result = new ArrayList<AnnotatedNode>();
         result.addAll(getFunctionNodes());
         result.addAll(getProcessNodes());
         result.addAll(getWorkflowNodes());
+        result.addAll(getTypeNodes());
         return result;
     }
 
-    public List<MethodNode> getDefinitions(URI uri) {
-        var result = new ArrayList<MethodNode>();
+    public List<AnnotatedNode> getDefinitions(URI uri) {
+        var result = new ArrayList<AnnotatedNode>();
         result.addAll(getFunctionNodes(uri));
         result.addAll(getProcessNodes(uri));
         result.addAll(getWorkflowNodes(uri));
+        result.addAll(getTypeNodes(uri));
         return result;
     }
 

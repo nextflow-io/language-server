@@ -26,9 +26,9 @@ import nextflow.script.ast.OutputNode;
 import nextflow.script.ast.ParamBlockNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
+import nextflow.script.ast.RecordNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
-import nextflow.script.ast.TupleParameter;
 import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -166,6 +166,17 @@ class ScriptAstParentVisitor extends ScriptVisitorSupport {
         try {
             lookup.visitParameters(node.getParameters());
             lookup.visit(node.getCode());
+        }
+        finally {
+            lookup.pop();
+        }
+    }
+
+    @Override
+    public void visitRecord(RecordNode node) {
+        lookup.push(node);
+        try {
+            super.visitRecord(node);
         }
         finally {
             lookup.pop();

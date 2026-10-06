@@ -13,20 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nextflow.script.dsl;
+package nextflow.lsp.services;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.util.List;
 
-/**
- * Annotation for defining the component types of a tuple.
- *
- * @author Ben Sherman <bentshermann@gmail.com>
- */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE_USE)
-public @interface TupleComponents {
-    Class[] value();
+import org.eclipse.lsp4j.CodeAction;
+import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+
+public interface CodeActionProvider {
+
+    List<CodeAction> codeAction(TextDocumentIdentifier textDocument, Range range);
+
 }

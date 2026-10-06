@@ -23,7 +23,6 @@ import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.lsp.services.LanguageService
 import nextflow.lsp.services.config.ConfigService
 import nextflow.lsp.services.script.ScriptService
-import nextflow.lsp.spec.PluginSpecCache
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.TextDocumentItem
 
@@ -43,16 +42,68 @@ class TestUtils {
     }
 
     /**
+     * Get the URI of the test workspace root.
+     */
+    static String workspaceRootUri() {
+        return workspaceRoot.toUri().toString()
+    }
+
+    /**
+     * Get a recording language service for testing the update mechanics of
+     * the base LanguageService. The service is connected and initialized but
+     * NOT scanned, with no files open.
+     *
+     * Recognized options:
+     *   rootUri - the workspace root URI (defaults to the test workspace;
+     *             pass null explicitly to exercise the no-workspace path)
+     *   client  - the language client (defaults to a fresh TestLanguageClient)
+     *   config  - the configuration (defaults to LanguageServerConfiguration.defaults())
+     *
+     * @param opts
+     */
+    static RecordingLanguageService recordingService(Map opts = [:]) {
+        def rootUri = opts.containsKey('rootUri') ? opts.rootUri : workspaceRootUri()
+        def client = opts.client ?: new TestLanguageClient()
+        def configuration = opts.config ?: LanguageServerConfiguration.defaults()
+        def service = new RecordingLanguageService(rootUri)
+        service.connect(client)
+        service.initialize(configuration, newConfigService(client))
+        return service
+    }
+
+    /**
      * Get a language service instance for Nextflow config files.
      */
     static ConfigService getConfigService() {
-        def service = new ConfigService(workspaceRoot.toUri().toString())
-        def configuration = LanguageServerConfiguration.defaults()
-        service.connect(new TestLanguageClient())
-        service.initialize(configuration)
-        // skip workspace scan
+        return getConfigService(new TestLanguageClient())
+    }
+
+    /**
+     * Get a language service instance for Nextflow config files, connected to
+     * the given client so that published diagnostics can be inspected.
+     *
+     * @param client
+     */
+    static ConfigService getConfigService(TestLanguageClient client) {
+        def service = newConfigService(client)
+        // scan the (empty) workspace up front, so that later updates compile
+        // changed files directly instead of re-triggering the scan
+        service.updateNow()
         open(service, getUri('nextflow.config'), '')
         service.updateNow()
+        return service
+    }
+
+    /**
+     * Get a language service instance for Nextflow config files which has not
+     * scanned the workspace yet, for testing against files on disk.
+     *
+     * @param client
+     */
+    static ConfigService newConfigService(TestLanguageClient client = new TestLanguageClient()) {
+        def service = new ConfigService(workspaceRoot.toUri().toString())
+        service.connect(client)
+        service.initialize(LanguageServerConfiguration.defaults())
         return service
     }
 
@@ -60,15 +111,56 @@ class TestUtils {
      * Get a language service instance for Nextflow scripts.
      */
     static ScriptService getScriptService() {
+        return getScriptService(new TestLanguageClient())
+    }
+
+    /**
+     * Get a language service instance for Nextflow scripts, connected to the
+     * given client so that published diagnostics can be inspected.
+     *
+     * @param client
+     */
+    static ScriptService getScriptService(TestLanguageClient client, ConfigService configService = null) {
         def service = new ScriptService(workspaceRoot.toUri().toString())
         def configuration = LanguageServerConfiguration.defaults()
-        def pluginSpecCache = new PluginSpecCache(configuration.pluginRegistryUrl())
-        service.connect(new TestLanguageClient())
-        service.initialize(configuration, pluginSpecCache)
+        service.connect(client)
+        service.initialize(configuration, configService ?: newConfigService())
         // skip workspace scan
         open(service, getUri('main.nf'), '')
         service.updateNow()
         return service
+    }
+
+    /**
+     * Get a script service and a config service that share a config AST cache,
+     * so that script features which read the config (e.g. config preview) can
+     * be tested.
+     */
+    static List getScriptAndConfigServices() {
+        def configService = getConfigService()
+        def scriptService = getScriptService(new TestLanguageClient(), configService)
+        return [ scriptService, configService ]
+    }
+
+    /**
+     * Write a file into the test workspace.
+     *
+     * @param path
+     * @param contents
+     */
+    static void writeWorkspaceFile(String path, String contents) {
+        def target = workspaceRoot.resolve(path)
+        Files.createDirectories(target.getParent())
+        Files.writeString(target, contents.stripIndent())
+    }
+
+    /**
+     * Delete a file from the test workspace.
+     *
+     * @param path
+     */
+    static void deleteWorkspaceFile(String path) {
+        Files.deleteIfExists(workspaceRoot.resolve(path))
     }
 
     /**
@@ -92,6 +184,32 @@ class TestUtils {
     static void open(LanguageService service, String uri, String contents) {
         def textDocumentItem = new TextDocumentItem(uri, 'nextflow', 1, contents.stripIndent())
         service.didOpen(new DidOpenTextDocumentParams(textDocumentItem))
+    }
+
+    /**
+     * Open a file, also writing it to disk. Tests that issue multiple
+     * requests against the same file without a document change in between
+     * must use this instead of open(): the deferred workspace scan re-scans
+     * from disk and would evict an in-memory-only file from the AST cache.
+     *
+     * Delete the file with deleteOnDisk() in the test's cleanup block.
+     *
+     * @param service
+     * @param uri
+     * @param contents
+     */
+    static void openOnDisk(LanguageService service, String uri, String contents) {
+        Files.writeString(Path.of(URI.create(uri)), contents.stripIndent())
+        open(service, uri, contents)
+    }
+
+    /**
+     * Delete a file written by openOnDisk().
+     *
+     * @param uri
+     */
+    static void deleteOnDisk(String uri) {
+        Files.deleteIfExists(Path.of(URI.create(uri)))
     }
 
 }

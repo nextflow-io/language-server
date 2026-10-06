@@ -20,7 +20,7 @@ import java.util.Collection;
 import java.util.List;
 
 import nextflow.script.dsl.Constant;
-import nextflow.script.types.TypesEx;
+import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -71,7 +71,7 @@ public class CompletionHelper {
     }
 
     public void addItemsFromObjectScope(Expression object, String namePrefix) {
-        ClassNode cn = TypesEx.normalize(getType(object));
+        ClassNode cn = Types.normalize(getType(object));
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var isStatic = object instanceof ClassExpression;
 
@@ -89,7 +89,7 @@ public class CompletionHelper {
                 boolean result;
                 if( an.isPresent() ) {
                     var name = an.get().getMember("value").getText();
-                    result = TypesEx.isNamespace(mn)
+                    result = Types.isNamespace(mn)
                         ? addItemForNamespace(name, mn, namePrefix)
                         : addItemForConstant(name, mn, namePrefix);
                 }
@@ -105,7 +105,7 @@ public class CompletionHelper {
     }
 
     public void addMethodsFromObjectScope(Expression object, String namePrefix) {
-        ClassNode cn = TypesEx.normalize(getType(object));
+        ClassNode cn = Types.normalize(getType(object));
         while( cn != null && !ClassHelper.isObjectType(cn) ) {
             var isStatic = object instanceof ClassExpression;
 
@@ -206,7 +206,7 @@ public class CompletionHelper {
                 boolean result;
                 if( an.isPresent() ) {
                     var name = an.get().getMember("value").getText();
-                    result = TypesEx.isNamespace(mn)
+                    result = Types.isNamespace(mn)
                         ? addItemForNamespace(name, mn, namePrefix)
                         : addItemForConstant(name, mn, namePrefix);
                 }

@@ -37,16 +37,18 @@ import nextflow.lsp.services.script.ScriptService;
 import nextflow.script.formatter.FormattingOptions;
 import nextflow.util.PathUtils;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
-import org.eclipse.lsp4j.ApplyWorkspaceEditParams;
 import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams;
 import org.eclipse.lsp4j.CallHierarchyItem;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCall;
 import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams;
 import org.eclipse.lsp4j.CallHierarchyPrepareParams;
+import org.eclipse.lsp4j.CodeAction;
+import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensOptions;
 import org.eclipse.lsp4j.CodeLensParams;
+import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionOptions;
@@ -88,6 +90,7 @@ import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersOptions;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceSymbol;
@@ -135,7 +138,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var workspaceFolders = params.getWorkspaceFolders();
         if( workspaceFolders != null && !workspaceFolders.isEmpty() ) {
             for( var workspaceFolder : workspaceFolders ) {
-                var name = workspaceFolder.getName();
+                var name = workspaceFolderName(workspaceFolder);
                 var uri = workspaceFolder.getUri();
                 addWorkspaceFolder(name, uri);
             }
@@ -156,6 +159,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         result.setWorkspace(workspaceCapabilities);
 
         result.setCallHierarchyProvider(true);
+        result.setCodeActionProvider(true);
         var codeLensOptions = new CodeLensOptions(false);
         result.setCodeLensProvider(codeLensOptions);
         var completionOptions = new CompletionOptions(false, List.of("."));
@@ -166,10 +170,9 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         result.setDocumentLinkProvider(documentLinkOptions);
         result.setDocumentSymbolProvider(true);
         var commands = List.of(
+            "nextflow.server.previewConfig",
             "nextflow.server.previewDag",
-            "nextflow.server.previewWorkspace",
-            "nextflow.server.convertPipelineToTyped",
-            "nextflow.server.convertScriptToTyped"
+            "nextflow.server.previewWorkspace"
         );
         var executeCommandOptions = new ExecuteCommandOptions(commands);
         result.setExecuteCommandProvider(executeCommandOptions);
@@ -297,6 +300,21 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             if( service == null )
                 return null;
             return service.callHierarchyOutgoingCalls(item);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
+        return CompletableFutures.computeAsync((cancelChecker) -> {
+            cancelChecker.checkCanceled();
+            var uri = params.getTextDocument().getUri();
+            log.debug("textDocument/codeAction " + relativePath(uri));
+            var service = getLanguageService(uri);
+            if( service == null )
+                return Collections.emptyList();
+            return service.codeAction(params).stream()
+                .map(action -> Either.<Command,CodeAction>forRight(action))
+                .toList();
         });
     }
 
@@ -462,8 +480,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.maheshForm"), configuration.maheshForm()),
             withDefault(JsonUtils.getInteger(settings, "nextflow.completion.maxItems"), configuration.maxCompletionItems()),
             withDefault(JsonUtils.getString(settings, "nextflow.pluginRegistryUrl"), configuration.pluginRegistryUrl()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), configuration.sortDeclarations()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.typeChecking"), configuration.typeChecking())
+            withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), configuration.sortDeclarations())
         );
 
         if( shouldInitialize(oldConfiguration, configuration) )
@@ -484,14 +501,13 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private boolean shouldInitialize(LanguageServerConfiguration previous, LanguageServerConfiguration current) {
         return previous.errorReportingMode() != current.errorReportingMode()
             || !DefaultGroovyMethods.equals(previous.excludePatterns(), current.excludePatterns())
-            || previous.pluginRegistryUrl() != current.pluginRegistryUrl()
-            || previous.typeChecking() != current.typeChecking();
+            || previous.pluginRegistryUrl() != current.pluginRegistryUrl();
     }
 
     private void initializeWorkspaces() {
         var progress = new ProgressNotification(client, "initialize");
         progress.create();
-        progress.begin("Initializing workspace...");
+        progress.begin("Initializing", "Initializing workspace...");
 
         var count = 0;
         var total = workspaceRoots.keySet().size() - 1;
@@ -503,7 +519,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             count++;
 
             configServices.get(name).initialize(configuration);
-            scriptServices.get(name).initialize(configuration, configServices.get(name).getPluginSpecCache());
+            scriptServices.get(name).initialize(configuration, configServices.get(name));
         }
 
         progress.end();
@@ -518,19 +534,19 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     public void didChangeWorkspaceFolders(DidChangeWorkspaceFoldersParams params) {
         var event = params.getEvent();
         for( var workspaceFolder : event.getRemoved() ) {
-            var name = workspaceFolder.getName();
+            var name = workspaceFolderName(workspaceFolder);
             log.debug("workspace/didChangeWorkspaceFolders remove " + name);
             workspaceRoots.remove(name);
             configServices.remove(name).clearDiagnostics();
             scriptServices.remove(name).clearDiagnostics();
         }
         for( var workspaceFolder : event.getAdded() ) {
-            var name = workspaceFolder.getName();
+            var name = workspaceFolderName(workspaceFolder);
             var uri = workspaceFolder.getUri();
             log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
             addWorkspaceFolder(name, uri);
             configServices.get(name).initialize(configuration);
-            scriptServices.get(name).initialize(configuration, configServices.get(name).getPluginSpecCache());
+            scriptServices.get(name).initialize(configuration, configServices.get(name));
         }
     }
 
@@ -562,44 +578,19 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 if( service != null )
                     return service.executeCommand(command, arguments, configuration);
             }
+            if( "nextflow.server.previewConfig".equals(command) && arguments.size() == 4 ) {
+                log.debug(String.format("textDocument/previewConfig %s", arguments.toString()));
+                var uri = JsonUtils.getString(arguments.get(0));
+                var service = getLanguageService(uri);
+                if( service != null )
+                    return service.executeCommand(command, arguments, configuration);
+            }
             if( "nextflow.server.previewWorkspace".equals(command) && arguments.size() == 1 ) {
                 log.debug(String.format("textDocument/previewWorkspace %s", arguments.toString()));
                 var name = JsonUtils.getString(arguments.get(0));
                 var service = scriptServices.get(name);
                 if( service != null )
                     return service.executeCommand(command, arguments, configuration);
-            }
-            if( "nextflow.server.convertPipelineToTyped".equals(command) && arguments.size() == 1 ) {
-                log.debug(String.format("textDocument/convertPipelineToTyped %s", arguments.toString()));
-                var name = JsonUtils.getString(arguments.get(0));
-                var service = scriptServices.get(name);
-                if( service != null ) {
-                    var result = (Map) service.executeCommand(command, arguments, configuration);
-                    var workspaceEdit = (WorkspaceEdit) result.get("applyEdit");
-                    if( workspaceEdit != null ) {
-                        client.applyEdit(new ApplyWorkspaceEditParams(workspaceEdit));
-                        return Collections.emptyMap();
-                    }
-                    else {
-                        return result;
-                    }
-                }
-            }
-            if( "nextflow.server.convertScriptToTyped".equals(command) && arguments.size() == 1 ) {
-                log.debug(String.format("textDocument/convertScriptToTyped %s", arguments.toString()));
-                var uri = JsonUtils.getString(arguments.get(0));
-                var service = getLanguageService(uri);
-                if( service != null ) {
-                    var result = (Map) service.executeCommand(command, arguments, configuration);
-                    var workspaceEdit = (WorkspaceEdit) result.get("applyEdit");
-                    if( workspaceEdit != null ) {
-                        client.applyEdit(new ApplyWorkspaceEditParams(workspaceEdit));
-                        return Collections.emptyMap();
-                    }
-                    else {
-                        return result;
-                    }
-                }
             }
             return null;
         });
@@ -629,6 +620,16 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var scriptService = new ScriptService(uri);
         scriptService.connect(client);
         scriptServices.put(name, scriptService);
+    }
+
+    private static String workspaceFolderName(WorkspaceFolder workspaceFolder) {
+        var name = workspaceFolder.getName();
+        var uri = workspaceFolder.getUri();
+        if( name == null || !name.isEmpty() || uri == null )
+            return name;
+
+        var path = Path.of(URI.create(uri)).getFileName();
+        return path != null ? path.toString() : name;
     }
 
     private String relativePath(String uri) {

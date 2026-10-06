@@ -18,11 +18,14 @@ package nextflow.lsp.services.script;
 import java.util.List;
 
 import nextflow.lsp.spec.PluginSpecCache;
+import nextflow.script.ast.ASTNodeMarker;
+import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.ast.ScriptVisitorSupport;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
+import nextflow.script.control.SeverityAware;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.SourceUnit;
@@ -58,34 +61,44 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitInclude(IncludeNode node) {
+        var uri = sourceUnit.getSource().getURI();
         var source = node.source.getText();
         if( !source.startsWith("plugin/") )
             return;
         var pluginName = source.split("/")[1];
-        var spec = pluginSpecCache.getCurrent(pluginName);
+        var spec = pluginSpecCache.getCurrent(uri, pluginName);
         if( spec == null ) {
             addError("Plugin '" + pluginName + "' does not exist or is not specified in the configuration file", node);
             return;
         }
         for( var entry : node.entries ) {
             var entryName = entry.name;
-            var mn = findMethod(spec.functions(), entryName);
-            if( mn != null ) {
-                entry.setTarget(mn);
+            var functions = findMethods(spec.functions(), entryName);
+            if( functions.size() == 1 ) {
+                entry.setTarget(functions.get(0));
                 continue;
             }
-            if( findMethod(spec.factories(), entryName) != null )
+            if( functions.size() > 1 ) {
+                // an include can only have one target, so overloads are resolved
+                // per call by PluginCallVisitor
+                var target = new FunctionNode(entry.getNameOrAlias());
+                target.setSynthetic(true);
+                target.putNodeMetaData(ASTNodeMarker.METHOD_OVERLOADS, functions);
+                entry.setTarget(target);
                 continue;
-            if( findMethod(spec.operators(), entryName) != null )
+            }
+            if( !findMethods(spec.factories(), entryName).isEmpty() )
+                continue;
+            if( !findMethods(spec.operators(), entryName).isEmpty() )
                 continue;
             addError("Included name '" + entryName + "' is not defined in plugin '" + pluginName + "'", node);
         }
     }
 
-    private static MethodNode findMethod(List<MethodNode> methods, String name) {
+    private static List<MethodNode> findMethods(List<MethodNode> methods, String name) {
         return methods.stream()
             .filter(mn -> mn.getName().equals(name))
-            .findFirst().orElse(null);
+            .toList();
     }
 
     @Override
@@ -95,7 +108,7 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
         sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
     }
 
-    private class ResolveIncludeError extends SyntaxException implements PhaseAware {
+    private class ResolveIncludeError extends SyntaxException implements PhaseAware, SeverityAware {
 
         public ResolveIncludeError(String message, ASTNode node) {
             super(message, node);
@@ -104,6 +117,11 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
         @Override
         public int getPhase() {
             return Phases.INCLUDE_RESOLUTION;
+        }
+
+        @Override
+        public boolean isSoftError() {
+            return true;
         }
     }
 }
