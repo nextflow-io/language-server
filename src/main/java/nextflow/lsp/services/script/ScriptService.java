@@ -66,6 +66,14 @@ public class ScriptService extends LanguageService {
     }
 
     @Override
+    protected void update() {
+        // plugin includes are resolved against plugin specs loaded by the config service
+        if( configService != null )
+            configService.updateNow();
+        super.update();
+    }
+
+    @Override
     protected ASTNodeCache getAstCache() {
         return astCache;
     }

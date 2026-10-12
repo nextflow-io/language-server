@@ -184,6 +184,27 @@ class ScriptDiagnosticsTest extends Specification {
             .collect { it.getMessage() }
     }
 
+    def 'should resolve plugin includes before the config file is compiled' () {
+        given:
+        def configService = newConfigService()
+        def client = new TestLanguageClient()
+        def service = getScriptService(client, configService)
+        def uri = getUri('main.nf')
+
+        when:
+        open(configService, getUri('nextflow.config'), "plugins { id 'nf-schema@2.7.3' }")
+        open(service, uri, """\
+            include { paramsHelp } from 'plugin/nf-schema'
+
+            workflow {
+                println paramsHelp()
+            }
+            """)
+        service.updateNow()
+        then:
+        client.getDiagnostics(uri).isEmpty()
+    }
+
     def 'should resolve overloaded plugin functions in a typed script' () {
         when:
         def errors = pluginErrors('nf-schema@2.7.3', """\
