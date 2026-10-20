@@ -14,14 +14,16 @@ repositories {
 
 java {
   toolchain {
-    languageVersion = JavaLanguageVersion.of(21)
+    languageVersion = JavaLanguageVersion.of(25)
+    vendor = JvmVendorSpec.AMAZON
   }
-  sourceCompatibility = JavaVersion.VERSION_17
-  targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+  options.release = java.toolchain.languageVersion.map { it.asInt() }
 }
 
 compileJava {
-  options.release.set(17)
   options.compilerArgs << '-parameters'
 }
 
@@ -117,3 +119,5 @@ application {
 shadowJar {
   archiveVersion = ''
 }
+
+apply from: 'gradle/bundle.gradle'

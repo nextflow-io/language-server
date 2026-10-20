@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# Launcher for the Nextflow language server. JVM options can be passed with NXF_LSP_JAVA_OPTS.
+#
+
+# resolve symlinks to find the installation directory
+app_path=$0
+while [ -h "$app_path" ]; do
+    link=$(readlink "$app_path")
+    case $link in
+        /*) app_path=$link ;;
+        *) app_path=$(dirname "$app_path")/$link ;;
+    esac
+done
+LSP_HOME=$(cd "$(dirname "$app_path")/.." && pwd -P) || exit 1
+
+# shellcheck disable=SC2086
+set -- $NXF_LSP_JAVA_OPTS -jar "$LSP_HOME/lib/language-server-all.jar" "$@"
+
+# the AOT cache only works with the exact runtime, jar and JVM options used to train it
+if [ -f "$LSP_HOME/lib/nextflow-lsp.aot" ]; then
+    set -- "-XX:AOTCache=$LSP_HOME/lib/nextflow-lsp.aot" "$@"
+fi
+
+# stdout is the LSP channel, so all JVM messages go to stderr.
+# compressed oops are forced so that the AOT cache is also accepted on hosts with >= 128 GB RAM
+exec "$LSP_HOME/runtime/bin/java" \
+    -XX:+UseCompressedOops \
+    -XX:+DisplayVMOutputToStderr -Xlog:disable -Xlog:all=warning:stderr \
+    "$@"

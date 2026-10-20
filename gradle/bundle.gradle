@@ -1,0 +1,217 @@
+// Standalone bundle for the current OS/arch:
+//
+//   build/bundle/nextflow-language-server-<version>-<os>-<arch>/
+//     bin/nextflow-lsp              launcher (JVM options: NXF_LSP_JAVA_OPTS)
+//     runtime/                      jlink image of the JDK modules found by jdeps
+//     lib/language-server-all.jar
+//     lib/nextflow-lsp.aot          AOT cache, valid only for this runtime and jar (incl. its mtime)
+//   build/bundle/nextflow-language-server-<version>-<os>-<arch>.tar.gz
+
+import javax.inject.Inject
+
+/**
+ * Computes the JDK modules required by the given jars
+ * using `jdeps --print-module-deps`.
+ */
+@CacheableTask
+abstract class JdepsModules extends DefaultTask {
+
+    @Classpath
+    abstract ConfigurableFileCollection getClasspath()
+
+    @Nested
+    abstract Property<JavaLauncher> getJavaLauncher()
+
+    /** Modules to add on top of those detected by jdeps (e.g. modules only loaded via ServiceLoader). */
+    @Input
+    abstract ListProperty<String> getExtraModules()
+
+    @OutputFile
+    abstract RegularFileProperty getModulesFile()
+
+    @Inject
+    protected abstract ExecOperations getExec()
+
+    @TaskAction
+    void run() {
+        final jdk = javaLauncher.get().metadata
+        final jars = classpath.files*.absolutePath
+        final stdout = new ByteArrayOutputStream()
+        exec.exec {
+            executable = jdk.installationPath.file('bin/jdeps').asFile.absolutePath
+            args '--print-module-deps', '--ignore-missing-deps', '--multi-release', jdk.languageVersion.asInt().toString()
+            args jars
+            standardOutput = stdout
+        }
+        final modules = (stdout.toString().trim().tokenize(',') + extraModules.get())
+            *.trim()
+            .findAll { it }
+            .toSorted()
+            .unique()
+        modulesFile.get().asFile.text = modules.join(',') + '\n'
+    }
+}
+
+/**
+ * Links a minimal Java runtime image containing only the given JDK modules.
+ */
+@CacheableTask
+abstract class JlinkRuntime extends DefaultTask {
+
+    @InputFile
+    @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getModulesFile()
+
+    @Nested
+    abstract Property<JavaLauncher> getJavaLauncher()
+
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDirectory()
+
+    @Inject
+    protected abstract ExecOperations getExec()
+
+    @Inject
+    protected abstract FileSystemOperations getFs()
+
+    @TaskAction
+    void run() {
+        final output = outputDirectory.get().asFile
+        // jlink refuses to write into an existing directory
+        fs.delete { delete(output) }
+        exec.exec {
+            executable = javaLauncher.get().metadata.installationPath.file('bin/jlink').asFile.absolutePath
+            args '--add-modules', modulesFile.get().asFile.text.trim()
+            args '--strip-debug', '--no-header-files', '--no-man-pages'
+            args '--output', output.absolutePath
+        }
+    }
+}
+
+/** Gives task actions in this script access to injected services. */
+interface ExecServices {
+    @Inject
+    ExecOperations getExec()
+}
+
+final bundleLauncher = javaToolchains.launcherFor(java.toolchain)
+
+final os = providers.systemProperty('os.name').map {
+    if( it.startsWith('Linux') ) return 'linux'
+    if( it.startsWith('Mac') ) return 'macos'
+    throw new GradleException("Unsupported OS: $it")
+}
+final arch = providers.systemProperty('os.arch').map {
+    it in ['amd64', 'x86_64'] ? 'x64' : it in ['aarch64', 'arm64'] ? 'arm64' : it
+}
+final bundleVersion = providers.exec {
+    commandLine 'git', 'describe', '--tags', '--always'
+}.standardOutput.asText.map { it.trim().replaceFirst(/^v/, '') }
+final bundleName = os.zip(arch) { o, a -> "$o-$a" }.zip(bundleVersion) { p, v -> "nextflow-language-server-$v-$p" }
+
+final trainingRepo = 'https://github.com/nf-core/methylseq'
+final trainingTag = '4.2.0'
+final trainingPasses = 2
+final trainingDir = layout.buildDirectory.dir('aot-train/methylseq')
+
+final jdeps = tasks.register('jdeps', JdepsModules) {
+    classpath.from(tasks.named('shadowJar'))
+    javaLauncher = bundleLauncher
+    // jdk.zipfs: loaded via ServiceLoader, used by Groovy to find the default imports in the jar
+    extraModules = ['jdk.zipfs']
+    modulesFile = layout.buildDirectory.file('jdeps/modules.txt')
+}
+
+final jlink = tasks.register('jlink', JlinkRuntime) {
+    modulesFile = jdeps.flatMap { it.modulesFile }
+    javaLauncher = bundleLauncher
+    outputDirectory = layout.buildDirectory.dir('jlink')
+}
+
+final trainingWorkspace = tasks.register('aotTrainingWorkspace', Exec) {
+    description = 'Clones the AOT training workspace.'
+    inputs.property('repo', trainingRepo)
+    inputs.property('tag', trainingTag)
+    outputs.dir(trainingDir)
+    commandLine 'scripts/bench-workspace.sh', '--repo', trainingRepo, '--tag', trainingTag, '--dir', trainingDir.get().asFile.absolutePath
+}
+
+// The AOT cache records the mtime of the jar, so it is created on the
+// assembled image, in the same task that copies the jar.
+final bundleImage = tasks.register('bundleImage', Sync) {
+    description = 'Assembles the standalone bundle and trains its AOT cache.'
+    final services = objects.newInstance(ExecServices)
+    final jar = tasks.named('shadowJar').flatMap { it.archiveFile }
+    final trainScript = layout.projectDirectory.file('scripts/aot-train.py')
+    final workspace = trainingDir
+    final passes = trainingPasses
+    inputs.files(trainScript, layout.projectDirectory.file('scripts/bench.py')).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(trainingWorkspace).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.property('passes', passes)
+    into(layout.buildDirectory.dir(bundleName.map { "bundle/$it" }))
+    from('src/bundle/nextflow-lsp') {
+        into 'bin'
+        filePermissions { unix('rwxr-xr-x') }
+    }
+    from(jlink) {
+        into 'runtime'
+        // jlink makes some files read-only, which prevents overwriting them
+        eachFile { details ->
+            final mode = details.permissions.toUnixNumeric() | 0200
+            details.permissions { it.unix(mode) }
+        }
+    }
+    from(jar) { into 'lib' }
+    doLast {
+        final home = destinationDir
+        final libJar = new File(home, 'lib/language-server-all.jar')
+        final aot = new File(home, 'lib/nextflow-lsp.aot')
+        final launcher = new File(home, 'bin/nextflow-lsp').absolutePath
+        libJar.setLastModified(jar.get().asFile.lastModified())
+        // train through the launcher, so that the JVM options match exactly
+        services.exec.exec {
+            environment 'NXF_LSP_JAVA_OPTS', "-XX:AOTCacheOutput=$aot"
+            commandLine 'python3', trainScript.asFile.absolutePath, '--workspace', workspace.get().asFile.absolutePath, '--passes', passes.toString(), '--server-cmd', launcher
+        }
+        if( !aot.exists() )
+            throw new GradleException('AOT cache was not created')
+    }
+}
+
+final bundleVerify = tasks.register('bundleVerify') {
+    description = 'Verifies that the JVM accepts the bundle AOT cache.'
+    final services = objects.newInstance(ExecServices)
+    final image = bundleImage.map { it.destinationDir }
+    final trainScript = layout.projectDirectory.file('scripts/aot-train.py')
+    final workspace = trainingDir
+    final stamp = layout.buildDirectory.file('bundle-verify/ok')
+    inputs.files(bundleImage).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(trainingWorkspace).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(stamp)
+    doLast {
+        // fails if the cache is rejected
+        services.exec.exec {
+            environment 'NXF_LSP_JAVA_OPTS', '-XX:AOTMode=on'
+            commandLine 'python3', trainScript.asFile.absolutePath, '--workspace', workspace.get().asFile.absolutePath, '--passes', '0', '--server-cmd', new File(image.get(), 'bin/nextflow-lsp').absolutePath
+            standardOutput = OutputStream.nullOutputStream()
+        }
+        stamp.get().asFile.text = ''
+    }
+}
+
+final bundleTar = tasks.register('bundleTar', Tar) {
+    dependsOn bundleVerify
+    from(bundleImage) { into bundleName }
+    destinationDirectory = layout.buildDirectory.dir('bundle')
+    archiveFileName = bundleName.map { "${it}.tar.gz" }
+    compression = Compression.GZIP
+    // keep executable bits, and the jar mtime which is validated by the AOT cache
+    useFileSystemPermissions()
+    preserveFileTimestamps = true
+}
+
+tasks.register('bundle') {
+    group = 'distribution'
+    description = 'Builds the standalone bundle for the current OS/arch.'
+    dependsOn bundleImage, bundleTar
+}

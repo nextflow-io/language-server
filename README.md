@@ -16,7 +16,9 @@ The following language features are currently supported:
 
 ## Requirements
 
-The language server requires Java 17 or later.
+The language server requires Java 25 or later. The standalone bundle includes its own Java runtime.
+
+Building requires a Corretto 25 JDK, which Gradle downloads if no matching JDK is installed.
 
 ## Configuration
 
@@ -41,6 +43,16 @@ java -jar build/libs/language-server-all.jar
 ```
 
 Protocol messages are exchanged using standard input/output.
+
+### Standalone bundle
+
+To build a standalone bundle for the current OS/arch (requires Python 3):
+
+```sh
+make bundle
+```
+
+The bundle (`build/bundle/nextflow-language-server-<version>-<os>-<arch>`, plus a `.tar.gz`) contains the shadow jar, a `jlink` runtime with only the required JDK modules, and an AOT cache (`lib/nextflow-lsp.aot`) that speeds up startup and warm-up. The runtime is built from the project's Java toolchain (Corretto 25). The AOT cache is trained at build time by `scripts/aot-train.py`, which indexes, edits and queries every file of [nf-core/methylseq](https://github.com/nf-core/methylseq). Run the server with `bin/nextflow-lsp`; extra JVM options can be passed with `NXF_LSP_JAVA_OPTS`. The cache is only valid for the bundled runtime and jar, and is rejected if the jar mtime changes, so copy the bundle with `tar` or `cp -p`. A rejected cache only makes startup slower; JVM messages are written to stderr.
 
 ## Testing
 
