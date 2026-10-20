@@ -29,5 +29,18 @@ bench-compare:
 	scripts/bench-workspace.sh
 	scripts/bench-compare.sh --base main
 
+.PHONY: native
+native:
+	./native/build.sh
+
+install-native:
+ifndef VERSION
+	$(error VERSION is required, e.g. `VERSION=<version> make install-native`)
+endif
+	$(eval STABLE := v$(shell echo $(VERSION)))
+	@mkdir -p ~/.nextflow/lsp/$(STABLE)
+	@cp build/native/nativeCompile/nextflow-lsp ~/.nextflow/lsp/$(STABLE)
+	@echo "installed at: ~/.nextflow/lsp/$(STABLE)/nextflow-lsp"
+
 clean:
 	./gradlew clean
