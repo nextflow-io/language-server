@@ -19,5 +19,15 @@ endif
 	@cp build/libs/language-server-all.jar ~/.nextflow/lsp/$(STABLE)/v$(VERSION).jar
 	@echo "installed at: ~/.nextflow/lsp/$(STABLE)/v$(VERSION).jar"
 
+.PHONY: bench bench-compare
+bench:
+	./gradlew shadowJar
+	scripts/bench-workspace.sh
+	python3 scripts/bench.py --workspace build/bench/rnaseq
+
+bench-compare:
+	scripts/bench-workspace.sh
+	scripts/bench-compare.sh --base main
+
 clean:
 	./gradlew clean

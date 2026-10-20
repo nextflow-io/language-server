@@ -34,12 +34,6 @@ git clone https://github.com/nextflow-io/nextflow ../nextflow
 make
 ```
 
-To run unit tests:
-
-```sh
-make test
-```
-
 To run the language server:
 
 ```sh
@@ -47,6 +41,34 @@ java -jar build/libs/language-server-all.jar
 ```
 
 Protocol messages are exchanged using standard input/output.
+
+## Testing
+
+To run unit tests:
+
+```sh
+make test
+```
+
+To run the performance benchmark:
+
+```sh
+make bench
+```
+
+The benchmark (`scripts/bench.py`, requires Python 3) builds the shadow jar, clones [nf-core/rnaseq](https://github.com/nf-core/rnaseq) into `build/bench/rnaseq`, and drives the language server over stdio through a scripted session: startup and workspace indexing, opening and editing `workflows/rnaseq/main.nf`, and common requests (hover, completion, definition, references, rename, etc). It reports min/median/p95/max latency for each operation, as well as the peak RSS of the server. Latencies for didOpen and didChange are measured up to the corresponding diagnostics, so they include the 1 second update debounce.
+
+Every response is validated, so the benchmark also serves as an integration test. Use `--server-cmd` (or `NXF_LSP_BENCH_SERVER`) to benchmark a different server build, e.g. `scripts/bench.py --workspace build/bench/rnaseq --server-cmd ./nextflow-lsp`. The workspace is cloned by `scripts/bench-workspace.sh`.
+
+To compare the current checkout against another version:
+
+```sh
+make bench-compare
+scripts/bench-compare.sh --base v26.04.5 --rounds 5
+scripts/bench-compare.sh --base-cmd "java -jar old.jar" --head-cmd ./nextflow-lsp
+```
+
+This builds the base ref in a git worktree at `build/bench/base`, runs the benchmark alternately for base and head in each round (results in `build/bench/compare`), and compares the pooled samples with `scripts/bench_diff.py`. A change is reported as faster/slower only if it is significant (Mann-Whitney U test, p < 0.05) and at least 5%; otherwise it is reported as noise. When `--base-cmd` is given, the base worktree is not built. See `scripts/bench-compare.sh --help` for all options. The diff script can also be used directly, e.g. `scripts/bench_diff.py --base a1.json a2.json --head b1.json b2.json`.
 
 ## Releasing
 
