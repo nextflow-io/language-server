@@ -300,7 +300,8 @@ def run(args):
     text = script.read_text(encoding='utf-8')
     uri = script.as_uri()
     doc = {'uri': uri}
-    cmd = shlex.split(args.server_cmd)
+    # on Windows, a command line is passed as is (e.g. a backslash path to a .cmd launcher)
+    cmd = args.server_cmd if os.name == 'nt' else shlex.split(args.server_cmd)
     n = args.iterations
     results = {}
     raw = {}

@@ -100,6 +100,12 @@ jobs:
           path: build/bundle/*-macos-arm64.tar.gz*
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bundle-windows-x64
+          path: build/bundle/*-windows-x64.tar.gz*
+          if-no-files-found: error
+
   smoke:
     name: Smoke test (${{ matrix.target }})
     needs: build
@@ -113,9 +119,16 @@ jobs:
             runner: ubuntu-24.04-arm
           - target: macos-arm64
             runner: macos-15
+          - target: windows-x64
+            runner: windows-2025
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
+      # keep LF line endings in the shell scripts and the benchmark workspace
+      - name: Disable CRLF conversion
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+
       - name: Checkout
         uses: actions/checkout@v7
 
@@ -127,24 +140,44 @@ jobs:
       - name: Extract
         run: |
           cd dist
-          shasum -a 256 -c ./*.sha256
+          if command -v sha256sum > /dev/null; then
+            sha256sum -c ./*.sha256
+          else
+            shasum -a 256 -c ./*.sha256
+          fi
           tarball=$(ls ./*.tar.gz)
-          tar -xzf "$tarball"
+          if [ "$RUNNER_OS" = Windows ]; then
+            # the bsdtar of Windows, as used by the VS Code extension (not the GNU tar of Git Bash)
+            "$(cygpath "$SYSTEMROOT")/System32/tar.exe" -xzf "$tarball"
+            launcher=bin/nextflow-lsp.cmd
+          else
+            tar -xzf "$tarball"
+            launcher=bin/nextflow-lsp
+          fi
           home=$PWD/$(basename "$tarball" .tar.gz)
           "$home/runtime/bin/java" -version
           echo "LSP_HOME=$home" >> "$GITHUB_ENV"
+          echo "LSP_LAUNCHER=$home/$launcher" >> "$GITHUB_ENV"
 
+      # there is no AOT cache on Windows yet
       - name: Train the AOT cache
+        if: runner.os != 'Windows'
         run: |
-          "$LSP_HOME/bin/nextflow-lsp" --train
+          "$LSP_LAUNCHER" --train
           test -s "$LSP_HOME/lib/nextflow-lsp.aot"
 
-      - name: Check that the AOT cache is accepted
+      - name: Check that stdout is silent and the AOT cache is accepted
         run: |
-          # fails if the cache is rejected; stdout is the LSP channel, so it must stay silent
+          # stdout is the LSP channel, so it must stay silent;
+          # with AOTMode=on, the server also fails if the cache is rejected
+          if [ "$RUNNER_OS" = Windows ]; then
+            opts=
+          else
+            opts=-XX:AOTMode=on
+          fi
           msg='{"jsonrpc":"2.0","method":"exit"}'
           printf 'Content-Length: %d\r\n\r\n%s' "${#msg}" "$msg" \
-            | NXF_LSP_JAVA_OPTS=-XX:AOTMode=on "$LSP_HOME/bin/nextflow-lsp" > stdout.txt
+            | NXF_LSP_JAVA_OPTS=$opts "$LSP_LAUNCHER" > stdout.txt
           if [ -s stdout.txt ]; then
             echo "Server wrote to stdout without a client:"
             cat stdout.txt
@@ -154,7 +187,12 @@ jobs:
       - name: Benchmark
         run: |
           scripts/bench-workspace.sh
-          python3 scripts/bench.py --workspace build/bench/rnaseq --server-cmd "$LSP_HOME/bin/nextflow-lsp" --iterations 3 --cold-iterations 1
+          if [ "$RUNNER_OS" = Windows ]; then
+            # bench.py passes the command line as is to Windows, which runs the .cmd with cmd.exe
+            python scripts/bench.py --workspace build/bench/rnaseq --server-cmd "$(cygpath -w "$LSP_LAUNCHER")" --iterations 3 --cold-iterations 1
+          else
+            python3 scripts/bench.py --workspace build/bench/rnaseq --server-cmd "$LSP_LAUNCHER" --iterations 3 --cold-iterations 1
+          fi
 
   release:
     name: Release

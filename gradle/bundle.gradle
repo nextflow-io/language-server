@@ -2,9 +2,10 @@
 //
 //   build/bundle/nextflow-language-server-<version>-<os>-<arch>/
 //     bin/nextflow-lsp              launcher (JVM options: NXF_LSP_JAVA_OPTS)
+//     bin/nextflow-lsp.cmd          launcher on Windows (no AOT cache)
 //     runtime/                      jlink image of the JDK modules found by jdeps
 //     lib/language-server-all.jar
-//     lib/training/                 AOT training workspace (nf-core/methylseq)
+//     lib/training/                 AOT training workspace (nf-core/methylseq), except on Windows
 //
 // The AOT cache is created by the launcher on the user's machine (see src/bundle/nextflow-lsp).
 //   build/bundle/nextflow-language-server-<version>-<os>-<arch>.tar.gz
@@ -20,6 +21,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import javax.inject.Inject
+import org.apache.tools.ant.filters.FixCrLfFilter
 
 /**
  * Downloads a JDK archive into a shared cache, verifies its
@@ -46,6 +48,9 @@ abstract class JdkDownload extends DefaultTask {
     @Inject
     protected abstract FileSystemOperations getFs()
 
+    @Inject
+    protected abstract ArchiveOperations getArchives()
+
     @TaskAction
     void run() {
         final archive = new File(cacheDirectory.get().asFile, url.get().tokenize('/').last())
@@ -62,11 +67,14 @@ abstract class JdkDownload extends DefaultTask {
             Files.move(tmp.toPath(), archive.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
 
-        // the JDK home is the top-level directory on Linux, and <name>.jdk/Contents/Home on macOS
+        // the JDK home is the top-level directory on Linux and Windows, and <name>.jdk/Contents/Home on macOS
         final extracted = temporaryDir
         fs.delete { delete(extracted) }
         extracted.mkdirs()
-        exec.exec { commandLine 'tar', '-xzf', archive.absolutePath, '-C', extracted.absolutePath }
+        if( archive.name.endsWith('.zip') )
+            fs.copy { from(archives.zipTree(archive)); into(extracted) }
+        else
+            exec.exec { commandLine 'tar', '-xzf', archive.absolutePath, '-C', extracted.absolutePath }
         final release = Files.find(extracted.toPath(), 4, { path, attrs -> path.fileName.toString() == 'release' && attrs.isRegularFile() })
             .withCloseable { it.findFirst() }
             .orElseThrow { new GradleException("No JDK found in ${archive}") }
@@ -193,18 +201,21 @@ interface ExecServices {
 // from https://github.com/corretto/corretto-25/releases/tag/<version>
 final correttoVersion = '25.0.3.9.1'
 final targets = [
-    'linux-x64'  : [corretto: 'linux-x64', sha256: '00486fa402136f8d40512b101c645dd4db9be2b5535171530ad241cd96c1223d'],
-    'linux-arm64': [corretto: 'linux-aarch64', sha256: '8b1fd78bbd1f188f3884f580be674727174635252c0d4d6dfa7cd15de51879ce'],
-    'macos-arm64': [corretto: 'macosx-aarch64', sha256: '614107ed76e9fb86d62d8cf2686a9cc4b3a11c019502ca3ba605fc5d51f4d7bb'],
+    'linux-x64'  : [corretto: 'linux-x64.tar.gz', sha256: '00486fa402136f8d40512b101c645dd4db9be2b5535171530ad241cd96c1223d'],
+    'linux-arm64': [corretto: 'linux-aarch64.tar.gz', sha256: '8b1fd78bbd1f188f3884f580be674727174635252c0d4d6dfa7cd15de51879ce'],
+    'macos-arm64': [corretto: 'macosx-aarch64.tar.gz', sha256: '614107ed76e9fb86d62d8cf2686a9cc4b3a11c019502ca3ba605fc5d51f4d7bb'],
+    'windows-x64': [corretto: 'windows-x64-jdk.zip', sha256: '3404a8be08f0fdbbd24c9bbdda79ba1ded87b264a833247b2124ac45da1c16e0'],
 ]
 
 final hostTarget = providers.systemProperty('os.name').zip(providers.systemProperty('os.arch')) { name, arch ->
-    final o = name.startsWith('Linux') ? 'linux' : name.startsWith('Mac') ? 'macos' : name
+    final o = name.startsWith('Linux') ? 'linux' : name.startsWith('Mac') ? 'macos' : name.startsWith('Windows') ? 'windows' : name
     final a = arch in ['amd64', 'x86_64'] ? 'x64' : arch in ['aarch64', 'arm64'] ? 'arm64' : arch
     "$o-$a".toString()
 }.get()
-final hostSupported = targets.containsKey(hostTarget)
-final unsupportedHost = "Unsupported host platform for the bundle: $hostTarget (supported: ${targets.keySet().join(', ')})".toString()
+// the build (incl. the launcher check and the training workspace) requires a POSIX host
+final hosts = targets.keySet().findAll { !it.startsWith('windows') }
+final hostSupported = hostTarget in hosts
+final unsupportedHost = "Unsupported host platform for the bundle: $hostTarget (supported: ${hosts.join(', ')})".toString()
 
 // e.g. linux-x64 -> LinuxX64
 final taskSuffix = { String target -> target.tokenize('-')*.capitalize().join() }
@@ -220,7 +231,7 @@ final trainingDir = layout.buildDirectory.dir('aot-train/methylseq')
 final jdks = targets.collectEntries { target, config ->
     [target, tasks.register("jdk${taskSuffix(target)}", JdkDownload) {
         description = "Downloads the Corretto $correttoVersion JDK for $target."
-        url = "https://corretto.aws/downloads/resources/$correttoVersion/amazon-corretto-$correttoVersion-${config.corretto}.tar.gz".toString()
+        url = "https://corretto.aws/downloads/resources/$correttoVersion/amazon-corretto-$correttoVersion-${config.corretto}".toString()
         sha256 = config.sha256
         cacheDirectory = new File(gradle.gradleUserHomeDir, 'caches/corretto')
         jdkHome = layout.buildDirectory.dir("jdk/$target")
@@ -252,6 +263,8 @@ final trainingWorkspace = tasks.register('aotTrainingWorkspace', Exec) {
 final bundleTars = targets.keySet().collect { target ->
     final suffix = taskSuffix(target)
     final targetOs = target.tokenize('-')[0]
+    // there is no AOT cache on Windows yet, so no training workspace
+    final windows = targetOs == 'windows'
     final bundleName = bundleVersion.map { "nextflow-language-server-$it-$target".toString() }
 
     final jlink = tasks.register("jlink$suffix", JlinkRuntime) {
@@ -275,10 +288,18 @@ final bundleTars = targets.keySet().collect { target ->
         inputs.property('trainingRepo', repo)
         inputs.property('trainingTag', tag)
         into(layout.buildDirectory.dir(bundleName.map { "bundle/$it" }))
-        from('src/bundle/nextflow-lsp') {
-            into 'bin'
-            filePermissions { unix('rwxr-xr-x') }
-            filter { it.replace('@bundleName@', bundleName.get()).replace('@os@', targetOs) }
+        if( windows ) {
+            from('src/bundle/nextflow-lsp.cmd') {
+                into 'bin'
+                filter(FixCrLfFilter, eol: FixCrLfFilter.CrLf.newInstance('crlf'))
+            }
+        }
+        else {
+            from('src/bundle/nextflow-lsp') {
+                into 'bin'
+                filePermissions { unix('rwxr-xr-x') }
+                filter { it.replace('@bundleName@', bundleName.get()).replace('@os@', targetOs) }
+            }
         }
         from(jlink) {
             into 'runtime'
@@ -289,15 +310,17 @@ final bundleTars = targets.keySet().collect { target ->
             }
         }
         from(jar) { into 'lib' }
-        // the files read by the AOT training workload (incl. the parameter schema)
-        from(trainingWorkspace) {
-            into 'lib/training'
-            include '**/*.nf', '**/*.config', 'nextflow_schema.json', 'LICENSE'
-            exclude '**/tests/**', 'nf-test.config'
-        }
-        from('src/bundle/training/README.md') {
-            into 'lib/training'
-            filter { it.replace('@repo@', repo).replace('@tag@', tag) }
+        if( !windows ) {
+            // the files read by the AOT training workload (incl. the parameter schema)
+            from(trainingWorkspace) {
+                into 'lib/training'
+                include '**/*.nf', '**/*.config', 'nextflow_schema.json', 'LICENSE'
+                exclude '**/tests/**', 'nf-test.config'
+            }
+            from('src/bundle/training/README.md') {
+                into 'lib/training'
+                filter { it.replace('@repo@', repo).replace('@tag@', tag) }
+            }
         }
     }
 
