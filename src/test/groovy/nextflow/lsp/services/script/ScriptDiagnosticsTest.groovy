@@ -45,6 +45,29 @@ class ScriptDiagnosticsTest extends Specification {
         client.getDiagnostics(uri).isEmpty()
     }
 
+    def 'should resolve classes from the Nextflow runtime' () {
+        given:
+        def client = new TestLanguageClient()
+        def service = getScriptService(client)
+        def uri = getUri('main.nf')
+
+        when:
+        open(service, uri, '''\
+            workflow {
+                def json = new groovy.json.JsonSlurper().parseText('{}')
+                def text = new groovy.text.SimpleTemplateEngine().createTemplate('$x').make([x: 1]).toString()
+                def yaml = new groovy.yaml.YamlSlurper().parseText('a: 1')
+                def builder = new groovy.yaml.YamlBuilder()
+                builder.call([a: 1])
+                def map = new org.yaml.snakeyaml.Yaml().load('a: 1')
+                println([json, text, yaml, builder, map])
+            }
+            ''')
+        service.updateNow()
+        then:
+        client.getDiagnostics(uri).isEmpty()
+    }
+
     def 'should report a syntax error' () {
         given:
         def client = new TestLanguageClient()

@@ -65,6 +65,10 @@ abstract class JlinkRuntime extends DefaultTask {
     @Nested
     abstract Property<JavaLauncher> getJavaLauncher()
 
+    /** Glob patterns of files to exclude from the image (see `jlink --exclude-files`). */
+    @Input
+    abstract ListProperty<String> getExcludeFiles()
+
     @OutputDirectory
     abstract DirectoryProperty getOutputDirectory()
 
@@ -83,6 +87,8 @@ abstract class JlinkRuntime extends DefaultTask {
             executable = javaLauncher.get().metadata.installationPath.file('bin/jlink').asFile.absolutePath
             args '--add-modules', modulesFile.get().asFile.text.trim()
             args '--strip-debug', '--no-header-files', '--no-man-pages'
+            if( excludeFiles.get() )
+                args '--exclude-files', excludeFiles.get().collect { "glob:$it" }.join(',')
             args '--output', output.absolutePath
         }
     }
@@ -125,6 +131,9 @@ final jdeps = tasks.register('jdeps', JdepsModules) {
 final jlink = tasks.register('jlink', JlinkRuntime) {
     modulesFile = jdeps.flatMap { it.modulesFile }
     javaLauncher = bundleLauncher
+    // java.desktop is only needed for java.beans (used by Groovy), which is pure Java,
+    // so its native libs (AWT, fonts, imaging, sound) and font config files are never loaded
+    excludeFiles = ['/java.desktop/lib/**']
     outputDirectory = layout.buildDirectory.dir('jlink')
 }
 
