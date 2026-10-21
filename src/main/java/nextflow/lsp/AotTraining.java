@@ -392,7 +392,7 @@ public final class AotTraining {
      */
     private static ServerSocket serve(byte[] body) throws IOException {
         var server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
-        Thread.ofPlatform().daemon().start(() -> {
+        var thread = new Thread(() -> {
             while( !server.isClosed() ) {
                 try( var socket = server.accept() ) {
                     var in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.ISO_8859_1));
@@ -407,6 +407,8 @@ public final class AotTraining {
                 }
             }
         });
+        thread.setDaemon(true);
+        thread.start();
         return server;
     }
 

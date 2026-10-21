@@ -16,7 +16,7 @@ The following language features are currently supported:
 
 ## Requirements
 
-The language server is distributed as a standalone bundle that includes its own Java runtime, for Linux (x64, arm64), macOS (arm64) and Windows (x64).
+The language server is distributed as a standalone bundle that includes its own Java runtime, for Linux (x64, arm64), macOS (arm64) and Windows (x64). The language server is also released as a jar for other platforms, which requires Java 17 or later.
 
 Building requires a Corretto 25 JDK, which Gradle downloads if no matching JDK is installed.
 
@@ -36,7 +36,7 @@ git clone https://github.com/nextflow-io/nextflow ../nextflow
 make
 ```
 
-To run the language server (requires Java 25 or later):
+To run the language server (requires Java 17 or later):
 
 ```sh
 java -jar build/libs/language-server-all.jar

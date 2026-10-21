@@ -19,8 +19,9 @@ java {
   }
 }
 
+// the jar also runs on the user's Java, so it targets the minimum Java version of Nextflow
 tasks.withType(JavaCompile).configureEach {
-  options.release = java.toolchain.languageVersion.map { it.asInt() }
+  options.release = 17
 }
 
 compileJava {
