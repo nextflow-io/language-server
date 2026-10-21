@@ -83,7 +83,8 @@ To make a new release of the language server:
 1. Checkout the appropriate branch of Nextflow (`STABLE-*` if present, otherwise `master`).
 2. Checkout the appropriate branch of the language server (`STABLE-*` if present, otherwise `main`).
 3. Build the language server locally.
-4. Create a new GitHub release with the language server JAR and a list of notable changes. No release commit.
+4. Run `make test` and `make bench`. Stop the release if anything fails.
+5. Create a new GitHub release with the language server JAR and a list of notable changes. No release commit.
 
 ## Troubleshooting
 
