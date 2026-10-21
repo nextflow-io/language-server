@@ -19,9 +19,12 @@ endif
 	@cp build/libs/language-server-all.jar ~/.nextflow/lsp/$(STABLE)/v$(VERSION).jar
 	@echo "installed at: ~/.nextflow/lsp/$(STABLE)/v$(VERSION).jar"
 
-.PHONY: bundle
+.PHONY: bundle bundle-all
 bundle:
 	./gradlew bundle
+
+bundle-all:
+	./gradlew bundleAll
 
 .PHONY: bench bench-compare
 bench:
