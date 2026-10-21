@@ -6,8 +6,6 @@ on:
   push:
     branches:
       - 'main'
-      # TEMPORARY: test the release job from the PR branch (as a draft release); remove before merging
-      - 'java25-aot-bundle'
   pull_request:
     types: [opened, reopened, synchronize]
   workflow_dispatch:
@@ -58,9 +56,6 @@ jobs:
         run: |
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             version=${INPUT_VERSION#v}
-          elif [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_NAME" = java25-aot-bundle ]; then
-            # TEMPORARY: fixed version so that test runs reuse the same draft release
-            version=0.0.0-test
           else
             version=$(git describe --tags --always)
             version=${version#v}
@@ -78,7 +73,7 @@ jobs:
             sha256sum "$f" > "$f.sha256"
           done
 
-      # TODO: remove the jar for 27.04, it is only needed by extension releases that predate the bundle
+      # the jar is the fallback for platforms without a bundle and for extension releases that predate the bundle
       - uses: actions/upload-artifact@v7
         with:
           name: jar
@@ -199,8 +194,7 @@ jobs:
 
   release:
     name: Release
-    # TEMPORARY: also release (as a draft) on push to the PR branch; remove before merging
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_name == 'java25-aot-bundle')
+    if: github.event_name == 'workflow_dispatch'
     needs: [build, smoke]
     runs-on: ubuntu-24.04
     permissions:
@@ -222,7 +216,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: v${{ needs.build.outputs.version }}
-          DRAFT: ${{ github.event_name != 'workflow_dispatch' || inputs.draft }}
+          DRAFT: ${{ inputs.draft }}
         run: |
           # re-running updates the assets of an existing release
           if gh release view "$TAG" > /dev/null 2>&1; then

@@ -117,7 +117,7 @@ To make a new release of the language server:
 3. Run the [Bundle](.github/workflows/bundle.yml) workflow manually from the same branch of the language server, with the release version (e.g. `26.10.1`). The workflow builds the bundles for all platforms, tests each one on its platform, and creates a draft GitHub release `v<version>` with the bundles, their SHA-256 checksums, and the language server JAR.
 4. Add a list of notable changes to the draft release and publish it. The release tag is created at the built commit when the release is published. No release commit.
 
-The JAR is included for releases of the VS Code extension that predate the bundle, so it must run on Java 17 for stable branches up to `STABLE-26.10.x`. It will be removed starting with 27.04.
+The JAR is included as a fallback for platforms without a bundle and for releases of the VS Code extension that predate the bundle, so it must run on Java 17.
 
 Stable branches that predate the bundle (`STABLE-26.04.x` and earlier) are released with the language server JAR only:
 
