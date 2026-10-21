@@ -68,6 +68,9 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Build bundles
+        env:
+          # for the Corretto release notes (GitHub API rate limit)
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           ./gradlew bundleAll "-Pversion=${{ steps.version.outputs.version }}"
           cd build/bundle

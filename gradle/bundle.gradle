@@ -10,30 +10,120 @@
 // The AOT cache is created by the launcher on the user's machine (see src/bundle/nextflow-lsp).
 //   build/bundle/nextflow-language-server-<version>-<os>-<arch>.tar.gz
 //
-// The runtime is linked from a pinned Corretto release, with the jlink of the host JDK
+// The runtime is linked from the latest Corretto 25 release, with the jlink of the host JDK
 // and the jmods of the target JDK, so that every target can be built on any supported host.
 //
 //   ./gradlew bundle                        current OS/arch, verified by training the AOT cache
 //   ./gradlew bundleAll                     all targets
 //   ./gradlew bundleAll -Pversion=<version> override the version (default: git describe)
+//   -PcorrettoVersion=<version>             override the Corretto release (default: latest)
 
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.regex.Pattern
 import javax.inject.Inject
 import org.apache.tools.ant.filters.FixCrLfFilter
 
 /**
- * Downloads a JDK archive into a shared cache, verifies its
+ * Resolves the Corretto release of the bundled runtime (the given version, or the latest
+ * one of every target) and the SHA-256 checksums of its archives, from its GitHub release.
+ */
+abstract class CorrettoRelease extends DefaultTask {
+
+    @Input
+    abstract Property<Integer> getFeatureVersion()
+
+    @Input
+    @Optional
+    abstract Property<String> getVersion()
+
+    /** Archive suffix of each target, e.g. linux-x64 -> linux-x64.tar.gz. */
+    @Input
+    abstract MapProperty<String,String> getArchives()
+
+    /** Name of the latest archive of each target, e.g. linux-x64 -> x64-linux-jdk.tar.gz. */
+    @Input
+    abstract MapProperty<String,String> getLatestArchives()
+
+    @Internal
+    abstract Property<Boolean> getOffline()
+
+    @OutputFile
+    abstract RegularFileProperty getOutputFile()
+
+    CorrettoRelease() {
+        // the latest release can change at any time
+        outputs.upToDateWhen { false }
+    }
+
+    @TaskAction
+    void run() {
+        final output = outputFile.get().asFile
+        if( offline.get() && output.exists() ) {
+            logger.warn("Offline: using the previously resolved Corretto release")
+            return
+        }
+        final version = this.version.getOrElse(latestVersion())
+        final notes = fetch("https://api.github.com/repos/corretto/corretto-${featureVersion.get()}/releases/tags/${version}")
+        final body = (new JsonSlurper().parseText(notes) as Map).body as String
+        final result = archives.get().collectEntries { target, suffix ->
+            // e.g. [amazon-corretto-<version>-linux-x64.tar.gz](<url>)|`<md5>` /<br /> `<sha256>`|
+            final name = "amazon-corretto-$version-$suffix"
+            final m = body =~ /\[${Pattern.quote(name)}\]\((https:[^)]+)\)\|`[0-9a-f]{32}` \/<br \/> `([0-9a-f]{64})`/
+            if( !m.find() )
+                throw new GradleException("No checksum for ${name} in the release notes of Corretto ${version}")
+            [target, [url: m.group(1), sha256: m.group(2)]]
+        }
+        logger.lifecycle("Corretto release: ${version}")
+        output.text = JsonOutput.prettyPrint(JsonOutput.toJson([version: version, archives: result]))
+    }
+
+    /**
+     * Gets the version that the latest download link of every target redirects to,
+     * since the latest GitHub release can be specific to one platform.
+     */
+    private String latestVersion() {
+        final versions = latestArchives.get().values().collect { name ->
+            final conn = (HttpURLConnection) URI.create("https://corretto.aws/downloads/latest/amazon-corretto-${featureVersion.get()}-${name}").toURL().openConnection()
+            conn.instanceFollowRedirects = false
+            conn.requestMethod = 'HEAD'
+            final location = conn.getHeaderField('Location')
+            conn.disconnect()
+            if( !location )
+                throw new GradleException("Can't resolve the latest Corretto release of ${name} (HTTP ${conn.responseCode})")
+            location.tokenize('/')[-2]
+        }.unique()
+        if( versions.size() != 1 )
+            throw new GradleException("The latest Corretto release differs between targets: ${versions.join(', ')}")
+        return versions.first()
+    }
+
+    private static String fetch(String url) {
+        final conn = URI.create(url).toURL().openConnection()
+        // authenticated requests have a higher rate limit
+        final token = System.getenv('GITHUB_TOKEN')
+        if( token )
+            conn.setRequestProperty('Authorization', "Bearer ${token}")
+        return conn.inputStream.withCloseable { it.getText('UTF-8') }
+    }
+}
+
+/**
+ * Downloads the JDK archive of a target into a shared cache, verifies its
  * SHA-256 checksum, and extracts the JDK home directory.
  */
 abstract class JdkDownload extends DefaultTask {
 
-    @Input
-    abstract Property<String> getUrl()
+    /** Output of {@link CorrettoRelease}. */
+    @InputFile
+    @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getRelease()
 
     @Input
-    abstract Property<String> getSha256()
+    abstract Property<String> getTarget()
 
     /** Download cache, shared across builds. */
     @Internal
@@ -53,16 +143,20 @@ abstract class JdkDownload extends DefaultTask {
 
     @TaskAction
     void run() {
-        final archive = new File(cacheDirectory.get().asFile, url.get().tokenize('/').last())
-        if( !archive.exists() || sha256(archive) != sha256.get() ) {
-            logger.lifecycle("Downloading ${url.get()}")
+        final json = new JsonSlurper().parse(release.get().asFile) as Map
+        final config = (json.archives as Map)[target.get()] as Map
+        final url = config.url as String
+        final expected = config.sha256 as String
+        final archive = new File(cacheDirectory.get().asFile, url.tokenize('/').last())
+        if( !archive.exists() || sha256(archive) != expected ) {
+            logger.lifecycle("Downloading ${url}")
             archive.parentFile.mkdirs()
             final tmp = new File(archive.path + '.part')
-            URI.create(url.get()).toURL().withInputStream { input -> Files.copy(input, tmp.toPath(), StandardCopyOption.REPLACE_EXISTING) }
+            URI.create(url).toURL().withInputStream { input -> Files.copy(input, tmp.toPath(), StandardCopyOption.REPLACE_EXISTING) }
             final actual = sha256(tmp)
-            if( actual != sha256.get() ) {
+            if( actual != expected ) {
                 tmp.delete()
-                throw new GradleException("Checksum mismatch for ${url.get()}: expected ${sha256.get()}, got ${actual}")
+                throw new GradleException("Checksum mismatch for ${url}: expected ${expected}, got ${actual}")
             }
             Files.move(tmp.toPath(), archive.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
@@ -197,14 +291,13 @@ interface ExecServices {
     ExecOperations getExec()
 }
 
-// pinned Corretto release for the bundled runtime, with the SHA-256 checksums
-// from https://github.com/corretto/corretto-25/releases/tag/<version>
-final correttoVersion = '25.0.3.9.1'
+// Java version of the bundled runtime, and the Corretto archives of each target
+final javaVersion = 25
 final targets = [
-    'linux-x64'  : [corretto: 'linux-x64.tar.gz', sha256: '00486fa402136f8d40512b101c645dd4db9be2b5535171530ad241cd96c1223d'],
-    'linux-arm64': [corretto: 'linux-aarch64.tar.gz', sha256: '8b1fd78bbd1f188f3884f580be674727174635252c0d4d6dfa7cd15de51879ce'],
-    'macos-arm64': [corretto: 'macosx-aarch64.tar.gz', sha256: '614107ed76e9fb86d62d8cf2686a9cc4b3a11c019502ca3ba605fc5d51f4d7bb'],
-    'windows-x64': [corretto: 'windows-x64-jdk.zip', sha256: '3404a8be08f0fdbbd24c9bbdda79ba1ded87b264a833247b2124ac45da1c16e0'],
+    'linux-x64'  : [corretto: 'linux-x64.tar.gz', latest: 'x64-linux-jdk.tar.gz'],
+    'linux-arm64': [corretto: 'linux-aarch64.tar.gz', latest: 'aarch64-linux-jdk.tar.gz'],
+    'macos-arm64': [corretto: 'macosx-aarch64.tar.gz', latest: 'aarch64-macos-jdk.tar.gz'],
+    'windows-x64': [corretto: 'windows-x64-jdk.zip', latest: 'x64-windows-jdk.zip'],
 ]
 
 final hostTarget = providers.systemProperty('os.name').zip(providers.systemProperty('os.arch')) { name, arch ->
@@ -228,11 +321,21 @@ final trainingRepo = 'https://github.com/nf-core/methylseq'
 final trainingTag = '4.2.0'
 final trainingDir = layout.buildDirectory.dir('aot-train/methylseq')
 
+final correttoRelease = tasks.register('correttoRelease', CorrettoRelease) {
+    description = "Resolves the Corretto $javaVersion release of the bundled runtime."
+    featureVersion = javaVersion
+    version = providers.gradleProperty('correttoVersion')
+    archives = targets.collectEntries { target, config -> [target, config.corretto] }
+    latestArchives = targets.collectEntries { target, config -> [target, config.latest] }
+    offline = gradle.startParameter.offline
+    outputFile = layout.buildDirectory.file('jdk/corretto.json')
+}
+
 final jdks = targets.collectEntries { target, config ->
     [target, tasks.register("jdk${taskSuffix(target)}", JdkDownload) {
-        description = "Downloads the Corretto $correttoVersion JDK for $target."
-        url = "https://corretto.aws/downloads/resources/$correttoVersion/amazon-corretto-$correttoVersion-${config.corretto}".toString()
-        sha256 = config.sha256
+        description = "Downloads the Corretto JDK for $target."
+        release = correttoRelease.flatMap { it.outputFile }
+        it.target = target
         cacheDirectory = new File(gradle.gradleUserHomeDir, 'caches/corretto')
         jdkHome = layout.buildDirectory.dir("jdk/$target")
     }]
@@ -246,7 +349,7 @@ final hostJdk = hostSupported
 final jdeps = tasks.register('jdeps', JdepsModules) {
     classpath.from(tasks.named('shadowJar'))
     jdkHome = hostJdk
-    release = correttoVersion.tokenize('.')[0] as int
+    release = javaVersion
     // jdk.zipfs: loaded via ServiceLoader, used by Groovy to find the default imports in the jar
     extraModules = ['jdk.zipfs']
     modulesFile = layout.buildDirectory.file('jdeps/modules.txt')
