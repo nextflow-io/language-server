@@ -7,8 +7,15 @@ pipeline (nf-core/rnaseq) and reports latency statistics for typical LSP
 operations. Every response is validated, so the benchmark also serves as an
 end-to-end integration test (non-zero exit on failure).
 
+The session covers startup and workspace indexing, opening and editing a file,
+and common requests (hover, completion, definition, references, rename, etc).
+didOpen/didChange are measured up to the corresponding diagnostics, so they
+include the server's 1 second update debounce. The peak RSS of the server is
+also reported.
+
 Usage:
   scripts/bench.py --workspace build/bench/rnaseq [--iterations 10] [--json out.json]
+  scripts/bench.py --workspace build/bench/rnaseq --server-cmd ./nextflow-lsp
 
 The JSON output contains per-scenario summaries (`results`) and raw samples in
 ms (`samples`), which can be compared across builds with scripts/bench_diff.py.

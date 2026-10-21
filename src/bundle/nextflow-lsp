@@ -10,8 +10,11 @@
 #   NXF_LSP_JAVA_OPTS       extra JVM options
 #   NXF_LSP_AOT=false       do not use or create the AOT cache
 #
-# The AOT cache speeds up startup and warm-up. It is created on first launch,
-# in the background, in lib/ if writable, otherwise in the user cache directory.
+# The AOT cache speeds up startup and warm-up. It is only valid for the exact
+# runtime, jar and JVM options, so it is created on the user's machine: on first
+# launch, the server starts without it while it is trained in the background
+# (~30 s, at low priority) on lib/training/. It is stored in lib/ if writable,
+# otherwise in the user cache directory, and recreated when the jar is newer.
 #
 
 BUNDLE_NAME='@bundleName@'
