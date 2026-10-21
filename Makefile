@@ -13,11 +13,15 @@ install:
 ifndef VERSION
 	$(error VERSION is required, e.g. `VERSION=<version> make install`)
 endif
-	./gradlew shadowJar
-	$(eval STABLE := v$(shell echo $(VERSION) | cut -d. -f1-2))
-	@mkdir -p ~/.nextflow/lsp/$(STABLE)
-	@cp build/libs/language-server-all.jar ~/.nextflow/lsp/$(STABLE)/v$(VERSION).jar
-	@echo "installed at: ~/.nextflow/lsp/$(STABLE)/v$(VERSION).jar"
+	./gradlew bundle -Pversion=$(VERSION)
+	scripts/install.sh --version $(VERSION)
+
+.PHONY: bundle bundle-all
+bundle:
+	./gradlew bundle
+
+bundle-all:
+	./gradlew bundleAll
 
 .PHONY: bench bench-compare
 bench:

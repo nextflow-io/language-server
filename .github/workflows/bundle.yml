@@ -1,0 +1,190 @@
+# Builds the standalone bundles for all targets on Linux, smoke-tests each one
+# on a native runner, and attaches them (and the jar) to a GitHub release when run manually.
+name: Bundle
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, e.g. 26.10.0 (the release is tagged v<version>)'
+        required: true
+        type: string
+      draft:
+        description: 'Create the release as a draft'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # tags are needed for the version (git describe)
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: corretto
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            version=${INPUT_VERSION#v}
+          else
+            version=$(git describe --tags --always)
+            version=${version#v}
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build bundles
+        env:
+          # for the Corretto release notes (GitHub API rate limit)
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          ./gradlew bundleAll "-Pversion=${{ steps.version.outputs.version }}"
+          cd build/bundle
+          for f in *.tar.gz; do
+            sha256sum "$f" > "$f.sha256"
+          done
+
+      # the jar is the fallback for platforms without a bundle and for extension releases that predate the bundle
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jar
+          path: build/libs/language-server-all.jar
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bundle-linux-x64
+          path: build/bundle/*-linux-x64.tar.gz*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bundle-linux-arm64
+          path: build/bundle/*-linux-arm64.tar.gz*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bundle-macos-arm64
+          path: build/bundle/*-macos-arm64.tar.gz*
+          if-no-files-found: error
+
+  smoke:
+    name: Smoke test (${{ matrix.target }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+          - target: macos-arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: bundle-${{ matrix.target }}
+          path: dist
+
+      - name: Extract
+        run: |
+          cd dist
+          shasum -a 256 -c ./*.sha256
+          tarball=$(ls ./*.tar.gz)
+          tar -xzf "$tarball"
+          home=$PWD/$(basename "$tarball" .tar.gz)
+          "$home/runtime/bin/java" -version
+          echo "LSP_HOME=$home" >> "$GITHUB_ENV"
+
+      - name: Train the AOT cache
+        run: |
+          "$LSP_HOME/bin/nextflow-lsp" --train
+          test -s "$LSP_HOME/lib/nextflow-lsp.aot"
+
+      - name: Check that the AOT cache is accepted
+        run: |
+          # fails if the cache is rejected; stdout is the LSP channel, so it must stay silent
+          msg='{"jsonrpc":"2.0","method":"exit"}'
+          printf 'Content-Length: %d\r\n\r\n%s' "${#msg}" "$msg" \
+            | NXF_LSP_JAVA_OPTS=-XX:AOTMode=on "$LSP_HOME/bin/nextflow-lsp" > stdout.txt
+          if [ -s stdout.txt ]; then
+            echo "Server wrote to stdout without a client:"
+            cat stdout.txt
+            exit 1
+          fi
+
+      - name: Benchmark
+        run: |
+          scripts/bench-workspace.sh
+          python3 scripts/bench.py --workspace build/bench/rnaseq --server-cmd "$LSP_HOME/bin/nextflow-lsp" --iterations 3 --cold-iterations 1
+
+  release:
+    name: Release
+    if: github.event_name == 'workflow_dispatch'
+    needs: [build, smoke]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bundle-*
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: jar
+          path: dist
+
+      - name: Attach bundles to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: v${{ needs.build.outputs.version }}
+          DRAFT: ${{ inputs.draft }}
+        run: |
+          # re-running updates the assets of an existing release
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            # the tag is created at the built commit when the release is published
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "$TAG" --notes "" \
+              $( [ "$DRAFT" = true ] && echo --draft )
+          fi

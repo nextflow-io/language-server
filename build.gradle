@@ -14,14 +14,17 @@ repositories {
 
 java {
   toolchain {
-    languageVersion = JavaLanguageVersion.of(21)
+    languageVersion = JavaLanguageVersion.of(25)
+    vendor = JvmVendorSpec.AMAZON
   }
-  sourceCompatibility = JavaVersion.VERSION_17
-  targetCompatibility = JavaVersion.VERSION_17
+}
+
+// the jar also runs on the user's Java, so it targets the minimum Java version of Nextflow
+tasks.withType(JavaCompile).configureEach {
+  options.release = 17
 }
 
 compileJava {
-  options.release.set(17)
   options.compilerArgs << '-parameters'
 }
 
@@ -41,19 +44,35 @@ tasks.withType(GroovyCompile).configureEach {
   groovyClasspath = configurations.groovyCompiler
 }
 
+// nf-lang depends on the full ANTLR tool (and its deps ST4, antlr3, treelayout), but its
+// generated parsers only need the ANTLR runtime (at the same version)
+configurations.matching { it.name in ['compileClasspath', 'runtimeClasspath', 'testCompileClasspath', 'testRuntimeClasspath'] }.configureEach {
+  resolutionStrategy.eachDependency {
+    if( requested.group == 'me.sunlan' && requested.name == 'antlr4' ) {
+      useTarget("me.sunlan:antlr4-runtime:${requested.version}")
+      because 'only the ANTLR runtime is needed'
+    }
+  }
+}
+
 dependencies {
   groovyCompiler 'org.apache.groovy:groovy:4.0.33'
 
   implementation 'io.nextflow:nf-lang:26.10.0'
   implementation 'org.apache.groovy:groovy:4.0.33'
   implementation 'org.apache.groovy:groovy-json:4.0.33'
-  implementation 'org.apache.groovy:groovy-yaml:4.0.33'
+  // Jackson is only used internally (by YamlConverter) when YAML is actually parsed or built,
+  // whereas the language server only resolves YamlSlurper/YamlBuilder when checking scripts
+  implementation('org.apache.groovy:groovy-yaml:4.0.33') {
+    exclude group: 'com.fasterxml.jackson.core'
+    exclude group: 'com.fasterxml.jackson.dataformat'
+  }
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.0'
   implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.23.0'
 
   // runtime dependencies for Nextflow scripts
   runtimeOnly 'org.apache.groovy:groovy-templates:4.0.33'
-  runtimeOnly 'org.yaml:snakeyaml:2.2'
+  runtimeOnly 'org.yaml:snakeyaml:2.4'
 
   // include Nextflow runtime at build-time to extract language definitions
   nextflowRuntime 'io.nextflow:nextflow:26.10.0'
@@ -116,4 +135,13 @@ application {
 
 shadowJar {
   archiveVersion = ''
+  // Groovy shades the full ANTLR tool, but its parser only needs the ANTLR runtime
+  // (groovyjarjarantlr4/v4/runtime), and nf-lang uses its own parser anyway
+  exclude 'groovyjarjarantlr4/runtime/**'     // ANTLR 3 runtime, used only by the tool
+  exclude 'groovyjarjarantlr4/v4/*.class'     // Tool
+  ['analysis', 'automata', 'codegen', 'gui', 'misc', 'parse', 'semantics', 'tool', 'unicode'].each {
+    exclude "groovyjarjarantlr4/v4/${it}/**"
+  }
 }
+
+apply from: 'gradle/bundle.gradle'

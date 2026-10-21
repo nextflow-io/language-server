@@ -1,0 +1,117 @@
+#!/bin/sh
+#
+# Launcher for the Nextflow language server.
+#
+# Usage:
+#   nextflow-lsp            start the server on stdio
+#   nextflow-lsp --train    create the AOT cache in the foreground
+#
+# Environment:
+#   NXF_LSP_JAVA_OPTS       extra JVM options
+#   NXF_LSP_AOT=false       do not use or create the AOT cache
+#
+# The AOT cache speeds up startup and warm-up. It is only valid for the exact
+# runtime, jar and JVM options, so it is created on the user's machine: on first
+# launch, the server starts without it while it is trained in the background
+# (~30 s, at low priority) on lib/training/. It is stored in lib/ if writable,
+# otherwise in the user cache directory, and recreated when the jar is newer.
+#
+
+BUNDLE_NAME='@bundleName@'
+BUNDLE_OS='@os@'
+
+# resolve symlinks to find the installation directory
+app_path=$0
+while [ -h "$app_path" ]; do
+    link=$(readlink "$app_path")
+    case $link in
+        /*) app_path=$link ;;
+        *) app_path=$(dirname "$app_path")/$link ;;
+    esac
+done
+LSP_HOME=$(cd "$(dirname "$app_path")/.." && pwd -P) || exit 1
+JAVA=$LSP_HOME/runtime/bin/java
+JAR=$LSP_HOME/lib/language-server-all.jar
+
+# stdout is the LSP channel, so all JVM messages go to stderr.
+# compressed oops are forced so that the AOT cache is also accepted on hosts with >= 128 GB RAM.
+# the AOT cache records the JVM options, so training uses the same ones
+JVM_OPTS="-XX:+UseCompressedOops -XX:+DisplayVMOutputToStderr -Xlog:disable -Xlog:all=warning:stderr $NXF_LSP_JAVA_OPTS"
+
+if [ -w "$LSP_HOME/lib" ]; then
+    AOT_DIR=$LSP_HOME/lib
+else
+    case $BUNDLE_OS in
+        macos) AOT_DIR=$HOME/Library/Caches ;;
+        *) AOT_DIR=${XDG_CACHE_HOME:-$HOME/.cache} ;;
+    esac
+    # keyed by installation, since the cache is only valid for the jar it was trained with
+    AOT_DIR=$AOT_DIR/nextflow-lsp/$BUNDLE_NAME-$(printf '%s' "$LSP_HOME" | cksum | cut -d' ' -f1)
+fi
+AOT=$AOT_DIR/nextflow-lsp.aot
+
+# usage: aot_train [command prefix, e.g. nice]
+# trains the AOT cache with the same runtime, jar and JVM options as the server,
+# and replaces it atomically
+aot_train() {
+    mkdir -p "$AOT_DIR" || return 1
+    tmp=$AOT.$$.tmp
+    # classes that can't be archived (e.g. generated or old bytecode) are reported as warnings
+    # shellcheck disable=SC2086
+    if "$@" "$JAVA" $JVM_OPTS -Xlog:aot=error:stderr "-XX:AOTCacheOutput=$tmp" -cp "$JAR" nextflow.lsp.AotTraining "$LSP_HOME/lib/training" && [ -s "$tmp" ] && mv -f "$tmp" "$AOT"; then
+        rm -f "$AOT.failed"
+    else
+        rm -f "$tmp" "$tmp.config"
+        return 1
+    fi
+}
+
+# trains the AOT cache in the background, at low priority and detached from the
+# server streams, unless another launcher is already doing it
+aot_train_background() {
+    mkdir -p "$AOT_DIR" 2>/dev/null || return
+    lock=$AOT.lock
+    if ! mkdir "$lock" 2>/dev/null; then
+        # stale if the trainer died, or after 30 minutes
+        pid=$(cat "$lock/pid" 2>/dev/null)
+        if { [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; } || [ -n "$(find "$lock" -prune -mmin +30 2>/dev/null)" ]; then
+            rm -rf "$lock"
+            mkdir "$lock" 2>/dev/null || return
+        else
+            return
+        fi
+    fi
+    (
+        trap '' HUP
+        trap 'rm -rf "$lock"' EXIT
+        aot_train nice -n 19 || : >"$AOT.failed"
+    ) </dev/null >"$AOT.log" 2>&1 &
+    echo $! >"$lock/pid"
+}
+
+newer() {
+    [ -n "$(find "$1" -prune -newer "$2" 2>/dev/null)" ]
+}
+
+if [ "$1" = --train ]; then
+    if aot_train; then
+        echo "AOT cache created: $AOT" >&2
+        exit 0
+    fi
+    echo "AOT cache training failed" >&2
+    exit 1
+fi
+
+aot_opt=
+if [ "$NXF_LSP_AOT" != false ]; then
+    # the cache is only valid for the jar it was trained with
+    if [ -f "$AOT" ] && newer "$AOT" "$JAR"; then
+        aot_opt=-XX:AOTCache=$AOT
+    # do not retry a failed training until the jar changes (or --train is used)
+    elif ! newer "$AOT.failed" "$JAR"; then
+        aot_train_background
+    fi
+fi
+
+# shellcheck disable=SC2086
+exec "$JAVA" $JVM_OPTS ${aot_opt:+"$aot_opt"} -jar "$JAR" "$@"

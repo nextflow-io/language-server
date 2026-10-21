@@ -2,6 +2,11 @@
 #
 # Compare a base version of the language server against the current checkout.
 #
+# The base ref is built in a git worktree. The benchmark is run alternately for
+# base and head in each round, and the pooled samples are compared with
+# scripts/bench_diff.py: a change is reported only if it is significant
+# (Mann-Whitney U test, p < 0.05) and at least 5%.
+#
 # Usage: scripts/bench-compare.sh [options] [-- bench.py args]
 #
 #   --base REF             git ref to build as the base (default: main)
@@ -37,7 +42,7 @@ while [[ $# -gt 0 ]]; do
         --cold-iterations) cold_iterations="$2"; shift 2 ;;
         --out)             out="$2"; shift 2 ;;
         --) shift; extra=("$@"); break ;;
-        -h|--help) sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 1 ;;
     esac
 done
