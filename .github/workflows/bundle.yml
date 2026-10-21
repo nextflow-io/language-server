@@ -1,5 +1,5 @@
 # Builds the standalone bundles for all targets on Linux, smoke-tests each one
-# on a native runner, and attaches them to a GitHub release when run manually.
+# on a native runner, and attaches them (and the jar) to a GitHub release when run manually.
 name: Bundle
 
 on:
@@ -74,6 +74,13 @@ jobs:
           for f in *.tar.gz; do
             sha256sum "$f" > "$f.sha256"
           done
+
+      # TODO: remove the jar for 27.04, it is only needed by extension releases that predate the bundle
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jar
+          path: build/libs/language-server-all.jar
+          if-no-files-found: error
 
       - uses: actions/upload-artifact@v7
         with:
@@ -163,6 +170,11 @@ jobs:
           pattern: bundle-*
           path: dist
           merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: jar
+          path: dist
 
       - name: Attach bundles to the release
         env:

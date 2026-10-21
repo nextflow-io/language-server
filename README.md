@@ -16,7 +16,7 @@ The following language features are currently supported:
 
 ## Requirements
 
-The language server requires Java 25 or later. The standalone bundle includes its own Java runtime.
+The language server is distributed as a standalone bundle that includes its own Java runtime, for Linux (x64, arm64) and macOS (arm64). Windows is not supported.
 
 Building requires a Corretto 25 JDK, which Gradle downloads if no matching JDK is installed.
 
@@ -36,7 +36,7 @@ git clone https://github.com/nextflow-io/nextflow ../nextflow
 make
 ```
 
-To run the language server:
+To run the language server (requires Java 25 or later):
 
 ```sh
 java -jar build/libs/language-server-all.jar
@@ -63,6 +63,16 @@ make bundle-all
 Each bundle (`build/bundle/nextflow-language-server-<version>-<os>-<arch>`, plus a `.tar.gz`) contains the shadow jar, a `jlink` runtime with only the required JDK modules, and a training workspace (the script and config files of [nf-core/methylseq](https://github.com/nf-core/methylseq)). The runtime is linked from a pinned Corretto release (see `gradle/bundle.gradle`), which is downloaded for each platform and verified against its SHA-256 checksum. The version is taken from `git describe`, and can be overridden with `-Pversion=<version>`. Only the bundle for the current OS/arch is tested by the build; the CI tests each bundle on its platform. Run the server with `bin/nextflow-lsp`; extra JVM options can be passed with `NXF_LSP_JAVA_OPTS`, and JVM messages are written to stderr.
 
 The launcher uses an AOT cache to speed up startup and warm-up. The cache is created on the user's machine, since it is only valid for the exact runtime, jar and JVM options. On first launch, the server starts without it while the cache is trained in the background (~30 s, at low priority), which indexes, edits and queries every file of the training workspace. Run `bin/nextflow-lsp --train` to create it in the foreground instead (e.g. after installing the bundle), or set `NXF_LSP_AOT=false` to disable it. The cache is stored in `lib/` if writable, otherwise in the user cache directory (`$XDG_CACHE_HOME` or `~/.cache` on Linux, `~/Library/Caches` on macOS), and it is recreated when the jar is newer.
+
+### Testing with VS Code
+
+To install a local build for the [Nextflow VS Code extension](https://github.com/nextflow-io/vscode-language-nextflow):
+
+```sh
+VERSION=<version> make install
+```
+
+This builds the bundle for the current platform with the given version and extracts it into `~/.nextflow/lsp/vX.Y/`, where the extension looks for language server versions. The version should match the release line selected in the extension (`nextflow.languageVersion`). Releases of the extension that predate the bundle use the `~/.nextflow/lsp/vX.Y/nextflow-lsp` executable if present, so it is linked to the launcher of the installed bundle.
 
 ## Testing
 
@@ -102,11 +112,19 @@ When updating the nf-lang version in `build.gradle`, make sure to also update th
 
 To make a new release of the language server:
 
-1. Checkout the appropriate branch of Nextflow (`STABLE-*` if present, otherwise `master`).
-2. Checkout the appropriate branch of the language server (`STABLE-*` if present, otherwise `main`).
-3. Build the language server locally.
-4. Run `make test` and `make bench`. Stop the release if anything fails.
-5. Create a new GitHub release with the language server JAR and a list of notable changes. No release commit.
+1. Checkout the appropriate branch of Nextflow (`STABLE-*` if present, otherwise `master`) and the language server (`STABLE-*` if present, otherwise `main`).
+2. Run `make test` and `make bench`. Stop the release if anything fails.
+3. Run the [Bundle](.github/workflows/bundle.yml) workflow manually from the same branch of the language server, with the release version (e.g. `26.10.1`). The workflow builds the bundles for all platforms, tests each one on its platform, and creates a draft GitHub release `v<version>` with the bundles, their SHA-256 checksums, and the language server JAR.
+4. Add a list of notable changes to the draft release and publish it. The release tag is created at the built commit when the release is published. No release commit.
+
+The JAR is included for releases of the VS Code extension that predate the bundle, so it must run on Java 17 for stable branches up to `STABLE-26.10.x`. It will be removed starting with 27.04.
+
+Stable branches that predate the bundle (`STABLE-26.04.x` and earlier) are released with the language server JAR only:
+
+1. Checkout the appropriate branch of Nextflow (`STABLE-*`) and the language server (`STABLE-*`).
+2. Build the language server locally.
+3. Run `make test` and `make bench`. Stop the release if anything fails.
+4. Create a new GitHub release with the language server JAR (`build/libs/language-server-all.jar`) and a list of notable changes. No release commit.
 
 ## Troubleshooting
 
