@@ -16,7 +16,7 @@ The following language features are currently supported:
 
 ## Requirements
 
-The language server is distributed as a standalone bundle that includes its own Java runtime, for Linux (x64, arm64), macOS (arm64) and Windows (x64). The language server is also released as a jar for other platforms, which requires Java 17 or later.
+The language server is distributed as a standalone bundle that includes its own Java runtime, for Linux (x64, arm64) and macOS (arm64). The language server is also released as a jar for other platforms, which requires Java 17 or later.
 
 Building requires a Corretto 25 JDK, which Gradle downloads if no matching JDK is installed.
 
@@ -46,7 +46,7 @@ Protocol messages are exchanged using standard input/output.
 
 ### Standalone bundle
 
-Standalone bundles are built for Linux (x64, arm64), macOS (arm64) and Windows (x64).
+Standalone bundles are built for Linux (x64, arm64) and macOS (arm64).
 
 To build a standalone bundle for the current OS/arch:
 
@@ -54,15 +54,15 @@ To build a standalone bundle for the current OS/arch:
 make bundle
 ```
 
-To build the bundles for all platforms (on any supported host; Windows can't be used as a host):
+To build the bundles for all platforms (on any supported host):
 
 ```sh
 make bundle-all
 ```
 
-Each bundle (`build/bundle/nextflow-language-server-<version>-<os>-<arch>`, plus a `.tar.gz`) contains the shadow jar, a `jlink` runtime with only the required JDK modules, and a training workspace (the script and config files of [nf-core/methylseq](https://github.com/nf-core/methylseq)), except on Windows. The runtime is linked from the latest Corretto 25 release, which is downloaded for each platform and verified against the SHA-256 checksum from its [GitHub release](https://github.com/corretto/corretto-25/releases). The Corretto version can be overridden with `-PcorrettoVersion=<version>`, and is recorded in `runtime/release`. The version is taken from `git describe`, and can be overridden with `-Pversion=<version>`. Only the bundle for the current OS/arch is tested by the build; the CI tests each bundle on its platform. Run the server with `bin/nextflow-lsp` (`bin\nextflow-lsp.cmd` on Windows); extra JVM options can be passed with `NXF_LSP_JAVA_OPTS`, and JVM messages are written to stderr.
+Each bundle (`build/bundle/nextflow-language-server-<version>-<os>-<arch>`, plus a `.tar.gz`) contains the shadow jar, a `jlink` runtime with only the required JDK modules, and a training workspace (the script and config files of [nf-core/methylseq](https://github.com/nf-core/methylseq)). The runtime is linked from the latest Corretto 25 release, which is downloaded for each platform and verified against the SHA-256 checksum from its [GitHub release](https://github.com/corretto/corretto-25/releases). The Corretto version can be overridden with `-PcorrettoVersion=<version>`, and is recorded in `runtime/release`. The version is taken from `git describe`, and can be overridden with `-Pversion=<version>`. Only the bundle for the current OS/arch is tested by the build; the CI tests each bundle on its platform. Run the server with `bin/nextflow-lsp`; extra JVM options can be passed with `NXF_LSP_JAVA_OPTS`, and JVM messages are written to stderr.
 
-The launcher uses an AOT cache to speed up startup and warm-up. The cache is created on the user's machine, since it is only valid for the exact runtime, jar and JVM options. On first launch, the server starts without it while the cache is trained in the background (~30 s, at low priority), which indexes, edits and queries every file of the training workspace. Run `bin/nextflow-lsp --train` to create it in the foreground instead (e.g. after installing the bundle), or set `NXF_LSP_AOT=false` to disable it. The cache is stored in `lib/` if writable, otherwise in the user cache directory (`$XDG_CACHE_HOME` or `~/.cache` on Linux, `~/Library/Caches` on macOS), and it is recreated when the jar is newer. There is no AOT cache on Windows yet: `--train` does nothing there.
+The launcher uses an AOT cache to speed up startup and warm-up. The cache is created on the user's machine, since it is only valid for the exact runtime, jar and JVM options. On first launch, the server starts without it while the cache is trained in the background (~30 s, at low priority), which indexes, edits and queries every file of the training workspace. Run `bin/nextflow-lsp --train` to create it in the foreground instead (e.g. after installing the bundle), or set `NXF_LSP_AOT=false` to disable it. The cache is stored in `lib/` if writable, otherwise in the user cache directory (`$XDG_CACHE_HOME` or `~/.cache` on Linux, `~/Library/Caches` on macOS), and it is recreated when the jar is newer.
 
 ### Testing with VS Code
 

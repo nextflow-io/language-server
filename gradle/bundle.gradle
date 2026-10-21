@@ -2,10 +2,9 @@
 //
 //   build/bundle/nextflow-language-server-<version>-<os>-<arch>/
 //     bin/nextflow-lsp              launcher (JVM options: NXF_LSP_JAVA_OPTS)
-//     bin/nextflow-lsp.cmd          launcher on Windows (no AOT cache)
 //     runtime/                      jlink image of the JDK modules found by jdeps
 //     lib/language-server-all.jar
-//     lib/training/                 AOT training workspace (nf-core/methylseq), except on Windows
+//     lib/training/                 AOT training workspace (nf-core/methylseq)
 //
 // The AOT cache is created by the launcher on the user's machine (see src/bundle/nextflow-lsp).
 //   build/bundle/nextflow-language-server-<version>-<os>-<arch>.tar.gz
@@ -25,7 +24,6 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.regex.Pattern
 import javax.inject.Inject
-import org.apache.tools.ant.filters.FixCrLfFilter
 
 /**
  * Resolves the Corretto release of the bundled runtime (the given version, or the latest
@@ -138,9 +136,6 @@ abstract class JdkDownload extends DefaultTask {
     @Inject
     protected abstract FileSystemOperations getFs()
 
-    @Inject
-    protected abstract ArchiveOperations getArchives()
-
     @TaskAction
     void run() {
         final json = new JsonSlurper().parse(release.get().asFile) as Map
@@ -161,14 +156,11 @@ abstract class JdkDownload extends DefaultTask {
             Files.move(tmp.toPath(), archive.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
 
-        // the JDK home is the top-level directory on Linux and Windows, and <name>.jdk/Contents/Home on macOS
+        // the JDK home is the top-level directory on Linux, and <name>.jdk/Contents/Home on macOS
         final extracted = temporaryDir
         fs.delete { delete(extracted) }
         extracted.mkdirs()
-        if( archive.name.endsWith('.zip') )
-            fs.copy { from(archives.zipTree(archive)); into(extracted) }
-        else
-            exec.exec { commandLine 'tar', '-xzf', archive.absolutePath, '-C', extracted.absolutePath }
+        exec.exec { commandLine 'tar', '-xzf', archive.absolutePath, '-C', extracted.absolutePath }
         final release = Files.find(extracted.toPath(), 4, { path, attrs -> path.fileName.toString() == 'release' && attrs.isRegularFile() })
             .withCloseable { it.findFirst() }
             .orElseThrow { new GradleException("No JDK found in ${archive}") }
@@ -297,18 +289,15 @@ final targets = [
     'linux-x64'  : [corretto: 'linux-x64.tar.gz', latest: 'x64-linux-jdk.tar.gz'],
     'linux-arm64': [corretto: 'linux-aarch64.tar.gz', latest: 'aarch64-linux-jdk.tar.gz'],
     'macos-arm64': [corretto: 'macosx-aarch64.tar.gz', latest: 'aarch64-macos-jdk.tar.gz'],
-    'windows-x64': [corretto: 'windows-x64-jdk.zip', latest: 'x64-windows-jdk.zip'],
 ]
 
 final hostTarget = providers.systemProperty('os.name').zip(providers.systemProperty('os.arch')) { name, arch ->
-    final o = name.startsWith('Linux') ? 'linux' : name.startsWith('Mac') ? 'macos' : name.startsWith('Windows') ? 'windows' : name
+    final o = name.startsWith('Linux') ? 'linux' : name.startsWith('Mac') ? 'macos' : name
     final a = arch in ['amd64', 'x86_64'] ? 'x64' : arch in ['aarch64', 'arm64'] ? 'arm64' : arch
     "$o-$a".toString()
 }.get()
-// the build (incl. the launcher check and the training workspace) requires a POSIX host
-final hosts = targets.keySet().findAll { !it.startsWith('windows') }
-final hostSupported = hostTarget in hosts
-final unsupportedHost = "Unsupported host platform for the bundle: $hostTarget (supported: ${hosts.join(', ')})".toString()
+final hostSupported = targets.containsKey(hostTarget)
+final unsupportedHost = "Unsupported host platform for the bundle: $hostTarget (supported: ${targets.keySet().join(', ')})".toString()
 
 // e.g. linux-x64 -> LinuxX64
 final taskSuffix = { String target -> target.tokenize('-')*.capitalize().join() }
@@ -366,8 +355,6 @@ final trainingWorkspace = tasks.register('aotTrainingWorkspace', Exec) {
 final bundleTars = targets.keySet().collect { target ->
     final suffix = taskSuffix(target)
     final targetOs = target.tokenize('-')[0]
-    // there is no AOT cache on Windows yet, so no training workspace
-    final windows = targetOs == 'windows'
     final bundleName = bundleVersion.map { "nextflow-language-server-$it-$target".toString() }
 
     final jlink = tasks.register("jlink$suffix", JlinkRuntime) {
@@ -391,18 +378,10 @@ final bundleTars = targets.keySet().collect { target ->
         inputs.property('trainingRepo', repo)
         inputs.property('trainingTag', tag)
         into(layout.buildDirectory.dir(bundleName.map { "bundle/$it" }))
-        if( windows ) {
-            from('src/bundle/nextflow-lsp.cmd') {
-                into 'bin'
-                filter(FixCrLfFilter, eol: FixCrLfFilter.CrLf.newInstance('crlf'))
-            }
-        }
-        else {
-            from('src/bundle/nextflow-lsp') {
-                into 'bin'
-                filePermissions { unix('rwxr-xr-x') }
-                filter { it.replace('@bundleName@', bundleName.get()).replace('@os@', targetOs) }
-            }
+        from('src/bundle/nextflow-lsp') {
+            into 'bin'
+            filePermissions { unix('rwxr-xr-x') }
+            filter { it.replace('@bundleName@', bundleName.get()).replace('@os@', targetOs) }
         }
         from(jlink) {
             into 'runtime'
@@ -413,17 +392,15 @@ final bundleTars = targets.keySet().collect { target ->
             }
         }
         from(jar) { into 'lib' }
-        if( !windows ) {
-            // the files read by the AOT training workload (incl. the parameter schema)
-            from(trainingWorkspace) {
-                into 'lib/training'
-                include '**/*.nf', '**/*.config', 'nextflow_schema.json', 'LICENSE'
-                exclude '**/tests/**', 'nf-test.config'
-            }
-            from('src/bundle/training/README.md') {
-                into 'lib/training'
-                filter { it.replace('@repo@', repo).replace('@tag@', tag) }
-            }
+        // the files read by the AOT training workload (incl. the parameter schema)
+        from(trainingWorkspace) {
+            into 'lib/training'
+            include '**/*.nf', '**/*.config', 'nextflow_schema.json', 'LICENSE'
+            exclude '**/tests/**', 'nf-test.config'
+        }
+        from('src/bundle/training/README.md') {
+            into 'lib/training'
+            filter { it.replace('@repo@', repo).replace('@tag@', tag) }
         }
     }
 
