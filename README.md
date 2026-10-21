@@ -46,13 +46,15 @@ Protocol messages are exchanged using standard input/output.
 
 ### Standalone bundle
 
-To build a standalone bundle for the current OS/arch (requires Python 3):
+To build a standalone bundle for the current OS/arch:
 
 ```sh
 make bundle
 ```
 
-The bundle (`build/bundle/nextflow-language-server-<version>-<os>-<arch>`, plus a `.tar.gz`) contains the shadow jar, a `jlink` runtime with only the required JDK modules, and an AOT cache (`lib/nextflow-lsp.aot`) that speeds up startup and warm-up. The runtime is built from the project's Java toolchain (Corretto 25). The AOT cache is trained at build time by `scripts/aot-train.py`, which indexes, edits and queries every file of [nf-core/methylseq](https://github.com/nf-core/methylseq). Run the server with `bin/nextflow-lsp`; extra JVM options can be passed with `NXF_LSP_JAVA_OPTS`. The cache is only valid for the bundled runtime and jar, and is rejected if the jar mtime changes, so copy the bundle with `tar` or `cp -p`. A rejected cache only makes startup slower; JVM messages are written to stderr.
+The bundle (`build/bundle/nextflow-language-server-<version>-<os>-<arch>`, plus a `.tar.gz`) contains the shadow jar, a `jlink` runtime with only the required JDK modules (built from the project's Java toolchain, Corretto 25), and a training workspace (the script and config files of [nf-core/methylseq](https://github.com/nf-core/methylseq)). Run the server with `bin/nextflow-lsp`; extra JVM options can be passed with `NXF_LSP_JAVA_OPTS`, and JVM messages are written to stderr.
+
+The launcher uses an AOT cache to speed up startup and warm-up. The cache is created on the user's machine, since it is only valid for the exact runtime, jar and JVM options. On first launch, the server starts without it while the cache is trained in the background (~30 s, at low priority), which indexes, edits and queries every file of the training workspace. Run `bin/nextflow-lsp --train` to create it in the foreground instead (e.g. after installing the bundle), or set `NXF_LSP_AOT=false` to disable it. The cache is stored in `lib/` if writable, otherwise in the user cache directory (`$XDG_CACHE_HOME` or `~/.cache` on Linux, `~/Library/Caches` on macOS), and it is recreated when the jar is newer.
 
 ## Testing
 

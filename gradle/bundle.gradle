@@ -4,7 +4,9 @@
 //     bin/nextflow-lsp              launcher (JVM options: NXF_LSP_JAVA_OPTS)
 //     runtime/                      jlink image of the JDK modules found by jdeps
 //     lib/language-server-all.jar
-//     lib/nextflow-lsp.aot          AOT cache, valid only for this runtime and jar (incl. its mtime)
+//     lib/training/                 AOT training workspace (nf-core/methylseq)
+//
+// The AOT cache is created by the launcher on the user's machine (see src/bundle/nextflow-lsp).
 //   build/bundle/nextflow-language-server-<version>-<os>-<arch>.tar.gz
 
 import javax.inject.Inject
@@ -117,7 +119,6 @@ final bundleName = os.zip(arch) { o, a -> "$o-$a" }.zip(bundleVersion) { p, v ->
 
 final trainingRepo = 'https://github.com/nf-core/methylseq'
 final trainingTag = '4.2.0'
-final trainingPasses = 2
 final trainingDir = layout.buildDirectory.dir('aot-train/methylseq')
 
 final jdeps = tasks.register('jdeps', JdepsModules) {
@@ -145,22 +146,22 @@ final trainingWorkspace = tasks.register('aotTrainingWorkspace', Exec) {
     commandLine 'scripts/bench-workspace.sh', '--repo', trainingRepo, '--tag', trainingTag, '--dir', trainingDir.get().asFile.absolutePath
 }
 
-// The AOT cache records the mtime of the jar, so it is created on the
-// assembled image, in the same task that copies the jar.
 final bundleImage = tasks.register('bundleImage', Sync) {
-    description = 'Assembles the standalone bundle and trains its AOT cache.'
-    final services = objects.newInstance(ExecServices)
+    description = 'Assembles the standalone bundle.'
     final jar = tasks.named('shadowJar').flatMap { it.archiveFile }
-    final trainScript = layout.projectDirectory.file('scripts/aot-train.py')
-    final workspace = trainingDir
-    final passes = trainingPasses
-    inputs.files(trainScript, layout.projectDirectory.file('scripts/bench.py')).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(trainingWorkspace).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.property('passes', passes)
+    final name = bundleName
+    final osName = os
+    final repo = trainingRepo
+    final tag = trainingTag
+    inputs.property('bundleName', name)
+    inputs.property('os', osName)
+    inputs.property('trainingRepo', repo)
+    inputs.property('trainingTag', tag)
     into(layout.buildDirectory.dir(bundleName.map { "bundle/$it" }))
     from('src/bundle/nextflow-lsp') {
         into 'bin'
         filePermissions { unix('rwxr-xr-x') }
+        filter { it.replace('@bundleName@', name.get()).replace('@os@', osName.get()) }
     }
     from(jlink) {
         into 'runtime'
@@ -171,39 +172,49 @@ final bundleImage = tasks.register('bundleImage', Sync) {
         }
     }
     from(jar) { into 'lib' }
-    doLast {
-        final home = destinationDir
-        final libJar = new File(home, 'lib/language-server-all.jar')
-        final aot = new File(home, 'lib/nextflow-lsp.aot')
-        final launcher = new File(home, 'bin/nextflow-lsp').absolutePath
-        libJar.setLastModified(jar.get().asFile.lastModified())
-        // train through the launcher, so that the JVM options match exactly
-        services.exec.exec {
-            environment 'NXF_LSP_JAVA_OPTS', "-XX:AOTCacheOutput=$aot"
-            commandLine 'python3', trainScript.asFile.absolutePath, '--workspace', workspace.get().asFile.absolutePath, '--passes', passes.toString(), '--server-cmd', launcher
-        }
-        if( !aot.exists() )
-            throw new GradleException('AOT cache was not created')
+    // the files read by the AOT training workload (incl. the parameter schema)
+    from(trainingWorkspace) {
+        into 'lib/training'
+        include '**/*.nf', '**/*.config', 'nextflow_schema.json', 'LICENSE'
+        exclude '**/tests/**', 'nf-test.config'
+    }
+    from('src/bundle/training/README.md') {
+        into 'lib/training'
+        filter { it.replace('@repo@', repo).replace('@tag@', tag) }
     }
 }
 
+// trains the AOT cache with the launcher, on a copy of the bundle,
+// and checks that the JVM accepts it
 final bundleVerify = tasks.register('bundleVerify') {
-    description = 'Verifies that the JVM accepts the bundle AOT cache.'
+    description = 'Verifies that the bundle can train and use its AOT cache.'
     final services = objects.newInstance(ExecServices)
     final image = bundleImage.map { it.destinationDir }
-    final trainScript = layout.projectDirectory.file('scripts/aot-train.py')
-    final workspace = trainingDir
+    final copy = layout.buildDirectory.dir('bundle-verify/image')
     final stamp = layout.buildDirectory.file('bundle-verify/ok')
     inputs.files(bundleImage).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(trainingWorkspace).withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.file(stamp)
     doLast {
+        final home = copy.get().asFile
+        services.exec.exec { commandLine 'rm', '-rf', home.absolutePath }
+        home.parentFile.mkdirs()
+        // -p keeps the jar mtime, which is checked by the launcher
+        services.exec.exec { commandLine 'cp', '-Rp', image.get().absolutePath, home.absolutePath }
+        final launcher = new File(home, 'bin/nextflow-lsp').absolutePath
+        services.exec.exec { commandLine launcher, '--train' }
+        if( !new File(home, 'lib/nextflow-lsp.aot').exists() )
+            throw new GradleException('AOT cache was not created')
         // fails if the cache is rejected
+        final exit = '{"jsonrpc":"2.0","method":"exit"}'
+        final stdout = new ByteArrayOutputStream()
         services.exec.exec {
             environment 'NXF_LSP_JAVA_OPTS', '-XX:AOTMode=on'
-            commandLine 'python3', trainScript.asFile.absolutePath, '--workspace', workspace.get().asFile.absolutePath, '--passes', '0', '--server-cmd', new File(image.get(), 'bin/nextflow-lsp').absolutePath
-            standardOutput = OutputStream.nullOutputStream()
+            commandLine launcher
+            standardInput = new ByteArrayInputStream("Content-Length: ${exit.length()}\r\n\r\n${exit}".getBytes('UTF-8'))
+            standardOutput = stdout
         }
+        if( stdout.size() > 0 )
+            throw new GradleException("Server wrote to stdout without a client: ${stdout}")
         stamp.get().asFile.text = ''
     }
 }
@@ -214,9 +225,8 @@ final bundleTar = tasks.register('bundleTar', Tar) {
     destinationDirectory = layout.buildDirectory.dir('bundle')
     archiveFileName = bundleName.map { "${it}.tar.gz" }
     compression = Compression.GZIP
-    // keep executable bits, and the jar mtime which is validated by the AOT cache
+    // keep executable bits
     useFileSystemPermissions()
-    preserveFileTimestamps = true
 }
 
 tasks.register('bundle') {
