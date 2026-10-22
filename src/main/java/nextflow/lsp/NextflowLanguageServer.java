@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -76,6 +77,7 @@ import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.RenameFilesParams;
 import org.eclipse.lsp4j.InitializeResult;
+import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.ReferenceParams;
@@ -143,6 +145,11 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 addWorkspaceFolder(name, uri);
             }
         }
+        else if( params.getRootUri() != null ) {
+            // fallback for clients that only send the (deprecated) root URI
+            var workspaceFolder = new WorkspaceFolder(params.getRootUri(), DEFAULT_WORKSPACE_FOLDER_NAME);
+            addWorkspaceFolder(workspaceFolderName(workspaceFolder), workspaceFolder.getUri());
+        }
 
         var initializeResult = new InitializeResult(serverCapabilities());
         return CompletableFuture.completedFuture(initializeResult);
@@ -189,6 +196,12 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         result.setRenameProvider(true);
         result.setWorkspaceSymbolProvider(true);
         return result;
+    }
+
+    @Override
+    public void initialized(InitializedParams params) {
+        // initialize with the default configuration, since some clients never send one
+        initializeWorkspaces();
     }
 
     @Override
@@ -501,7 +514,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private boolean shouldInitialize(LanguageServerConfiguration previous, LanguageServerConfiguration current) {
         return previous.errorReportingMode() != current.errorReportingMode()
             || !DefaultGroovyMethods.equals(previous.excludePatterns(), current.excludePatterns())
-            || previous.pluginRegistryUrl() != current.pluginRegistryUrl();
+            || !Objects.equals(previous.pluginRegistryUrl(), current.pluginRegistryUrl());
     }
 
     private void initializeWorkspaces() {
@@ -512,11 +525,12 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var count = 0;
         var total = workspaceRoots.keySet().size() - 1;
         for( var name : workspaceRoots.keySet() ) {
-            if( DEFAULT_WORKSPACE_FOLDER_NAME.equals(name) )
-                continue;
-            var progressMessage = String.format("Initializing workspace: %s (%d / %d)", name, count + 1, total);
-            progress.update(progressMessage, count * 100 / total);
-            count++;
+            // the default workspace contains files outside of the workspace folders
+            if( !DEFAULT_WORKSPACE_FOLDER_NAME.equals(name) ) {
+                var progressMessage = String.format("Initializing workspace: %s (%d / %d)", name, count + 1, total);
+                progress.update(progressMessage, count * 100 / total);
+                count++;
+            }
 
             configServices.get(name).initialize(configuration);
             scriptServices.get(name).initialize(configuration, configServices.get(name));

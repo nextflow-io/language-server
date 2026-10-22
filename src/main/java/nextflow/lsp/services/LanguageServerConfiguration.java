@@ -15,7 +15,6 @@
  */
 package nextflow.lsp.services;
 
-import java.util.Collections;
 import java.util.List;
 
 public record LanguageServerConfiguration(
@@ -36,7 +35,7 @@ public record LanguageServerConfiguration(
             "TB",
             false,
             ErrorReportingMode.WARNINGS,
-            Collections.emptyList(),
+            List.of(".git", ".lineage", ".nf-test", ".pixi", ".venv", "work"),
             false,
             false,
             false,

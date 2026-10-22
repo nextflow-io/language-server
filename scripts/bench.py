@@ -37,7 +37,6 @@ from pathlib import Path
 DEFAULT_SERVER_CMD = 'java -jar build/libs/language-server-all.jar'
 
 # settings shape as read by NextflowLanguageServer.didChangeConfiguration();
-# the exclude list must differ from the default (empty) to initialize the services
 SETTINGS = {
     'nextflow': {
         'debug': False,
