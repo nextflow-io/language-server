@@ -33,16 +33,28 @@ public class ProgressNotification {
 
     private String token;
 
-    public ProgressNotification(LanguageClient client, String token) {
+    private boolean enabled;
+
+    /**
+     * @param client
+     * @param token
+     * @param enabled whether the client supports server-initiated progress
+     */
+    public ProgressNotification(LanguageClient client, String token, boolean enabled) {
         this.client = client;
         this.token = token;
+        this.enabled = enabled;
     }
 
     public void create() {
+        if( !enabled )
+            return;
         client.createProgress(new WorkDoneProgressCreateParams(Either.forLeft(token)));
     }
 
     public void begin(String title, String message) {
+        if( !enabled )
+            return;
         var progress = new WorkDoneProgressBegin();
         progress.setTitle(title);
         progress.setMessage(message);
@@ -51,6 +63,8 @@ public class ProgressNotification {
     }
 
     public void update(String message, int percentage) {
+        if( !enabled )
+            return;
         var progress = new WorkDoneProgressReport();
         progress.setMessage(message);
         progress.setPercentage(percentage);
@@ -58,6 +72,8 @@ public class ProgressNotification {
     }
 
     public void end() {
+        if( !enabled )
+            return;
         var progress = new WorkDoneProgressEnd();
         client.notifyProgress(new ProgressParams(Either.forLeft(token), Either.forLeft(progress)));
     }

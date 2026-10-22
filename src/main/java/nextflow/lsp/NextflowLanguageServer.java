@@ -131,10 +131,15 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     private LanguageServerConfiguration configuration = LanguageServerConfiguration.defaults();
 
+    private boolean workDoneProgress;
+
     // -- LanguageServer
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+        var window = params.getCapabilities() != null ? params.getCapabilities().getWindow() : null;
+        workDoneProgress = window != null && Boolean.TRUE.equals(window.getWorkDoneProgress());
+
         addWorkspaceFolder(DEFAULT_WORKSPACE_FOLDER_NAME, null);
 
         var workspaceFolders = params.getWorkspaceFolders();
@@ -518,7 +523,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     }
 
     private void initializeWorkspaces() {
-        var progress = new ProgressNotification(client, "initialize");
+        var progress = new ProgressNotification(client, "initialize", workDoneProgress);
         progress.create();
         progress.begin("Initializing", "Initializing workspace...");
 

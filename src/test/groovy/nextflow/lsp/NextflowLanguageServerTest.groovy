@@ -19,10 +19,12 @@ package nextflow.lsp
 import java.nio.file.Files
 import java.nio.file.Path
 
+import org.eclipse.lsp4j.ClientCapabilities
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializedParams
 import org.eclipse.lsp4j.TextDocumentItem
+import org.eclipse.lsp4j.WindowClientCapabilities
 import org.eclipse.lsp4j.WorkspaceFolder
 import spock.lang.Specification
 import spock.lang.TempDir
@@ -94,6 +96,16 @@ class NextflowLanguageServerTest extends Specification {
         !client.getAllDiagnostics().containsKey(excludedUri)
     }
 
+    def 'should report progress only if the client supports it' () {
+        when:
+        initialize(workspaceFolders: [new WorkspaceFolder(workspace.toUri().toString(), 'test')], workDoneProgress: supported)
+        then:
+        client.getProgress().isEmpty() != supported
+
+        where:
+        supported << [true, false]
+    }
+
     private String writeScript(String path) {
         def file = workspace.resolve(path)
         Files.createDirectories(file.parent)
@@ -105,6 +117,11 @@ class NextflowLanguageServerTest extends Specification {
         def params = new InitializeParams()
         params.setWorkspaceFolders(opts.workspaceFolders as List<WorkspaceFolder>)
         params.setRootUri(opts.rootUri as String)
+        if( opts.workDoneProgress != null ) {
+            def window = new WindowClientCapabilities()
+            window.setWorkDoneProgress(opts.workDoneProgress as Boolean)
+            params.setCapabilities(new ClientCapabilities(null, null, window, null))
+        }
         server.initialize(params).get()
         server.initialized(new InitializedParams())
     }

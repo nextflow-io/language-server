@@ -36,6 +36,8 @@ class TestLanguageClient implements LanguageClient {
 
     private final Map<String,List<Diagnostic>> diagnostics = new ConcurrentHashMap<>()
 
+    private final List<Object> progress = Collections.synchronizedList(new ArrayList<>())
+
     @Override
     public void telemetryEvent(Object object) {
     }
@@ -56,11 +58,20 @@ class TestLanguageClient implements LanguageClient {
 
     @Override
     public CompletableFuture<Void> createProgress(WorkDoneProgressCreateParams params) {
+        progress.add(params)
         return CompletableFuture.completedFuture(null)
     }
 
     @Override
     public void notifyProgress(ProgressParams params) {
+        progress.add(params)
+    }
+
+    /**
+     * Get the progress requests and notifications sent by the server.
+     */
+    List<Object> getProgress() {
+        return progress
     }
 
     @Override
