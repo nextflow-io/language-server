@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 #
 # Install the bundle for the current platform into the language server
-# directory of the VS Code extension, for testing a local build.
+# directory of the VS Code extension, for testing a local build. The
+# extension uses it in place of the release with the same version, so the
+# version must be the latest release of the release line.
 #
 # Usage: scripts/install.sh --version VERSION [--dest DIR]
 #
-#   --version VERSION   bundle version, e.g. 27.04.0 (must match a built bundle)
+#   --version VERSION   bundle version, e.g. 26.10.1 (must match a built bundle)
 #   --dest DIR          installation directory (default: ~/.nextflow/lsp)
 #
 set -euo pipefail
@@ -17,7 +19,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --version) version="${2#v}"; shift 2 ;;
         --dest)    dest="$2"; shift 2 ;;
-        -h|--help) sed -n '3,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -49,11 +51,8 @@ fi
 line_dir=$dest/v$(echo "$version" | cut -d. -f1-2)
 mkdir -p "$line_dir"
 rm -rf "${line_dir:?}/$name"
-# extract with tar to preserve the jar mtime, which the AOT cache depends on
 tar -xzf "$tarball" -C "$line_dir"
-
-# the current extension uses an executable named nextflow-lsp in the version
-# directory if present, so link it to the launcher of the bundle
-ln -sfn "$name/bin/nextflow-lsp" "$line_dir/nextflow-lsp"
+# the extension replaces preview installs that are older than the release
+touch "$line_dir/$name"
 
 echo "installed at: $line_dir/$name"

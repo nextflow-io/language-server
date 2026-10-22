@@ -36,7 +36,7 @@ To install a local build for the [Nextflow VS Code extension](https://github.com
 VERSION=<version> make install
 ```
 
-This builds the bundle for the current platform and extracts it into `~/.nextflow/lsp/vX.Y/`, where the extension looks for language server versions. The version should match the release line selected in the extension (`nextflow.languageVersion`).
+This builds the bundle for the current platform and extracts it into `~/.nextflow/lsp/vX.Y/`, where the extension installs downloaded bundles. The extension uses it in place of the release with the same version, so the version must be the latest release of the release line selected in the extension (`nextflow.languageVersion`), e.g. `26.10.1`.
 
 ## Testing
 
