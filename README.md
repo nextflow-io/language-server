@@ -23,7 +23,7 @@ For other editors, download the language server from [GitHub releases](https://g
 - Linux (x64, arm64) and macOS (arm64): download the standalone bundle for your platform, which includes its own Java runtime, and run `bin/nextflow-lsp`.
 - Other platforms: download `language-server-all.jar` and run it with Java 17 or later: `java -jar language-server-all.jar`.
 
-The language server communicates over standard input/output.
+The language server communicates over standard input/output. See [Editor support](docs/editors.md) for how to set it up with other editors, including Zed, Neovim, and Emacs.
 
 ## Configuration
 
