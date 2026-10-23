@@ -29,6 +29,8 @@ import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +50,7 @@ class PreviewDagTest {
      * root, so that the expected output doesn't depend on its location.
      */
     @TestFactory
+    @Execution(ExecutionMode.SAME_THREAD) // the dynamic tests share one service
     Stream<DynamicTest> previewDagGoldenFiles() {
         var service = getScriptService();
         var uri = getUri("main.nf");

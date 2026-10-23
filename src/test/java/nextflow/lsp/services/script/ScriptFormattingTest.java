@@ -29,6 +29,8 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -65,6 +67,7 @@ class ScriptFormattingTest {
      * must be stable when formatted again.
      */
     @TestFactory
+    @Execution(ExecutionMode.SAME_THREAD) // the dynamic tests share one service
     Stream<DynamicTest> formatGoldenFiles() {
         var service = getScriptService();
         var uri = getUri("main.nf");
