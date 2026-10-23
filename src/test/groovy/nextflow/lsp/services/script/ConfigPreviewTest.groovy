@@ -374,6 +374,7 @@ class ConfigPreviewTest extends Specification {
                 SUB2()
             }
             '''.stripIndent())
+        scriptService.updateNow()
 
         when:
         def position = new Position(line, character)

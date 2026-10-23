@@ -44,7 +44,7 @@ class NextflowLanguageServerTest extends Specification {
 
     TestLanguageClient client = new TestLanguageClient()
 
-    NextflowLanguageServer server = new NextflowLanguageServer()
+    NextflowLanguageServer server = new NextflowLanguageServer(50)
 
     def setup() {
         server.connect(client)

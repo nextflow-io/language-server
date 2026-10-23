@@ -38,8 +38,8 @@ class RecordingLanguageService extends ScriptService {
     /** When non-null, returned by getWorkspaceFiles() instead of scanning disk. */
     Set<URI> workspaceFilesOverride = null
 
-    RecordingLanguageService(String rootUri) {
-        super(rootUri)
+    RecordingLanguageService(String rootUri, long debounceMillis = MANUAL_UPDATES) {
+        super(rootUri, debounceMillis)
     }
 
     @Override

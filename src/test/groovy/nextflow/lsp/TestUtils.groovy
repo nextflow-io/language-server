@@ -35,6 +35,14 @@ class TestUtils {
 
     private static final Path workspaceRoot = workspaceRoot()
 
+    /**
+     * Test services don't use the debounce timer, so that a background
+     * update (e.g. the deferred workspace scan) can't fire mid-test.
+     * Changes are compiled by updateNow() or by a request that awaits
+     * an update.
+     */
+    private static final long DEBOUNCE_MILLIS = LanguageService.MANUAL_UPDATES
+
     private static Path workspaceRoot() {
         def workspaceRoot = Path.of(System.getProperty('user.dir')).resolve('build/test_workspace/')
         if( !Files.exists(workspaceRoot) )
@@ -59,6 +67,7 @@ class TestUtils {
      *             pass null explicitly to exercise the no-workspace path)
      *   client  - the language client (defaults to a fresh TestLanguageClient)
      *   config  - the configuration (defaults to LanguageServerConfiguration.defaults())
+     *   debounceMillis - the debounce delay (defaults to manual updates only)
      *
      * @param opts
      */
@@ -66,7 +75,8 @@ class TestUtils {
         def rootUri = opts.containsKey('rootUri') ? opts.rootUri : workspaceRootUri()
         def client = opts.client ?: new TestLanguageClient()
         def configuration = opts.config ?: LanguageServerConfiguration.defaults()
-        def service = new RecordingLanguageService(rootUri)
+        def debounceMillis = opts.debounceMillis != null ? opts.debounceMillis as long : DEBOUNCE_MILLIS
+        def service = new RecordingLanguageService(rootUri, debounceMillis)
         service.connect(client)
         service.initialize(configuration, newConfigService(client))
         return service
@@ -102,7 +112,7 @@ class TestUtils {
      * @param client
      */
     static ConfigService newConfigService(TestLanguageClient client = new TestLanguageClient()) {
-        def service = new ConfigService(workspaceRoot.toUri().toString())
+        def service = new ConfigService(workspaceRoot.toUri().toString(), DEBOUNCE_MILLIS)
         service.connect(client)
         service.initialize(LanguageServerConfiguration.defaults(), new PluginSpecCache(TestPluginRegistry.url()))
         return service
@@ -122,7 +132,7 @@ class TestUtils {
      * @param client
      */
     static ScriptService getScriptService(TestLanguageClient client, ConfigService configService = null) {
-        def service = new ScriptService(workspaceRoot.toUri().toString())
+        def service = new ScriptService(workspaceRoot.toUri().toString(), DEBOUNCE_MILLIS)
         def configuration = LanguageServerConfiguration.defaults()
         service.connect(client)
         service.initialize(configuration, configService ?: newConfigService())
@@ -176,8 +186,6 @@ class TestUtils {
     /**
      * Open a file.
      *
-     * NOTE: this operation is asynchronous due to debouncing
-     *
      * @param service
      * @param uri
      * @param contents
@@ -190,8 +198,9 @@ class TestUtils {
     /**
      * Open a file, also writing it to disk. Tests that issue multiple
      * requests against the same file without a document change in between
-     * must use this instead of open(): the deferred workspace scan re-scans
-     * from disk and would evict an in-memory-only file from the AST cache.
+     * must use this instead of open() if they trigger the deferred workspace
+     * scan (an updateNow() with no pending changes): the scan re-scans from
+     * disk and would evict an in-memory-only file from the AST cache.
      *
      * Delete the file with deleteOnDisk() in the test's cleanup block.
      *

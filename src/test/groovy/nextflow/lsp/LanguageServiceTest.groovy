@@ -273,8 +273,9 @@ class LanguageServiceTest extends Specification {
 
     def 'a request should await a pending debounced update' () {
         given:
-        def service = getScriptService()
+        def service = recordingService(debounceMillis: 50)
         def uri = getUri('main.nf')
+        scanEmptyWorkspace(service)
 
         when: 'the file is opened but left to debounce (no updateNow)'
         open(service, uri, '''\

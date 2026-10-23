@@ -92,7 +92,14 @@ import org.eclipse.lsp4j.services.LanguageClient;
  */
 public abstract class LanguageService {
 
-    private static final long DEBOUNCE_MILLIS = 1_000;
+    public static final long DEFAULT_DEBOUNCE_MILLIS = 1_000;
+
+    /**
+     * Debounce delay which disables the update timer, so that pending
+     * changes are compiled only by updateNow() or by a request that
+     * awaits an update.
+     */
+    public static final long MANUAL_UPDATES = -1;
 
     private static Logger log = Logger.getInstance();
 
@@ -102,11 +109,18 @@ public abstract class LanguageService {
 
     private FileCache fileCache = new FileCache();
 
+    private long debounceMillis;
+
     private DebouncingExecutor updateExecutor;
 
     public LanguageService(String rootUri) {
+        this(rootUri, DEFAULT_DEBOUNCE_MILLIS);
+    }
+
+    public LanguageService(String rootUri, long debounceMillis) {
         this.rootUri = rootUri;
-        this.updateExecutor = new DebouncingExecutor(DEBOUNCE_MILLIS, this::update);
+        this.debounceMillis = debounceMillis;
+        this.updateExecutor = new DebouncingExecutor(debounceMillis, this::update);
     }
 
     public abstract boolean matchesFile(String uri);
@@ -310,7 +324,8 @@ public abstract class LanguageService {
 
     protected void updateLater() {
         awaitingUpdate = true;
-        updateExecutor.executeLater();
+        if( debounceMillis != MANUAL_UPDATES )
+            updateExecutor.executeLater();
     }
 
     /**
@@ -326,9 +341,14 @@ public abstract class LanguageService {
         if( !awaitingUpdate )
             return;
 
+        if( debounceMillis == MANUAL_UPDATES ) {
+            updateNow();
+            return;
+        }
+
         updateLock.lock();
         try {
-            updateCondition.await(DEBOUNCE_MILLIS * 2, TimeUnit.MILLISECONDS);
+            updateCondition.await(debounceMillis * 2, TimeUnit.MILLISECONDS);
         }
         catch( InterruptedException e ) {
         }

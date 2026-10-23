@@ -37,7 +37,11 @@ public class ConfigService extends LanguageService {
     private ConfigAstCache astCache;
 
     public ConfigService(String rootUri) {
-        super(rootUri);
+        this(rootUri, DEFAULT_DEBOUNCE_MILLIS);
+    }
+
+    public ConfigService(String rootUri, long debounceMillis) {
+        super(rootUri, debounceMillis);
         astCache = new ConfigAstCache();
     }
 

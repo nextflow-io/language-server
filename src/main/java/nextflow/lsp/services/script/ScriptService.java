@@ -48,7 +48,11 @@ public class ScriptService extends LanguageService {
     private ConfigService configService;
 
     public ScriptService(String rootUri) {
-        super(rootUri);
+        this(rootUri, DEFAULT_DEBOUNCE_MILLIS);
+    }
+
+    public ScriptService(String rootUri, long debounceMillis) {
+        super(rootUri, debounceMillis);
         astCache = new ScriptAstCache(rootUri);
     }
 

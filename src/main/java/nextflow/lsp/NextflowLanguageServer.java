@@ -133,6 +133,16 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     private boolean workDoneProgress;
 
+    private long debounceMillis;
+
+    public NextflowLanguageServer() {
+        this(LanguageService.DEFAULT_DEBOUNCE_MILLIS);
+    }
+
+    public NextflowLanguageServer(long debounceMillis) {
+        this.debounceMillis = debounceMillis;
+    }
+
     // -- LanguageServer
 
     @Override
@@ -632,11 +642,11 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private void addWorkspaceFolder(String name, String uri) {
         workspaceRoots.put(name, uri);
 
-        var configService = new ConfigService(uri);
+        var configService = new ConfigService(uri, debounceMillis);
         configService.connect(client);
         configServices.put(name, configService);
 
-        var scriptService = new ScriptService(uri);
+        var scriptService = new ScriptService(uri, debounceMillis);
         scriptService.connect(client);
         scriptServices.put(name, scriptService);
     }
