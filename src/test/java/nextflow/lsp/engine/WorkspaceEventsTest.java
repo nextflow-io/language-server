@@ -54,6 +54,68 @@ class WorkspaceEventsTest {
     }
 
     @Test
+    void buildFilesOfNestedFoldersOnlyInTheInnermostFolder() {
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.folders("", "sub");
+            o.settle = false;
+        }) ) {
+            f.write("sub/a.nf", "workflow A { def x = 1 }\n");
+            f.write("sub/b.nf", WITH_WARNING);
+            f.write("main.nf", """
+                include { A } from './sub/a.nf'
+                workflow {
+                    A()
+                }
+                """);
+            f.settle();
+            var outer = f.workspace().folder("root").get();
+            var inner = f.workspace().folder("sub").get();
+            var a = f.path("sub/a.nf").toUri();
+            var b = f.path("sub/b.nf").toUri();
+            // the outer folder loads only what its own files include
+            assertThat(outer.entries()).extracting(FileEntry::uri).containsExactly(f.path("main.nf").toUri(), a);
+            assertThat(outer.entry(a).role()).isEqualTo(FileEntry.Role.DEPENDENCY);
+            assertThat(inner.entries()).extracting(FileEntry::uri).containsExactly(a, b);
+            assertThat(inner.entry(a).role()).isEqualTo(FileEntry.Role.WORKSPACE);
+            assertThat(f.publishes("sub/a.nf")).hasSize(1);
+            assertThat(f.messages("sub/b.nf")).containsExactly(UNUSED);
+            assertThat(f.messages("main.nf")).isEmpty();
+        }
+    }
+
+    @Test
+    void moveFilesBetweenNestedFoldersWhenTheInnerFolderChanges() {
+        try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
+            f.write("sub/a.nf", WITH_WARNING);
+            f.write("sub/b.nf", WITH_WARNING);
+            f.open("sub/b.nf", WITH_WARNING);
+            f.settle();
+            var a = f.path("sub/a.nf").toUri();
+            var b = f.path("sub/b.nf").toUri();
+            var outer = f.workspace().folder("root").get();
+            assertThat(outer.entry(a)).isNotNull();
+
+            f.addFolder("sub");
+            f.settle();
+            var inner = f.workspace().folder("sub").get();
+            assertThat(outer.entry(a)).isNull();
+            assertThat(outer.entry(b)).isNull();
+            assertThat(inner.entry(a).isBuilt()).isTrue();
+            assertThat(inner.entry(b).isBuilt()).isTrue();
+            assertThat(f.messages("sub/a.nf")).containsExactly(UNUSED);
+            assertThat(f.messages("sub/b.nf")).containsExactly(UNUSED);
+
+            f.removeFolder("sub");
+            f.settle();
+            assertThat(outer.entry(a).role()).isEqualTo(FileEntry.Role.WORKSPACE);
+            assertThat(outer.entry(b).role()).isEqualTo(FileEntry.Role.WORKSPACE);
+            assertThat(f.messages("sub/a.nf")).containsExactly(UNUSED);
+            assertThat(f.messages("sub/b.nf")).containsExactly(UNUSED);
+            assertThat(f.publishes("sub/a.nf")).noneMatch(List::isEmpty);
+        }
+    }
+
+    @Test
     void moveOpenDocumentToAnAddedFolder() {
         try( var f = WorkspaceFixture.start((o) -> o.folders()) ) {
             f.open("a/main.nf", WITH_WARNING);

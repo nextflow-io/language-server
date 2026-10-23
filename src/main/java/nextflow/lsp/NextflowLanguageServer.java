@@ -17,8 +17,8 @@ package nextflow.lsp;
 
 import java.net.URI;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -533,10 +533,11 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     public CompletableFuture<Either<List<? extends SymbolInformation>, List<? extends WorkspaceSymbol>>> symbol(WorkspaceSymbolParams params) {
         var query = params.getQuery();
         return request("workspace/symbol", null, null, Need.ALL, false, Either.forRight(Collections.emptyList()), (ctx) -> {
-            var result = new ArrayList<WorkspaceSymbol>();
+            // a file included from another folder is in both projects
+            var result = new LinkedHashSet<WorkspaceSymbol>();
             for( var project : ctx.allProjects() )
                 result.addAll(new ScriptSymbolProvider(project.scriptView(), ctx.cancelChecker()).symbol(query));
-            return Either.forRight(result);
+            return Either.forRight(List.copyOf(result));
         });
     }
 

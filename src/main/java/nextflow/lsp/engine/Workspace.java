@@ -381,15 +381,49 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
             return null;
         var project = new Project("p" + (++projectCount), folderName(folder, root), root, this);
         folders.add(project);
-        // open documents under the new folder move to it
-        for( var openUri : engine.documents().uris() ) {
-            if( projectFor(Path.of(openUri)) != project || project.getOrCreate(openUri, FileEntry.Role.WORKSPACE) == null )
-                continue;
-            var previous = defaultProject.entry(openUri);
-            if( previous != null )
-                ledger.publish(release(defaultProject, previous));
+        updateInnerRoots();
+        // open documents under the new folder move to it, and so do the
+        // files of an enclosing folder, which its next walk drops
+        var documents = engine.documents();
+        for( var openUri : documents.uris() ) {
+            if( projectFor(Path.of(openUri)) == project )
+                project.getOrCreate(openUri, FileEntry.Role.WORKSPACE);
         }
+        for( var other : projects() ) {
+            if( other == project )
+                continue;
+            for( var entry : other.entries() ) {
+                if( other.entry(entry.uri) != entry || entry.role != FileEntry.Role.WORKSPACE || projectFor(entry.path) != project )
+                    continue;
+                if( documents.isOpen(entry.uri) )
+                    ledger.publish(release(other, entry));
+                else if( !project.isExcluded(entry.path) )
+                    project.getOrCreate(entry.uri, FileEntry.Role.WORKSPACE);
+            }
+        }
+        rewalkEnclosing(root);
         return project;
+    }
+
+    /**
+     * Record in each folder the roots of the folders nested in it.
+     */
+    private void updateInnerRoots() {
+        for( var project : folders ) {
+            var inner = new TreeSet<Path>();
+            for( var other : folders ) {
+                if( other != project && other.root.startsWith(project.root) )
+                    inner.add(other.root);
+            }
+            project.innerRoots = Set.copyOf(inner);
+        }
+    }
+
+    private void rewalkEnclosing(Path root) {
+        for( var project : folders ) {
+            if( !project.root.equals(root) && root.startsWith(project.root) && project.index != Project.IndexStatus.NOT_STARTED )
+                startWalk(project);
+        }
     }
 
     private static String folderName(WorkspaceFolder folder, Path root) {
@@ -402,14 +436,19 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
     private void removeFolder(Project project) {
         folders.remove(project);
+        updateInnerRoots();
+        rewalkEnclosing(project.root);
         var touched = new TreeSet<URI>();
-        for( var entry : project.entries() )
+        var documents = engine.documents();
+        for( var entry : project.entries() ) {
             touched.add(entry.uri);
-        // open documents of the removed folder move to their new owner
-        for( var openUri : engine.documents().uris() ) {
-            if( project.entry(openUri) == null )
-                continue;
-            projectFor(Path.of(openUri)).getOrCreate(openUri, FileEntry.Role.WORKSPACE).role = FileEntry.Role.WORKSPACE;
+            // open documents move to their new owner, and so do the files
+            // of the removed folder if it was nested in another folder
+            var target = projectFor(entry.path);
+            var moved = documents.isOpen(entry.uri)
+                || (entry.role == FileEntry.Role.WORKSPACE && !target.isDefault() && !target.isExcluded(entry.path));
+            if( moved )
+                target.getOrCreate(entry.uri, FileEntry.Role.WORKSPACE).role = FileEntry.Role.WORKSPACE;
         }
         ledger.publish(touched);
     }
@@ -447,10 +486,11 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         var id = project.id;
         var root = project.root;
         var patterns = List.copyOf(configuration.excludePatterns());
+        var innerRoots = project.innerRoots;
         var files = engine.environment().files();
         engine.submitIo("walk " + root, () -> {
             try {
-                var result = files.walk(root, (path) -> PathUtils.isExcluded(path, patterns), FileKind::isManaged);
+                var result = files.walk(root, (path) -> innerRoots.contains(path) || PathUtils.isExcluded(path, patterns), FileKind::isManaged);
                 return new Event.WalkDone(id, generation, result, null);
             }
             catch( IOException e ) {
@@ -482,7 +522,9 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         var documents = engine.documents();
         var removed = new TreeSet<URI>();
         for( var entry : project.entries() ) {
-            if( entry.role != FileEntry.Role.WORKSPACE || discovered.contains(entry.uri) || documents.isOpen(entry.uri) )
+            if( entry.role != FileEntry.Role.WORKSPACE || discovered.contains(entry.uri) )
+                continue;
+            if( documents.isOpen(entry.uri) && projectFor(entry.path) == project )
                 continue;
             if( project.addedDuringWalk.contains(entry.uri) )
                 continue;

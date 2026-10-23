@@ -110,6 +110,9 @@ public final class Project {
 
     long walkGeneration;
 
+    // roots of the workspace folders nested in this one
+    Set<Path> innerRoots = Set.of();
+
     // files created or loaded since the current walk started, which
     // the walk result may not include
     final Set<URI> addedDuringWalk = new HashSet<>();
@@ -215,13 +218,20 @@ public final class Project {
     }
 
     /**
-     * Whether a path is under the project root (always false for
+     * Whether a file belongs to the project: it is under the project
+     * root and not under a nested workspace folder (always false for
      * the default project).
      *
      * @param path
      */
     boolean contains(Path path) {
-        return root != null && path.startsWith(root);
+        if( root == null || !path.startsWith(root) )
+            return false;
+        for( var inner : innerRoots ) {
+            if( path.startsWith(inner) )
+                return false;
+        }
+        return true;
     }
 
     /**
