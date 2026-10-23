@@ -19,17 +19,22 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.InitializedParams;
+import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
 import org.eclipse.lsp4j.WorkDoneProgressEnd;
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Test the workspace setup of the language server for clients
@@ -134,6 +139,34 @@ class NextflowLanguageServerTest {
             assertThat(client.getProgress()).first().isInstanceOf(WorkDoneProgressCreateParams.class);
             assertThat(publishedAtEnd).hasSize(1);
             assertThat(publishedAtEnd.get(0)).containsAll(files);
+        }
+    }
+
+    @Test
+    void exitWithStatusZeroOnlyAfterShutdown() {
+        try( var server = TestServer.start() ) {
+            server.server().exit();
+            assertThat(server.env().exits()).containsExactly(1);
+        }
+        try( var server = TestServer.start() ) {
+            assertThat(server.call(NextflowLanguageServer::shutdown)).isNull();
+            server.server().exit();
+            assertThat(server.env().exits()).containsExactly(0);
+        }
+    }
+
+    @Test
+    void rejectRequestsAfterShutdown() {
+        try( var server = TestServer.start() ) {
+            server.open("main.nf", INVALID_SCRIPT);
+            server.call(NextflowLanguageServer::shutdown);
+            var hover = server.send(s -> s.hover(new HoverParams(server.document("main.nf"), new Position(0, 0))));
+            server.runPending();
+            assertThat(hover).isCompletedExceptionally();
+            assertThatThrownBy(hover::join)
+                .hasCauseInstanceOf(ResponseErrorException.class)
+                .cause()
+                .satisfies(e -> assertThat(((ResponseErrorException) e).getResponseError().getCode()).isEqualTo(ResponseErrorCode.InvalidRequest.getValue()));
         }
     }
 
