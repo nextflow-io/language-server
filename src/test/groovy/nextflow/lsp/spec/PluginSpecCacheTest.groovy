@@ -16,6 +16,7 @@
 
 package nextflow.lsp.spec
 
+import com.sun.net.httpserver.HttpServer
 import spock.lang.Specification
 
 /**
@@ -32,6 +33,34 @@ class PluginSpecCacheTest extends Specification {
         def spec = psc.get('nf-prov', '1.6.0')
         then:
         spec.configScopes().containsKey('prov')
+    }
+
+    def 'should cache plugins that are not found in the registry' () {
+        given:
+        def requests = [:].withDefault { 0 }
+        def server = HttpServer.create(new InetSocketAddress('127.0.0.1', 0), 0)
+        server.createContext('/') { exchange ->
+            def path = exchange.getRequestURI().getPath()
+            requests[path] += 1
+            def status = path.endsWith('nf-missing') ? 404 : 503
+            exchange.sendResponseHeaders(status, -1)
+            exchange.close()
+        }
+        server.start()
+        def psc = new PluginSpecCache("http://127.0.0.1:${server.getAddress().getPort()}/api/")
+
+        when:
+        psc.get('nf-missing', null)
+        psc.get('nf-missing', null)
+        psc.get('nf-unavailable', null)
+        psc.get('nf-unavailable', null)
+        then:
+        psc.get('nf-missing', null) == null
+        requests['/api/v1/plugins/nf-missing'] == 1
+        requests['/api/v1/plugins/nf-unavailable'] == 2
+
+        cleanup:
+        server.stop(0)
     }
 
     def 'should only track plugin versions for main config files' () {

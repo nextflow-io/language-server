@@ -20,6 +20,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +41,8 @@ public class PluginSpecCache {
 
     private static Logger log = Logger.getInstance();
 
+    private static final Duration TIMEOUT = Duration.ofSeconds(10);
+
     private URI registryUri;
 
     private Map<PluginRef, PluginSpec> cache = new HashMap<>();
@@ -55,7 +58,8 @@ public class PluginSpecCache {
      *
      * If the version is not specified, the latest version is used instead.
      *
-     * Results are cached to minimize registry API calls.
+     * Results are cached to minimize registry API calls, including
+     * plugins that are not found in the registry.
      *
      * @param name
      * @param version
@@ -76,17 +80,24 @@ public class PluginSpecCache {
 
             // select plugin release (or latest if not specified)
             var release = pluginRelease(response);
-            if( release == null )
-                return;
 
-            // save plugin spec to cache
-            cache.put(ref, pluginSpec(release));
+            // save plugin spec to cache (or null if not found)
+            cache.put(ref, release != null ? pluginSpec(release) : null);
         }
         catch( IOException | InterruptedException e ) {
-            e.printStackTrace(System.err);
+            log.error("Failed to fetch plugin " + ref.name() + " from registry: " + e.toString());
         }
     }
 
+    /**
+     * Fetch a plugin from the registry.
+     *
+     * Returns an empty map if the plugin was not found, or null
+     * if the registry returned an unexpected response.
+     *
+     * @param name
+     * @param version
+     */
     private Map fetch(String name, String version) throws IOException, InterruptedException {
         var path = version != null
             ? String.format("v1/plugins/%s/%s", name, version)
@@ -95,13 +106,23 @@ public class PluginSpecCache {
 
         log.debug("fetch plugin " + uri);
 
-        var client = HttpClient.newBuilder().build();
+        var client = HttpClient.newBuilder()
+            .connectTimeout(TIMEOUT)
+            .build();
         var request = HttpRequest.newBuilder()
             .uri(uri)
+            .timeout(TIMEOUT)
             .GET()
             .header("Accept", "application/json")
             .build();
         var httpResponse = client.send(request, BodyHandlers.ofString());
+        var status = httpResponse.statusCode();
+        if( status == 404 )
+            return Collections.emptyMap();
+        if( status != 200 ) {
+            log.error("Failed to fetch plugin " + name + " from registry: HTTP " + status);
+            return null;
+        }
         var response = new JsonSlurper().parseText(httpResponse.body());
         return response instanceof Map m ? m : null;
     }
