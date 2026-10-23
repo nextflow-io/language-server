@@ -146,7 +146,7 @@ public final class AotTraining {
 
     private AotTraining(Path workspace, String registryUrl) {
         this.workspace = workspace;
-        // settings shape as read by NextflowLanguageServer.didChangeConfiguration()
+        // settings shape as read by nextflow.lsp.engine.Settings
         this.settings = Map.of("nextflow", Map.of(
             "debug", false,
             "errorReportingMode", "warnings",
