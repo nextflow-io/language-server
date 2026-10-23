@@ -18,10 +18,12 @@ package nextflow.lsp.services.script;
 
 import java.util.List;
 
+import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.DocumentLink;
 import org.eclipse.lsp4j.DocumentLinkParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@ExtendWith(TestWorkspace.class)
 class ScriptLinkTest {
 
     static List<DocumentLink> getLinks(ScriptService service, String uri) {
@@ -78,26 +81,19 @@ class ScriptLinkTest {
     void noLinkForPluginInclude() {
         // a module directory with the same name would otherwise resolve as a remote module
         writeWorkspaceFile("modules/plugin/nf-hello/main.nf", "");
-        try {
-            var service = getScriptService();
-            var uri = getUri("main.nf");
+        var service = getScriptService();
+        var uri = getUri("main.nf");
 
-            open(service, uri, """
-                include { sayHello } from 'plugin/nf-hello'
+        open(service, uri, """
+            include { sayHello } from 'plugin/nf-hello'
 
-                workflow {
-                    sayHello()
-                }
-                """);
-            service.updateNow();
+            workflow {
+                sayHello()
+            }
+            """);
+        service.updateNow();
 
-            assertThat(getLinks(service, uri)).isEmpty();
-        }
-        finally {
-            deleteWorkspaceFile("modules/plugin/nf-hello/main.nf");
-            deleteWorkspaceFile("modules/plugin/nf-hello");
-            deleteWorkspaceFile("modules/plugin");
-        }
+        assertThat(getLinks(service, uri)).isEmpty();
     }
 
 }

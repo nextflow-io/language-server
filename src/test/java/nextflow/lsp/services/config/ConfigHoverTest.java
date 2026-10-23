@@ -22,6 +22,7 @@ import java.util.Map;
 import nextflow.config.spec.SpecNode;
 import nextflow.lsp.TestLanguageClient;
 import nextflow.lsp.TestPluginRegistry;
+import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.spec.PluginSpec;
 import nextflow.lsp.spec.PluginSpecCache;
@@ -29,6 +30,7 @@ import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@ExtendWith(TestWorkspace.class)
 class ConfigHoverTest {
 
     static String getHoverHint(ConfigService service, String uri, Position position) {

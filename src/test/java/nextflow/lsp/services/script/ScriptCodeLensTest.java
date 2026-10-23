@@ -19,10 +19,12 @@ package nextflow.lsp.services.script;
 import java.util.List;
 import java.util.Map;
 
+import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@ExtendWith(TestWorkspace.class)
 class ScriptCodeLensTest {
 
     @Test

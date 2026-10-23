@@ -22,11 +22,13 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import nextflow.lsp.Golden;
+import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +38,7 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@ExtendWith(TestWorkspace.class)
 class PreviewDagTest {
 
     /**
@@ -48,6 +51,7 @@ class PreviewDagTest {
     Stream<DynamicTest> previewDagGoldenFiles() {
         var service = getScriptService();
         var uri = getUri("main.nf");
+        var rootUri = workspaceRootUri();
         // scan the workspace now, as otherwise the second request of the
         // first case would scan it and evict the in-memory script
         service.updateNow();
@@ -65,7 +69,7 @@ class PreviewDagTest {
                     assertThat(response).isNotNull();
                     var result = (String) response.get("result");
                     assertThat(result).as("DAG preview error: %s", response.get("error")).isNotNull();
-                    return result.replace(workspaceRootUri(), "");
+                    return result.replace(rootUri, "");
                 })
                 .collect(Collectors.joining("\n"));
             Golden.check(Golden.sibling(input, ".mmd"), mmd);

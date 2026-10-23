@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import nextflow.lsp.TestLanguageClient;
+import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.CodeActionContext;
@@ -28,8 +29,8 @@ import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -43,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@ExtendWith(TestWorkspace.class)
 class ConfigPreviewTest {
 
     static final String SCRIPT = """
@@ -102,15 +104,6 @@ class ConfigPreviewTest {
      * A layer of a directive, as (source, value, active).
      */
     record Layer(String source, String value, boolean active) {
-    }
-
-    @AfterEach
-    void cleanup() {
-        deleteWorkspaceFile("nextflow.config");
-        deleteWorkspaceFile("conf/extra.config");
-        deleteWorkspaceFile("modules/align.nf");
-        deleteWorkspaceFile("subworkflows/sub.nf");
-        deleteWorkspaceFile("main.nf");
     }
 
     /**

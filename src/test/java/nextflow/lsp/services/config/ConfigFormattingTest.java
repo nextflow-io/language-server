@@ -23,10 +23,12 @@ import java.util.Collections;
 import java.util.stream.Stream;
 
 import nextflow.lsp.Golden;
+import nextflow.lsp.TestWorkspace;
 import nextflow.script.formatter.FormattingOptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +38,7 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@ExtendWith(TestWorkspace.class)
 class ConfigFormattingTest {
 
     /**
@@ -81,19 +84,14 @@ class ConfigFormattingTest {
             """;
         var expected = contents.replace("cpus=2", "cpus = 2");
 
-        try {
-            openOnDisk(service, uri, contents);
-            var texts = new ArrayList<String>();
-            for( int i = 0; i < 3; i++ ) {
-                var edits = service.formatting(URI.create(uri), new FormattingOptions(4, true));
-                texts.add(edits != null && !edits.isEmpty() ? edits.get(0).getNewText() : contents);
-            }
+        openOnDisk(service, uri, contents);
+        var texts = new ArrayList<String>();
+        for( int i = 0; i < 3; i++ ) {
+            var edits = service.formatting(URI.create(uri), new FormattingOptions(4, true));
+            texts.add(edits != null && !edits.isEmpty() ? edits.get(0).getNewText() : contents);
+        }
 
-            assertThat(texts).isEqualTo(Collections.nCopies(3, expected));
-        }
-        finally {
-            deleteOnDisk(uri);
-        }
+        assertThat(texts).isEqualTo(Collections.nCopies(3, expected));
     }
 
 }

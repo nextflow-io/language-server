@@ -14,19 +14,13 @@
  * limitations under the License.
  */
 
-
 package nextflow.lsp.services.script;
 
-import java.io.IOException;
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Comparator;
-
 import nextflow.lsp.TestLanguageClient;
+import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.services.LanguageServerConfiguration;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@ExtendWith(TestWorkspace.class)
 class ScriptLibDirTest {
 
     static final String GREETER = """
@@ -54,26 +49,12 @@ class ScriptLibDirTest {
         }
         """;
 
-    final Path libDir = Path.of(URI.create(workspaceRootUri())).resolve("lib");
-
-    @AfterEach
-    void deleteLibDir() throws IOException {
-        if( !Files.exists(libDir) )
-            return;
-        try( var paths = Files.walk(libDir) ) {
-            for( var path : paths.sorted(Comparator.reverseOrder()).toList() )
-                Files.delete(path);
-        }
-    }
-
-    void writeLib(String path, String contents) throws IOException {
-        var file = libDir.resolve(path);
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, contents.stripIndent());
+    void writeLib(String path, String contents) {
+        writeWorkspaceFile("lib/" + path, contents);
     }
 
     @Test
-    void resolveClassInLibDirectory() throws IOException {
+    void resolveClassInLibDirectory() {
         writeLib("Greeter.groovy", GREETER);
         var client = new TestLanguageClient();
         var service = getScriptService(client);
@@ -89,7 +70,7 @@ class ScriptLibDirTest {
     }
 
     @Test
-    void resolveClassInLibSubdirectoryByFullyQualifiedName() throws IOException {
+    void resolveClassInLibSubdirectoryByFullyQualifiedName() {
         writeLib("acme/Widget.groovy", WIDGET);
         var client = new TestLanguageClient();
         var service = getScriptService(client);
@@ -105,7 +86,7 @@ class ScriptLibDirTest {
     }
 
     @Test
-    void doNotResolvePackagedClassBySimpleName() throws IOException {
+    void doNotResolvePackagedClassBySimpleName() {
         writeLib("acme/Widget.groovy", WIDGET);
         var client = new TestLanguageClient();
         var service = getScriptService(client);
@@ -123,7 +104,7 @@ class ScriptLibDirTest {
     }
 
     @Test
-    void resolveLibClassUsedAsTypeAnnotation() throws IOException {
+    void resolveLibClassUsedAsTypeAnnotation() {
         writeLib("Greeter.groovy", GREETER);
         var client = new TestLanguageClient();
         var service = getScriptService(client);
@@ -143,7 +124,7 @@ class ScriptLibDirTest {
     }
 
     @Test
-    void reportErrorForClassNotInLibDirectory() throws IOException {
+    void reportErrorForClassNotInLibDirectory() {
         writeLib("Greeter.groovy", GREETER);
         var client = new TestLanguageClient();
         var service = getScriptService(client);
@@ -178,7 +159,7 @@ class ScriptLibDirTest {
     }
 
     @Test
-    void resolveLibClassWhenLibDirectoryIsCreatedAfterStartup() throws IOException {
+    void resolveLibClassWhenLibDirectoryIsCreatedAfterStartup() {
         var client = new TestLanguageClient();
         var service = getScriptService(client);
         var uri = getUri("main.nf");
@@ -194,7 +175,7 @@ class ScriptLibDirTest {
     }
 
     @Test
-    void pickUpChangesToLibClassWithoutRestarting() throws IOException {
+    void pickUpChangesToLibClassWithoutRestarting() {
         writeLib("Greeter.groovy", GREETER);
         var client = new TestLanguageClient();
         var service = getScriptService(client);
@@ -218,7 +199,7 @@ class ScriptLibDirTest {
     }
 
     @Test
-    void reportDiagnosticsWhenLibClassHasSyntaxError() throws IOException {
+    void reportDiagnosticsWhenLibClassHasSyntaxError() {
         writeLib("Greeter.groovy", "class Greeter {");
         var client = new TestLanguageClient();
         var service = getScriptService(client);

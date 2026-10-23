@@ -20,9 +20,11 @@ package nextflow.lsp.services.script;
 import java.util.List;
 
 import nextflow.lsp.TestLanguageClient;
+import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -35,6 +37,7 @@ import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@ExtendWith(TestWorkspace.class)
 class ScriptDiagnosticsTest {
 
     @Test

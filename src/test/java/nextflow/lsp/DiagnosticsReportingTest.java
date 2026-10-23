@@ -23,6 +23,7 @@ import nextflow.lsp.services.config.ConfigService;
 import nextflow.lsp.spec.PluginSpecCache;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@ExtendWith(TestWorkspace.class)
 class DiagnosticsReportingTest {
 
     // a config with an unrecognized option -> warning

@@ -36,8 +36,6 @@ import org.eclipse.lsp4j.TextDocumentItem;
  */
 public class TestUtils {
 
-    private static final Path workspaceRoot = workspaceRoot();
-
     /**
      * Test services don't use the debounce timer, so that a background
      * update (e.g. the deferred workspace scan) can't fire mid-test.
@@ -46,18 +44,11 @@ public class TestUtils {
      */
     private static final long DEBOUNCE_MILLIS = LanguageService.MANUAL_UPDATES;
 
-    private static Path workspaceRoot() {
-        var workspaceRoot = Path.of(System.getProperty("user.dir")).resolve("build/test_workspace/");
-        if( !Files.exists(workspaceRoot) )
-            workspaceRoot.toFile().mkdirs();
-        return workspaceRoot;
-    }
-
     /**
-     * Get the URI of the test workspace root.
+     * Get the URI of the workspace root of the current test.
      */
     public static String workspaceRootUri() {
-        return workspaceRoot.toUri().toString();
+        return TestWorkspace.root().toUri().toString();
     }
 
     /**
@@ -198,13 +189,13 @@ public class TestUtils {
     }
 
     /**
-     * Write a file into the test workspace.
+     * Write a file into the workspace of the current test.
      *
      * @param path
      * @param contents
      */
     public static void writeWorkspaceFile(String path, String contents) {
-        var target = workspaceRoot.resolve(path);
+        var target = TestWorkspace.root().resolve(path);
         try {
             Files.createDirectories(target.getParent());
             Files.writeString(target, contents.stripIndent());
@@ -215,21 +206,12 @@ public class TestUtils {
     }
 
     /**
-     * Delete a file from the test workspace.
-     *
-     * @param path
-     */
-    public static void deleteWorkspaceFile(String path) {
-        deleteIfExists(workspaceRoot.resolve(path));
-    }
-
-    /**
-     * Get the URI for a relative path.
+     * Get the URI for a path relative to the workspace of the current test.
      *
      * @param path
      */
     public static String getUri(String path) {
-        return workspaceRoot.resolve(path).toUri().toString();
+        return TestWorkspace.root().resolve(path).toUri().toString();
     }
 
     /**
@@ -263,8 +245,6 @@ public class TestUtils {
      * scan (an updateNow() with no pending changes): the scan re-scans from
      * disk and would evict an in-memory-only file from the AST cache.
      *
-     * Delete the file with deleteOnDisk() in the test's cleanup block.
-     *
      * @param service
      * @param uri
      * @param contents
@@ -277,24 +257,6 @@ public class TestUtils {
             throw new UncheckedIOException(e);
         }
         open(service, uri, contents);
-    }
-
-    /**
-     * Delete a file written by openOnDisk().
-     *
-     * @param uri
-     */
-    public static void deleteOnDisk(String uri) {
-        deleteIfExists(Path.of(URI.create(uri)));
-    }
-
-    private static void deleteIfExists(Path path) {
-        try {
-            Files.deleteIfExists(path);
-        }
-        catch( IOException e ) {
-            throw new UncheckedIOException(e);
-        }
     }
 
 }
