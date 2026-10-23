@@ -27,6 +27,10 @@ jobs:
           distribution: corretto
           java-version: '25'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # tests against unreleased nf-lang; the other Nextflow modules resolve from the Seqera repo
       - name: Compile
         run: |
           git clone --depth 1 https://github.com/nextflow-io/nextflow ../nextflow
