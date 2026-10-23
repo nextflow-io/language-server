@@ -1,0 +1,10 @@
+flowchart TB
+  subgraph ECHO
+    subgraph take
+      v0["debug"]
+    end
+    subgraph emit
+      v5["echo"]
+    end
+    v0 --> v5
+  end

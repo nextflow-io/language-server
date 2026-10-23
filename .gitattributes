@@ -1,0 +1,2 @@
+# golden files are compared byte for byte
+src/test/resources/** text eol=lf

@@ -1,0 +1,75 @@
+/*
+ * Copyright 2024-2025, Seqera Labs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+package nextflow.lsp.services.script.dag;
+
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import nextflow.lsp.Golden;
+import nextflow.lsp.services.LanguageServerConfiguration;
+import org.eclipse.lsp4j.CodeLensParams;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.TestFactory;
+
+import static nextflow.lsp.TestUtils.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.DynamicTest.dynamicTest;
+
+/**
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+class PreviewDagTest {
+
+    /**
+     * Preview the DAG of each workflow in each script in dag, via its
+     * "Preview DAG" code lens, and compare the Mermaid diagrams with the
+     * sibling .mmd file. Links to the script are relative to the workspace
+     * root, so that the expected output doesn't depend on its location.
+     */
+    @TestFactory
+    Stream<DynamicTest> previewDagGoldenFiles() {
+        var service = getScriptService();
+        var uri = getUri("main.nf");
+        // scan the workspace now, as otherwise the second request of the
+        // first case would scan it and evict the in-memory script
+        service.updateNow();
+
+        return Golden.inputs("dag", ".nf").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
+            openVerbatim(service, uri, Golden.read(input));
+            var lenses = service.codeLens(new CodeLensParams(new TextDocumentIdentifier(uri))).stream()
+                .filter(lens -> "nextflow.previewDag".equals(lens.getCommand().getCommand()))
+                .toList();
+            assertThat(lenses).isNotEmpty();
+
+            var mmd = lenses.stream()
+                .map((lens) -> {
+                    var response = (Map<?,?>) service.executeCommand("nextflow.server.previewDag", lens.getCommand().getArguments(), LanguageServerConfiguration.defaults());
+                    assertThat(response).isNotNull();
+                    var result = (String) response.get("result");
+                    assertThat(result).as("DAG preview error: %s", response.get("error")).isNotNull();
+                    return result.replace(workspaceRootUri(), "");
+                })
+                .collect(Collectors.joining("\n"));
+            Golden.check(Golden.sibling(input, ".mmd"), mmd);
+        }));
+    }
+
+}

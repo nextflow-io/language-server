@@ -28,8 +28,18 @@ compileJava {
   options.compilerArgs << '-parameters'
 }
 
+// ./gradlew test -PupdateGolden rewrites golden files from actual output
+def updateGolden = providers.gradleProperty('updateGolden').isPresent()
+
 test {
   useJUnitPlatform()
+  // golden files are read from the source tree, not the classpath
+  inputs.dir('src/test/resources').withPathSensitivity(PathSensitivity.RELATIVE)
+  systemProperty 'golden.update', updateGolden
+  if( updateGolden ) {
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+  }
 }
 
 configurations {
@@ -85,9 +95,9 @@ dependencies {
   nextflowRuntime 'io.nextflow:nf-tower:1.32.1'
   nextflowRuntime 'io.nextflow:nf-wave:1.22.3'
 
-  testImplementation ('org.objenesis:objenesis:3.4')
-  testImplementation ('net.bytebuddy:byte-buddy:1.14.17')
-  testImplementation ('org.spockframework:spock-core:2.4-groovy-4.0') { exclude group: 'org.apache.groovy' }
+  testImplementation platform('org.junit:junit-bom:6.1.3')
+  testImplementation 'org.junit.jupiter:junit-jupiter'
+  testImplementation 'org.assertj:assertj-core:3.27.7'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
