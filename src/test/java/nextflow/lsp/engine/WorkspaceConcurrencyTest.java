@@ -48,6 +48,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Isolated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -60,6 +61,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @ExtendWith(TestWorkspace.class)
+@Isolated // real threads, so other tests would slow it down
 class WorkspaceConcurrencyTest {
 
     static final int MODULES = 40;
@@ -97,7 +99,7 @@ class WorkspaceConcurrencyTest {
     }
 
     @Test
-    @Timeout(60)
+    @Timeout(120)
     void parseOnARealPoolLikeOnTheCallingThread() {
         Map<String, List<Diagnostic>> direct;
         try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {

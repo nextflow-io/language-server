@@ -107,6 +107,9 @@ public final class ManualExecutor implements SerialExecutor {
      */
     public boolean runNext() {
         checkOwner();
+        // let the JUnit timeout stop a test whose engine never goes idle
+        if( Thread.currentThread().isInterrupted() )
+            throw new IllegalStateException("Interrupted while running engine tasks");
         Timer next;
         synchronized (this) {
             next = queue.peek();

@@ -23,6 +23,8 @@ import java.util.Collections;
 import com.sun.net.httpserver.HttpServer;
 import nextflow.lsp.TestPluginRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.parallel.Isolated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,6 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@Isolated // real threads, so other tests would slow it down
+@Timeout(60) // hang guard
 class HttpPluginRegistryClientTest {
 
     @Test

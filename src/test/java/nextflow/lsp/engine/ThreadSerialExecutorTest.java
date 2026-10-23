@@ -22,6 +22,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.parallel.Isolated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,6 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@Isolated // real threads, so other tests would slow it down
+@Timeout(60) // hang guard
 class ThreadSerialExecutorTest {
 
     @Test
@@ -53,7 +57,7 @@ class ThreadSerialExecutorTest {
             cancelled.cancel();
             var done = new CompletableFuture<Void>();
             executor.execute(() -> done.complete(null));
-            done.get(5, TimeUnit.SECONDS);
+            done.get(30, TimeUnit.SECONDS);
 
             assertThat(order).hasSize(100).isSorted();
             assertThat(threads).containsOnly(true);
@@ -70,13 +74,13 @@ class ThreadSerialExecutorTest {
         try {
             var engine = new Engine(env, null, Engine.DEFAULT_DEBOUNCE, FakeState::new);
             var spec = new RequestSpec("test", null, null, Need.NONE, false);
-            var thread = engine.request(spec, null, (ctx) -> Thread.currentThread()).get(5, TimeUnit.SECONDS);
+            var thread = engine.request(spec, null, (ctx) -> Thread.currentThread()).get(30, TimeUnit.SECONDS);
             var shutdown = engine.shutdown();
             // a request queued behind the shutdown is still answered
             var later = engine.request(spec, null, (ctx) -> Thread.currentThread());
-            shutdown.get(5, TimeUnit.SECONDS);
-            assertThat(later).failsWithin(5, TimeUnit.SECONDS);
-            thread.join(5_000);
+            shutdown.get(30, TimeUnit.SECONDS);
+            assertThat(later).failsWithin(30, TimeUnit.SECONDS);
+            thread.join(30_000);
             assertThat(thread.isAlive()).isFalse();
         }
         finally {
@@ -92,8 +96,8 @@ class ThreadSerialExecutorTest {
             var spec = new RequestSpec("test", null, null, Need.NONE, false);
             var result = engine.request(spec, null, (ctx) -> Thread.currentThread().getName() + " daemon=" + Thread.currentThread().isDaemon());
 
-            assertThat(result.get(5, TimeUnit.SECONDS)).isEqualTo("nextflow-engine daemon=true");
-            engine.shutdown().get(5, TimeUnit.SECONDS);
+            assertThat(result.get(30, TimeUnit.SECONDS)).isEqualTo("nextflow-engine daemon=true");
+            engine.shutdown().get(30, TimeUnit.SECONDS);
             assertThat(env.compilePool().isShutdown()).isTrue();
         }
         finally {

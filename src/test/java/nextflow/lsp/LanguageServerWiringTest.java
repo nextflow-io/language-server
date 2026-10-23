@@ -55,6 +55,7 @@ import org.eclipse.lsp4j.services.LanguageServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Isolated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -65,7 +66,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 @ExtendWith(TestWorkspace.class)
-@Timeout(60) // hang guard
+@Isolated // real threads, so other tests would slow it down
+@Timeout(120) // hang guard
 class LanguageServerWiringTest {
 
     /**
