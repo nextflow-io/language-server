@@ -63,6 +63,7 @@ import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
+import org.eclipse.lsp4j.MessageType;
 
 /**
  * Builds a dependency-closed batch of entries of one project.
@@ -169,6 +170,7 @@ final class Builder {
         String text;
         SourceUnit unit;
         boolean missing;
+        IOException readError;
         Throwable internalError;
         // discovered dependencies
         final Set<URI> targets = new TreeSet<>();
@@ -380,6 +382,8 @@ final class Builder {
             for( var parsed : tasks ) {
                 if( parsed.internalError != null )
                     logInternalError(parsed, "parsing", parsed.internalError);
+                if( parsed.readError != null )
+                    context.engine().log(MessageType.Warning, "Failed to read " + parsed.entry.path + " -- " + parsed.readError);
             }
             return tasks;
         }
@@ -415,7 +419,8 @@ final class Builder {
                     return;
                 }
                 catch( IOException e ) {
-                    System.err.println("Failed to read " + entry.path + " -- " + e);
+                    // treated as missing, and retried on the next event
+                    parsed.readError = e;
                     parsed.missing = true;
                     return;
                 }

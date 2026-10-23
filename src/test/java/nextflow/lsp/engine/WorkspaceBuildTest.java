@@ -385,6 +385,7 @@ class WorkspaceBuildTest {
             f.settle();
             assertThat(f.messages("good.nf")).containsExactly(UNUSED);
             assertThat(f.messages("bad.nf")).isEmpty();
+            assertThat(f.client().getLogMessages()).anyMatch(m -> m.getMessage().startsWith("Failed to read " + f.path("bad.nf")));
 
             failing[0] = false;
             f.notify("bad.nf", org.eclipse.lsp4j.FileChangeType.Changed);
