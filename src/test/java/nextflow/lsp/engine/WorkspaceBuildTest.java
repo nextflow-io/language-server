@@ -15,8 +15,8 @@
  */
 package nextflow.lsp.engine;
 
-import java.net.URI;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -429,6 +429,82 @@ class WorkspaceBuildTest {
             f.settle();
             assertThat(f.diagnostics("main.nf")).isNotEmpty();
             assertThat(f.messages("other.nf")).containsExactly(UNUSED);
+        }
+    }
+
+    @Test
+    void rebuildDependentsOfAModuleThatARequestBuilt() {
+        try( var f = start() ) {
+            f.write("mod.nf", "workflow FOO {}\n");
+            f.write("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).isEmpty();
+
+            f.open("mod.nf", "workflow BAR {}\n");
+            // builds only the module, so the dependent is stale only by stamp
+            f.call(Need.FILE, "mod.nf", null, (context) -> null);
+            f.settle();
+            assertThat(f.messages("main.nf")).isNotEmpty();
+        }
+    }
+
+    @Test
+    void rebuildDependentsOfAModuleThatARequestRemoved() {
+        try( var f = start() ) {
+            f.write("mod.nf", "workflow FOO {}\n");
+            f.write("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).isEmpty();
+
+            f.delete("mod.nf");
+            f.call(Need.FILE, "mod.nf", null, (context) -> null);
+            f.settle();
+            assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
+        }
+    }
+
+    @Test
+    void rebuildAnEditedFileWhenItIsNewlyIncluded() {
+        try( var f = start() ) {
+            f.write("mod.nf", "workflow FOO {}\n");
+            f.write("main.nf", "workflow {}\n");
+            f.settle();
+
+            f.open("mod.nf", "workflow BAR {}\n");
+            f.open("main.nf", "include { BAR } from './mod.nf'\nworkflow { BAR() }\n");
+            var builds = f.workspace().buildCount();
+            var errors = f.call(Need.FILE, "main.nf", List.<String>of(), (context) ->
+                WorkspaceFixture.requestEntry(context).errors().stream().map(e -> e.getOriginalMessage()).toList());
+            assertThat(errors).isEmpty();
+            // main.nf is never analysed against the previous build of mod.nf
+            assertThat(f.workspace().buildCount() - builds).isEqualTo(1);
+            assertThat(f.publishes("main.nf")).allMatch(List::isEmpty);
+        }
+    }
+
+    @Test
+    void resolveMissingIncludeWhenTheTargetIsOpened() {
+        try( var f = start() ) {
+            f.write("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
+
+            // not on disk, and no watcher event
+            f.open("mod.nf", "workflow FOO {}\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).isEmpty();
+        }
+    }
+
+    @Test
+    void publishTheDocumentVersionOfTheBuild() {
+        try( var f = start() ) {
+            f.open("main.nf", "workflow { def x = 1 }\n");
+            f.change("main.nf", "workflow { def y = 1 }\n");
+            f.settle();
+            var uri = f.uri("main.nf");
+            assertThat(f.client().getPublishLog()).filteredOn(p -> p.getUri().equals(uri)).last()
+                .satisfies(p -> assertThat(p.getVersion()).isEqualTo(2));
         }
     }
 

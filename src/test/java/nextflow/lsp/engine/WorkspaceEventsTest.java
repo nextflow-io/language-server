@@ -300,6 +300,51 @@ class WorkspaceEventsTest {
     }
 
     @Test
+    void ignoreTheResultOfASupersededWalk() {
+        var io = new QueuedExecutor();
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.environment = new TestEnvironment().withIoExecutor(io);
+            o.initialized = false;
+            o.settle = false;
+        }) ) {
+            f.write("main.nf", WITH_WARNING);
+            f.write("tests/y.nf", WITH_WARNING);
+            f.configure(Map.of("nextflow.files.exclude", List.of("tests")));
+            f.initialized();
+            f.runPending();
+            f.configure(Map.of("nextflow.files.exclude", List.of(".git", "work")));
+            f.runPending();
+            assertThat(io.size()).isEqualTo(2);
+
+            // the first walk, which excludes tests/, completes last
+            io.runLast();
+            f.runPending();
+            f.settle(io);
+            assertThat(f.messages("main.nf")).containsExactly(UNUSED);
+            assertThat(f.messages("tests/y.nf")).containsExactly(UNUSED);
+            assertThat(f.publishes("tests/y.nf")).hasSize(1);
+        }
+    }
+
+    @Test
+    void publishNothingAfterShutdown() {
+        var io = new QueuedExecutor();
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.folders("a");
+            o.environment = new TestEnvironment().withIoExecutor(io);
+            o.settle = false;
+        }) ) {
+            f.runPending();
+            // background work runs without delay while the folder is indexing
+            f.open("outside.nf", WITH_WARNING);
+            var shutdown = f.engine().shutdown();
+            f.runPending();
+            assertThat(shutdown).isDone();
+            assertThat(f.client().getPublishLog()).isEmpty();
+        }
+    }
+
+    @Test
     void ignoreInvalidSettingsButApplyTheOthers() {
         try( var f = WorkspaceFixture.start() ) {
             f.configure(Map.of(

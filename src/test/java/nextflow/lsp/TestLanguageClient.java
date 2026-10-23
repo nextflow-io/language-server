@@ -18,6 +18,7 @@ package nextflow.lsp;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -49,7 +50,7 @@ public class TestLanguageClient implements LanguageClient {
 
     private final List<RegistrationParams> registrations = Collections.synchronizedList(new ArrayList<>());
 
-    private final List<CompletableFuture<Void>> heldProgressCreates = Collections.synchronizedList(new ArrayList<>());
+    private final Map<String,CompletableFuture<Void>> heldProgressCreates = Collections.synchronizedMap(new LinkedHashMap<>());
 
     private volatile boolean holdProgressCreate;
 
@@ -85,7 +86,7 @@ public class TestLanguageClient implements LanguageClient {
         if( !holdProgressCreate )
             return CompletableFuture.completedFuture(null);
         var result = new CompletableFuture<Void>();
-        heldProgressCreates.add(result);
+        heldProgressCreates.put(params.getToken().getLeft(), result);
         return result;
     }
 
@@ -105,10 +106,22 @@ public class TestLanguageClient implements LanguageClient {
     public void completeProgressCreate() {
         List<CompletableFuture<Void>> pending;
         synchronized (heldProgressCreates) {
-            pending = new ArrayList<>(heldProgressCreates);
+            pending = new ArrayList<>(heldProgressCreates.values());
             heldProgressCreates.clear();
         }
         pending.forEach(f -> f.complete(null));
+    }
+
+    /**
+     * Respond to the held window/workDoneProgress/create request for
+     * the given token.
+     *
+     * @param token
+     */
+    public void completeProgressCreate(String token) {
+        var pending = heldProgressCreates.remove(token);
+        if( pending != null )
+            pending.complete(null);
     }
 
     @Override

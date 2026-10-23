@@ -69,7 +69,9 @@ class WorkspaceConcurrencyTest {
         "workflow MOD%d { def x = 1 }\n",
         "workflow MOD%d {\n",
         "include { MOD%d_HELPER } from './helper.nf'\nworkflow MOD%<d { MOD%<d_HELPER() }\n",
-        "include { HELPER } from './helper.nf'\nworkflow MOD%d { HELPER() }\n");
+        "include { HELPER } from './helper.nf'\nworkflow MOD%d { HELPER() }\n",
+        // no longer exports the name that main.nf includes
+        "workflow RENAMED%d {}\n");
 
     static void writeWorkspace(WorkspaceFixture f) {
         f.write("modules/helper.nf", "workflow HELPER { def unused = 1 }\n");
@@ -164,6 +166,13 @@ class WorkspaceConcurrencyTest {
             openDocuments = new HashMap<>();
             var versions = new HashMap<String, Integer>();
             for( int step = 0; step < 400; step++ ) {
+                // let the engine catch up now and then, so that later
+                // messages interleave with builds instead of coalescing
+                if( step % 20 == 19 ) {
+                    var mainUri = TestWorkspace.root().resolve("main.nf").toUri().toString();
+                    var paced = engine.request(new RequestSpec("pace", mainUri, null, Need.FILE, false), null, (context) -> null);
+                    paced.get(60, TimeUnit.SECONDS);
+                }
                 var module = "modules/mod" + random.nextInt(MODULES) + ".nf";
                 var uri = TestWorkspace.root().resolve(module).toUri().toString();
                 var index = Integer.parseInt(module.replaceAll("\\D", ""));

@@ -186,6 +186,36 @@ class WorkspaceIndexTest {
     }
 
     @Test
+    void ignoreTheTokenOfAPreviousRun() {
+        var client = new TestLanguageClient();
+        client.setHoldProgressCreate(true);
+        var io = new QueuedExecutor();
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.client = client;
+            o.environment = new TestEnvironment().withIoExecutor(io);
+            o.progress = true;
+            o.initialized = false;
+            o.settle = false;
+        }) ) {
+            writeModules(f, 1);
+            f.initialized();
+            f.settle(io);
+            f.addFolder("other");
+            f.runPending();
+            assertThat(progressKinds(client)).containsExactly("create", "create");
+
+            // the first run ended before its token was created
+            client.completeProgressCreate("nextflow/index/1");
+            f.runPending();
+            assertThat(progressKinds(client)).containsExactly("create", "create");
+            client.completeProgressCreate("nextflow/index/2");
+            f.runPending();
+            assertThat(progressKinds(client)).containsExactly("create", "create", "begin");
+            f.settle(io);
+        }
+    }
+
+    @Test
     void doNotReportProgressWithoutClientSupport() {
         try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
             writeModules(f, 3);

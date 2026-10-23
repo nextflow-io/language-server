@@ -389,6 +389,17 @@ class EngineTest {
     }
 
     @Test
+    void doNotRunBodyOfRequestCancelledWhilePreparing() {
+        var h = start();
+        var result = send("hover", Need.FILE);
+        state.onPrepare = () -> result.cancel(true);
+
+        h.runPending();
+        assertThat(result).isCancelled();
+        assertThat(state.log).contains("prepare hover").doesNotContain("body hover");
+    }
+
+    @Test
     void dropParkedRequestWhenCancelled() {
         var h = start();
         state.satisfied = false;

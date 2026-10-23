@@ -38,6 +38,38 @@ public final class QueuedExecutor implements Executor {
     }
 
     /**
+     * Run the oldest queued task, if any.
+     *
+     * @return true if a task was run
+     */
+    public boolean runNext() {
+        Runnable next;
+        synchronized (this) {
+            next = queue.poll();
+        }
+        if( next == null )
+            return false;
+        next.run();
+        return true;
+    }
+
+    /**
+     * Run the newest queued task, if any.
+     *
+     * @return true if a task was run
+     */
+    public boolean runLast() {
+        Runnable last;
+        synchronized (this) {
+            last = queue.pollLast();
+        }
+        if( last == null )
+            return false;
+        last.run();
+        return true;
+    }
+
+    /**
      * Run the queued tasks, including tasks queued while running.
      */
     public int runAll() {

@@ -57,6 +57,8 @@ final class FakeState implements EngineState {
 
     RuntimeException prepareError;
 
+    Runnable onPrepare;
+
     RuntimeException sliceError;
 
     RuntimeException shutdownError;
@@ -121,6 +123,8 @@ final class FakeState implements EngineState {
         @Override
         public void prepare() {
             log.add("prepare " + spec.method());
+            if( onPrepare != null )
+                onPrepare.run();
             if( prepareError != null )
                 throw prepareError;
         }
