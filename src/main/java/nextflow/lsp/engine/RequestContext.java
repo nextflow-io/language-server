@@ -47,4 +47,14 @@ public interface RequestContext {
      */
     CancelChecker cancelChecker();
 
+    /**
+     * Get the URI that the client uses for a file: the URI that it
+     * opened the document with, if it is open, otherwise the given URI.
+     *
+     * @param uri
+     */
+    default String clientUri(String uri) {
+        return uri;
+    }
+
 }

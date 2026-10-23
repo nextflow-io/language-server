@@ -132,10 +132,13 @@ final class DiagnosticsLedger {
         var client = engine.client();
         if( client == null )
             return;
-        var clientUri = engine.documents().get(uri)
+        client.publishDiagnostics(new PublishDiagnosticsParams(clientUri(uri), diagnostics, version));
+    }
+
+    private String clientUri(URI uri) {
+        return engine.documents().get(uri)
             .map(DocumentStore.OpenDocument::clientUri)
             .orElse(uri.toString());
-        client.publishDiagnostics(new PublishDiagnosticsParams(clientUri, diagnostics, version));
     }
 
     /**
@@ -187,11 +190,13 @@ final class DiagnosticsLedger {
         return result;
     }
 
-    private static List<DiagnosticRelatedInformation> relatedInformation(RelatedInformationAware ria, URI uri) {
+    private List<DiagnosticRelatedInformation> relatedInformation(RelatedInformationAware ria, URI uri) {
         var otherNode = ria.getOtherNode();
         if( otherNode == null )
             return null;
         var location = LanguageServerUtils.astNodeToLocation(otherNode, uri);
+        if( location != null )
+            location.setUri(clientUri(uri));
         return List.of(new DiagnosticRelatedInformation(location, ria.getOtherMessage()));
     }
 

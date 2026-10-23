@@ -1010,6 +1010,14 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                 public CancelChecker cancelChecker() {
                     return cancelChecker;
                 }
+
+                @Override
+                public String clientUri(String uri) {
+                    return Uris.canonical(uri)
+                        .flatMap(engine.documents()::get)
+                        .map(DocumentStore.OpenDocument::clientUri)
+                        .orElse(uri);
+                }
             };
         }
     }

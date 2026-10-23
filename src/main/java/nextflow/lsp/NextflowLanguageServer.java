@@ -303,37 +303,38 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<List<CallHierarchyItem>> prepareCallHierarchy(CallHierarchyPrepareParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/prepareCallHierarchy", textDocument.getUri(), null, (ctx) ->
             ctx.project().scripts()
-                .map(ast -> new ScriptCallHierarchyProvider(ast).prepare(textDocument, params.getPosition()))
+                .map(ast -> ClientUris.items(new ScriptCallHierarchyProvider(ast).prepare(textDocument, params.getPosition()), ctx::clientUri))
                 .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<List<CallHierarchyIncomingCall>> callHierarchyIncomingCalls(CallHierarchyIncomingCallsParams params) {
-        var item = params.getItem();
+        var item = ClientUris.canonical(params.getItem());
         return request("callHierarchy/incomingCalls", item.getUri(), null, Need.PROJECT, true, null, (ctx) ->
             ctx.project().scripts()
-                .map(ast -> new ScriptCallHierarchyProvider(ast, ctx.cancelChecker()).incomingCalls(item))
+                .map(ast -> ClientUris.incoming(new ScriptCallHierarchyProvider(ast, ctx.cancelChecker()).incomingCalls(item), ctx::clientUri))
                 .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<List<CallHierarchyOutgoingCall>> callHierarchyOutgoingCalls(CallHierarchyOutgoingCallsParams params) {
-        var item = params.getItem();
+        var item = ClientUris.canonical(params.getItem());
         return fileRequest("callHierarchy/outgoingCalls", item.getUri(), null, (ctx) ->
             ctx.project().scripts()
-                .map(ast -> new ScriptCallHierarchyProvider(ast).outgoingCalls(item))
+                .map(ast -> ClientUris.outgoing(new ScriptCallHierarchyProvider(ast).outgoingCalls(item), ctx::clientUri))
                 .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/codeAction", textDocument.getUri(), Collections.emptyList(), (ctx) ->
             ctx.project().scripts()
                 .map(ast -> new ScriptCodeActionProvider(ast).codeAction(textDocument, params.getRange()).stream()
+                    .peek(action -> ClientUris.command(action.getCommand(), ctx::clientUri))
                     .map(action -> Either.<Command,CodeAction>forRight(action))
                     .toList())
                 .orElse(Collections.emptyList()));
@@ -341,16 +342,16 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/codeLens", textDocument.getUri(), Collections.emptyList(), (ctx) ->
             ctx.project().scripts()
-                .<List<? extends CodeLens>>map(ast -> new ScriptCodeLensProvider(ast).codeLens(textDocument))
+                .<List<? extends CodeLens>>map(ast -> ClientUris.codeLenses(new ScriptCodeLensProvider(ast).codeLens(textDocument), ctx::clientUri))
                 .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         var position = params.getPosition();
         return fileRequest("textDocument/completion", textDocument.getUri(), Either.forLeft(Collections.emptyList()), (ctx) -> {
             var configuration = ctx.configuration();
@@ -371,16 +372,16 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> definition(DefinitionParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/definition", textDocument.getUri(), Either.forLeft(Collections.emptyList()), (ctx) ->
             ctx.project().scripts()
-                .map(ast -> new ScriptDefinitionProvider(ast).definition(textDocument, params.getPosition()))
+                .map(ast -> ClientUris.definition(new ScriptDefinitionProvider(ast).definition(textDocument, params.getPosition()), ctx::clientUri))
                 .orElse(Either.forLeft(Collections.emptyList())));
     }
 
     @Override
     public CompletableFuture<List<DocumentLink>> documentLink(DocumentLinkParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/documentLink", textDocument.getUri(), Collections.emptyList(), (ctx) -> {
             var project = ctx.project();
             return project.scripts()
@@ -391,7 +392,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/documentSymbol", textDocument.getUri(), Collections.emptyList(), (ctx) ->
             ctx.project().scripts()
                 .map(ast -> new ScriptSymbolProvider(ast).documentSymbol(textDocument))
@@ -400,7 +401,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/formatting", textDocument.getUri(), Collections.emptyList(), (ctx) -> {
             var configuration = ctx.configuration();
             var options = new FormattingOptions(
@@ -420,7 +421,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<Hover> hover(HoverParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/hover", textDocument.getUri(), null, (ctx) -> {
             var project = ctx.project();
             return project.scripts()
@@ -431,25 +432,25 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<List<? extends Location>> references(ReferenceParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return request("textDocument/references", textDocument.getUri(), null, Need.PROJECT, true, Collections.emptyList(), (ctx) ->
             ctx.project().scripts()
-                .<List<? extends Location>>map(ast -> new ScriptReferenceProvider(ast, ctx.cancelChecker()).references(textDocument, params.getPosition(), params.getContext().isIncludeDeclaration()))
+                .<List<? extends Location>>map(ast -> ClientUris.locations(new ScriptReferenceProvider(ast, ctx.cancelChecker()).references(textDocument, params.getPosition(), params.getContext().isIncludeDeclaration()), ctx::clientUri))
                 .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<WorkspaceEdit> rename(RenameParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return request("textDocument/rename", textDocument.getUri(), null, Need.PROJECT, true, null, (ctx) ->
             ctx.project().scripts()
-                .map(ast -> new ScriptReferenceProvider(ast, ctx.cancelChecker()).rename(textDocument, params.getPosition(), params.getNewName()))
+                .map(ast -> ClientUris.edit(new ScriptReferenceProvider(ast, ctx.cancelChecker()).rename(textDocument, params.getPosition(), params.getNewName()), ctx::clientUri))
                 .orElse(null));
     }
 
     @Override
     public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
-        var textDocument = params.getTextDocument();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/semanticTokens/full", textDocument.getUri(), null, (ctx) -> {
             var project = ctx.project();
             return project.scripts()
@@ -498,7 +499,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var command = params.getCommand();
         var arguments = params.getArguments() != null ? params.getArguments() : List.<Object>of();
         if( PREVIEW_DAG.equals(command) && arguments.size() == 2 ) {
-            var uri = JsonUtils.getString(arguments.get(0));
+            var uri = canonical(JsonUtils.getString(arguments.get(0)));
             var name = JsonUtils.getString(arguments.get(1));
             return fileRequest(PREVIEW_DAG, uri, null, (ctx) -> {
                 var configuration = ctx.configuration();
@@ -508,7 +509,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             });
         }
         if( PREVIEW_CONFIG.equals(command) && arguments.size() == 4 ) {
-            var uri = JsonUtils.getString(arguments.get(0));
+            var uri = canonical(JsonUtils.getString(arguments.get(0)));
             var name = JsonUtils.getString(arguments.get(1));
             var profiles = JsonUtils.getStringArray(arguments.get(2));
             var qualifiedName = JsonUtils.getString(arguments.get(3));
@@ -537,11 +538,15 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var result = new LinkedHashSet<WorkspaceSymbol>();
             for( var project : ctx.allProjects() )
                 result.addAll(new ScriptSymbolProvider(project.scriptView(), ctx.cancelChecker()).symbol(query));
-            return Either.forRight(List.copyOf(result));
+            return Either.forRight(ClientUris.symbols(List.copyOf(result), ctx::clientUri));
         });
     }
 
     // -- INTERNAL
+
+    private static String canonical(String uri) {
+        return uri != null ? ClientUris.canonical(uri) : null;
+    }
 
     private <T> CompletableFuture<T> fileRequest(String method, String uri, T emptyValue, RequestBody<T> body) {
         return request(method, uri, null, Need.FILE, false, emptyValue, body);
