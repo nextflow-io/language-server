@@ -445,6 +445,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
     private void startWalk(Project project) {
         var generation = ++project.walkGeneration;
         project.index = Project.IndexStatus.WALKING;
+        project.addedDuringWalk.clear();
         var id = project.id;
         var root = project.root;
         var patterns = List.copyOf(configuration.excludePatterns());
@@ -485,6 +486,8 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         for( var entry : project.entries() ) {
             if( entry.role != FileEntry.Role.WORKSPACE || discovered.contains(entry.uri) || documents.isOpen(entry.uri) )
                 continue;
+            if( project.addedDuringWalk.contains(entry.uri) )
+                continue;
             if( project.entry(entry.uri) != entry )
                 continue;
             if( hasDependents(project, entry) )
@@ -492,6 +495,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
             else
                 removed.addAll(project.removeAndCollect(entry, documents::isOpen));
         }
+        project.addedDuringWalk.clear();
         ledger.publish(removed);
         scheduleBackground(Duration.ZERO);
     }
@@ -587,13 +591,24 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
             if( change.getType() != FileChangeType.Deleted ) {
                 // a changed file may be unknown if its last read failed
                 var project = projectFor(path);
-                if( !project.isDefault() && project.entry(uri) == null && !project.isExcluded(path) )
+                if( !project.isDefault() && !project.isExcluded(path) ) {
                     project.getOrCreate(uri, FileEntry.Role.WORKSPACE);
+                    noteAdded(project, uri);
+                }
                 matchMissing(path);
+            }
+            else {
+                for( var project : folders )
+                    project.addedDuringWalk.remove(uri);
             }
             bumpAll(uri);
         }
         scheduleEdit();
+    }
+
+    private static void noteAdded(Project project, URI uri) {
+        if( project.index == Project.IndexStatus.WALKING )
+            project.addedDuringWalk.add(uri);
     }
 
     private void libChanged(Project project, boolean jar) {
@@ -833,8 +848,10 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
             if( uri != null ) {
                 // load the file on demand if it is not known yet
                 var entry = project.entry(uri);
-                if( entry == null )
+                if( entry == null ) {
                     entry = project.getOrCreate(uri, project.isDefault() ? FileEntry.Role.DEPENDENCY : FileEntry.Role.WORKSPACE);
+                    noteAdded(project, uri);
+                }
                 if( entry != null && !roots.contains(entry) )
                     roots.add(entry);
             }

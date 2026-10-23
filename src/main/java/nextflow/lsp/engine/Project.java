@@ -110,6 +110,10 @@ public final class Project {
 
     long walkGeneration;
 
+    // files created or loaded since the current walk started, which
+    // the walk result may not include
+    final Set<URI> addedDuringWalk = new HashSet<>();
+
     long libStamp;
 
     Project(String id, String name, Path root, Context context) {

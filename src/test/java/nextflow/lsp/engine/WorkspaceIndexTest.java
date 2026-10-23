@@ -15,11 +15,14 @@
  */
 package nextflow.lsp.engine;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 
 import nextflow.lsp.TestLanguageClient;
 import nextflow.lsp.TestWorkspace;
@@ -300,6 +303,60 @@ class WorkspaceIndexTest {
             assertThat(buildsAtAnswer).isLessThan(3);
             f.settle();
             assertThat(f.workspace().isIndexing()).isFalse();
+        }
+    }
+
+    /**
+     * File access whose walk omits some files, as if the listing was
+     * taken before they were created.
+     */
+    static final class LaggingWalk implements FileAccess {
+
+        private final Predicate<Path> omitted;
+
+        LaggingWalk(Predicate<Path> omitted) {
+            this.omitted = omitted;
+        }
+
+        @Override
+        public String readText(Path path) throws IOException {
+            return FileAccess.system().readText(path);
+        }
+
+        @Override
+        public boolean exists(Path path) {
+            return FileAccess.system().exists(path);
+        }
+
+        @Override
+        public List<Path> walk(Path root, Predicate<Path> excluded, Predicate<Path> matcher) throws IOException {
+            var result = new ArrayList<>(FileAccess.system().walk(root, excluded, matcher));
+            result.removeIf(omitted);
+            return result;
+        }
+    }
+
+    @Test
+    void keepFilesCreatedDuringTheWalk() {
+        var io = new QueuedExecutor();
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.environment = new TestEnvironment()
+                .withIoExecutor(io)
+                .withFiles(new LaggingWalk((path) -> path.getFileName().toString().startsWith("late")));
+            o.watchers = true;
+            o.settle = false;
+        }) ) {
+            f.write("main.nf", "workflow { def x = 1 }\n");
+            f.runPending();
+            // created while the walk is in flight
+            f.writeAndNotify("late.nf", "workflow LATE { def y = 1 }\n");
+            // loaded on demand while the walk is in flight
+            f.write("late-request.nf", "workflow LATE_REQUEST { def z = 1 }\n");
+            f.call(Need.FILE, "late-request.nf", null, (context) -> null);
+            f.settle(io);
+            assertThat(f.messages("main.nf")).containsExactly(UNUSED);
+            assertThat(f.messages("late.nf")).containsExactly(UNUSED);
+            assertThat(f.messages("late-request.nf")).containsExactly(UNUSED);
         }
     }
 
