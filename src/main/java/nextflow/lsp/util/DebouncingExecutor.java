@@ -57,9 +57,14 @@ public class DebouncingExecutor {
     /**
      * Execute the action immediately, cancelling the currently
      * scheduled task if present.
+     *
+     * The action is run outside the monitor so that it can call
+     * executeLater() while holding its own locks.
      */
-    public synchronized void executeNow() {
-        cancelExisting();
+    public void executeNow() {
+        synchronized (this) {
+            cancelExisting();
+        }
         action.run();
     }
 

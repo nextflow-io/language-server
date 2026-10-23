@@ -18,8 +18,10 @@ package nextflow.lsp.util
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 import spock.lang.Specification
+import spock.lang.Timeout
 
 /**
  *
@@ -85,6 +87,43 @@ class DebouncingExecutorSpec extends Specification {
 
         then:
         executions == 3
+
+        cleanup:
+        debouncer.shutdown()
+    }
+
+    @Timeout(10)
+    def "executeNow does not deadlock with a scheduled action that calls executeLater"() {
+        given: "an action that reschedules itself while holding a lock, like LanguageService.update()"
+        def lock = new Object()
+        def runs = new AtomicInteger()
+        def timerHoldsLock = new CountDownLatch(1)
+        def callerInAction = new CountDownLatch(1)
+        DebouncingExecutor debouncer
+        debouncer = new DebouncingExecutor(10, {
+            if( runs.incrementAndGet() == 1 ) {
+                synchronized (lock) {
+                    timerHoldsLock.countDown()
+                    callerInAction.await(5, TimeUnit.SECONDS)
+                    debouncer.executeLater()
+                }
+            }
+            else {
+                callerInAction.countDown()
+                synchronized (lock) {}
+            }
+        })
+
+        when: "executeNow is called while the scheduled action holds the lock"
+        debouncer.executeLater()
+        timerHoldsLock.await(5, TimeUnit.SECONDS)
+        def caller = new Thread({ debouncer.executeNow() })
+        caller.daemon = true
+        caller.start()
+        caller.join(5_000)
+
+        then:
+        !caller.alive
 
         cleanup:
         debouncer.shutdown()

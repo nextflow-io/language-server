@@ -348,7 +348,9 @@ public abstract class LanguageService {
 
         updateLock.lock();
         try {
-            updateCondition.await(debounceMillis * 2, TimeUnit.MILLISECONDS);
+            // re-check under the lock in case the update finished in the meantime
+            if( awaitingUpdate )
+                updateCondition.await(debounceMillis * 2, TimeUnit.MILLISECONDS);
         }
         catch( InterruptedException e ) {
         }
