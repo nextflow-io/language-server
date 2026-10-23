@@ -45,6 +45,8 @@ make test                     # all unit tests
 make test class=<test class>  # a single test class
 ```
 
+Tests resolve plugins from a local registry that serves the fixtures in `src/test/resources/registry/`. To test against a new plugin release, add the registry response for it (`GET https://registry.nextflow.io/api/v1/plugins/<name>/<version>`) as `registry/v1/plugins/<name>/<version>.json`.
+
 ### Benchmark
 
 ```sh

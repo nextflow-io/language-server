@@ -17,6 +17,7 @@
 package nextflow.lsp.spec
 
 import com.sun.net.httpserver.HttpServer
+import nextflow.lsp.TestPluginRegistry
 import spock.lang.Specification
 
 /**
@@ -27,7 +28,7 @@ class PluginSpecCacheTest extends Specification {
 
     def 'should fetch a plugin spec' () {
         given:
-        def psc = pluginSpecCache()
+        def psc = new PluginSpecCache(TestPluginRegistry.url())
 
         when:
         def spec = psc.get('nf-prov', '1.6.0')
@@ -114,7 +115,7 @@ class PluginSpecCacheTest extends Specification {
     }
 
     def pluginSpecCache(Map entries = null) {
-        def result = new PluginSpecCache('https://registry.nextflow.io/api/')
+        def result = new PluginSpecCache(TestPluginRegistry.url())
         if( entries ) {
             def field = PluginSpecCache.getDeclaredField('cache')
             field.setAccessible(true)

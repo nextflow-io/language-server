@@ -202,7 +202,10 @@ class ScriptDiagnosticsTest extends Specification {
         def uri = getUri('main.nf')
         open(service, uri, script)
         service.updateNow()
-        return client.getDiagnostics(uri)
+        def diagnostics = client.getDiagnostics(uri)
+        // otherwise type checking is skipped and the test passes vacuously
+        assert !diagnostics.any { it.getMessage().contains('does not exist or is not specified') }
+        return diagnostics
             .findAll { it.getSeverity() == DiagnosticSeverity.Error }
             .collect { it.getMessage() }
     }

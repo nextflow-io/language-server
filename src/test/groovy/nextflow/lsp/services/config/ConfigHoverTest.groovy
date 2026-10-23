@@ -18,6 +18,7 @@ package nextflow.lsp.services.config
 
 import nextflow.config.spec.SpecNode
 import nextflow.lsp.TestLanguageClient
+import nextflow.lsp.TestPluginRegistry
 import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.lsp.spec.PluginSpec
 import nextflow.lsp.spec.PluginSpecCache
@@ -80,7 +81,7 @@ class ConfigHoverTest extends Specification {
         def uri = getUri('nextflow.config')
         def service = new ConfigService(workspaceRoot().toUri().toString())
         def configuration = LanguageServerConfiguration.defaults()
-        def pluginSpecCache = Spy(new PluginSpecCache(configuration.pluginRegistryUrl()))
+        def pluginSpecCache = Spy(new PluginSpecCache(TestPluginRegistry.url()))
         pluginSpecCache.get('nf-prov', '1.6.0') >> new PluginSpec(
             [
                 'prov': new SpecNode.Scope('The `prov` scope allows you to configure the `nf-prov` plugin.', [:])

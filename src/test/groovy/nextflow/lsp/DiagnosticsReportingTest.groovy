@@ -46,7 +46,7 @@ class DiagnosticsReportingTest extends Specification {
             d.maxCompletionItems(), d.pluginRegistryUrl(), d.sortDeclarations())
         def service = new ConfigService(workspaceRootUri())
         service.connect(client)
-        service.initialize(configuration, new PluginSpecCache(configuration.pluginRegistryUrl()))
+        service.initialize(configuration, new PluginSpecCache(TestPluginRegistry.url()))
         // mirror TestUtils.getConfigService: open empty file to skip the workspace scan
         open(service, getUri('nextflow.config'), '')
         service.updateNow()

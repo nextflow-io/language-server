@@ -18,7 +18,7 @@ package nextflow.lsp.services.config
 
 import nextflow.config.control.ConfigParser
 import nextflow.config.control.ConfigResolveVisitor
-import nextflow.lsp.services.LanguageServerConfiguration
+import nextflow.lsp.TestPluginRegistry
 import nextflow.lsp.spec.PluginSpecCache
 import nextflow.script.dsl.Types
 import org.codehaus.groovy.control.SourceUnit
@@ -44,8 +44,7 @@ class ConfigSpecTest extends Specification {
     }
 
     SourceUnit parse(String contents) {
-        def configuration = LanguageServerConfiguration.defaults()
-        def pluginSpecCache = new PluginSpecCache(configuration.pluginRegistryUrl())
+        def pluginSpecCache = new PluginSpecCache(TestPluginRegistry.url())
         def source = configParser.parse('nextflow.config', contents.stripIndent())
         new ConfigResolveVisitor(source, configParser.compiler().compilationUnit(), Types.DEFAULT_CONFIG_IMPORTS).visit()
         new ConfigSpecVisitor(source, pluginSpecCache).visit()

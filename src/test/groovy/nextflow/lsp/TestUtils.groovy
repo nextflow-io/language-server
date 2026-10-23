@@ -23,6 +23,7 @@ import nextflow.lsp.services.LanguageServerConfiguration
 import nextflow.lsp.services.LanguageService
 import nextflow.lsp.services.config.ConfigService
 import nextflow.lsp.services.script.ScriptService
+import nextflow.lsp.spec.PluginSpecCache
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.TextDocumentItem
 
@@ -103,7 +104,7 @@ class TestUtils {
     static ConfigService newConfigService(TestLanguageClient client = new TestLanguageClient()) {
         def service = new ConfigService(workspaceRoot.toUri().toString())
         service.connect(client)
-        service.initialize(LanguageServerConfiguration.defaults())
+        service.initialize(LanguageServerConfiguration.defaults(), new PluginSpecCache(TestPluginRegistry.url()))
         return service
     }
 
