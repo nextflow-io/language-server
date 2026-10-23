@@ -208,6 +208,30 @@ class WorkspaceEventsTest {
     }
 
     @Test
+    void ignoreInvalidRegistryUrlButApplyTheOtherSettings() {
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.environment = new TestEnvironment().withRegistry(HttpPluginRegistryClient::new);
+            o.settle = false;
+        }) ) {
+            f.write("main.nf", WITH_WARNING);
+            f.settle();
+            assertThat(f.messages("main.nf")).containsExactly(UNUSED);
+
+            var registryUrl = f.workspace().configuration().pluginRegistryUrl();
+            f.configure(Map.of(
+                "nextflow.pluginRegistryUrl", "http://bad url/",
+                "nextflow.errorReportingMode", "off"));
+            f.settle();
+            assertThat(f.workspace().configuration().pluginRegistryUrl()).isEqualTo(registryUrl);
+            assertThat(f.messages("main.nf")).isEmpty();
+            assertThat(f.client().getLogMessages())
+                .filteredOn(m -> m.getType() == MessageType.Warning)
+                .extracting(m -> m.getMessage())
+                .anyMatch(m -> m.contains("nextflow.pluginRegistryUrl"));
+        }
+    }
+
+    @Test
     void dropClosedFileFromTheDefaultProject() {
         try( var f = WorkspaceFixture.start((o) -> o.folders()) ) {
             f.write("outside/main.nf", WITH_WARNING);

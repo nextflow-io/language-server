@@ -43,10 +43,21 @@ public class HttpPluginRegistryClient implements PluginRegistryClient {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
 
-    private final URI registryUri;
+    private final String registryUrl;
+
+    private HttpClient client;
 
     public HttpPluginRegistryClient(String registryUrl) {
-        this.registryUri = URI.create(registryUrl);
+        this.registryUrl = registryUrl;
+    }
+
+    private synchronized HttpClient client() {
+        if( client == null ) {
+            client = HttpClient.newBuilder()
+                .connectTimeout(TIMEOUT)
+                .build();
+        }
+        return client;
     }
 
     @Override
@@ -55,20 +66,17 @@ public class HttpPluginRegistryClient implements PluginRegistryClient {
             var path = version != null
                 ? String.format("v1/plugins/%s/%s", name, version)
                 : String.format("v1/plugins/%s", name);
-            var uri = registryUri.resolve(path);
+            var uri = URI.create(registryUrl).resolve(path);
 
             log.debug("fetch plugin " + uri);
 
-            var client = HttpClient.newBuilder()
-                .connectTimeout(TIMEOUT)
-                .build();
             var request = HttpRequest.newBuilder()
                 .uri(uri)
                 .timeout(TIMEOUT)
                 .GET()
                 .header("Accept", "application/json")
                 .build();
-            var httpResponse = client.send(request, BodyHandlers.ofString());
+            var httpResponse = client().send(request, BodyHandlers.ofString());
             var status = httpResponse.statusCode();
             if( status == 404 )
                 return new NotFound();

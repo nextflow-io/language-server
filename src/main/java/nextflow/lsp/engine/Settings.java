@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.engine;
 
+import java.net.URI;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -53,7 +54,7 @@ final class Settings {
             get("nextflow.formatting.harshilAlignment", () -> JsonUtils.getBoolean(settings, "nextflow.formatting.harshilAlignment"), current.harshilAlignment(), warn),
             get("nextflow.formatting.maheshForm", () -> JsonUtils.getBoolean(settings, "nextflow.formatting.maheshForm"), current.maheshForm(), warn),
             get("nextflow.completion.maxItems", () -> JsonUtils.getInteger(settings, "nextflow.completion.maxItems"), current.maxCompletionItems(), warn),
-            get("nextflow.pluginRegistryUrl", () -> JsonUtils.getString(settings, "nextflow.pluginRegistryUrl"), current.pluginRegistryUrl(), warn),
+            get("nextflow.pluginRegistryUrl", () -> registryUrl(settings), current.pluginRegistryUrl(), warn),
             get("nextflow.formatting.sortDeclarations", () -> JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), current.sortDeclarations(), warn)
         );
     }
@@ -77,6 +78,16 @@ final class Settings {
         if( string == null )
             return null;
         return ErrorReportingMode.valueOf(string.toUpperCase());
+    }
+
+    private static String registryUrl(Object settings) {
+        var string = JsonUtils.getString(settings, "nextflow.pluginRegistryUrl");
+        if( string == null )
+            return null;
+        var uri = URI.create(string);
+        if( !"http".equals(uri.getScheme()) && !"https".equals(uri.getScheme()) )
+            throw new IllegalArgumentException("not an HTTP URL: " + string);
+        return string;
     }
 
     private static <T> T get(String key, Supplier<T> value, T current, Consumer<String> warn) {
