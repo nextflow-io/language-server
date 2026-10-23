@@ -15,9 +15,7 @@
  */
 package nextflow.lsp.services.script;
 
-import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
@@ -47,15 +44,11 @@ import nextflow.script.control.ResolveIncludeVisitor;
 import nextflow.script.control.ScriptResolveVisitor;
 import nextflow.script.control.TypeCheckingVisitor;
 import nextflow.script.dsl.Types;
-import nextflow.script.parser.ScriptAstBuilder;
-import nextflow.script.parser.ScriptParserPluginFactory;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.control.messages.WarningMessage;
 
 /**
  *
@@ -77,53 +70,7 @@ public class ScriptAstCache extends ASTNodeCache {
     }
 
     private static LanguageServerCompiler createCompiler(String rootUri) {
-        var config = createConfiguration();
-        var classLoader = new GroovyClassLoader();
-        if( rootUri != null )
-            addLibToClasspath(classLoader, Path.of(URI.create(rootUri)).resolve("lib"));
-        return new LanguageServerCompiler(config, classLoader);
-    }
-
-    /**
-     * Add the `lib` directory and any JARs within it to the classpath,
-     * the same way that Nextflow does. Groovy source files are compiled
-     * on demand when a script refers to them.
-     *
-     * Source files are resolved against the lib directory on every lookup
-     * rather than through the classpath, so that files (or the lib directory
-     * itself) can be added while the language server is running. New JARs
-     * still require a restart.
-     *
-     * @param classLoader
-     * @param libDir
-     */
-    private static void addLibToClasspath(GroovyClassLoader classLoader, Path libDir) {
-        classLoader.setResourceLoader((name) -> {
-            var source = libDir.resolve(name.replace('.', '/') + ".groovy");
-            return Files.exists(source) ? source.toUri().toURL() : null;
-        });
-        if( !Files.isDirectory(libDir) )
-            return;
-        try( var files = Files.list(libDir) ) {
-            files
-                .filter(path -> path.toString().endsWith(".jar"))
-                .forEach(path -> classLoader.addClasspath(path.toString()));
-        }
-        catch( IOException e ) {
-            System.err.println(String.format("Failed to read JAR files in lib directory: %s -- %s", libDir, e));
-        }
-    }
-
-    private static CompilerConfiguration createConfiguration() {
-        var config = new CompilerConfiguration();
-        config.setPluginFactory(new ScriptParserPluginFactory());
-        config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
-
-        var optimizationOptions = config.getOptimizationOptions();
-        optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true);
-        optimizationOptions.put(ScriptAstBuilder.COMMENTS_OPTION, true);
-
-        return config;
+        return LanguageServerCompiler.forScripts(rootUri != null ? Path.of(URI.create(rootUri)) : null);
     }
 
     public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {

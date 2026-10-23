@@ -18,6 +18,7 @@ package nextflow.lsp.services.config;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.spec.SpecNode;
 import nextflow.lsp.spec.ConfigSpecFactory;
 import nextflow.lsp.spec.PluginRef;
+import nextflow.lsp.spec.PluginSpec;
 import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.control.PhaseAware;
@@ -74,13 +76,49 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private PluginSpecCache pluginSpecCache;
+    private PluginLookup plugins;
 
     private Stack<String> scopes = new Stack<>();
 
-    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache) {
+    /**
+     * Source of plugin specs for the plugins declared by a config file.
+     */
+    public interface PluginLookup {
+
+        /**
+         * Get the spec of a plugin release, or null if it is not
+         * available (unknown, or still being fetched).
+         *
+         * @param ref
+         */
+        PluginSpec get(PluginRef ref);
+
+        /**
+         * Record the plugins declared by a config file.
+         *
+         * @param uri
+         * @param refs
+         */
+        void declare(URI uri, List<PluginRef> refs);
+    }
+
+    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginLookup plugins) {
         this.sourceUnit = sourceUnit;
-        this.pluginSpecCache = pluginSpecCache;
+        this.plugins = plugins;
+    }
+
+    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache) {
+        this(sourceUnit, new PluginLookup() {
+            @Override
+            public PluginSpec get(PluginRef ref) {
+                return pluginSpecCache.get(ref.name(), ref.version());
+            }
+
+            @Override
+            public void declare(URI uri, List<PluginRef> refs) {
+                pluginSpecCache.setCurrentVersions(uri, refs);
+            }
+        });
     }
 
     @Override
@@ -142,14 +180,14 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
         // fetch plugin specs from plugin registry
         var entries = refs.stream()
-            .map((ref) -> pluginSpecCache.get(ref.name(), ref.version()))
+            .map((ref) -> plugins.get(ref))
             .filter(spec -> spec != null)
             .map(spec -> spec.configScopes())
             .toList();
 
         // save current versions to plugin cache
         var uri = sourceUnit.getSource().getURI();
-        pluginSpecCache.setCurrentVersions(uri, refs);
+        plugins.declare(uri, refs);
 
         // collect config scopes from plugin specs
         var result = new HashMap<String, SpecNode>();

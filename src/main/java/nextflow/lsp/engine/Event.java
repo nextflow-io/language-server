@@ -58,7 +58,12 @@ public sealed interface Event {
      */
     record WalkDone(String projectId, long generation, List<Path> files, IOException error) implements Event {}
 
-    record PluginFetched(PluginRef ref, PluginRegistryClient.Result result) implements Event {}
+    /**
+     * A plugin spec fetch finished. The registry URL identifies the
+     * registry the fetch was made against, so that a result from a
+     * previous registry is ignored.
+     */
+    record PluginFetched(String registryUrl, PluginRef ref, PluginRegistryClient.Result result) implements Event {}
 
     /**
      * The client responded to window/workDoneProgress/create.

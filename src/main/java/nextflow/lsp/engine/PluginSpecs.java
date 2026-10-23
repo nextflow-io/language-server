@@ -1,0 +1,163 @@
+/*
+ * Copyright 2024-2025, Seqera Labs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package nextflow.lsp.engine;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+import nextflow.lsp.spec.PluginRef;
+import nextflow.lsp.spec.PluginSpec;
+import org.eclipse.lsp4j.MessageType;
+
+/**
+ * Plugin specs fetched from a plugin registry.
+ *
+ * Specs are fetched asynchronously on the IO pool and cached per
+ * release, including releases that don't exist. A failed fetch is
+ * retried at most once per {@link #RETRY_INTERVAL}. Each completed
+ * fetch bumps the generation of its ref, which is the stamp of
+ * {@link ExtKey.Plugin}, so that the files that looked it up are
+ * rebuilt.
+ *
+ * Engine-confined.
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+final class PluginSpecs {
+
+    static final Duration RETRY_INTERVAL = Duration.ofMinutes(5);
+
+    enum State { PENDING, READY, MISSING, FAILED }
+
+    /**
+     * The result of a lookup.
+     *
+     * @param spec the spec, if available
+     * @param pending whether the spec is still being fetched
+     */
+    record Lookup(Optional<PluginSpec> spec, boolean pending) {}
+
+    private static final class Entry {
+        State state = State.PENDING;
+        PluginSpec spec;
+        long generation;
+        Instant retryAt;
+    }
+
+    private final Engine engine;
+
+    private final String registryUrl;
+
+    private final PluginRegistryClient client;
+
+    private final Map<PluginRef, Entry> cache = new HashMap<>();
+
+    PluginSpecs(Engine engine, String registryUrl) {
+        this.engine = engine;
+        this.registryUrl = registryUrl;
+        this.client = engine.environment().registry(registryUrl);
+    }
+
+    /**
+     * Look up the spec of a plugin release, and start fetching it if
+     * it has not been fetched yet, or if its last fetch failed long
+     * enough ago.
+     *
+     * @param ref
+     */
+    Lookup lookup(PluginRef ref) {
+        var entry = cache.get(ref);
+        var now = engine.environment().clock().instant();
+        if( entry == null ) {
+            entry = new Entry();
+            cache.put(ref, entry);
+            fetch(ref);
+        }
+        else if( entry.state == State.FAILED && !now.isBefore(entry.retryAt) ) {
+            entry.state = State.PENDING;
+            fetch(ref);
+        }
+        return switch( entry.state ) {
+            case READY -> new Lookup(Optional.of(entry.spec), false);
+            case PENDING -> new Lookup(Optional.empty(), true);
+            case MISSING, FAILED -> new Lookup(Optional.empty(), false);
+        };
+    }
+
+    /**
+     * The stamp of a ref, which changes whenever a fetch completes.
+     *
+     * @param ref
+     */
+    long generation(PluginRef ref) {
+        var entry = cache.get(ref);
+        return entry != null ? entry.generation : 0;
+    }
+
+    /**
+     * Apply the result of a fetch.
+     *
+     * @param event
+     * @return true if the event applies to this registry
+     */
+    boolean onFetched(Event.PluginFetched event) {
+        if( !registryUrl.equals(event.registryUrl()) )
+            return false;
+        var entry = cache.get(event.ref());
+        if( entry == null || entry.state != State.PENDING )
+            return false;
+        var result = event.result();
+        if( result instanceof PluginRegistryClient.Found found ) {
+            entry.state = State.READY;
+            entry.spec = found.spec();
+        }
+        else if( result instanceof PluginRegistryClient.NotFound ) {
+            entry.state = State.MISSING;
+        }
+        else if( result instanceof PluginRegistryClient.Failed failed ) {
+            entry.state = State.FAILED;
+            entry.retryAt = engine.environment().clock().instant().plus(RETRY_INTERVAL);
+            engine.log(MessageType.Warning, "Failed to fetch plugin " + refString(event.ref()) + " from registry: " + failed.reason());
+        }
+        entry.generation++;
+        return true;
+    }
+
+    private void fetch(PluginRef ref) {
+        engine.submitIo("plugin fetch " + refString(ref), () -> {
+            PluginRegistryClient.Result result;
+            try {
+                result = client.fetch(ref.name(), ref.version());
+            }
+            catch( InterruptedException e ) {
+                Thread.currentThread().interrupt();
+                result = new PluginRegistryClient.Failed("interrupted");
+            }
+            catch( RuntimeException e ) {
+                result = new PluginRegistryClient.Failed(e.toString());
+            }
+            return new Event.PluginFetched(registryUrl, ref, result);
+        });
+    }
+
+    private static String refString(PluginRef ref) {
+        return ref.version() != null ? ref.name() + "@" + ref.version() : ref.name();
+    }
+
+}

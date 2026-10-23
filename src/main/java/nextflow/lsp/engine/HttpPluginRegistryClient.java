@@ -74,18 +74,27 @@ public class HttpPluginRegistryClient implements PluginRegistryClient {
                 return new NotFound();
             if( status != 200 )
                 return new Failed("HTTP " + status);
-            if( !(new JsonSlurper().parseText(httpResponse.body()) instanceof Map response) )
-                return new Failed("unexpected response from registry");
-
-            // select plugin release (or latest if not specified)
-            var release = pluginRelease(response);
-            return release != null
-                ? new Found(pluginSpec(release))
-                : new NotFound();
+            return parseResponse(httpResponse.body());
         }
         catch( IOException | RuntimeException e ) {
             return new Failed(e.toString());
         }
+    }
+
+    /**
+     * Parse the body of a successful registry response.
+     *
+     * @param body
+     */
+    static Result parseResponse(String body) {
+        if( !(new JsonSlurper().parseText(body) instanceof Map response) )
+            return new Failed("unexpected response from registry");
+
+        // select plugin release (or latest if not specified)
+        var release = pluginRelease(response);
+        return release != null
+            ? new Found(pluginSpec(release))
+            : new NotFound();
     }
 
     private static Map pluginRelease(Map response) {

@@ -21,12 +21,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import groovy.lang.GroovyClassLoader;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.control.ConfigResolveVisitor;
 import nextflow.config.control.ResolveIncludeVisitor;
-import nextflow.config.parser.ConfigAstBuilder;
-import nextflow.config.parser.ConfigParserPluginFactory;
 import nextflow.config.spec.SpecNode;
 import nextflow.lsp.ast.ASTNodeCache;
 import nextflow.lsp.compiler.LanguageServerCompiler;
@@ -38,9 +35,7 @@ import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
 import nextflow.script.dsl.Types;
 import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.control.messages.WarningMessage;
 
 /**
  *
@@ -57,17 +52,7 @@ public class ConfigAstCache extends ASTNodeCache {
     }
 
     private static LanguageServerCompiler createCompiler() {
-        var config = createConfiguration();
-        var classLoader = new GroovyClassLoader();
-        return new LanguageServerCompiler(config, classLoader);
-    }
-
-    private static CompilerConfiguration createConfiguration() {
-        var config = new CompilerConfiguration();
-        config.setPluginFactory(new ConfigParserPluginFactory());
-        config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
-        config.getOptimizationOptions().put(ConfigAstBuilder.COMMENTS_OPTION, true);
-        return config;
+        return LanguageServerCompiler.forConfigs();
     }
 
     public void initialize(LanguageServerConfiguration configuration, PluginSpecCache pluginSpecCache) {

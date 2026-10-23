@@ -17,6 +17,7 @@ package nextflow.lsp.services.script;
 
 import java.util.List;
 
+import nextflow.lsp.spec.PluginSpec;
 import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.FunctionNode;
@@ -41,11 +42,39 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private PluginSpecCache pluginSpecCache;
+    private PluginResolver plugins;
+
+    /**
+     * Source of plugin specs for the plugin includes of a script.
+     */
+    public interface PluginResolver {
+
+        /**
+         * Get the spec of the plugin with the given name, as declared
+         * by the governing config file, or null if it is not available.
+         *
+         * @param name
+         */
+        PluginSpec get(String name);
+
+        /**
+         * Whether the spec of the given plugin is still being fetched,
+         * in which case a missing spec is not reported.
+         *
+         * @param name
+         */
+        default boolean isPending(String name) {
+            return false;
+        }
+    }
+
+    public ResolvePluginIncludeVisitor(SourceUnit sourceUnit, PluginResolver plugins) {
+        this.sourceUnit = sourceUnit;
+        this.plugins = plugins;
+    }
 
     public ResolvePluginIncludeVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache) {
-        this.sourceUnit = sourceUnit;
-        this.pluginSpecCache = pluginSpecCache;
+        this(sourceUnit, (name) -> pluginSpecCache.getCurrent(sourceUnit.getSource().getURI(), name));
     }
 
     @Override
@@ -61,13 +90,14 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
 
     @Override
     public void visitInclude(IncludeNode node) {
-        var uri = sourceUnit.getSource().getURI();
         var source = node.source.getText();
         if( !source.startsWith("plugin/") )
             return;
         var pluginName = source.split("/")[1];
-        var spec = pluginSpecCache.getCurrent(uri, pluginName);
+        var spec = plugins.get(pluginName);
         if( spec == null ) {
+            if( plugins.isPending(pluginName) )
+                return;
             addError("Plugin '" + pluginName + "' does not exist or is not specified in the configuration file", node);
             return;
         }

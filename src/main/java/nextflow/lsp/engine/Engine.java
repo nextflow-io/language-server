@@ -308,13 +308,13 @@ public final class Engine {
         env.exiter().exit(1);
     }
 
-    private void log(MessageType type, String message) {
+    void log(MessageType type, String message) {
         System.err.println(message);
         if( client != null )
             client.logMessage(new MessageParams(type, message));
     }
 
-    private void logError(String message, Throwable e) {
+    void logError(String message, Throwable e) {
         var trace = new StringWriter();
         e.printStackTrace(new PrintWriter(trace));
         System.err.println(message);
