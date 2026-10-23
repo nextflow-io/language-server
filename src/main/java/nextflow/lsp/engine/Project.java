@@ -285,6 +285,18 @@ public final class Project {
      * @param entry
      */
     void bump(FileEntry entry) {
+        entry.otherInputChanged = true;
+        bumpText(entry);
+    }
+
+    /**
+     * Mark the text of an entry as changed, without any other input
+     * change. If the text turns out to be the same as in the last
+     * build, the build is kept.
+     *
+     * @param entry
+     */
+    void bumpText(FileEntry entry) {
         entry.inputVersion = context.nextInputVersion();
         inputStale.add(entry.uri);
         changed();

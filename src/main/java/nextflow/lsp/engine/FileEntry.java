@@ -71,7 +71,13 @@ public final class FileEntry {
 
     Set<Path> missingTargets = Set.of();
 
+    // set when an input other than the text changed since the last build
+    boolean otherInputChanged;
+
     SourceUnit unit;
+
+    // the text of the last build, which the source unit also holds
+    String builtText;
 
     Map<ASTNode, ASTNode> parents = Map.of();
 

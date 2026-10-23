@@ -596,7 +596,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         for( var project : projects() ) {
             var entry = project.entry(uri);
             if( entry != null )
-                project.bump(entry);
+                project.bumpText(entry);
         }
     }
 
@@ -795,7 +795,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         var count = Math.max(1, result.built().size());
         millisPerFile = millisPerFile == 0 ? (double) elapsed / count : 0.8 * millisPerFile + 0.2 * elapsed / count;
         builds++;
-        builtFiles += result.built().size();
+        builtFiles += result.built().size() - result.reused().size();
         if( log.isDebugEnabled() )
             log.debug("built " + result.built().size() + " files of " + project + " in " + elapsed + " ms");
         ledger.publish(result.touched());

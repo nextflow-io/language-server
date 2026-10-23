@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.engine;
 
+import java.net.URI;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -428,6 +429,54 @@ class WorkspaceBuildTest {
             f.settle();
             assertThat(f.diagnostics("main.nf")).isNotEmpty();
             assertThat(f.messages("other.nf")).containsExactly(UNUSED);
+        }
+    }
+
+    @Test
+    void keepTheBuildOfAModuleOpenedOrClosedWithUnchangedText() {
+        try( var f = start() ) {
+            var module = "workflow FOO { def x = 1 }\n";
+            f.write("mod.nf", module);
+            for( int i = 0; i < 5; i++ )
+                f.write("main" + i + ".nf", "include { FOO } from './mod.nf'\nworkflow W" + i + " { FOO() }\n");
+            f.settle();
+            var built = f.workspace().builtFileCount();
+
+            f.open("mod.nf", module);
+            f.settle();
+            f.close("mod.nf");
+            f.settle();
+            assertThat(f.workspace().builtFileCount()).isEqualTo(built);
+            assertThat(f.messages("mod.nf")).containsExactly(UNUSED);
+            assertThat(f.client().getPublishLog()).last().satisfies(p -> assertThat(p.getVersion()).isNull());
+
+            // the dependents still refer to the indexed module
+            var target = f.call(Need.FILE, "main0.nf", null, (context) -> {
+                var scripts = context.project().scriptView();
+                var include = scripts.getIncludeNodes(URI.create(f.uri("main0.nf"))).get(0);
+                return scripts.getURI(include.entries.get(0).getTarget());
+            });
+            assertThat(target).isEqualTo(URI.create(f.uri("mod.nf")));
+
+            // a real change still rebuilds the dependents
+            f.open("mod.nf", "workflow BAR {}\n");
+            f.settle();
+            assertThat(f.workspace().builtFileCount() - built).isEqualTo(6);
+            assertThat(f.messages("main0.nf")).isNotEmpty();
+        }
+    }
+
+    @Test
+    void rebuildAFileWithUnchangedTextWhenAnotherInputChanged() {
+        try( var f = start() ) {
+            f.write("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).isNotEmpty();
+            f.open("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
+            // the missing target is created while main.nf is stale
+            f.writeAndNotify("mod.nf", "workflow FOO {}\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).isEmpty();
         }
     }
 

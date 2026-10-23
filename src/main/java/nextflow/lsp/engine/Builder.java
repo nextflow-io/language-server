@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -94,9 +95,11 @@ final class Builder {
      * The result of a build.
      *
      * @param built the entries that were built, in build order
+     * @param reused the built entries whose text was unchanged, so
+     *   that their last build was kept
      * @param removed the URIs of entries that were removed
      */
-    record Result(List<FileEntry> built, Set<URI> removed) {
+    record Result(List<FileEntry> built, List<FileEntry> reused, Set<URI> removed) {
         Set<URI> touched() {
             var result = new TreeSet<URI>(removed);
             for( var entry : built )
@@ -140,6 +143,8 @@ final class Builder {
             project.compilerFor(entry.kind).getSources().remove(entry.uri);
             project.unindex(entry);
             entry.unit = null;
+            entry.builtText = null;
+            entry.otherInputChanged = false;
             entry.errors = List.of();
             entry.warnings = List.of();
             entry.internalError = error;
@@ -160,6 +165,7 @@ final class Builder {
         final FileEntry entry;
         final long inputVersion;
         final Integer documentVersion;
+        String text;
         SourceUnit unit;
         boolean missing;
         Throwable internalError;
@@ -190,14 +196,21 @@ final class Builder {
 
         private final Map<URI, Parsed> batch = new LinkedHashMap<>();
 
+        // text read while checking for unchanged files
+        private final Map<URI, String> texts = new LinkedHashMap<>();
+
         Build(Project project) {
             this.project = project;
         }
 
         Result run(Collection<FileEntry> initial) {
+            var kept = keepUnchanged(initial);
+
             // parse and discover dependencies until the batch is closed
             var pending = new ArrayList<FileEntry>();
             for( var entry : initial ) {
+                if( kept.contains(entry) || project.isFresh(entry) )
+                    continue;
                 if( !batch.containsKey(entry.uri) && project.entry(entry.uri) == entry ) {
                     batch.put(entry.uri, null);
                     pending.add(entry);
@@ -218,7 +231,7 @@ final class Builder {
 
             var order = postOrder();
             var removed = new TreeSet<URI>();
-            var built = new ArrayList<FileEntry>();
+            var built = new ArrayList<FileEntry>(kept);
             var analysed = new ArrayList<Parsed>();
             for( var parsed : order ) {
                 if( parsed.missing )
@@ -252,7 +265,83 @@ final class Builder {
             }
 
             commit(analysed, removed);
-            return new Result(built, collectGarbage(order, removed));
+            return new Result(built, kept, collectGarbage(order, removed));
+        }
+
+        // -- unchanged files
+
+        /**
+         * Keep the last build of each entry whose text is the same as
+         * in its last build, when nothing else changed, so that it
+         * keeps its stamp and its dependents stay fresh. This happens
+         * when a file is opened or closed without changes.
+         *
+         * @param initial
+         * @return the kept entries
+         */
+        private List<FileEntry> keepUnchanged(Collection<FileEntry> initial) {
+            var documents = context.engine().documents();
+            var pool = context.engine().environment().compilePool();
+            var files = context.engine().environment().files();
+            var candidates = new ArrayList<FileEntry>();
+            var reads = new ArrayList<Future<String>>();
+            for( var entry : initial ) {
+                if( project.entry(entry.uri) != entry || entry.builtInputVersion == entry.inputVersion )
+                    continue;
+                if( entry.otherInputChanged || entry.builtText == null || entry.internalError != null )
+                    continue;
+                var document = documents.get(entry.uri);
+                var path = entry.path;
+                candidates.add(entry);
+                reads.add(document.isPresent()
+                    ? CompletableFuture.completedFuture(document.get().text())
+                    : submit(pool, () -> files.readText(path)));
+            }
+            var result = new ArrayList<FileEntry>();
+            // dependencies come first, so that their dependents can be kept too
+            for( int i = 0; i < candidates.size(); i++ ) {
+                var entry = candidates.get(i);
+                String text;
+                try {
+                    text = reads.get(i).get();
+                }
+                catch( InterruptedException e ) {
+                    Thread.currentThread().interrupt();
+                    continue;
+                }
+                catch( ExecutionException e ) {
+                    if( e.getCause() instanceof VirtualMachineError vme )
+                        throw vme;
+                    // reported by the build
+                    continue;
+                }
+                if( !text.equals(entry.builtText) || !isOtherwiseFresh(entry) ) {
+                    texts.put(entry.uri, text);
+                    continue;
+                }
+                entry.builtInputVersion = entry.inputVersion;
+                entry.builtFromVersion = documents.get(entry.uri).map(DocumentStore.OpenDocument::version).orElse(null);
+                project.built(entry);
+                result.add(entry);
+            }
+            return result;
+        }
+
+        /**
+         * Whether every dependency and external input of an entry is
+         * unchanged since its last build.
+         */
+        private boolean isOtherwiseFresh(FileEntry entry) {
+            for( var dep : entry.depStamps.entrySet() ) {
+                var target = project.entry(dep.getKey());
+                if( target == null || target.stamp != dep.getValue() || !project.isFresh(target) )
+                    return false;
+            }
+            for( var ext : entry.extKeys.entrySet() ) {
+                if( context.extStamp(project, ext.getKey()) != ext.getValue() )
+                    return false;
+            }
+            return true;
         }
 
         // -- parse
@@ -265,7 +354,7 @@ final class Builder {
             for( var entry : entries ) {
                 var document = documents.get(entry.uri);
                 var parsed = new Parsed(entry, entry.inputVersion, document.map(DocumentStore.OpenDocument::version).orElse(null));
-                var text = document.map(DocumentStore.OpenDocument::text);
+                var text = document.map(DocumentStore.OpenDocument::text).or(() -> Optional.ofNullable(texts.get(entry.uri)));
                 Callable<Void> task = () -> {
                     parse(parsed, text);
                     return null;
@@ -294,12 +383,12 @@ final class Builder {
             return tasks;
         }
 
-        private Future<?> submit(ExecutorService pool, Callable<Void> task) {
+        private <T> Future<T> submit(ExecutorService pool, Callable<T> task) {
             try {
                 return pool.submit(task);
             }
             catch( RejectedExecutionException e ) {
-                // the pool is shut down -- parse on this thread
+                // the pool is shut down -- run on this thread
                 var inline = new FutureTask<>(task);
                 inline.run();
                 return inline;
@@ -330,6 +419,7 @@ final class Builder {
                     return;
                 }
             }
+            parsed.text = text;
             var compiler = project.compilerFor(entry.kind);
             var unit = compiler.createSourceUnit(entry.uri, Optional.of(text));
             parsed.unit = unit;
@@ -624,6 +714,7 @@ final class Builder {
             var entry = parsed.entry;
             project.unindex(entry);
             entry.unit = parsed.unit;
+            entry.builtText = parsed.unit != null ? parsed.text : null;
             entry.internalError = parsed.internalError;
             entry.errors = parsed.unit != null ? errors(parsed.unit) : List.of();
             entry.warnings = parsed.unit != null ? warnings(parsed.unit) : List.of();
@@ -705,6 +796,7 @@ final class Builder {
                 entry.extKeys = extKeys;
                 entry.builtInputVersion = parsed.inputVersion;
                 entry.builtFromVersion = parsed.documentVersion;
+                entry.otherInputChanged = false;
                 entry.pluginRefs = List.copyOf(parsed.pluginRefs);
                 project.graph.setEdges(entry.uri, depStamps.keySet());
                 project.setMissingTargets(entry, missing);
