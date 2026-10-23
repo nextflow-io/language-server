@@ -36,7 +36,6 @@ import nextflow.config.spec.SpecNode;
 import nextflow.lsp.spec.ConfigSpecFactory;
 import nextflow.lsp.spec.PluginRef;
 import nextflow.lsp.spec.PluginSpec;
-import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
@@ -105,20 +104,6 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
     public ConfigSpecVisitor(SourceUnit sourceUnit, PluginLookup plugins) {
         this.sourceUnit = sourceUnit;
         this.plugins = plugins;
-    }
-
-    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache) {
-        this(sourceUnit, new PluginLookup() {
-            @Override
-            public PluginSpec get(PluginRef ref) {
-                return pluginSpecCache.get(ref.name(), ref.version());
-            }
-
-            @Override
-            public void declare(URI uri, List<PluginRef> refs) {
-                pluginSpecCache.setCurrentVersions(uri, refs);
-            }
-        });
     }
 
     @Override

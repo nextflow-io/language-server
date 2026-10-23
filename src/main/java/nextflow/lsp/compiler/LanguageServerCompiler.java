@@ -26,12 +26,11 @@ import groovy.lang.GroovyClassLoader;
 import nextflow.config.control.StringReaderSourceWithURI;
 import nextflow.config.parser.ConfigAstBuilder;
 import nextflow.config.parser.ConfigParserPluginFactory;
-import nextflow.lsp.file.FileCache;
 import nextflow.script.control.Compiler;
+import nextflow.script.control.LazyErrorCollector;
 import nextflow.script.parser.ScriptAstBuilder;
 import nextflow.script.parser.ScriptParserPluginFactory;
 import org.antlr.v4.runtime.RecognitionException;
-import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.ErrorCollector;
@@ -39,8 +38,8 @@ import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.WarningMessage;
 
 /**
- * Compiler that can load source files from the file cache
- * and defers errors to the language server.
+ * Compiler that parses source files from the given text or from
+ * disk, and defers errors to the language server.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -138,31 +137,11 @@ public class LanguageServerCompiler extends Compiler {
         return null;
     }
 
-    /**
-     * Prepare a source file from the open cache, or the filesystem
-     * if it is not open.
-     *
-     * @param uri
-     * @param fileCache
-     */
-    public SourceUnit createSourceUnit(URI uri, FileCache fileCache) {
-        var text = fileCache.isOpen(uri)
-            ? Optional.ofNullable(fileCache.getContents(uri))
-            : Optional.<String>empty();
-        return createSourceUnit(uri, text);
-    }
-
     @Override
     protected ErrorCollector createErrorCollector() {
-        return new LanguageServerErrorCollector(configuration());
+        return new LazyErrorCollector(configuration());
     }
 
-    /**
-     * Compile a source file enough to build the AST, and defer
-     * any errors to be handled later.
-     *
-     * @param sourceUnit
-     */
     /**
      * Parse a source file and build the AST. Syntax errors are added
      * to the error collector, while any other exception propagates.
@@ -178,18 +157,6 @@ public class LanguageServerCompiler extends Compiler {
         }
         catch( RecognitionException | CompilationFailedException e ) {
             // syntax errors are in the error collector
-        }
-    }
-
-    @Override
-    public void compile(SourceUnit sourceUnit) {
-        try {
-            super.compile(sourceUnit);
-        }
-        catch( GroovyBugError | Exception e ) {
-            var uri = sourceUnit.getSource().getURI();
-            System.err.println("Unexpected exception while compiling " + uri.getPath() + ": " + e.toString());
-            e.printStackTrace();
         }
     }
 

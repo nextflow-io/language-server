@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.TestWorkspace;
+import nextflow.script.control.LazyErrorCollector;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
 import org.junit.jupiter.api.Test;
@@ -55,7 +56,7 @@ class LanguageServerCompilerTest {
         var unit = compiler.createSourceUnit(file.toUri(), Optional.of("in memory"));
         assertThat(sourceText(unit)).isEqualTo("in memory");
         assertThat(unit.getSource().getURI()).isEqualTo(file.toUri());
-        assertThat(unit.getErrorCollector()).isInstanceOf(LanguageServerErrorCollector.class);
+        assertThat(unit.getErrorCollector()).isInstanceOf(LazyErrorCollector.class);
     }
 
     @Test

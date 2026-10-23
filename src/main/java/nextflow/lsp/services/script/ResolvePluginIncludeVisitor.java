@@ -18,7 +18,6 @@ package nextflow.lsp.services.script;
 import java.util.List;
 
 import nextflow.lsp.spec.PluginSpec;
-import nextflow.lsp.spec.PluginSpecCache;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.FunctionNode;
 import nextflow.script.ast.IncludeNode;
@@ -71,10 +70,6 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
     public ResolvePluginIncludeVisitor(SourceUnit sourceUnit, PluginResolver plugins) {
         this.sourceUnit = sourceUnit;
         this.plugins = plugins;
-    }
-
-    public ResolvePluginIncludeVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache) {
-        this(sourceUnit, (name) -> pluginSpecCache.getCurrent(sourceUnit.getSource().getURI(), name));
     }
 
     @Override

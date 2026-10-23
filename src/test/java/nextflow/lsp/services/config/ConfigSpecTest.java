@@ -16,13 +16,14 @@
 
 package nextflow.lsp.services.config;
 
+import java.net.URI;
 import java.util.Comparator;
 import java.util.List;
 
 import nextflow.config.control.ConfigParser;
 import nextflow.config.control.ConfigResolveVisitor;
-import nextflow.lsp.TestPluginRegistry;
-import nextflow.lsp.spec.PluginSpecCache;
+import nextflow.lsp.spec.PluginRef;
+import nextflow.lsp.spec.PluginSpec;
 import nextflow.script.dsl.Types;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
@@ -40,11 +41,21 @@ class ConfigSpecTest {
 
     static final ConfigParser CONFIG_PARSER = new ConfigParser();
 
+    static final ConfigSpecVisitor.PluginLookup NO_PLUGINS = new ConfigSpecVisitor.PluginLookup() {
+        @Override
+        public PluginSpec get(PluginRef ref) {
+            return null;
+        }
+
+        @Override
+        public void declare(URI uri, List<PluginRef> refs) {
+        }
+    };
+
     static SourceUnit parse(String contents) {
-        var pluginSpecCache = new PluginSpecCache(TestPluginRegistry.url());
         var source = CONFIG_PARSER.parse("nextflow.config", contents);
         new ConfigResolveVisitor(source, CONFIG_PARSER.compiler().compilationUnit(), Types.DEFAULT_CONFIG_IMPORTS).visit();
-        new ConfigSpecVisitor(source, pluginSpecCache).visit();
+        new ConfigSpecVisitor(source, NO_PLUGINS).visit();
         return source;
     }
 
