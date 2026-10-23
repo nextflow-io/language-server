@@ -448,11 +448,12 @@ class WorkspaceIndexTest {
             f.write("conf/other.config", "process.memory = '1 GB'\n");
             f.write("main.nf", "workflow {}\n");
             f.open("main.nf", "workflow {}\n");
+            // before the scan, the main config and its includes are loaded on demand
             var configs = f.call(Need.PROJECT_CONFIGS, "main.nf", List.<URI>of(), (context) ->
                 WorkspaceFixture.project(context).builtEntries(FileKind.CONFIG).stream().map(FileEntry::uri).toList());
-            assertThat(configs).isEmpty();
+            assertThat(configs).containsExactly(URI.create(f.uri("conf/base.config")), URI.create(f.uri("nextflow.config")));
 
-            // configs are known once the scan has found them
+            // other configs are known once the scan has found them
             f.initialized();
             f.runPending();
             configs = f.call(Need.PROJECT_CONFIGS, "main.nf", List.<URI>of(), (context) ->

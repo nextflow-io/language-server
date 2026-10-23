@@ -109,7 +109,7 @@ final class Builder {
         }
     }
 
-    private static final String MAIN_CONFIG = "nextflow.config";
+    static final String MAIN_CONFIG = "nextflow.config";
 
     private final Context context;
 

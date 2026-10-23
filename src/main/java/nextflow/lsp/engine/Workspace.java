@@ -955,18 +955,16 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                 return;
             var roots = new ArrayList<FileEntry>();
             if( configs ) {
+                // the main config is loaded on demand while the folder is walked
+                if( project.root != null )
+                    loadOnDemand(project, project.root.resolve(Builder.MAIN_CONFIG).toUri());
                 for( var entry : project.entries() ) {
                     if( entry.kind == FileKind.CONFIG )
                         roots.add(entry);
                 }
             }
             if( uri != null ) {
-                // load the file on demand if it is not known yet
-                var entry = project.entry(uri);
-                if( entry == null ) {
-                    entry = project.getOrCreate(uri, project.isDefault() ? FileEntry.Role.DEPENDENCY : FileEntry.Role.WORKSPACE);
-                    noteAdded(project, uri);
-                }
+                var entry = loadOnDemand(project, uri);
                 if( entry != null && !roots.contains(entry) )
                     roots.add(entry);
             }
@@ -981,6 +979,19 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                 buildClosure(project, includers);
             }
             markReadyIfDone(project);
+        }
+
+        /**
+         * Get the entry of a file, and create it if it is not known
+         * yet. The build removes it if the file doesn't exist.
+         */
+        private FileEntry loadOnDemand(Project project, URI uri) {
+            var entry = project.entry(uri);
+            if( entry == null ) {
+                entry = project.getOrCreate(uri, project.isDefault() ? FileEntry.Role.DEPENDENCY : FileEntry.Role.WORKSPACE);
+                noteAdded(project, uri);
+            }
+            return entry;
         }
 
         @Override
