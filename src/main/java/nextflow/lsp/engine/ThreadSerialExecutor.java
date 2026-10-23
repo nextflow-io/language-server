@@ -65,7 +65,7 @@ final class ThreadSerialExecutor implements SerialExecutor {
 
     @Override
     public void shutdown() {
-        executor.shutdownNow();
+        executor.shutdown();
     }
 
 }

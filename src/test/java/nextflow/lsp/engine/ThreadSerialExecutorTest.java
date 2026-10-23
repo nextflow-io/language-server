@@ -65,6 +65,26 @@ class ThreadSerialExecutorTest {
     }
 
     @Test
+    void stopTheEngineThreadOnShutdown() throws Exception {
+        var env = EngineEnvironment.system();
+        try {
+            var engine = new Engine(env, null, Engine.DEFAULT_DEBOUNCE, FakeState::new);
+            var spec = new RequestSpec("test", null, null, Need.NONE, false);
+            var thread = engine.request(spec, null, (ctx) -> Thread.currentThread()).get(5, TimeUnit.SECONDS);
+            var shutdown = engine.shutdown();
+            // a request queued behind the shutdown is still answered
+            var later = engine.request(spec, null, (ctx) -> Thread.currentThread());
+            shutdown.get(5, TimeUnit.SECONDS);
+            assertThat(later).failsWithin(5, TimeUnit.SECONDS);
+            thread.join(5_000);
+            assertThat(thread.isAlive()).isFalse();
+        }
+        finally {
+            env.engineExecutor().shutdown();
+        }
+    }
+
+    @Test
     void runRequestsOnTheEngineThreadOfTheSystemEnvironment() throws Exception {
         var env = EngineEnvironment.system();
         try {

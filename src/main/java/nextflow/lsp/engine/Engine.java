@@ -93,6 +93,9 @@ public final class Engine {
 
     private boolean shutdown;
 
+    // consecutive background slices that failed
+    private int backgroundFailures;
+
     public Engine(EngineEnvironment env, LanguageClient client, Duration debounce, EngineState.Factory stateFactory) {
         this.env = env;
         this.executor = env.engineExecutor();
@@ -366,6 +369,8 @@ public final class Engine {
             env.compilePool().shutdownNow();
             if( env.ioExecutor() instanceof ExecutorService io )
                 io.shutdownNow();
+            // tasks that are already queued still run, and fail their requests
+            executor.shutdown();
         }
     }
 
@@ -540,15 +545,29 @@ public final class Engine {
 
     private void runBackground() {
         background = null;
-        var more = false;
+        boolean more;
         try {
             more = state.runSlice();
+            backgroundFailures = 0;
         }
         catch( VirtualMachineError e ) {
             throw e;
         }
         catch( Throwable e ) {
             logError("Unexpected error in background work", e);
+            // retry once, then release the parked requests, which would
+            // otherwise wait for the next input event
+            if( ++backgroundFailures == 1 ) {
+                scheduleBackground(debounce);
+            }
+            else {
+                var pending = new ArrayList<>(parked);
+                parked.clear();
+                cancelStarvationTimer();
+                for( var task : pending )
+                    fail(task, ResponseErrorCode.InternalError, "Background work failed; see the language server log");
+            }
+            return;
         }
         resumeParked();
         if( more )

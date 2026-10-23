@@ -48,6 +48,11 @@ public interface SerialExecutor {
      */
     boolean inEngineThread();
 
+    /**
+     * Stop accepting tasks and cancel the timers that are not due
+     * yet. The tasks that are already queued still run, and the
+     * thread ends once they are done. Can be called from any thread.
+     */
     void shutdown();
 
 }

@@ -490,13 +490,34 @@ class EngineTest {
         state.sliceError = new IllegalStateException("slice failed");
         h.open("main.nf", "a");
         h.settle();
-        assertThat(state.slices).isEqualTo(1);
+        // retried once
+        assertThat(state.slices).isEqualTo(2);
         assertThat(errorLogs()).anyMatch(m -> m.contains("background") && m.contains("slice failed"));
 
         state.sliceError = null;
         var result = send("hover", Need.FILE);
         h.runPending();
         assertThat(result).isCompletedWithValue("hover");
+    }
+
+    @Test
+    void releaseParkedRequestsWhenBackgroundWorkKeepsFailing() {
+        var h = start();
+        state.satisfied = false;
+        state.indexed = false;
+        state.sliceError = new IllegalStateException("slice failed");
+        var parked = send("references", Need.PROJECT);
+        h.settle();
+        assertThat(errorCode(parked)).isEqualTo(ResponseErrorCode.InternalError.getValue());
+        assertThat(state.log).doesNotContain("body references");
+        assertThat(h.engine().isIdle()).isTrue();
+
+        // background work resumes on the next request
+        state.sliceError = null;
+        state.pendingSlices = 1;
+        var later = send("references", Need.PROJECT);
+        h.settle();
+        assertThat(later).isCompletedWithValue("references");
     }
 
     @Test
@@ -531,6 +552,7 @@ class EngineTest {
         assertThat(state.shutdownCalled).isTrue();
         assertThat(state.log).doesNotContain("event DidOpen", "route hover");
         assertThat(h.env().compilePool().isShutdown()).isTrue();
+        assertThat(h.env().manualExecutor().isShutdown()).isTrue();
         assertThat(h.engine().isIdle()).isTrue();
     }
 

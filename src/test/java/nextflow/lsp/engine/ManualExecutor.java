@@ -92,7 +92,12 @@ public final class ManualExecutor implements SerialExecutor {
     @Override
     public synchronized void shutdown() {
         shutdown = true;
-        queue.clear();
+        var now = clock.instant();
+        queue.removeIf(timer -> timer.due.isAfter(now));
+    }
+
+    public synchronized boolean isShutdown() {
+        return shutdown;
     }
 
     /**
