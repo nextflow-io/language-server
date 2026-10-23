@@ -76,6 +76,7 @@ dependencies {
 
   // include Nextflow runtime at build-time to extract language definitions
   nextflowRuntime 'io.nextflow:nextflow:26.10.3'
+  nextflowRuntime 'io.nextflow:nf-lineage:26.10.3'
   nextflowRuntime 'io.nextflow:nf-amazon:3.12.1'
   nextflowRuntime 'io.nextflow:nf-azure:1.24.2'
   nextflowRuntime 'io.nextflow:nf-google:1.29.1'
