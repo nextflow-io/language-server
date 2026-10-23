@@ -216,6 +216,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
     @Override
     public Optional<Route> route(RequestSpec spec) {
+        plugins.retryFailed();
         if( spec.need() == Need.ALL )
             return Optional.of(new WorkspaceRoute(spec.need(), projects(), null, null, null));
         if( spec.uri() == null ) {
@@ -240,6 +241,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
     @Override
     public boolean runSlice() {
+        plugins.retryFailed();
         var open = engine.documents().uris();
         for( var project : projects() ) {
             if( !canBuild(project) )

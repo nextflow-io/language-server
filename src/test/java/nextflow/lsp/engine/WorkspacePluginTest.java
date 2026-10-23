@@ -111,7 +111,8 @@ class WorkspacePluginTest {
             f.open("main.nf", SCRIPT);
             f.settle();
             assertThat(registry.fetches).hasSize(1);
-            assertThat(f.messages("main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
+            // a failed fetch doesn't mean that the plugin doesn't exist
+            assertThat(f.messages("main.nf")).isEmpty();
 
             // rebuilding within the retry interval doesn't fetch again
             f.change("nextflow.config", SCHEMA_CONFIG + "// edit 1\n");
@@ -125,6 +126,47 @@ class WorkspacePluginTest {
             registry.overrides.clear();
             f.advance(Duration.ofMinutes(1));
             f.change("nextflow.config", SCHEMA_CONFIG + "// edit 3\n");
+            f.settle();
+            assertThat(registry.fetches).hasSize(2);
+            assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        }
+    }
+
+    @Test
+    void retryFailedFetchOnTheNextRequestAfterTheInterval() {
+        var registry = new FixtureRegistry();
+        registry.overrides.put("nf-schema@2.7.3", new PluginRegistryClient.Failed("connection refused"));
+        try( var f = start(registry) ) {
+            f.write("nextflow.config", SCHEMA_CONFIG);
+            f.write("main.nf", SCRIPT);
+            f.settle();
+            registry.overrides.clear();
+            f.advance(Duration.ofMinutes(4));
+            f.call(Need.FILE, "main.nf", null, (context) -> null);
+            f.settle();
+            assertThat(registry.fetches).hasSize(1);
+            assertThat(f.messages("main.nf")).isEmpty();
+
+            // no config edit is needed
+            f.advance(Duration.ofMinutes(1));
+            f.call(Need.FILE, "main.nf", null, (context) -> null);
+            f.settle();
+            assertThat(registry.fetches).hasSize(2);
+            assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        }
+    }
+
+    @Test
+    void retryFailedFetchOnTheNextBackgroundBuildAfterTheInterval() {
+        var registry = new FixtureRegistry();
+        registry.overrides.put("nf-schema@2.7.3", new PluginRegistryClient.Failed("connection refused"));
+        try( var f = start(registry) ) {
+            f.write("nextflow.config", SCHEMA_CONFIG);
+            f.write("main.nf", SCRIPT);
+            f.settle();
+            registry.overrides.clear();
+            f.advance(Duration.ofMinutes(5));
+            f.open("other.nf", "workflow {}\n");
             f.settle();
             assertThat(registry.fetches).hasSize(2);
             assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);

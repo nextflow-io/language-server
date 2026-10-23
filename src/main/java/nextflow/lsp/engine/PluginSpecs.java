@@ -49,7 +49,8 @@ final class PluginSpecs {
      * The result of a lookup.
      *
      * @param spec the spec, if available
-     * @param pending whether the spec is still being fetched
+     * @param pending whether the spec is not known yet, because it is
+     *   being fetched or its last fetch failed
      */
     record Lookup(Optional<PluginSpec> spec, boolean pending) {}
 
@@ -95,9 +96,24 @@ final class PluginSpecs {
         }
         return switch( entry.state ) {
             case READY -> new Lookup(Optional.of(entry.spec), false);
-            case PENDING -> new Lookup(Optional.empty(), true);
-            case MISSING, FAILED -> new Lookup(Optional.empty(), false);
+            case PENDING, FAILED -> new Lookup(Optional.empty(), true);
+            case MISSING -> new Lookup(Optional.empty(), false);
         };
+    }
+
+    /**
+     * Fetch again every spec whose last fetch failed long enough ago.
+     * The files that looked it up are rebuilt when the fetch completes.
+     */
+    void retryFailed() {
+        var now = engine.environment().clock().instant();
+        for( var e : cache.entrySet() ) {
+            var entry = e.getValue();
+            if( entry.state == State.FAILED && !now.isBefore(entry.retryAt) ) {
+                entry.state = State.PENDING;
+                fetch(e.getKey());
+            }
+        }
     }
 
     /**
