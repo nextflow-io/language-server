@@ -79,7 +79,7 @@ final class IndexProgress {
             end();
             return;
         }
-        if( begun && (done != lastDone || total != lastTotal) )
+        if( begun && total > 0 && (done != lastDone || total != lastTotal) )
             report(done, total);
         lastDone = done;
         lastTotal = total;
@@ -101,7 +101,9 @@ final class IndexProgress {
         begun = true;
         var begin = new WorkDoneProgressBegin();
         begin.setTitle("Indexing");
-        begin.setMessage(message(Math.max(lastDone, 0), Math.max(lastTotal, 0)));
+        // the number of files is not known until the walk is done
+        if( lastTotal > 0 )
+            begin.setMessage(message(Math.max(lastDone, 0), lastTotal));
         begin.setPercentage(percentage(lastDone, lastTotal));
         notify(begin);
     }
@@ -127,6 +129,8 @@ final class IndexProgress {
     }
 
     private void end() {
+        if( begun && lastTotal > 0 && lastDone != lastTotal )
+            report(lastTotal, lastTotal);
         if( begun )
             notify(new WorkDoneProgressEnd());
         token = null;
@@ -142,7 +146,7 @@ final class IndexProgress {
     }
 
     private static Integer percentage(int done, int total) {
-        return total > 0 ? done * 100 / total : 0;
+        return total > 0 ? Math.max(done, 0) * 100 / total : 0;
     }
 
 }

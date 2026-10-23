@@ -186,6 +186,39 @@ class WorkspaceIndexTest {
     }
 
     @Test
+    void reportTheNumberOfFilesOnlyOnceItIsKnown() {
+        var client = new TestLanguageClient();
+        var io = new QueuedExecutor();
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.client = client;
+            o.environment = new TestEnvironment().withIoExecutor(io);
+            o.progress = true;
+            o.settle = false;
+        }) ) {
+            writeModules(f, 3);
+            f.runPending();
+            f.settle(io);
+            var messages = new ArrayList<String>();
+            synchronized (client.getProgress()) {
+                for( var item : client.getProgress() ) {
+                    if( item instanceof ProgressParams params ) {
+                        var value = params.getValue().getLeft();
+                        if( value instanceof WorkDoneProgressBegin begin )
+                            messages.add("begin " + begin.getMessage());
+                        else if( value instanceof WorkDoneProgressReport report )
+                            messages.add("report " + report.getMessage());
+                        else
+                            messages.add("end");
+                    }
+                }
+            }
+            assertThat(messages).first().isEqualTo("begin null");
+            assertThat(messages).endsWith("report 3 / 3 files", "end");
+            assertThat(messages).noneMatch(m -> m.contains("/ 0"));
+        }
+    }
+
+    @Test
     void ignoreTheTokenOfAPreviousRun() {
         var client = new TestLanguageClient();
         client.setHoldProgressCreate(true);
