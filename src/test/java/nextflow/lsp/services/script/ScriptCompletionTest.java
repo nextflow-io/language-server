@@ -22,6 +22,7 @@ import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.CompletionParams;
 import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.junit.jupiter.api.Test;
 
@@ -35,10 +36,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ScriptCompletionTest {
 
     static List<CompletionItem> getCompletions(ScriptService service, String uri, Position position) {
+        return getCompletions(service, uri, position, false);
+    }
+
+    static List<CompletionItem> getCompletions(ScriptService service, String uri, Position position, boolean extended) {
         return service
-            .completion(new CompletionParams(new TextDocumentIdentifier(uri), position), 100, false)
+            .completion(new CompletionParams(new TextDocumentIdentifier(uri), position), 100, extended)
             .getLeft();
     }
+
+    static final String MODULE = """
+        def sayHello() {
+        }
+
+        process HELLO {
+            script:
+            \"""
+            echo hello
+            \"""
+        }
+
+        workflow HELLO_FLOW {
+        }
+        """;
 
     static CompletionItem findByLabel(List<CompletionItem> completions, String label) {
         return completions.stream()
@@ -121,6 +141,115 @@ class ScriptCompletionTest {
         assertThat(findByLabel(completions, "ALIGN"))
             .extracting(CompletionItem::getKind)
             .isEqualTo(CompletionItemKind.Function);
+    }
+
+    @Test
+    void completeIncludedMethodsByAlias() {
+        var service = getScriptService();
+        var uri = getUri("main.nf");
+
+        open(service, getUri("module.nf"), MODULE);
+        open(service, uri, """
+            include { sayHello as greet } from './module.nf'
+
+            workflow {
+                gre
+            }
+            """);
+        var completions = getCompletions(service, uri, new Position(3, 7));
+
+        var greet = findByLabel(completions, "greet");
+        assertThat(greet).isNotNull();
+        assertThat(greet.getKind()).isEqualTo(CompletionItemKind.Function);
+        assertThat(greet.getLabelDetails().getDescription()).isEqualTo("./module.nf");
+        assertThat(greet.getAdditionalTextEdits()).isNull();
+
+        // non-extended completion does not suggest definitions that are not included
+        open(service, uri, """
+            include { sayHello as greet } from './module.nf'
+
+            workflow {
+                HEL
+            }
+            """);
+        completions = getCompletions(service, uri, new Position(3, 7));
+
+        assertThat(completions).extracting(CompletionItem::getLabel).doesNotContain("HELLO", "HELLO_FLOW");
+    }
+
+    @Test
+    void completeExternalMethodsWithIncludeEdit() {
+        var service = getScriptService();
+        var uri = getUri("main.nf");
+
+        open(service, getUri("module.nf"), MODULE);
+        open(service, uri, """
+            include { sayHello } from './module.nf'
+
+            workflow {
+                HEL
+            }
+            """);
+        var completions = getCompletions(service, uri, new Position(3, 7), true);
+
+        // definitions that are not included add an include after the last one
+        assertThat(List.of("HELLO", "HELLO_FLOW")).allSatisfy(name -> {
+            var item = findByLabel(completions, name);
+            assertThat(item).isNotNull();
+            assertThat(item.getKind()).isEqualTo(CompletionItemKind.Function);
+            assertThat(item.getLabelDetails().getDescription()).isEqualTo("./module.nf");
+            assertThat(item.getAdditionalTextEdits()).singleElement().satisfies(edit -> {
+                assertThat(edit.getRange()).isEqualTo(new Range(new Position(1, 0), new Position(1, 0)));
+                assertThat(edit.getNewText()).isEqualTo("include { " + name + " } from './module.nf'\n");
+            });
+        });
+
+        // definitions that are already included don't add an include
+        open(service, uri, """
+            include { sayHello } from './module.nf'
+
+            workflow {
+                say
+            }
+            """);
+        var included = getCompletions(service, uri, new Position(3, 7), true);
+
+        assertThat(findByLabel(included, "sayHello"))
+            .extracting(CompletionItem::getAdditionalTextEdits)
+            .isNull();
+    }
+
+    @Test
+    void completeOnlyExternalFunctionsInProcessBody() {
+        var service = getScriptService();
+        var uri = getUri("main.nf");
+
+        open(service, getUri("module.nf"), MODULE);
+        open(service, uri, """
+            process FOO {
+                exec:
+                s
+            }
+            """);
+        var completions = getCompletions(service, uri, new Position(2, 5), true);
+
+        // with no includes, the include is added at the top of the script
+        assertThat(findByLabel(completions, "sayHello").getAdditionalTextEdits())
+            .singleElement()
+            .satisfies(edit -> {
+                assertThat(edit.getRange()).isEqualTo(new Range(new Position(0, 0), new Position(0, 0)));
+                assertThat(edit.getNewText()).isEqualTo("include { sayHello } from './module.nf'\n");
+            });
+
+        open(service, uri, """
+            process FOO {
+                exec:
+                HEL
+            }
+            """);
+        completions = getCompletions(service, uri, new Position(2, 7), true);
+
+        assertThat(completions).extracting(CompletionItem::getLabel).doesNotContain("HELLO", "HELLO_FLOW");
     }
 
     @Test

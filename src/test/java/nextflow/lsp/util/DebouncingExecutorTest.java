@@ -16,9 +16,10 @@
 
 package nextflow.lsp.util;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -33,26 +34,31 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class DebouncingExecutorTest {
 
+    /**
+     * Run a probe on the executor's own single-thread scheduler after the
+     * given delay. Scheduled tasks run in order of due time, so the probe
+     * runs after every task that was scheduled before it with the same delay.
+     */
+    static <T> T probeAfter(DebouncingExecutor debouncer, long delayMillis, Callable<T> probe) throws Exception {
+        var field = DebouncingExecutor.class.getDeclaredField("scheduler");
+        field.setAccessible(true);
+        var scheduler = (ScheduledExecutorService) field.get(debouncer);
+        return scheduler.schedule(probe, delayMillis, TimeUnit.MILLISECONDS).get(5, TimeUnit.SECONDS);
+    }
+
     @Test
-    void delayAndDeduplicateRapidSubmissions() throws InterruptedException {
+    void delayAndDeduplicateRapidSubmissions() throws Exception {
         var counter = new AtomicInteger();
-        var latch = new CountDownLatch(1);
-        var debouncer = new DebouncingExecutor(200, () -> {
-            counter.incrementAndGet();
-            latch.countDown();
-        });
+        var debouncer = new DebouncingExecutor(50, counter::incrementAndGet);
 
         try {
             // executeLater is called rapidly multiple times
             debouncer.executeLater();
-            Thread.sleep(50);
             debouncer.executeLater();
-            Thread.sleep(50);
             debouncer.executeLater();
 
             // action is only run once after the last delay
-            assertThat(latch.await(1, TimeUnit.SECONDS)).isTrue();
-            assertThat(counter.get()).isEqualTo(1);
+            assertThat(probeAfter(debouncer, 50, counter::get)).isEqualTo(1);
         }
         finally {
             debouncer.shutdown();
@@ -60,22 +66,19 @@ class DebouncingExecutorTest {
     }
 
     @Test
-    void executeNowRunsActionImmediatelyAndCancelsPendingTask() throws InterruptedException {
-        var executed = new AtomicBoolean();
-        var latch = new CountDownLatch(1);
-        var debouncer = new DebouncingExecutor(300, () -> {
-            executed.set(true);
-            latch.countDown();
-        });
+    void executeNowRunsActionImmediatelyAndCancelsPendingTask() throws Exception {
+        var counter = new AtomicInteger();
+        var debouncer = new DebouncingExecutor(50, counter::incrementAndGet);
 
         try {
             debouncer.executeLater();
-            Thread.sleep(100);
             debouncer.executeNow();
 
             // action runs immediately
-            assertThat(latch.await(500, TimeUnit.MILLISECONDS)).isTrue();
-            assertThat(executed.get()).isTrue();
+            assertThat(counter.get()).isEqualTo(1);
+
+            // pending task is cancelled
+            assertThat(probeAfter(debouncer, 50, counter::get)).isEqualTo(1);
         }
         finally {
             debouncer.shutdown();

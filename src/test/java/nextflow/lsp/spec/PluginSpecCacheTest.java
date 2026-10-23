@@ -102,6 +102,7 @@ class PluginSpecCacheTest {
     void returnCurrentPluginVersionsForScriptFile() throws ReflectiveOperationException {
         var ref1 = new PluginRef("nf-hello", "0.9.0");
         var ref2 = new PluginRef("nf-hello", "1.0.0");
+        // equal records, so compare by identity
         var spec1 = new PluginSpec(Map.of(), List.of(), List.of(), List.of());
         var spec2 = new PluginSpec(Map.of(), List.of(), List.of(), List.of());
         var psc = pluginSpecCache(Map.of(ref1, spec1, ref2, spec2));
@@ -119,13 +120,13 @@ class PluginSpecCacheTest {
 
         // return plugin spec from nearest parent config
         psc.setCurrentVersions(uri("/project/nextflow.config"), List.of(ref1));
-        assertThat(psc.getCurrent(uri("/project/main.nf"), "nf-hello")).isEqualTo(spec2);
-        assertThat(psc.getCurrent(uri("/project/subdir/module.nf"), "nf-hello")).isEqualTo(spec2);
+        assertThat(psc.getCurrent(uri("/project/main.nf"), "nf-hello")).isSameAs(spec1);
+        assertThat(psc.getCurrent(uri("/project/subdir/module.nf"), "nf-hello")).isSameAs(spec1);
 
         psc.setCurrentVersions(uri("/project/nextflow.config"), List.of(ref1));
         psc.setCurrentVersions(uri("/project/subdir/nextflow.config"), List.of(ref2));
-        assertThat(psc.getCurrent(uri("/project/main.nf"), "nf-hello")).isEqualTo(spec1);
-        assertThat(psc.getCurrent(uri("/project/subdir/module.nf"), "nf-hello")).isEqualTo(spec2);
+        assertThat(psc.getCurrent(uri("/project/main.nf"), "nf-hello")).isSameAs(spec1);
+        assertThat(psc.getCurrent(uri("/project/subdir/module.nf"), "nf-hello")).isSameAs(spec2);
     }
 
 }

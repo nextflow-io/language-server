@@ -76,19 +76,28 @@ class ScriptLinkTest {
 
     @Test
     void noLinkForPluginInclude() {
-        var service = getScriptService();
-        var uri = getUri("main.nf");
+        // a module directory with the same name would otherwise resolve as a remote module
+        writeWorkspaceFile("modules/plugin/nf-hello/main.nf", "");
+        try {
+            var service = getScriptService();
+            var uri = getUri("main.nf");
 
-        open(service, uri, """
-            include { sayHello } from 'plugin/nf-hello'
+            open(service, uri, """
+                include { sayHello } from 'plugin/nf-hello'
 
-            workflow {
-                sayHello()
-            }
-            """);
-        service.updateNow();
+                workflow {
+                    sayHello()
+                }
+                """);
+            service.updateNow();
 
-        assertThat(getLinks(service, uri)).isEmpty();
+            assertThat(getLinks(service, uri)).isEmpty();
+        }
+        finally {
+            deleteWorkspaceFile("modules/plugin/nf-hello/main.nf");
+            deleteWorkspaceFile("modules/plugin/nf-hello");
+            deleteWorkspaceFile("modules/plugin");
+        }
     }
 
 }
