@@ -1,0 +1,66 @@
+/*
+ * Copyright 2024-2025, Seqera Labs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package nextflow.lsp.engine;
+
+import java.time.Clock;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+
+/**
+ * Runtime services used by the engine, so that tests can replace
+ * threads, time, the file system and the plugin registry.
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public interface EngineEnvironment {
+
+    /**
+     * The engine thread, which owns all language service state.
+     */
+    SerialExecutor engineExecutor();
+
+    /**
+     * Pool for parsing files in parallel.
+     */
+    ExecutorService compilePool();
+
+    /**
+     * Pool for blocking I/O (directory walks, registry requests).
+     * Results return to the engine as events.
+     */
+    Executor ioExecutor();
+
+    Clock clock();
+
+    FileAccess files();
+
+    /**
+     * Get a client for the plugin registry at the given URL.
+     *
+     * @param registryUrl
+     */
+    PluginRegistryClient registry(String registryUrl);
+
+    Exiter exiter();
+
+    /**
+     * Create the production environment, with daemon threads.
+     */
+    static EngineEnvironment system() {
+        return new DefaultEngineEnvironment();
+    }
+
+}

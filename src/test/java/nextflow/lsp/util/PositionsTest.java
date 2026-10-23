@@ -53,7 +53,27 @@ class PositionsTest {
         assertThat(Positions.getOffset(SCRIPT, new Position(0, 0))).isEqualTo(0);
         assertThat(Positions.getOffset(SCRIPT, new Position(1, 0))).isEqualTo(11);
         assertThat(Positions.getOffset(SCRIPT, new Position(2, 0))).isEqualTo(38);
-        assertThat(Positions.getOffset(SCRIPT, new Position(3, 0))).isEqualTo(-1);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+        0 | 99 | 10
+        1 | 99 | 37
+        2 | 99 | 39
+        3 |  0 | 39
+        9 |  9 | 39
+       -1 | -1 |  0
+        """)
+    void clampOutOfRangePositions(int line, int character, int offset) {
+        assertThat(Positions.getOffset(SCRIPT, new Position(line, character))).isEqualTo(offset);
+    }
+
+    @Test
+    void supportCrlfAndCrLineTerminators() {
+        assertThat(Positions.getOffset("a\r\nb\rc\nd", new Position(1, 0))).isEqualTo(3);
+        assertThat(Positions.getOffset("a\r\nb\rc\nd", new Position(2, 0))).isEqualTo(5);
+        assertThat(Positions.getOffset("a\r\nb\rc\nd", new Position(3, 0))).isEqualTo(7);
+        assertThat(Positions.getOffset("a\r\nb\rc\nd", new Position(0, 5))).isEqualTo(1);
     }
 
     @Test

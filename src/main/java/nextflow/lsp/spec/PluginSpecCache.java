@@ -15,22 +15,15 @@
  */
 package nextflow.lsp.spec;
 
-import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.nio.file.Path;
-import java.time.Duration;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import groovy.json.JsonSlurper;
+import nextflow.lsp.engine.HttpPluginRegistryClient;
+import nextflow.lsp.engine.PluginRegistryClient;
 import nextflow.lsp.util.Logger;
-import org.codehaus.groovy.ast.MethodNode;
-
-import static java.net.http.HttpResponse.BodyHandlers;
 
 /**
  * Cache plugin specs that are fetched from the plugin registry.
@@ -41,16 +34,14 @@ public class PluginSpecCache {
 
     private static Logger log = Logger.getInstance();
 
-    private static final Duration TIMEOUT = Duration.ofSeconds(10);
-
-    private URI registryUri;
+    private final PluginRegistryClient client;
 
     private Map<PluginRef, PluginSpec> cache = new HashMap<>();
 
     private Map<Path, List<PluginRef>> pluginsMap = new HashMap<>();
 
     public PluginSpecCache(String registryUrl) {
-        this.registryUri = URI.create(registryUrl);
+        this.client = new HttpPluginRegistryClient(registryUrl);
     }
 
     /**
@@ -73,88 +64,18 @@ public class PluginSpecCache {
 
     private void updateCache(PluginRef ref) {
         try {
-            // fetch plugin spec from registry
-            var response = fetch(ref.name(), ref.version());
-            if( response == null )
-                return;
-
-            // select plugin release (or latest if not specified)
-            var release = pluginRelease(response);
-
-            // save plugin spec to cache (or null if not found)
-            cache.put(ref, release != null ? pluginSpec(release) : null);
+            var result = client.fetch(ref.name(), ref.version());
+            if( result instanceof PluginRegistryClient.Found found )
+                cache.put(ref, found.spec());
+            else if( result instanceof PluginRegistryClient.NotFound )
+                cache.put(ref, null);
+            else if( result instanceof PluginRegistryClient.Failed failed )
+                log.error("Failed to fetch plugin " + ref.name() + " from registry: " + failed.reason());
         }
-        catch( IOException | InterruptedException e ) {
+        catch( InterruptedException e ) {
+            Thread.currentThread().interrupt();
             log.error("Failed to fetch plugin " + ref.name() + " from registry: " + e.toString());
         }
-    }
-
-    /**
-     * Fetch a plugin from the registry.
-     *
-     * Returns an empty map if the plugin was not found, or null
-     * if the registry returned an unexpected response.
-     *
-     * @param name
-     * @param version
-     */
-    private Map fetch(String name, String version) throws IOException, InterruptedException {
-        var path = version != null
-            ? String.format("v1/plugins/%s/%s", name, version)
-            : String.format("v1/plugins/%s", name);
-        var uri = registryUri.resolve(path);
-
-        log.debug("fetch plugin " + uri);
-
-        var client = HttpClient.newBuilder()
-            .connectTimeout(TIMEOUT)
-            .build();
-        var request = HttpRequest.newBuilder()
-            .uri(uri)
-            .timeout(TIMEOUT)
-            .GET()
-            .header("Accept", "application/json")
-            .build();
-        var httpResponse = client.send(request, BodyHandlers.ofString());
-        var status = httpResponse.statusCode();
-        if( status == 404 )
-            return Collections.emptyMap();
-        if( status != 200 ) {
-            log.error("Failed to fetch plugin " + name + " from registry: HTTP " + status);
-            return null;
-        }
-        var response = new JsonSlurper().parseText(httpResponse.body());
-        return response instanceof Map m ? m : null;
-    }
-
-    private static Map pluginRelease(Map response) {
-        if( response.containsKey("plugin") ) {
-            var plugin = (Map) response.get("plugin");
-            var releases = (List<Map>) plugin.get("releases");
-            return releases.get(0);
-        }
-        if( response.containsKey("pluginRelease") ) {
-            return (Map) response.get("pluginRelease");
-        }
-        return null;
-    }
-
-    private static PluginSpec pluginSpec(Map release) {
-        var definitions = pluginDefinitions(release);
-        return new PluginSpec(
-            ConfigSpecFactory.fromDefinitions(definitions),
-            ScriptSpecFactory.fromDefinitions(definitions, "Factory"),
-            ScriptSpecFactory.fromDefinitions(definitions, "Function"),
-            ScriptSpecFactory.fromDefinitions(definitions, "Operator")
-        );
-    }
-
-    private static List<Map> pluginDefinitions(Map release) {
-        var specJson = (String) release.get("spec");
-        if( specJson == null )
-            return Collections.emptyList();
-        var spec = (Map) new JsonSlurper().parseText(specJson);
-        return (List<Map>) spec.get("definitions");
     }
 
     /**

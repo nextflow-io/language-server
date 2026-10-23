@@ -28,6 +28,7 @@ import org.eclipse.lsp4j.MessageActionItem;
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
+import org.eclipse.lsp4j.RegistrationParams;
 import org.eclipse.lsp4j.ShowMessageRequestParams;
 import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -41,6 +42,16 @@ public class TestLanguageClient implements LanguageClient {
     private final Map<String,List<Diagnostic>> diagnostics = new ConcurrentHashMap<>();
 
     private final List<Object> progress = Collections.synchronizedList(new ArrayList<>());
+
+    private final List<PublishDiagnosticsParams> publishLog = Collections.synchronizedList(new ArrayList<>());
+
+    private final List<MessageParams> logMessages = Collections.synchronizedList(new ArrayList<>());
+
+    private final List<RegistrationParams> registrations = Collections.synchronizedList(new ArrayList<>());
+
+    private final List<CompletableFuture<Void>> heldProgressCreates = Collections.synchronizedList(new ArrayList<>());
+
+    private volatile boolean holdProgressCreate;
 
     @Override
     public void telemetryEvent(Object object) {
@@ -58,12 +69,59 @@ public class TestLanguageClient implements LanguageClient {
     @Override
     public void publishDiagnostics(PublishDiagnosticsParams params) {
         diagnostics.put(params.getUri(), params.getDiagnostics());
+        publishLog.add(params);
+    }
+
+    /**
+     * Get every publishDiagnostics notification, in order.
+     */
+    public List<PublishDiagnosticsParams> getPublishLog() {
+        return publishLog;
     }
 
     @Override
     public CompletableFuture<Void> createProgress(WorkDoneProgressCreateParams params) {
         progress.add(params);
+        if( !holdProgressCreate )
+            return CompletableFuture.completedFuture(null);
+        var result = new CompletableFuture<Void>();
+        heldProgressCreates.add(result);
+        return result;
+    }
+
+    /**
+     * Hold the responses to window/workDoneProgress/create until
+     * {@link #completeProgressCreate} is called.
+     *
+     * @param value
+     */
+    public void setHoldProgressCreate(boolean value) {
+        holdProgressCreate = value;
+    }
+
+    /**
+     * Respond to the held window/workDoneProgress/create requests.
+     */
+    public void completeProgressCreate() {
+        List<CompletableFuture<Void>> pending;
+        synchronized (heldProgressCreates) {
+            pending = new ArrayList<>(heldProgressCreates);
+            heldProgressCreates.clear();
+        }
+        pending.forEach(f -> f.complete(null));
+    }
+
+    @Override
+    public CompletableFuture<Void> registerCapability(RegistrationParams params) {
+        registrations.add(params);
         return CompletableFuture.completedFuture(null);
+    }
+
+    /**
+     * Get the client/registerCapability requests sent by the server.
+     */
+    public List<RegistrationParams> getRegistrations() {
+        return registrations;
     }
 
     @Override
@@ -80,7 +138,15 @@ public class TestLanguageClient implements LanguageClient {
 
     @Override
     public void logMessage(MessageParams message) {
+        logMessages.add(message);
         System.err.println(message.getMessage());
+    }
+
+    /**
+     * Get the window/logMessage notifications sent by the server, in order.
+     */
+    public List<MessageParams> getLogMessages() {
+        return logMessages;
     }
 
     /**
@@ -104,5 +170,6 @@ public class TestLanguageClient implements LanguageClient {
      */
     public void resetDiagnostics() {
         diagnostics.clear();
+        publishLog.clear();
     }
 }

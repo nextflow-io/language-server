@@ -19,6 +19,7 @@ import java.io.File;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.config.control.StringReaderSourceWithURI;
@@ -42,21 +43,20 @@ public class LanguageServerCompiler extends Compiler {
     }
 
     /**
-     * Prepare a source file from the open cache, or the filesystem
-     * if it is not open.
+     * Prepare a source file from the given text, or from the
+     * filesystem if no text is given.
      *
-     * If the file is not open and doesn't exist in the filesystem,
-     * it has been renamed. Return null so that the file is removed
-     * from any downstream caches.
+     * Returns null if no text is given and the file doesn't exist,
+     * so that the file is removed from any downstream caches.
      *
      * @param uri
+     * @param text
      */
-    public SourceUnit createSourceUnit(URI uri, FileCache fileCache) {
-        if( fileCache.isOpen(uri) ) {
-            var contents = fileCache.getContents(uri);
+    public SourceUnit createSourceUnit(URI uri, Optional<String> text) {
+        if( text.isPresent() ) {
             return new SourceUnit(
                     uri.toString(),
-                    new StringReaderSourceWithURI(contents, uri, configuration()),
+                    new StringReaderSourceWithURI(text.get(), uri, configuration()),
                     configuration(),
                     classLoader(),
                     createErrorCollector());
@@ -65,6 +65,20 @@ public class LanguageServerCompiler extends Compiler {
             return super.createSourceUnit(new File(uri));
         }
         return null;
+    }
+
+    /**
+     * Prepare a source file from the open cache, or the filesystem
+     * if it is not open.
+     *
+     * @param uri
+     * @param fileCache
+     */
+    public SourceUnit createSourceUnit(URI uri, FileCache fileCache) {
+        var text = fileCache.isOpen(uri)
+            ? Optional.ofNullable(fileCache.getContents(uri))
+            : Optional.<String>empty();
+        return createSourceUnit(uri, text);
     }
 
     @Override
