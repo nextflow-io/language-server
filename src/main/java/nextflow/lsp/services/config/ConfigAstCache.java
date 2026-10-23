@@ -26,6 +26,7 @@ import nextflow.config.control.ConfigResolveVisitor;
 import nextflow.config.control.ResolveIncludeVisitor;
 import nextflow.config.spec.SpecNode;
 import nextflow.lsp.ast.ASTNodeCache;
+import nextflow.lsp.ast.ConfigView;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
 import nextflow.lsp.file.FileCache;
@@ -41,7 +42,7 @@ import org.codehaus.groovy.control.SourceUnit;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class ConfigAstCache extends ASTNodeCache {
+public class ConfigAstCache extends ASTNodeCache implements ConfigView {
 
     private LanguageServerConfiguration configuration;
 

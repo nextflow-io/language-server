@@ -25,6 +25,7 @@ import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.spec.SpecNode;
 import nextflow.lsp.ast.ASTNodeStringUtils;
+import nextflow.lsp.ast.ConfigView;
 import nextflow.lsp.ast.LanguageServerASTUtils;
 import nextflow.lsp.services.HoverProvider;
 import nextflow.lsp.util.Logger;
@@ -49,9 +50,9 @@ public class ConfigHoverProvider implements HoverProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ConfigAstCache ast;
+    private ConfigView ast;
 
-    public ConfigHoverProvider(ConfigAstCache ast) {
+    public ConfigHoverProvider(ConfigView ast) {
         this.ast = ast;
     }
 

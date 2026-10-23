@@ -49,7 +49,7 @@ import org.eclipse.lsp4j.util.Ranges;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public abstract class ASTNodeCache {
+public abstract class ASTNodeCache implements AstView {
 
     private LanguageServerCompiler compiler;
 

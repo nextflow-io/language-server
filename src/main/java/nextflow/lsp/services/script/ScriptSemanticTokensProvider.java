@@ -18,6 +18,7 @@ package nextflow.lsp.services.script;
 import java.net.URI;
 import java.util.List;
 
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.SemanticTokensProvider;
 import nextflow.lsp.services.SemanticTokensVisitor;
 import nextflow.lsp.util.Logger;
@@ -52,9 +53,9 @@ public class ScriptSemanticTokensProvider implements SemanticTokensProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public ScriptSemanticTokensProvider(ScriptAstCache ast) {
+    public ScriptSemanticTokensProvider(ScriptView ast) {
         this.ast = ast;
     }
 

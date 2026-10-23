@@ -19,6 +19,7 @@ import java.net.URI;
 
 import nextflow.lsp.ast.ASTNodeStringUtils;
 import nextflow.lsp.ast.LanguageServerASTUtils;
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.HoverProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.script.ast.FunctionNode;
@@ -52,9 +53,9 @@ public class ScriptHoverProvider implements HoverProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public ScriptHoverProvider(ScriptAstCache ast) {
+    public ScriptHoverProvider(ScriptView ast) {
         this.ast = ast;
     }
 

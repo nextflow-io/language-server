@@ -15,6 +15,8 @@
  */
 package nextflow.lsp.ast;
 
+import java.util.Optional;
+
 /**
  * Read-only view of a project for request bodies. Valid only during
  * the request body and only on the engine thread.
@@ -27,5 +29,27 @@ public interface ProjectView {
      * The workspace folder name, or "" for the default project.
      */
     String name();
+
+    /**
+     * The scripts of the project, if the request file is a script,
+     * or for project-wide requests.
+     */
+    Optional<ScriptView> scripts();
+
+    /**
+     * The config files of the project, if the request file is a
+     * config file, or for project-wide requests.
+     */
+    Optional<ConfigView> configs();
+
+    /**
+     * The scripts of the project, regardless of the request file.
+     */
+    ScriptView scriptView();
+
+    /**
+     * The config files of the project, regardless of the request file.
+     */
+    ConfigView configView();
 
 }

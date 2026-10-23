@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 import nextflow.lsp.ast.LanguageServerASTUtils;
+import nextflow.lsp.ast.ScriptView;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.MethodNode;
@@ -41,7 +42,7 @@ class CallPathVisitor {
 
     private static final String SCOPE_SEP = ":";
 
-    private final ScriptAstCache ast;
+    private final ScriptView ast;
 
     /** Guards against a cycle in the call graph, which Nextflow rejects anyway. */
     private final Deque<MethodNode> stack = new ArrayDeque<>();
@@ -50,7 +51,7 @@ class CallPathVisitor {
 
     private MethodCallExpression target;
 
-    CallPathVisitor(ScriptAstCache ast) {
+    CallPathVisitor(ScriptView ast) {
         this.ast = ast;
     }
 

@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import nextflow.lsp.ast.LanguageServerASTUtils;
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.ReferenceProvider;
 import nextflow.lsp.services.RenameProvider;
 import nextflow.lsp.util.LanguageServerUtils;
@@ -39,6 +40,7 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 /**
  * Find or rename all references of a symbol.
@@ -49,10 +51,17 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public ScriptReferenceProvider(ScriptAstCache ast) {
+    private CancelChecker cancelChecker;
+
+    public ScriptReferenceProvider(ScriptView ast) {
+        this(ast, () -> {});
+    }
+
+    public ScriptReferenceProvider(ScriptView ast, CancelChecker cancelChecker) {
         this.ast = ast;
+        this.cancelChecker = cancelChecker;
     }
 
     @Override
@@ -73,7 +82,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
 
         var defNode = LanguageServerASTUtils.getDefinition(offsetNode);
         var isAlias = !symbolName.equals(getSymbolName(defNode, null));
-        var references = LanguageServerASTUtils.getReferences(defNode, ast, includeDeclaration);
+        var references = LanguageServerASTUtils.getReferences(defNode, ast, includeDeclaration, cancelChecker);
         var result = new ArrayList<Location>();
         references.forEachRemaining((refNode) -> {
             var refUri = ast.getURI(refNode);
@@ -111,7 +120,7 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
             return null;
 
         var isAlias = !oldName.equals(getSymbolName(defNode, null));
-        var references = LanguageServerASTUtils.getReferences(defNode, ast, true);
+        var references = LanguageServerASTUtils.getReferences(defNode, ast, true, cancelChecker);
         var changes = new HashMap<String,List<TextEdit>>();
         references.forEachRemaining((refNode) -> {
             var refUri = ast.getURI(refNode);

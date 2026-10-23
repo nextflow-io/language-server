@@ -35,7 +35,8 @@ import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigBlockNode;
 import nextflow.config.ast.ConfigIncludeNode;
 import nextflow.config.ast.ConfigStatement;
-import nextflow.lsp.services.config.ConfigAstCache;
+import nextflow.lsp.ast.ConfigView;
+import nextflow.lsp.ast.ScriptView;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
@@ -46,6 +47,7 @@ import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.stmt.Statement;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 import static nextflow.script.ast.ASTUtils.*;
 
@@ -82,13 +84,20 @@ public class ConfigPreviewProvider {
      */
     private static final Set<String> REPEATABLE_DIRECTIVES = Set.of("label", "module", "pod", "publishDir");
 
-    private ScriptAstCache scriptAst;
+    private ScriptView scriptAst;
 
-    private ConfigAstCache configAst;
+    private ConfigView configAst;
 
-    public ConfigPreviewProvider(ScriptAstCache scriptAst, ConfigAstCache configAst) {
+    private CancelChecker cancelChecker;
+
+    public ConfigPreviewProvider(ScriptView scriptAst, ConfigView configAst) {
+        this(scriptAst, configAst, () -> {});
+    }
+
+    public ConfigPreviewProvider(ScriptView scriptAst, ConfigView configAst, CancelChecker cancelChecker) {
         this.scriptAst = scriptAst;
         this.configAst = configAst;
+        this.cancelChecker = cancelChecker;
     }
 
     /**
@@ -443,6 +452,7 @@ public class ConfigPreviewProvider {
         private URI errored;
 
         void walk(URI uri, String profile, List<String> scope, String selector) {
+            cancelChecker.checkCanceled();
             if( including.contains(uri) )
                 return;
             // a config file that cannot be parsed is an error in its own right,
@@ -507,7 +517,7 @@ public class ConfigPreviewProvider {
         private void visitInclude(ConfigIncludeNode node, URI uri, String profile, List<String> scope, String selector) {
             if( !(node.source instanceof ConstantExpression ce) )
                 return;
-            var includeUri = ConfigAstCache.resolveIncludeUri(uri, ce.getText());
+            var includeUri = ConfigView.resolveIncludeUri(uri, ce.getText());
             if( includeUri != null )
                 walk(includeUri, profile, scope, selector);
         }

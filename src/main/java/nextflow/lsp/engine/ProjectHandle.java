@@ -16,8 +16,11 @@
 package nextflow.lsp.engine;
 
 import java.net.URI;
+import java.util.Optional;
 
+import nextflow.lsp.ast.ConfigView;
 import nextflow.lsp.ast.ProjectView;
+import nextflow.lsp.ast.ScriptView;
 
 /**
  * The project of a request, as seen by the request body: the
@@ -37,6 +40,10 @@ public final class ProjectHandle implements ProjectView {
 
     private final FileKind kind;
 
+    private ScriptView scriptView;
+
+    private ConfigView configView;
+
     ProjectHandle(Engine engine, Project project, URI uri, FileKind kind) {
         this.engine = engine;
         this.project = project;
@@ -48,6 +55,32 @@ public final class ProjectHandle implements ProjectView {
     public String name() {
         engine.checkEngineThread();
         return project.name();
+    }
+
+    @Override
+    public Optional<ScriptView> scripts() {
+        return kind == null || kind == FileKind.SCRIPT ? Optional.of(scriptView()) : Optional.empty();
+    }
+
+    @Override
+    public Optional<ConfigView> configs() {
+        return kind == null || kind == FileKind.CONFIG ? Optional.of(configView()) : Optional.empty();
+    }
+
+    @Override
+    public ScriptView scriptView() {
+        engine.checkEngineThread();
+        if( scriptView == null )
+            scriptView = new ScriptEntryView(engine, project);
+        return scriptView;
+    }
+
+    @Override
+    public ConfigView configView() {
+        engine.checkEngineThread();
+        if( configView == null )
+            configView = new ConfigEntryView(engine, project);
+        return configView;
     }
 
     /**

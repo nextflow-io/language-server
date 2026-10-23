@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import nextflow.lsp.ast.ASTNodeCache;
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.compiler.LanguageServerErrorCollector;
 import nextflow.lsp.file.FileCache;
@@ -54,7 +55,7 @@ import org.codehaus.groovy.control.SourceUnit;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class ScriptAstCache extends ASTNodeCache {
+public class ScriptAstCache extends ASTNodeCache implements ScriptView {
 
     private Path projectDir;
 

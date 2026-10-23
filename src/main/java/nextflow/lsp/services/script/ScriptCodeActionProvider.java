@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.List;
 
 import nextflow.lsp.ast.LanguageServerASTUtils;
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.CodeActionProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.script.ast.ProcessNode;
@@ -42,9 +43,9 @@ public class ScriptCodeActionProvider implements CodeActionProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public ScriptCodeActionProvider(ScriptAstCache ast) {
+    public ScriptCodeActionProvider(ScriptView ast) {
         this.ast = ast;
     }
 
