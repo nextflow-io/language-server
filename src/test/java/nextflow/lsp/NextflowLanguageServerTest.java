@@ -17,8 +17,11 @@ package nextflow.lsp;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
+import nextflow.lsp.engine.QueuedExecutor;
+import nextflow.lsp.engine.TestEnvironment;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.HoverParams;
@@ -26,6 +29,9 @@ import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
+import org.eclipse.lsp4j.ReferenceContext;
+import org.eclipse.lsp4j.ReferenceParams;
+import org.eclipse.lsp4j.RenameParams;
 import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
 import org.eclipse.lsp4j.WorkDoneProgressEnd;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
@@ -112,6 +118,26 @@ class NextflowLanguageServerTest {
             assertThat(server.diagnostics("work/ab/main.nf")).isEmpty();
             symbols = server.call((s) -> s.documentSymbol(new DocumentSymbolParams(document)));
             assertThat(symbols).isEmpty();
+        }
+    }
+
+    @Test
+    void answerScriptOnlyRequestsOnConfigFilesWithoutWaitingForTheIndex() {
+        var io = new QueuedExecutor();
+        try( var server = TestServer.start((o) -> {
+            o.environment = new TestEnvironment().withIoExecutor(io);
+            o.settle = false;
+        }) ) {
+            var config = "process.cpus = 2\n";
+            server.write("nextflow.config", config);
+            server.open("nextflow.config", config);
+            var document = server.document("nextflow.config");
+            var position = new Position(0, 0);
+            var references = server.send((s) -> s.references(new ReferenceParams(document, position, new ReferenceContext(true))));
+            var rename = server.send((s) -> s.rename(new RenameParams(document, position, "x")));
+            server.runPending();
+            assertThat(references).isCompletedWithValue(List.of());
+            assertThat(rename).isCompletedWithValue(null);
         }
     }
 

@@ -16,6 +16,7 @@
 package nextflow.lsp;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -27,9 +28,11 @@ import nextflow.lsp.engine.Engine;
 import nextflow.lsp.engine.EngineEnvironment;
 import nextflow.lsp.engine.EngineState;
 import nextflow.lsp.engine.Event;
+import nextflow.lsp.engine.FileKind;
 import nextflow.lsp.engine.Need;
 import nextflow.lsp.engine.RequestBody;
 import nextflow.lsp.engine.RequestSpec;
+import nextflow.lsp.engine.Uris;
 import nextflow.lsp.engine.Workspace;
 import nextflow.lsp.services.SemanticTokensVisitor;
 import nextflow.lsp.services.config.ConfigCompletionProvider;
@@ -313,6 +316,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     @Override
     public CompletableFuture<List<CallHierarchyIncomingCall>> callHierarchyIncomingCalls(CallHierarchyIncomingCallsParams params) {
         var item = ClientUris.canonical(params.getItem());
+        if( !isScript(item.getUri()) )
+            return CompletableFuture.completedFuture(Collections.emptyList());
         return request("callHierarchy/incomingCalls", item.getUri(), null, Need.PROJECT, true, null, (ctx) ->
             ctx.project().scripts()
                 .map(ast -> ClientUris.incoming(new ScriptCallHierarchyProvider(ast, ctx.cancelChecker()).incomingCalls(item), ctx::clientUri))
@@ -434,6 +439,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     @Override
     public CompletableFuture<List<? extends Location>> references(ReferenceParams params) {
         var textDocument = ClientUris.canonical(params.getTextDocument());
+        if( !isScript(textDocument.getUri()) )
+            return CompletableFuture.completedFuture(Collections.emptyList());
         return request("textDocument/references", textDocument.getUri(), null, Need.PROJECT, true, Collections.emptyList(), (ctx) ->
             ctx.project().scripts()
                 .<List<? extends Location>>map(ast -> ClientUris.locations(new ScriptReferenceProvider(ast, ctx.cancelChecker()).references(textDocument, params.getPosition(), params.getContext().isIncludeDeclaration()), ctx::clientUri))
@@ -443,6 +450,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     @Override
     public CompletableFuture<WorkspaceEdit> rename(RenameParams params) {
         var textDocument = ClientUris.canonical(params.getTextDocument());
+        if( !isScript(textDocument.getUri()) )
+            return CompletableFuture.completedFuture(null);
         return request("textDocument/rename", textDocument.getUri(), null, Need.PROJECT, true, null, (ctx) ->
             ctx.project().scripts()
                 .map(ast -> ClientUris.edit(new ScriptReferenceProvider(ast, ctx.cancelChecker()).rename(textDocument, params.getPosition(), params.getNewName()), ctx::clientUri))
@@ -547,6 +556,19 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     private static String canonical(String uri) {
         return uri != null ? ClientUris.canonical(uri) : null;
+    }
+
+    /**
+     * Whether a request URI is a script. Project-wide requests that
+     * only apply to scripts don't need to wait for the index otherwise.
+     *
+     * @param uri
+     */
+    private static boolean isScript(String uri) {
+        return Uris.canonical(uri)
+            .flatMap(u -> FileKind.of(Path.of(u)))
+            .filter(kind -> kind == FileKind.SCRIPT)
+            .isPresent();
     }
 
     private <T> CompletableFuture<T> fileRequest(String method, String uri, T emptyValue, RequestBody<T> body) {
