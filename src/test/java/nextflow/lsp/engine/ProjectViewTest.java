@@ -15,8 +15,11 @@
  */
 package nextflow.lsp.engine;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -52,6 +55,16 @@ class ProjectViewTest {
             'echo hello'
         }
         """;
+
+    @Test
+    void exposeOnlyTheViewApiToProviders() {
+        var publicMethods = Arrays.stream(ProjectHandle.class.getDeclaredMethods())
+            .filter(method -> Modifier.isPublic(method.getModifiers()))
+            .map(Method::getName)
+            .toList();
+        var viewMethods = Arrays.stream(ProjectView.class.getMethods()).map(Method::getName).toList();
+        assertThat(publicMethods).containsExactlyInAnyOrderElementsOf(viewMethods);
+    }
 
     @Test
     void showBuiltScriptsOfTheProject() {

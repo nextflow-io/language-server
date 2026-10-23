@@ -18,7 +18,7 @@ package nextflow.lsp.ast;
 import java.net.URI;
 
 import nextflow.config.ast.ConfigNode;
-import nextflow.lsp.engine.Includes;
+import nextflow.lsp.util.Includes;
 
 /**
  * Read-only view of the built config files of a project.

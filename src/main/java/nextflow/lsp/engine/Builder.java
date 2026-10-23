@@ -48,6 +48,7 @@ import nextflow.lsp.services.script.ResolvePluginIncludeVisitor;
 import nextflow.lsp.services.script.ScriptAstParentVisitor;
 import nextflow.lsp.spec.PluginRef;
 import nextflow.lsp.spec.PluginSpec;
+import nextflow.lsp.util.Includes;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.control.CallArityVisitor;
 import nextflow.script.control.ModuleResolver;

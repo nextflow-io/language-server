@@ -84,32 +84,17 @@ public final class ProjectHandle implements ProjectView {
     }
 
     /**
-     * The project, for building views.
+     * The project, for engine tests.
      */
-    public Project project() {
+    Project project() {
         engine.checkEngineThread();
         return project;
     }
 
     /**
-     * The canonical URI of the request file, or null for
-     * project-wide requests.
-     */
-    public URI requestUri() {
-        return uri;
-    }
-
-    /**
-     * The kind of the request file, or null for project-wide requests.
-     */
-    public FileKind requestKind() {
-        return kind;
-    }
-
-    /**
      * The entry of the request file, or null if there is none.
      */
-    public FileEntry requestEntry() {
+    FileEntry requestEntry() {
         engine.checkEngineThread();
         return uri != null ? project.entry(uri) : null;
     }
