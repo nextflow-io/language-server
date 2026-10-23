@@ -392,7 +392,7 @@ public final class Engine {
         var r = route.get();
         switch( task.spec.need() ) {
             case NONE -> run(task, r);
-            case FILE, PROJECT_CONFIGS -> {
+            case FILE, FILE_AND_DEPENDENTS, PROJECT_CONFIGS -> {
                 r.prepare();
                 run(task, r);
             }

@@ -942,14 +942,15 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         public void prepare() {
             switch( need ) {
                 case NONE -> {}
-                case FILE -> prepareFile(false);
-                case PROJECT_CONFIGS -> prepareFile(true);
+                case FILE -> prepareFile(false, false);
+                case FILE_AND_DEPENDENTS -> prepareFile(false, true);
+                case PROJECT_CONFIGS -> prepareFile(true, false);
                 case PROJECT, ALL -> targets.forEach(Workspace.this::buildAll);
             }
             updateProgress();
         }
 
-        private void prepareFile(boolean configs) {
+        private void prepareFile(boolean configs, boolean dependents) {
             if( project == null )
                 return;
             var roots = new ArrayList<FileEntry>();
@@ -970,6 +971,15 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                     roots.add(entry);
             }
             buildClosure(project, roots);
+            if( dependents && uri != null ) {
+                var includers = new ArrayList<FileEntry>();
+                for( var dependent : project.graph.transitiveDependents(List.of(uri)) ) {
+                    var entry = project.entry(dependent);
+                    if( entry != null )
+                        includers.add(entry);
+                }
+                buildClosure(project, includers);
+            }
             markReadyIfDone(project);
         }
 

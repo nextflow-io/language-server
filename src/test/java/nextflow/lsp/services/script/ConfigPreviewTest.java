@@ -448,6 +448,42 @@ class ConfigPreviewTest {
     }
 
     @Test
+    void qualifyInvocationRightAfterAnEditOfTheSubworkflow() {
+        writeWorkspaceFile("modules/align.nf", """
+            process ALIGN {
+                script:
+                \"""
+                echo align
+                \"""
+            }
+            """);
+        var sub = """
+            include { ALIGN as ALIGN_DNA } from '../modules/align.nf'
+
+            workflow SUB {
+                main:
+                ALIGN_DNA()
+            }
+            """;
+        writeWorkspaceFile("subworkflows/sub.nf", sub);
+        writeWorkspaceFile("main.nf", """
+            include { SUB } from './subworkflows/sub.nf'
+
+            workflow {
+                SUB()
+            }
+            """);
+        try( var server = TestServer.start() ) {
+            var uri = getUri("subworkflows/sub.nf");
+            server.open("subworkflows/sub.nf", sub);
+            server.change("subworkflows/sub.nf", sub + "\n");
+
+            // the includers are rebuilt against the edited file
+            assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for SUB:ALIGN_DNA");
+        }
+    }
+
+    @Test
     void matchSelectorAgainstQualifiedNameAndAlias() {
         var response = preview("""
             process {

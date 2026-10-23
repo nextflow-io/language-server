@@ -25,6 +25,8 @@ public enum Need {
     NONE,
     /** The request file and its transitive dependencies are built first. */
     FILE,
+    /** Like FILE, plus the files that depend on the request file. */
+    FILE_AND_DEPENDENTS,
     /** Like FILE, plus every config file of the project. */
     PROJECT_CONFIGS,
     /** Parked until the project is indexed and fresh. */
