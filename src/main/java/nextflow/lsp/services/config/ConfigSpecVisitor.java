@@ -93,6 +93,16 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         PluginSpec get(PluginRef ref);
 
         /**
+         * Whether the spec of a plugin release is not known yet,
+         * because it is still being fetched.
+         *
+         * @param ref
+         */
+        default boolean isPending(PluginRef ref) {
+            return false;
+        }
+
+        /**
          * Record the plugins declared by a config file.
          *
          * @param uri
@@ -113,6 +123,9 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private SpecNode.Scope spec;
 
+    // whether the config scopes of some declared plugins are not known yet
+    private boolean pendingScopes;
+
     /**
      * Synthetic type for the params declared by this config file. Fields are
      * added as param assignments are visited, so a params reference is typed
@@ -130,6 +143,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         super.visit(cn);
         this.spec = null;
         this.paramsType = null;
+        this.pendingScopes = false;
     }
 
     private SpecNode.Scope getPluginScopes(ConfigNode cn) {
@@ -170,6 +184,8 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             .map(spec -> spec.configScopes())
             .toList();
 
+        pendingScopes = refs.stream().anyMatch(ref -> plugins.isPending(ref));
+
         // save current versions to plugin cache
         var uri = sourceUnit.getSource().getURI();
         plugins.declare(uri, refs);
@@ -206,6 +222,9 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             return;
         var option = spec.getOption(names);
         if( option == null ) {
+            // the scope may be defined by a plugin whose spec is not known yet
+            if( pendingScopes && !ConfigSpecFactory.defaultScopes().containsKey(scope) )
+                return;
             var message = "Unrecognized config option '" + fqName + "'";
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
             return;

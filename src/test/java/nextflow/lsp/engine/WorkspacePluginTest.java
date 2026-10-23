@@ -103,6 +103,33 @@ class WorkspacePluginTest {
     }
 
     @Test
+    void suppressUnknownScopeWarningsWhileTheSpecIsPending() {
+        var registry = new FixtureRegistry();
+        var io = new QueuedExecutor();
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.environment = new TestEnvironment().withRegistry((url) -> registry).withIoExecutor(io);
+            o.settle = false;
+        }) ) {
+            f.open("nextflow.config", """
+                plugins { id 'nf-schema@2.7.3' }
+                validation { parametersSchema = 'schema.json' }
+                validation.bogus = true
+                manifest.bogus = true
+                """);
+            f.call(Need.FILE, "nextflow.config", null, (context) -> null);
+            f.advance(Duration.ofSeconds(1));
+            assertThat(registry.fetches).isEmpty();
+            assertThat(f.messages("nextflow.config")).containsExactly("Unrecognized config option 'manifest.bogus'");
+
+            // check again once the spec is known
+            f.settle(io);
+            assertThat(f.messages("nextflow.config")).containsExactly(
+                "Unrecognized config option 'validation.bogus'",
+                "Unrecognized config option 'manifest.bogus'");
+        }
+    }
+
+    @Test
     void retryFailedFetchAtMostOncePerInterval() {
         var registry = new FixtureRegistry();
         registry.overrides.put("nf-schema@2.7.3", new PluginRegistryClient.Failed("connection refused"));

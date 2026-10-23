@@ -143,7 +143,6 @@ final class Builder {
             entry.errors = List.of();
             entry.warnings = List.of();
             entry.internalError = error;
-            entry.pendingPlugins = false;
             entry.depStamps = Map.of();
             entry.extKeys = Map.of();
             entry.stamp = context.nextStamp();
@@ -169,7 +168,6 @@ final class Builder {
         final Set<Path> missingTargets = new TreeSet<>();
         final Map<ExtKey, Long> extKeys = new LinkedHashMap<>();
         final List<PluginRef> pluginRefs = new ArrayList<>();
-        boolean pendingPlugins;
         boolean hasPluginInclude;
         // dependencies of the previous build
         final Set<URI> previousTargets;
@@ -510,8 +508,12 @@ final class Builder {
                 public PluginSpec get(PluginRef ref) {
                     var lookup = context.plugins().lookup(ref);
                     parsed.extKeys.put(new ExtKey.Plugin(ref), 0L);
-                    parsed.pendingPlugins |= lookup.pending();
                     return lookup.spec().orElse(null);
+                }
+
+                @Override
+                public boolean isPending(PluginRef ref) {
+                    return context.plugins().lookup(ref).pending();
                 }
 
                 @Override
@@ -549,7 +551,6 @@ final class Builder {
                         return null;
                     var lookup = context.plugins().lookup(ref);
                     parsed.extKeys.put(new ExtKey.Plugin(ref), 0L);
-                    parsed.pendingPlugins |= lookup.pending();
                     return lookup;
                 }
             }).visit();
@@ -705,7 +706,6 @@ final class Builder {
                 entry.builtInputVersion = parsed.inputVersion;
                 entry.builtFromVersion = parsed.documentVersion;
                 entry.pluginRefs = List.copyOf(parsed.pluginRefs);
-                entry.pendingPlugins = parsed.pendingPlugins;
                 project.graph.setEdges(entry.uri, depStamps.keySet());
                 project.setMissingTargets(entry, missing);
                 project.built(entry);

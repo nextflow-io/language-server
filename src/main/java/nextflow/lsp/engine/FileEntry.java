@@ -87,8 +87,6 @@ public final class FileEntry {
 
     List<PluginRef> pluginRefs = List.of();
 
-    boolean pendingPlugins;
-
     FileEntry(URI uri, Path path, FileKind kind, Role role) {
         this.uri = uri;
         this.path = path;
