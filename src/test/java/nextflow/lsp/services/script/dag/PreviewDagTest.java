@@ -22,8 +22,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import nextflow.lsp.Golden;
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
-import nextflow.lsp.services.LanguageServerConfiguration;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.junit.jupiter.api.DynamicTest;
@@ -50,25 +50,22 @@ class PreviewDagTest {
      * root, so that the expected output doesn't depend on its location.
      */
     @TestFactory
-    @Execution(ExecutionMode.SAME_THREAD) // the dynamic tests share one service
+    @Execution(ExecutionMode.SAME_THREAD) // the dynamic tests share one server
     Stream<DynamicTest> previewDagGoldenFiles() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
         var rootUri = workspaceRootUri();
-        // scan the workspace now, as otherwise the second request of the
-        // first case would scan it and evict the in-memory script
-        service.updateNow();
 
         return Golden.inputs("dag", ".nf").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
-            openVerbatim(service, uri, Golden.read(input));
-            var lenses = service.codeLens(new CodeLensParams(new TextDocumentIdentifier(uri))).stream()
+            openVerbatim(server, uri, Golden.read(input));
+            var lenses = server.call(s -> s.codeLens(new CodeLensParams(new TextDocumentIdentifier(uri)))).stream()
                 .filter(lens -> "nextflow.previewDag".equals(lens.getCommand().getCommand()))
                 .toList();
             assertThat(lenses).isNotEmpty();
 
             var mmd = lenses.stream()
                 .map((lens) -> {
-                    var response = (Map<?,?>) service.executeCommand("nextflow.server.previewDag", lens.getCommand().getArguments(), LanguageServerConfiguration.defaults());
+                    var response = (Map<?,?>) executeCommand(server, "nextflow.server.previewDag", lens.getCommand().getArguments());
                     assertThat(response).isNotNull();
                     var result = (String) response.get("result");
                     assertThat(result).as("DAG preview error: %s", response.get("error")).isNotNull();

@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.util.Positions;
 import org.eclipse.lsp4j.Position;
@@ -41,8 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TestWorkspace.class)
 class ScriptReferencesTest {
 
-    static Map<String,List<Range>> getReferences(ScriptService service, String uri, Position position) {
-        var locations = service.references(new ReferenceParams(new TextDocumentIdentifier(uri), position, new ReferenceContext(true)));
+    static Map<String,List<Range>> getReferences(TestServer server, String uri, Position position) {
+        var locations = server.call(s -> s.references(new ReferenceParams(new TextDocumentIdentifier(uri), position, new ReferenceContext(true))));
         var result = new HashMap<String,List<Range>>();
         for( var location : locations ) {
             var ranges = result.computeIfAbsent(location.getUri(), (k) -> new ArrayList<>());
@@ -55,7 +56,7 @@ class ScriptReferencesTest {
 
     @Test
     void getReferencesOfWorkflowDefinition() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
         var contents = """
@@ -66,9 +67,8 @@ class ScriptReferencesTest {
                 HELLO()
             }
             """;
-        open(service, uri, contents);
-        service.updateNow();
-        var references = getReferences(service, uri, new Position(0, 9));
+        open(server, uri, contents);
+        var references = getReferences(server, uri, new Position(0, 9));
 
         assertThat(references.get(uri)).hasSize(2);
         assertThat(references.get(uri).get(0).getStart()).isEqualTo(new Position(0, 0));
@@ -79,23 +79,22 @@ class ScriptReferencesTest {
 
     @Test
     void getReferencesOfWorkflowDefinitionInDifferentFile() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var mainUri = getUri("main.nf");
         var moduleUri = getUri("module.nf");
 
-        open(service, moduleUri, """
+        open(server, moduleUri, """
             workflow HELLO {
             }
             """);
-        open(service, mainUri, """
+        open(server, mainUri, """
             include { HELLO } from './module.nf'
 
             workflow {
                 HELLO()
             }
             """);
-        service.updateNow();
-        var references = getReferences(service, moduleUri, new Position(0, 9));
+        var references = getReferences(server, moduleUri, new Position(0, 9));
 
         assertThat(references.get(moduleUri)).hasSize(1);
         assertThat(references.get(moduleUri).get(0).getStart()).isEqualTo(new Position(0, 0));

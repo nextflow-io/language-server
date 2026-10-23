@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.SymbolKind;
@@ -39,17 +40,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TestWorkspace.class)
 class ScriptSymbolTest {
 
-    static Map<String,SymbolKind> getDocumentSymbols(ScriptService service, String uri) {
-        var symbols = service.documentSymbol(new DocumentSymbolParams(new TextDocumentIdentifier(uri)));
+    static Map<String,SymbolKind> getDocumentSymbols(TestServer server, String uri) {
+        var symbols = server.call(s -> s.documentSymbol(new DocumentSymbolParams(new TextDocumentIdentifier(uri))));
         var result = new HashMap<String,SymbolKind>();
         for( var symbol : symbols )
             result.put(symbol.getRight().getName(), symbol.getRight().getKind());
         return result;
     }
 
-    static List<String> getWorkspaceSymbolNames(ScriptService service, String query) {
-        return service
-            .symbol(new WorkspaceSymbolParams(query))
+    static List<String> getWorkspaceSymbolNames(TestServer server, String query) {
+        return server
+            .call(s -> s.symbol(new WorkspaceSymbolParams(query)))
+            .getRight()
             .stream()
             .map(WorkspaceSymbol::getName)
             .toList();
@@ -57,10 +59,10 @@ class ScriptSymbolTest {
 
     @Test
     void provideDocumentSymbolForEachDefinitionKind() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        open(server, uri, """
             record Sample {
                 id: String
             }
@@ -87,8 +89,7 @@ class ScriptSymbolTest {
                 BAR()
             }
             """);
-        service.updateNow();
-        var symbols = getDocumentSymbols(service, uri);
+        var symbols = getDocumentSymbols(server, uri);
 
         assertThat(symbols.get("record Sample")).isEqualTo(SymbolKind.Struct);
         assertThat(symbols.get("enum Color")).isEqualTo(SymbolKind.Enum);
@@ -100,22 +101,21 @@ class ScriptSymbolTest {
 
     @Test
     void noDocumentSymbolsForEmptyFile() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, "");
-        service.updateNow();
+        open(server, uri, "");
 
-        assertThat(getDocumentSymbols(service, uri)).isEmpty();
+        assertThat(getDocumentSymbols(server, uri)).isEmpty();
     }
 
     @Test
     void findWorkspaceSymbolsByCaseInsensitiveSubstring() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var mainUri = getUri("main.nf");
         var moduleUri = getUri("module.nf");
 
-        open(service, moduleUri, """
+        open(server, moduleUri, """
             process ALIGN {
                 script:
                 \"""
@@ -123,24 +123,23 @@ class ScriptSymbolTest {
                 \"""
             }
             """);
-        open(service, mainUri, """
+        open(server, mainUri, """
             workflow ALIGN_READS {
             }
 
             workflow {
             }
             """);
-        service.updateNow();
 
         // a query matches symbol names across files, case-insensitively
-        var names = getWorkspaceSymbolNames(service, "align");
+        var names = getWorkspaceSymbolNames(server, "align");
         assertThat(names).containsExactlyInAnyOrder("process ALIGN", "workflow ALIGN_READS");
 
         // a non-matching query returns nothing
-        assertThat(getWorkspaceSymbolNames(service, "zzz")).isEmpty();
+        assertThat(getWorkspaceSymbolNames(server, "zzz")).isEmpty();
 
         // an empty query matches every definition
-        assertThat(getWorkspaceSymbolNames(service, "")).hasSize(3);
+        assertThat(getWorkspaceSymbolNames(server, "")).hasSize(3);
     }
 
 }

@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-final class DefaultEngineEnvironment implements EngineEnvironment {
+public final class DefaultEngineEnvironment implements EngineEnvironment {
 
     private static final int IO_THREADS = 4;
 
@@ -46,7 +46,20 @@ final class DefaultEngineEnvironment implements EngineEnvironment {
 
     private final ThreadPoolExecutor ioExecutor;
 
-    DefaultEngineEnvironment() {
+    private final FileAccess files;
+
+    public DefaultEngineEnvironment() {
+        this(FileAccess.system());
+    }
+
+    /**
+     * Create a production environment with the given file access,
+     * for testing.
+     *
+     * @param files
+     */
+    public DefaultEngineEnvironment(FileAccess files) {
+        this.files = files;
         ioExecutor = new ThreadPoolExecutor(
             IO_THREADS, IO_THREADS,
             60, TimeUnit.SECONDS,
@@ -86,7 +99,7 @@ final class DefaultEngineEnvironment implements EngineEnvironment {
 
     @Override
     public FileAccess files() {
-        return FileAccess.system();
+        return files;
     }
 
     @Override

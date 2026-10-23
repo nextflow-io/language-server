@@ -24,7 +24,7 @@ import java.util.concurrent.Executor;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-final class QueuedExecutor implements Executor {
+public final class QueuedExecutor implements Executor {
 
     private final ArrayDeque<Runnable> queue = new ArrayDeque<>();
 
@@ -33,14 +33,14 @@ final class QueuedExecutor implements Executor {
         queue.add(task);
     }
 
-    synchronized int size() {
+    public synchronized int size() {
         return queue.size();
     }
 
     /**
      * Run the queued tasks, including tasks queued while running.
      */
-    int runAll() {
+    public int runAll() {
         var count = 0;
         while( true ) {
             Runnable next;

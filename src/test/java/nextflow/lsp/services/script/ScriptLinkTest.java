@@ -18,6 +18,7 @@ package nextflow.lsp.services.script;
 
 import java.util.List;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.DocumentLink;
 import org.eclipse.lsp4j.DocumentLinkParams;
@@ -35,24 +36,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TestWorkspace.class)
 class ScriptLinkTest {
 
-    static List<DocumentLink> getLinks(ScriptService service, String uri) {
-        return service.documentLink(new DocumentLinkParams(new TextDocumentIdentifier(uri)));
+    static List<DocumentLink> getLinks(TestServer server, String uri) {
+        return server.call(s -> s.documentLink(new DocumentLinkParams(new TextDocumentIdentifier(uri))));
     }
 
     @Test
     void resolveIncludeOfNfModule() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        open(server, uri, """
             include { HELLO } from './module.nf'
 
             workflow {
                 HELLO()
             }
             """);
-        service.updateNow();
-        var links = getLinks(service, uri);
+        var links = getLinks(server, uri);
 
         assertThat(links).hasSize(1);
         assertThat(links.get(0).getTarget()).isEqualTo(getUri("module.nf"));
@@ -60,18 +60,17 @@ class ScriptLinkTest {
 
     @Test
     void appendNfExtensionWhenIncludeOmitsIt() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        open(server, uri, """
             include { HELLO } from './module'
 
             workflow {
                 HELLO()
             }
             """);
-        service.updateNow();
-        var links = getLinks(service, uri);
+        var links = getLinks(server, uri);
 
         assertThat(links).hasSize(1);
         assertThat(links.get(0).getTarget()).isEqualTo(getUri("module.nf"));
@@ -81,19 +80,18 @@ class ScriptLinkTest {
     void noLinkForPluginInclude() {
         // a module directory with the same name would otherwise resolve as a remote module
         writeWorkspaceFile("modules/plugin/nf-hello/main.nf", "");
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        open(server, uri, """
             include { sayHello } from 'plugin/nf-hello'
 
             workflow {
                 sayHello()
             }
             """);
-        service.updateNow();
 
-        assertThat(getLinks(service, uri)).isEmpty();
+        assertThat(getLinks(server, uri)).isEmpty();
     }
 
 }

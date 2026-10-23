@@ -17,7 +17,9 @@
 package nextflow.lsp.services.script;
 
 import java.util.List;
+import java.util.Map;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
@@ -38,13 +40,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TestWorkspace.class)
 class ScriptCompletionTest {
 
-    static List<CompletionItem> getCompletions(ScriptService service, String uri, Position position) {
-        return getCompletions(service, uri, position, false);
+    static List<CompletionItem> getCompletions(TestServer server, String uri, Position position) {
+        return getCompletions(server, uri, position, false);
     }
 
-    static List<CompletionItem> getCompletions(ScriptService service, String uri, Position position, boolean extended) {
-        return service
-            .completion(new CompletionParams(new TextDocumentIdentifier(uri), position), 100, extended)
+    static List<CompletionItem> getCompletions(TestServer server, String uri, Position position, boolean extended) {
+        server.configure(Map.of("nextflow.completion.extended", extended));
+        return server
+            .call(s -> s.completion(new CompletionParams(new TextDocumentIdentifier(uri), position)))
             .getLeft();
     }
 
@@ -71,15 +74,15 @@ class ScriptCompletionTest {
 
     @Test
     void getCompletionProposalsForPropertyExpression() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        open(server, uri, """
             workflow {
                 workflow.f
             }
             """);
-        var completions = getCompletions(service, uri, new Position(1, 14));
+        var completions = getCompletions(server, uri, new Position(1, 14));
 
         assertThat(completions).hasSize(2);
         var failOnIgnore = findByLabel(completions, "failOnIgnore");
@@ -91,12 +94,12 @@ class ScriptCompletionTest {
         assertThat(fusion.getKind()).isEqualTo(CompletionItemKind.Module);
         assertThat(fusion.getDetail()).isEqualTo("(namespace) fusion");
 
-        open(service, uri, """
+        open(server, uri, """
             workflow {
                 workflow.config
             }
             """);
-        completions = getCompletions(service, uri, new Position(1, 19));
+        completions = getCompletions(server, uri, new Position(1, 19));
 
         assertThat(completions).hasSize(1);
         var configFiles = findByLabel(completions, "configFiles");
@@ -104,12 +107,12 @@ class ScriptCompletionTest {
         assertThat(configFiles.getKind()).isEqualTo(CompletionItemKind.Constant);
         assertThat(configFiles.getDetail()).isEqualTo("configFiles: List<Path>");
 
-        open(service, uri, """
+        open(server, uri, """
             workflow {
                 log.
             }
             """);
-        completions = getCompletions(service, uri, new Position(1, 8));
+        completions = getCompletions(server, uri, new Position(1, 8));
 
         assertThat(completions).hasSize(3);
         var logCompletions = completions;
@@ -124,10 +127,10 @@ class ScriptCompletionTest {
 
     @Test
     void completeProcessNameInWorkflowBody() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        open(server, uri, """
             process ALIGN {
                 script:
                 \"""
@@ -139,7 +142,7 @@ class ScriptCompletionTest {
                 ALI
             }
             """);
-        var completions = getCompletions(service, uri, new Position(8, 7));
+        var completions = getCompletions(server, uri, new Position(8, 7));
 
         assertThat(findByLabel(completions, "ALIGN"))
             .extracting(CompletionItem::getKind)
@@ -148,18 +151,18 @@ class ScriptCompletionTest {
 
     @Test
     void completeIncludedMethodsByAlias() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, getUri("module.nf"), MODULE);
-        open(service, uri, """
+        open(server, getUri("module.nf"), MODULE);
+        open(server, uri, """
             include { sayHello as greet } from './module.nf'
 
             workflow {
                 gre
             }
             """);
-        var completions = getCompletions(service, uri, new Position(3, 7));
+        var completions = getCompletions(server, uri, new Position(3, 7));
 
         var greet = findByLabel(completions, "greet");
         assertThat(greet).isNotNull();
@@ -168,32 +171,32 @@ class ScriptCompletionTest {
         assertThat(greet.getAdditionalTextEdits()).isNull();
 
         // non-extended completion does not suggest definitions that are not included
-        open(service, uri, """
+        open(server, uri, """
             include { sayHello as greet } from './module.nf'
 
             workflow {
                 HEL
             }
             """);
-        completions = getCompletions(service, uri, new Position(3, 7));
+        completions = getCompletions(server, uri, new Position(3, 7));
 
         assertThat(completions).extracting(CompletionItem::getLabel).doesNotContain("HELLO", "HELLO_FLOW");
     }
 
     @Test
     void completeExternalMethodsWithIncludeEdit() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, getUri("module.nf"), MODULE);
-        open(service, uri, """
+        open(server, getUri("module.nf"), MODULE);
+        open(server, uri, """
             include { sayHello } from './module.nf'
 
             workflow {
                 HEL
             }
             """);
-        var completions = getCompletions(service, uri, new Position(3, 7), true);
+        var completions = getCompletions(server, uri, new Position(3, 7), true);
 
         // definitions that are not included add an include after the last one
         assertThat(List.of("HELLO", "HELLO_FLOW")).allSatisfy(name -> {
@@ -208,14 +211,14 @@ class ScriptCompletionTest {
         });
 
         // definitions that are already included don't add an include
-        open(service, uri, """
+        open(server, uri, """
             include { sayHello } from './module.nf'
 
             workflow {
                 say
             }
             """);
-        var included = getCompletions(service, uri, new Position(3, 7), true);
+        var included = getCompletions(server, uri, new Position(3, 7), true);
 
         assertThat(findByLabel(included, "sayHello"))
             .extracting(CompletionItem::getAdditionalTextEdits)
@@ -224,17 +227,19 @@ class ScriptCompletionTest {
 
     @Test
     void completeOnlyExternalFunctionsInProcessBody() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, getUri("module.nf"), MODULE);
-        open(service, uri, """
+        open(server, getUri("module.nf"), MODULE);
+        // extended completion offers the definitions of other built files
+        server.settle();
+        open(server, uri, """
             process FOO {
                 exec:
                 s
             }
             """);
-        var completions = getCompletions(service, uri, new Position(2, 5), true);
+        var completions = getCompletions(server, uri, new Position(2, 5), true);
 
         // with no includes, the include is added at the top of the script
         assertThat(findByLabel(completions, "sayHello").getAdditionalTextEdits())
@@ -244,23 +249,23 @@ class ScriptCompletionTest {
                 assertThat(edit.getNewText()).isEqualTo("include { sayHello } from './module.nf'\n");
             });
 
-        open(service, uri, """
+        open(server, uri, """
             process FOO {
                 exec:
                 HEL
             }
             """);
-        completions = getCompletions(service, uri, new Position(2, 7), true);
+        completions = getCompletions(server, uri, new Position(2, 7), true);
 
         assertThat(completions).extracting(CompletionItem::getLabel).doesNotContain("HELLO", "HELLO_FLOW");
     }
 
     @Test
     void completeProcessDirectiveInProcessBody() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        open(server, uri, """
             process FOO {
                 cp
                 script:
@@ -269,31 +274,31 @@ class ScriptCompletionTest {
                 \"""
             }
             """);
-        var completions = getCompletions(service, uri, new Position(1, 6));
+        var completions = getCompletions(server, uri, new Position(1, 6));
 
         assertThat(findByLabel(completions, "cpus")).isNotNull();
     }
 
     @Test
     void noCompletionsInsideComment() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        open(server, uri, """
             workflow {
                 // foo.
             }
             """);
-        var completions = getCompletions(service, uri, new Position(1, 10));
+        var completions = getCompletions(server, uri, new Position(1, 10));
 
         assertThat(completions).isEmpty();
 
-        open(service, uri, """
+        open(server, uri, """
             // foo.
             workflow {
             }
             """);
-        completions = getCompletions(service, uri, new Position(0, 7));
+        completions = getCompletions(server, uri, new Position(0, 7));
 
         assertThat(completions).isEmpty();
     }

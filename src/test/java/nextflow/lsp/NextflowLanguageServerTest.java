@@ -13,25 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package nextflow.lsp;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
-import org.eclipse.lsp4j.ClientCapabilities;
-import org.eclipse.lsp4j.DidOpenTextDocumentParams;
-import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.InitializedParams;
-import org.eclipse.lsp4j.TextDocumentItem;
-import org.eclipse.lsp4j.WindowClientCapabilities;
-import org.eclipse.lsp4j.WorkspaceFolder;
-import org.junit.jupiter.api.BeforeEach;
+import org.eclipse.lsp4j.ProgressParams;
+import org.eclipse.lsp4j.PublishDiagnosticsParams;
+import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
+import org.eclipse.lsp4j.WorkDoneProgressEnd;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -43,105 +37,104 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-@Timeout(15) // longer than the 10 s wait in awaitDiagnostics()
+@ExtendWith(TestWorkspace.class)
 class NextflowLanguageServerTest {
 
     private static final String INVALID_SCRIPT = "workflow {\n";
 
-    @TempDir
-    Path workspace;
-
-    private final TestLanguageClient client = new TestLanguageClient();
-
-    private final NextflowLanguageServer server = new NextflowLanguageServer(50);
-
-    @BeforeEach
-    void setup() {
-        server.connect(client);
+    @Test
+    void reportDiagnosticsWithoutConfiguration() {
+        try( var server = TestServer.start((o) -> o.settle = false) ) {
+            server.write("main.nf", INVALID_SCRIPT);
+            server.open("main.nf", INVALID_SCRIPT);
+            server.settle();
+            assertThat(server.diagnostics("main.nf")).isNotEmpty();
+        }
     }
 
     @Test
-    void reportDiagnosticsWithoutConfiguration() throws Exception {
-        var uri = writeScript("main.nf");
-
-        initialize(workspaceFolders(), null, null);
-        open(uri);
-        awaitDiagnostics(uri);
+    void useRootUriIfThereAreNoWorkspaceFolders() {
+        try( var server = TestServer.start((o) -> o.rootUri = true) ) {
+            server.write("main.nf", INVALID_SCRIPT);
+            server.open("main.nf", INVALID_SCRIPT);
+            server.settle();
+            assertThat(server.diagnostics("main.nf")).isNotEmpty();
+        }
     }
 
     @Test
-    void useRootUriIfThereAreNoWorkspaceFolders() throws Exception {
-        var uri = writeScript("main.nf");
-
-        initialize(null, workspace.toUri().toString(), null);
-        open(uri);
-        awaitDiagnostics(uri);
+    void reportDiagnosticsForFilesOutsideOfWorkspaceFolders() {
+        try( var server = TestServer.start((o) -> o.folders()) ) {
+            server.write("main.nf", INVALID_SCRIPT);
+            server.open("main.nf", INVALID_SCRIPT);
+            server.settle();
+            assertThat(server.diagnostics("main.nf")).isNotEmpty();
+        }
     }
 
     @Test
-    void reportDiagnosticsForFilesOutsideOfWorkspaceFolders() throws Exception {
-        var uri = writeScript("main.nf");
-
-        initialize(null, null, null);
-        open(uri);
-        awaitDiagnostics(uri);
-    }
-
-    @Test
-    void excludeWorkDirectoryByDefault() throws Exception {
-        var uri = writeScript("main.nf");
-        var excludedUri = writeScript("work/ab/cdef/main.nf");
-
-        initialize(workspaceFolders(), null, null);
-        open(uri);
-        awaitDiagnostics(uri);
-        assertThat(client.getAllDiagnostics()).doesNotContainKey(excludedUri);
+    void excludeWorkDirectoryByDefault() {
+        try( var server = TestServer.start((o) -> o.initialized = false) ) {
+            server.write("main.nf", INVALID_SCRIPT);
+            server.write("work/ab/cdef/main.nf", INVALID_SCRIPT);
+            server.server().initialized(new InitializedParams());
+            server.open("main.nf", INVALID_SCRIPT);
+            server.settle();
+            assertThat(server.diagnostics("main.nf")).isNotEmpty();
+            assertThat(server.client().getAllDiagnostics()).doesNotContainKey(server.uri("work/ab/cdef/main.nf"));
+        }
     }
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    void reportProgressOnlyIfClientSupportsIt(boolean supported) throws Exception {
-        initialize(workspaceFolders(), null, supported);
-        assertThat(client.getProgress().isEmpty()).isNotEqualTo(supported);
-    }
-
-    private String writeScript(String path) throws IOException {
-        var file = workspace.resolve(path);
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, INVALID_SCRIPT);
-        return file.toUri().toString();
-    }
-
-    private List<WorkspaceFolder> workspaceFolders() {
-        return List.of(new WorkspaceFolder(workspace.toUri().toString(), "test"));
-    }
-
-    @SuppressWarnings("deprecation") // rootUri
-    private void initialize(List<WorkspaceFolder> workspaceFolders, String rootUri, Boolean workDoneProgress) throws Exception {
-        var params = new InitializeParams();
-        params.setWorkspaceFolders(workspaceFolders);
-        params.setRootUri(rootUri);
-        if( workDoneProgress != null ) {
-            var window = new WindowClientCapabilities();
-            window.setWorkDoneProgress(workDoneProgress);
-            params.setCapabilities(new ClientCapabilities(null, null, window, null));
+    void reportProgressOnlyIfClientSupportsIt(boolean supported) {
+        try( var server = TestServer.start((o) -> {
+            o.progress = supported;
+            o.initialized = false;
+        }) ) {
+            server.write("main.nf", INVALID_SCRIPT);
+            server.server().initialized(new InitializedParams());
+            server.settle();
+            assertThat(server.client().getProgress().isEmpty()).isNotEqualTo(supported);
         }
-        server.initialize(params).get();
-        server.initialized(new InitializedParams());
     }
 
-    private void open(String uri) {
-        server.didOpen(new DidOpenTextDocumentParams(new TextDocumentItem(uri, "nextflow", 1, INVALID_SCRIPT)));
-    }
+    @Test
+    void endProgressOnlyAfterTheIndexIsComplete() {
+        var publishedAtEnd = new ArrayList<Set<String>>();
+        var published = new HashSet<String>();
+        var client = new TestLanguageClient() {
+            @Override
+            public void publishDiagnostics(PublishDiagnosticsParams params) {
+                super.publishDiagnostics(params);
+                published.add(params.getUri());
+            }
 
-    private void awaitDiagnostics(String uri) throws InterruptedException {
-        var deadline = System.currentTimeMillis() + 10_000;
-        while( System.currentTimeMillis() < deadline ) {
-            if( !client.getDiagnostics(uri).isEmpty() )
-                return;
-            Thread.sleep(100);
+            @Override
+            public void notifyProgress(ProgressParams params) {
+                super.notifyProgress(params);
+                if( params.getValue().getLeft() instanceof WorkDoneProgressEnd )
+                    publishedAtEnd.add(Set.copyOf(published));
+            }
+        };
+        try( var server = TestServer.start((o) -> {
+            o.client = client;
+            o.progress = true;
+            o.maxSliceFiles = 2;
+            o.initialized = false;
+        }) ) {
+            var files = new ArrayList<String>();
+            for( int i = 0; i < 7; i++ ) {
+                var path = "modules/mod" + i + ".nf";
+                server.write(path, "workflow MOD" + i + " { def x = 1 }\n");
+                files.add(server.uri(path));
+            }
+            server.server().initialized(new InitializedParams());
+            server.settle();
+            assertThat(client.getProgress()).first().isInstanceOf(WorkDoneProgressCreateParams.class);
+            assertThat(publishedAtEnd).hasSize(1);
+            assertThat(publishedAtEnd.get(0)).containsAll(files);
         }
-        assertThat(client.getDiagnostics(uri)).as("diagnostics for " + uri).isNotEmpty();
     }
 
 }

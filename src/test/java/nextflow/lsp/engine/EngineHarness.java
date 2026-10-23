@@ -88,6 +88,24 @@ public final class EngineHarness implements AutoCloseable {
         this.engine = new Engine(env, client, options.debounce, stateFactory);
     }
 
+    private EngineHarness(TestEnvironment env, TestLanguageClient client, Engine engine) {
+        this.env = env;
+        this.client = client;
+        this.engine = engine;
+    }
+
+    /**
+     * Drive an engine that was created elsewhere (e.g. by the
+     * language server) with the given test environment.
+     *
+     * @param engine
+     * @param env
+     * @param client
+     */
+    public static EngineHarness attach(Engine engine, TestEnvironment env, TestLanguageClient client) {
+        return new EngineHarness(env, client, engine);
+    }
+
     public static EngineHarness start(EngineState.Factory stateFactory) {
         return start(stateFactory, (options) -> {});
     }

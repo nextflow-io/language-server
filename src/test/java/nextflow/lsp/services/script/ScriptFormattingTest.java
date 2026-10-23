@@ -17,12 +17,12 @@
 
 package nextflow.lsp.services.script;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.stream.Stream;
 
 import nextflow.lsp.Golden;
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.script.formatter.FormattingOptions;
 import org.junit.jupiter.api.DynamicTest;
@@ -43,10 +43,10 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 @ExtendWith(TestWorkspace.class)
 class ScriptFormattingTest {
 
-    static void checkFormat(ScriptService service, String uri, FormattingOptions options, String before, String after) {
+    static void checkFormat(TestServer server, String uri, FormattingOptions options, String before, String after) {
         // open verbatim to preserve CRLF line endings
-        openVerbatim(service, uri, before);
-        var textEdits = service.formatting(URI.create(uri), options);
+        openVerbatim(server, uri, before);
+        var textEdits = formatting(server, uri, options);
         // the provider returns no edits both when the document is already
         // formatted and when it refuses to format (e.g. a comment would be
         // lost), so a document that should change must produce an edit
@@ -56,8 +56,8 @@ class ScriptFormattingTest {
         assertThat(newText).isEqualTo(after);
     }
 
-    static void checkFormat(ScriptService service, String uri, String before, String after) {
-        checkFormat(service, uri, new FormattingOptions(4, true), before, after);
+    static void checkFormat(TestServer server, String uri, String before, String after) {
+        checkFormat(server, uri, new FormattingOptions(4, true), before, after);
     }
 
     /**
@@ -67,21 +67,21 @@ class ScriptFormattingTest {
      * must be stable when formatted again.
      */
     @TestFactory
-    @Execution(ExecutionMode.SAME_THREAD) // the dynamic tests share one service
+    @Execution(ExecutionMode.SAME_THREAD) // the dynamic tests share one server
     Stream<DynamicTest> formatGoldenFiles() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
         var options = new FormattingOptions(4, true);
 
         return Golden.inputs("format/script", ".nf").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
-            openVerbatim(service, uri, Golden.read(input));
-            var textEdits = service.formatting(URI.create(uri), options);
+            openVerbatim(server, uri, Golden.read(input));
+            var textEdits = formatting(server, uri, options);
             assertThat(textEdits).isNotEmpty();
             var formatted = textEdits.get(0).getNewText();
             Golden.check(Golden.sibling(input, ".formatted"), formatted);
 
-            openVerbatim(service, uri, formatted);
-            var reformatted = service.formatting(URI.create(uri), options);
+            openVerbatim(server, uri, formatted);
+            var reformatted = formatting(server, uri, options);
             if( !reformatted.isEmpty() )
                 assertThat(reformatted.get(0).getNewText()).isEqualTo(formatted);
         }));
@@ -89,11 +89,11 @@ class ScriptFormattingTest {
 
     @Test
     void reindentMultiLineStrings() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
         var options = new FormattingOptions(2, true);
 
-        checkFormat(service, uri, options,
+        checkFormat(server, uri, options,
             """
             process foo {
                 script:
@@ -115,10 +115,10 @@ class ScriptFormattingTest {
 
     @Test
     void formatLeadingCommentsInFileWithCrlfLineEndings() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        checkFormat(service, uri,
+        checkFormat(server, uri,
             "workflow {\r\n    // ALIGN reads to reference genome\r\n    BWA_ALIGN(sample_id, library_id)\r\n}\r\n",
             """
             workflow {
@@ -135,7 +135,7 @@ class ScriptFormattingTest {
         // reuses the same cached AST -- the output must not change, including
         // for comments inside wrapped expressions; the input is deliberately
         // non-canonical so that every request returns an edit
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
         var contents = """
             workflow {
@@ -153,10 +153,10 @@ class ScriptFormattingTest {
             """;
         var expected = contents.replace("y=1", "y = 1");
 
-        openOnDisk(service, uri, contents);
+        open(server, uri, contents);
         var texts = new ArrayList<String>();
         for( int i = 0; i < 3; i++ ) {
-            var edits = service.formatting(URI.create(uri), new FormattingOptions(4, true));
+            var edits = formatting(server, uri, new FormattingOptions(4, true));
             texts.add(edits != null && !edits.isEmpty() ? edits.get(0).getNewText() : contents);
         }
 

@@ -31,11 +31,11 @@ import java.util.Map;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-final class FixtureRegistry implements PluginRegistryClient {
+public final class FixtureRegistry implements PluginRegistryClient {
 
-    final List<String> fetches = Collections.synchronizedList(new ArrayList<>());
+    public final List<String> fetches = Collections.synchronizedList(new ArrayList<>());
 
-    final Map<String, Result> overrides = Collections.synchronizedMap(new HashMap<>());
+    public final Map<String, Result> overrides = Collections.synchronizedMap(new HashMap<>());
 
     @Override
     public Result fetch(String name, String version) {

@@ -21,14 +21,21 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.services.LanguageService;
 import nextflow.lsp.services.config.ConfigService;
 import nextflow.lsp.services.script.ScriptService;
 import nextflow.lsp.spec.PluginSpecCache;
+import nextflow.script.formatter.FormattingOptions;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
+import org.eclipse.lsp4j.DocumentFormattingParams;
+import org.eclipse.lsp4j.ExecuteCommandParams;
+import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.TextDocumentItem;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 
 /**
  *
@@ -257,6 +264,60 @@ public class TestUtils {
             throw new UncheckedIOException(e);
         }
         open(service, uri, contents);
+    }
+
+    /**
+     * Open a document in a test server, with its indentation stripped.
+     *
+     * @param server
+     * @param uri
+     * @param contents
+     */
+    public static void open(TestServer server, String uri, String contents) {
+        openVerbatim(server, uri, contents.stripIndent());
+    }
+
+    /**
+     * Open a document in a test server with exactly the given contents.
+     *
+     * @param server
+     * @param uri
+     * @param contents
+     */
+    public static void openVerbatim(TestServer server, String uri, String contents) {
+        var textDocumentItem = new TextDocumentItem(uri, "nextflow", 1, contents);
+        server.server().didOpen(new DidOpenTextDocumentParams(textDocumentItem));
+    }
+
+    /**
+     * Execute a command in a test server.
+     *
+     * @param server
+     * @param command
+     * @param arguments
+     */
+    public static Object executeCommand(TestServer server, String command, List<Object> arguments) {
+        return server.call(s -> s.executeCommand(new ExecuteCommandParams(command, arguments)));
+    }
+
+    /**
+     * Format a document in a test server, with the formatting settings
+     * of the given options.
+     *
+     * @param server
+     * @param uri
+     * @param options
+     */
+    public static List<? extends TextEdit> formatting(TestServer server, String uri, FormattingOptions options) {
+        server.configure(Map.of(
+            "nextflow.formatting.harshilAlignment", options.harshilAlignment(),
+            "nextflow.formatting.maheshForm", options.maheshForm(),
+            "nextflow.formatting.sortDeclarations", options.sortDeclarations()
+        ));
+        var params = new DocumentFormattingParams(
+            new TextDocumentIdentifier(uri),
+            new org.eclipse.lsp4j.FormattingOptions(options.tabSize(), options.insertSpaces()));
+        return server.call(s -> s.formatting(params));
     }
 
 }

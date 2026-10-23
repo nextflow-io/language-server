@@ -19,6 +19,7 @@ package nextflow.lsp.services.config;
 import java.util.ArrayList;
 import java.util.List;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.services.SemanticTokensVisitor;
 import org.eclipse.lsp4j.SemanticTokensParams;
@@ -61,21 +62,20 @@ class ConfigSemanticTokensTest {
         return result;
     }
 
-    static List<Token> getTokens(ConfigService service, String uri) {
-        var st = service.semanticTokensFull(new SemanticTokensParams(new TextDocumentIdentifier(uri)));
+    static List<Token> getTokens(TestServer server, String uri) {
+        var st = server.call(s -> s.semanticTokensFull(new SemanticTokensParams(new TextDocumentIdentifier(uri))));
         return st != null ? decode(st.getData()) : null;
     }
 
     @Test
     void tokenizeValueExpressionOfConfigAssignment() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, """
+        open(server, uri, """
             process.clusterOptions = "--account=${params.account}"
             """);
-        service.updateNow();
-        var tokens = getTokens(service, uri);
+        var tokens = getTokens(server, uri);
 
         // the GString literal, interpolated variable, and property are highlighted
         assertThat(tokens).containsExactly(
@@ -87,24 +87,23 @@ class ConfigSemanticTokensTest {
 
     @Test
     void noTokensForAssignmentKeysOrPlainLiteralValues() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, """
+        open(server, uri, """
             includeConfig 'extra.config'
             process.cpus = 2
             """);
-        service.updateNow();
-        var tokens = getTokens(service, uri);
+        var tokens = getTokens(server, uri);
 
         assertThat(tokens).isEmpty();
     }
 
     @Test
     void returnNullForFileThatHasNoAst() {
-        var service = getConfigService();
+        var server = TestServer.start();
 
-        assertThat(getTokens(service, getUri("not-open.config"))).isNull();
+        assertThat(getTokens(server, getUri("not-open.config"))).isNull();
     }
 
 }
