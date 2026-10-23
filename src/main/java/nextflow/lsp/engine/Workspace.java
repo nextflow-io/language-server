@@ -28,13 +28,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 
 import nextflow.lsp.ast.ProjectView;
 import nextflow.lsp.services.ErrorReportingMode;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.util.Logger;
 import nextflow.util.PathUtils;
+import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
 import org.eclipse.lsp4j.FileChangeType;
+import org.eclipse.lsp4j.FileEvent;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.MessageType;
 import org.eclipse.lsp4j.WorkspaceFolder;
@@ -61,6 +64,10 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
     static final Duration SLICE_BUDGET = Duration.ofMillis(100);
 
     static final String DEFAULT_PROJECT_NAME = "";
+
+    // extensions of watched files that are not managed, so a watcher
+    // event for any other unmanaged path may be for a directory
+    private static final Set<String> NOT_DIRECTORIES = Set.of("groovy", "jar", "json");
 
     private static final Logger log = Logger.getInstance();
 
@@ -485,18 +492,29 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         project.addedDuringWalk.clear();
         var id = project.id;
         var root = project.root;
-        var patterns = List.copyOf(configuration.excludePatterns());
-        var innerRoots = project.innerRoots;
+        var excluded = walkExclusions(project);
         var files = engine.environment().files();
         engine.submitIo("walk " + root, () -> {
             try {
-                var result = files.walk(root, (path) -> innerRoots.contains(path) || PathUtils.isExcluded(path, patterns), FileKind::isManaged);
+                var result = files.walk(root, excluded, FileKind::isManaged);
                 return new Event.WalkDone(id, generation, result, null);
             }
             catch( IOException e ) {
                 return new Event.WalkDone(id, generation, null, e);
             }
         });
+    }
+
+    /**
+     * Get the paths that a walk of the project skips: excluded paths
+     * and nested workspace folders. Safe to use on any thread.
+     *
+     * @param project
+     */
+    private Predicate<Path> walkExclusions(Project project) {
+        var patterns = List.copyOf(configuration.excludePatterns());
+        var innerRoots = project.innerRoots;
+        return (path) -> innerRoots.contains(path) || PathUtils.isExcluded(path, patterns);
     }
 
     private void onWalkDone(Event.WalkDone event) {
@@ -620,12 +638,17 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
             var path = Path.of(uri);
             var fileName = path.getFileName() != null ? path.getFileName().toString() : "";
             for( var project : folders ) {
-                if( path.startsWith(project.root.resolve("lib")) )
-                    libChanged(project, fileName.endsWith(".jar"));
+                var lib = project.root.resolve("lib");
+                if( path.startsWith(lib) )
+                    libChanged(project, fileName.endsWith(".jar") || path.equals(lib));
             }
             if( "nextflow_schema.json".equals(fileName) ) {
                 schemaStamps.merge(path.getParent(), 1L, Long::sum);
                 projects().forEach(Project::markDirty);
+            }
+            if( !FileKind.isManaged(path) && !NOT_DIRECTORIES.contains(extension(fileName)) ) {
+                directoryChanged(path, change.getType());
+                continue;
             }
             if( !FileKind.isManaged(path) || documents.isOpen(uri) )
                 continue;
@@ -645,6 +668,56 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
             bumpAll(uri);
         }
         scheduleEdit();
+    }
+
+    private static String extension(String fileName) {
+        var dot = fileName.lastIndexOf('.');
+        return dot >= 0 ? fileName.substring(dot + 1) : "";
+    }
+
+    /**
+     * Handle a watcher event that may be for a directory, since some
+     * clients report only the directory when it is deleted or moved.
+     * A deleted directory deletes every file under it, and the files
+     * under a created directory are discovered with a walk.
+     *
+     * @param path
+     * @param type
+     */
+    private void directoryChanged(Path path, FileChangeType type) {
+        var documents = engine.documents();
+        if( type == FileChangeType.Deleted ) {
+            for( var project : projects() ) {
+                for( var entry : project.entries() ) {
+                    if( entry.path.startsWith(path) && !documents.isOpen(entry.uri) )
+                        project.bumpText(entry);
+                }
+            }
+            return;
+        }
+        if( type != FileChangeType.Created )
+            return;
+        var project = projectFor(path);
+        if( project.isDefault() || project.isExcluded(path) )
+            return;
+        var excluded = walkExclusions(project);
+        var files = engine.environment().files();
+        engine.submitIo("walk " + path, () -> {
+            List<Path> result;
+            try {
+                result = files.walk(path, excluded, FileKind::isManaged);
+            }
+            catch( IOException e ) {
+                // not a directory, or deleted since
+                return null;
+            }
+            if( result.isEmpty() )
+                return null;
+            var created = result.stream()
+                .map(file -> new FileEvent(file.toUri().toString(), FileChangeType.Created))
+                .toList();
+            return new Event.WatchedFiles(new DidChangeWatchedFilesParams(created));
+        });
     }
 
     private static void noteAdded(Project project, URI uri) {

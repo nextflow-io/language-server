@@ -15,12 +15,16 @@
  */
 package nextflow.lsp.engine;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.ast.ProjectView;
+import org.eclipse.lsp4j.FileChangeType;
 import org.eclipse.lsp4j.MessageType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -393,6 +397,65 @@ class WorkspaceEventsTest {
             f.settle();
             assertThat(f.messages("new.nf")).isEmpty();
             assertThat(f.workspace().projects().get(0).size()).isZero();
+        }
+    }
+
+    @Test
+    void deleteEveryFileOfADeletedDirectory() throws IOException {
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.watchers = true;
+            o.settle = false;
+        }) ) {
+            f.write("modules/a.nf", "workflow A { def x = 1 }\n");
+            f.write("modules/sub/b.nf", WITH_WARNING);
+            f.write("main.nf", """
+                include { A } from './modules/a.nf'
+                workflow {
+                    A()
+                }
+                """);
+            f.settle();
+            assertThat(f.messages("modules/a.nf")).containsExactly(UNUSED);
+
+            // the client reports only the directory
+            try( var paths = Files.walk(f.path("modules")) ) {
+                for( var path : paths.sorted(Comparator.reverseOrder()).toList() )
+                    Files.delete(path);
+            }
+            f.notify("modules", FileChangeType.Deleted);
+            f.settle();
+            assertThat(f.messages("modules/a.nf")).isEmpty();
+            assertThat(f.messages("modules/sub/b.nf")).isEmpty();
+            assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
+            assertThat(f.workspace().projects().get(0).entries()).extracting(FileEntry::uri).containsExactly(f.path("main.nf").toUri());
+        }
+    }
+
+    @Test
+    void discoverTheFilesOfACreatedDirectory() {
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.watchers = true;
+            o.settle = false;
+        }) ) {
+            f.write("main.nf", """
+                include { A } from './modules/a.nf'
+                workflow {
+                    A()
+                }
+                """);
+            f.settle();
+            assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
+
+            // the client reports only the directory
+            f.write("modules/a.nf", "workflow A { def x = 1 }\n");
+            f.write("modules/sub/b.nf", WITH_WARNING);
+            f.write("modules/work/c.nf", WITH_WARNING);
+            f.notify("modules", FileChangeType.Created);
+            f.settle();
+            assertThat(f.messages("main.nf")).isEmpty();
+            assertThat(f.messages("modules/a.nf")).containsExactly(UNUSED);
+            assertThat(f.messages("modules/sub/b.nf")).containsExactly(UNUSED);
+            assertThat(f.publishes("modules/work/c.nf")).isEmpty();
         }
     }
 
