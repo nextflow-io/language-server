@@ -73,6 +73,52 @@ class WorkspaceEventsTest {
     }
 
     @Test
+    void moveExcludedOpenDocumentToAnAddedFolder() {
+        try( var f = WorkspaceFixture.start((o) -> o.folders()) ) {
+            f.open("a/work/x.nf", WITH_WARNING);
+            f.settle();
+            assertThat(f.messages("a/work/x.nf")).containsExactly(UNUSED);
+
+            f.addFolder("a");
+            f.settle();
+            var uri = f.path("a/work/x.nf").toUri();
+            assertThat(f.workspace().defaultProject().entry(uri)).isNull();
+            assertThat(f.workspace().folder("a").get().entry(uri).isBuilt()).isTrue();
+            f.change("a/work/x.nf", "workflow {\n");
+            f.settle();
+            assertThat(f.messages("a/work/x.nf")).hasSize(1).doesNotContain(UNUSED);
+        }
+    }
+
+    @Test
+    void publishOpenExcludedFileOnlyWhileItIsOpen() {
+        try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
+            f.write("work/mod.nf", "workflow FOO { def x = 1 }\n");
+            f.write("main.nf", """
+                include { FOO } from './work/mod.nf'
+                workflow {
+                    FOO()
+                }
+                """);
+            f.settle();
+            // an included excluded file is loaded but not published
+            assertThat(f.workspace().projects().get(0).entry(f.path("work/mod.nf").toUri()).role()).isEqualTo(FileEntry.Role.DEPENDENCY);
+            assertThat(f.publishes("work/mod.nf")).isEmpty();
+
+            f.open("work/mod.nf", "workflow FOO { def x = 1 }\n");
+            f.settle();
+            assertThat(f.messages("work/mod.nf")).containsExactly(UNUSED);
+            assertThat(f.call(Need.FILE, "work/mod.nf", "empty", (context) -> "ran")).isEqualTo("ran");
+
+            f.close("work/mod.nf");
+            f.settle();
+            assertThat(f.messages("work/mod.nf")).isEmpty();
+            assertThat(f.messages("main.nf")).isEmpty();
+            assertThat(f.workspace().projects().get(0).entry(f.path("work/mod.nf").toUri()).role()).isEqualTo(FileEntry.Role.DEPENDENCY);
+        }
+    }
+
+    @Test
     void clearDiagnosticsOfRemovedFolder() {
         try( var f = WorkspaceFixture.start((o) -> {
             o.folders("a", "b");

@@ -234,7 +234,8 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         if( kind.isEmpty() )
             return Optional.empty();
         var project = projectFor(path);
-        if( project.isExcluded(path) )
+        // excludes apply to the scan, not to files that the client opened
+        if( project.isExcluded(path) && !engine.documents().isOpen(uri.get()) )
             return Optional.empty();
         return Optional.of(new WorkspaceRoute(spec.need(), List.of(project), project, uri.get(), kind.get()));
     }
@@ -316,7 +317,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
     public FileEntry owner(URI uri) {
         var path = Path.of(uri);
         var routed = projectFor(path);
-        if( routed.isExcluded(path) )
+        if( routed.isExcluded(path) && !engine.documents().isOpen(uri) )
             return null;
         var entry = routed.entry(uri);
         if( entry != null )
@@ -382,13 +383,11 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         folders.add(project);
         // open documents under the new folder move to it
         for( var openUri : engine.documents().uris() ) {
-            var path = Path.of(openUri);
-            if( projectFor(path) != project || project.isExcluded(path) )
+            if( projectFor(Path.of(openUri)) != project || project.getOrCreate(openUri, FileEntry.Role.WORKSPACE) == null )
                 continue;
-            project.getOrCreate(openUri, FileEntry.Role.WORKSPACE);
             var previous = defaultProject.entry(openUri);
             if( previous != null )
-                ledger.publish(releaseDefaultEntry(previous));
+                ledger.publish(release(defaultProject, previous));
         }
         return project;
     }
@@ -410,10 +409,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         for( var openUri : engine.documents().uris() ) {
             if( project.entry(openUri) == null )
                 continue;
-            var path = Path.of(openUri);
-            var target = projectFor(path);
-            if( target.entry(openUri) == null && !target.isExcluded(path) )
-                target.getOrCreate(openUri, FileEntry.Role.WORKSPACE);
+            projectFor(Path.of(openUri)).getOrCreate(openUri, FileEntry.Role.WORKSPACE).role = FileEntry.Role.WORKSPACE;
         }
         ledger.publish(touched);
     }
@@ -517,12 +513,8 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         if( !FileKind.isManaged(path) )
             return;
         bumpAll(uri);
-        var project = projectFor(path);
-        var entry = project.entry(uri);
-        if( entry == null && !project.isExcluded(path) )
-            project.getOrCreate(uri, FileEntry.Role.WORKSPACE);
-        else if( entry != null && project.isDefault() )
-            entry.role = FileEntry.Role.WORKSPACE;
+        // an open file is part of the project, even if it is excluded
+        projectFor(path).getOrCreate(uri, FileEntry.Role.WORKSPACE).role = FileEntry.Role.WORKSPACE;
         scheduleEdit();
     }
 
@@ -533,24 +525,29 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
     private void onClose(URI uri) {
         bumpAll(uri);
-        var entry = defaultProject.entry(uri);
-        if( entry != null )
-            ledger.publish(releaseDefaultEntry(entry));
+        var path = Path.of(uri);
+        var project = projectFor(path);
+        var entry = project.entry(uri);
+        if( entry != null && (project.isDefault() || project.isExcluded(path)) ) {
+            var released = new TreeSet<>(release(project, entry));
+            released.add(uri);
+            ledger.publish(released);
+        }
         scheduleEdit();
     }
 
     /**
-     * Drop a file from the default project, unless another file of
-     * the default project depends on it.
+     * Drop a file that is not part of the file set of a project,
+     * unless another file of the project depends on it.
      *
      * @return the URIs of the removed entries
      */
-    private Set<URI> releaseDefaultEntry(FileEntry entry) {
-        if( hasDependents(defaultProject, entry) ) {
+    private Set<URI> release(Project project, FileEntry entry) {
+        if( hasDependents(project, entry) ) {
             entry.role = FileEntry.Role.DEPENDENCY;
             return Set.of();
         }
-        return defaultProject.removeAndCollect(entry, engine.documents()::isOpen);
+        return project.removeAndCollect(entry, engine.documents()::isOpen);
     }
 
     private void bumpAll(URI uri) {

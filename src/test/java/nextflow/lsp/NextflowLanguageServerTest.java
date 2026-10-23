@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.Position;
@@ -87,6 +89,29 @@ class NextflowLanguageServerTest {
             server.settle();
             assertThat(server.diagnostics("main.nf")).isNotEmpty();
             assertThat(server.client().getAllDiagnostics()).doesNotContainKey(server.uri("work/ab/cdef/main.nf"));
+        }
+    }
+
+    @Test
+    void serveOpenFilesInExcludedDirectories() {
+        try( var server = TestServer.start() ) {
+            var text = "workflow HELLO {\n    def x = 1\n}\n";
+            server.write("work/ab/main.nf", text);
+            server.open("work/ab/main.nf", text);
+            var document = server.document("work/ab/main.nf");
+            var symbols = server.call((s) -> s.documentSymbol(new DocumentSymbolParams(document)));
+            assertThat(symbols).extracting(symbol -> symbol.getRight().getName()).containsExactly("workflow HELLO");
+            var hover = server.call((s) -> s.hover(new HoverParams(document, new Position(0, 10))));
+            assertThat(hover).isNotNull();
+            server.settle();
+            assertThat(server.diagnostics("work/ab/main.nf")).extracting(Diagnostic::getMessage).containsExactly("Variable was declared but not used");
+
+            // once closed, the file is excluded again
+            server.close("work/ab/main.nf");
+            server.settle();
+            assertThat(server.diagnostics("work/ab/main.nf")).isEmpty();
+            symbols = server.call((s) -> s.documentSymbol(new DocumentSymbolParams(document)));
+            assertThat(symbols).isEmpty();
         }
     }
 
