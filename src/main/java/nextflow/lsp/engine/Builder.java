@@ -164,13 +164,11 @@ final class Builder {
         final Set<PluginRef> pluginLookups = new LinkedHashSet<>();
         final List<PluginRef> pluginRefs = new ArrayList<>();
         boolean hasPluginInclude;
-        final Set<URI> previousDependencies;
 
         Parsed(FileEntry entry, long inputVersion, Integer documentVersion) {
             this.entry = entry;
             this.inputVersion = inputVersion;
             this.documentVersion = documentVersion;
-            this.previousDependencies = Set.copyOf(entry.depStamps.keySet());
         }
 
         boolean isAnalysable() {
@@ -252,8 +250,10 @@ final class Builder {
                 built.add(parsed.entry);
             }
 
-            commit(analysed, removed);
-            return new Result(built, collectGarbage(order, removed));
+            var previous = commit(analysed, removed);
+            var result = new TreeSet<URI>(removed);
+            result.addAll(project.collectGarbage(previous));
+            return new Result(built, result);
         }
 
         // -- unchanged files
@@ -591,8 +591,12 @@ final class Builder {
             if( !FileKind.isManaged(path) )
                 return;
             parsed.candidates.add(canonical.get());
-            if( workspace.engine().documents().isOpen(canonical.get()) || workspace.engine().environment().files().exists(path) )
+            if( isPresent(canonical.get()) )
                 parsed.targets.add(canonical.get());
+        }
+
+        private boolean isPresent(URI uri) {
+            return workspace.engine().documents().isOpen(uri) || workspace.engine().environment().files().exists(Path.of(uri));
         }
 
         /**
@@ -643,8 +647,7 @@ final class Builder {
                     var includeUri = getIncludeUri(unit.getSource().getURI(), node.source.getText());
                     if( !isIncludeLocal(includeUri) )
                         return;
-                    var path = Path.of(includeUri);
-                    if( !workspace.engine().documents().isOpen(includeUri) && !workspace.engine().environment().files().exists(path) )
+                    if( !isPresent(includeUri) )
                         addError("Invalid include source: '" + includeUri.getPath() + "'", node);
                 }
             };
@@ -813,20 +816,30 @@ final class Builder {
             return warnings != null ? List.copyOf(warnings) : List.of();
         }
 
-        private void commit(List<Parsed> analysed, Set<URI> removed) {
+        /**
+         * Record the results of the build in the project.
+         *
+         * @return the previous dependencies of the built and removed
+         *         entries, which may now be unreachable
+         */
+        private Set<URI> commit(List<Parsed> analysed, Set<URI> removed) {
             // stamps first, so that dependencies in the batch carry their new stamps
             for( var parsed : analysed )
                 parsed.entry.stamp = workspace.nextSeq();
+            var previous = new TreeSet<URI>();
             for( var uri : removed ) {
                 var entry = project.entry(uri);
-                if( entry != null )
-                    project.remove(entry);
+                if( entry == null )
+                    continue;
+                previous.addAll(entry.depStamps.keySet());
+                project.remove(entry);
             }
             for( var parsed : analysed ) {
                 var entry = parsed.entry;
                 var depStamps = new TreeMap<URI, Long>();
                 for( var candidate : parsed.candidates )
                     depStamps.put(candidate, project.stampOf(candidate));
+                previous.addAll(entry.depStamps.keySet());
                 project.graph.setEdges(entry.uri, entry.depStamps.keySet(), depStamps.keySet());
                 entry.depStamps = depStamps;
                 entry.builtInputVersion = parsed.inputVersion;
@@ -835,19 +848,7 @@ final class Builder {
                 entry.pluginRefs = List.copyOf(parsed.pluginRefs);
                 entry.pluginLookups = Set.copyOf(parsed.pluginLookups);
             }
-        }
-
-        /**
-         * Remove dependency-only entries that are no longer reachable,
-         * and return the URIs of every removed entry.
-         */
-        private Set<URI> collectGarbage(List<Parsed> order, Set<URI> removed) {
-            var candidates = new TreeSet<URI>();
-            for( var parsed : order )
-                candidates.addAll(parsed.previousDependencies);
-            var result = new TreeSet<URI>(removed);
-            result.addAll(project.collectGarbage(candidates));
-            return result;
+            return previous;
         }
 
         private void logInternalError(Parsed parsed, String step, Throwable e) {
