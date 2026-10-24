@@ -325,9 +325,7 @@ public final class Engine {
     void logError(String message, Throwable e) {
         var trace = new StringWriter();
         e.printStackTrace(new PrintWriter(trace));
-        System.err.println(message);
-        e.printStackTrace();
-        client.logMessage(new MessageParams(MessageType.Error, message + "\n" + trace));
+        log(MessageType.Error, message + "\n" + trace);
     }
 
     // -- events
