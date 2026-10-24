@@ -38,10 +38,17 @@ public interface EngineEnvironment {
     ExecutorService compilePool();
 
     /**
-     * Pool for blocking I/O (directory walks, registry requests).
-     * Results return to the engine as events.
+     * Pool for blocking file I/O (directory walks). Results return
+     * to the engine as events.
      */
     Executor ioExecutor();
+
+    /**
+     * Pool for plugin registry requests, separate from the IO pool so
+     * that slow requests don't delay walks. Results return to the
+     * engine as events.
+     */
+    Executor fetchExecutor();
 
     Clock clock();
 

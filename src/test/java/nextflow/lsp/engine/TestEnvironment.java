@@ -44,6 +44,9 @@ public final class TestEnvironment implements EngineEnvironment {
 
     private Executor ioExecutor = new DirectExecutorService();
 
+    // the IO executor if not set
+    private Executor fetchExecutor;
+
     private FileAccess files = FileAccess.system();
 
     private Function<String, PluginRegistryClient> registry = (url) -> (name, version) -> new PluginRegistryClient.NotFound();
@@ -57,6 +60,11 @@ public final class TestEnvironment implements EngineEnvironment {
 
     public TestEnvironment withIoExecutor(Executor ioExecutor) {
         this.ioExecutor = ioExecutor;
+        return this;
+    }
+
+    public TestEnvironment withFetchExecutor(Executor fetchExecutor) {
+        this.fetchExecutor = fetchExecutor;
         return this;
     }
 
@@ -98,6 +106,11 @@ public final class TestEnvironment implements EngineEnvironment {
     @Override
     public Executor ioExecutor() {
         return ioExecutor;
+    }
+
+    @Override
+    public Executor fetchExecutor() {
+        return fetchExecutor != null ? fetchExecutor : ioExecutor;
     }
 
     @Override

@@ -142,7 +142,7 @@ final class PluginSpecs {
     }
 
     private void fetch(PluginRef ref) {
-        engine.submitIo("plugin fetch " + refString(ref), () -> {
+        engine.submitFetch("plugin fetch " + refString(ref), () -> {
             PluginRegistryClient.Result result;
             try {
                 result = client.fetch(ref.name(), ref.version());

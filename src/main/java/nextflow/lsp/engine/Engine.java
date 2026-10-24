@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -223,9 +224,24 @@ public final class Engine {
      * @param work
      */
     public void submitIo(String description, Callable<Event> work) {
+        runOn(env.ioExecutor(), description, work);
+    }
+
+    /**
+     * Run a plugin registry request on the fetch pool, like
+     * {@link #submitIo}.
+     *
+     * @param description
+     * @param work
+     */
+    void submitFetch(String description, Callable<Event> work) {
+        runOn(env.fetchExecutor(), description, work);
+    }
+
+    private void runOn(Executor pool, String description, Callable<Event> work) {
         ioInFlight.incrementAndGet();
         try {
-            env.ioExecutor().execute(() -> {
+            pool.execute(() -> {
                 try {
                     var event = work.call();
                     if( event != null )
@@ -367,6 +383,8 @@ public final class Engine {
         env.compilePool().shutdownNow();
         if( env.ioExecutor() instanceof ExecutorService io )
             io.shutdownNow();
+        if( env.fetchExecutor() instanceof ExecutorService fetch )
+            fetch.shutdownNow();
         // tasks that are already queued still run, and fail their requests
         executor.shutdown();
     }

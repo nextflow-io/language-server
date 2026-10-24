@@ -36,6 +36,8 @@ public final class DefaultEngineEnvironment implements EngineEnvironment {
 
     private static final int IO_THREADS = 4;
 
+    private static final int FETCH_THREADS = 2;
+
     private final SerialExecutor engineExecutor = new ThreadSerialExecutor("nextflow-engine");
 
     private final ExecutorService compilePool = new ForkJoinPool(
@@ -45,6 +47,8 @@ public final class DefaultEngineEnvironment implements EngineEnvironment {
         false);
 
     private final ThreadPoolExecutor ioExecutor;
+
+    private final ThreadPoolExecutor fetchExecutor;
 
     private final FileAccess files;
 
@@ -60,12 +64,18 @@ public final class DefaultEngineEnvironment implements EngineEnvironment {
      */
     public DefaultEngineEnvironment(FileAccess files) {
         this.files = files;
-        ioExecutor = new ThreadPoolExecutor(
-            IO_THREADS, IO_THREADS,
+        this.ioExecutor = pool(IO_THREADS, "nextflow-io");
+        this.fetchExecutor = pool(FETCH_THREADS, "nextflow-fetch");
+    }
+
+    private static ThreadPoolExecutor pool(int threads, String prefix) {
+        var result = new ThreadPoolExecutor(
+            threads, threads,
             60, TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(),
-            daemonThreads("nextflow-io"));
-        ioExecutor.allowCoreThreadTimeOut(true);
+            daemonThreads(prefix));
+        result.allowCoreThreadTimeOut(true);
+        return result;
     }
 
     private static ThreadFactory daemonThreads(String prefix) {
@@ -90,6 +100,11 @@ public final class DefaultEngineEnvironment implements EngineEnvironment {
     @Override
     public Executor ioExecutor() {
         return ioExecutor;
+    }
+
+    @Override
+    public Executor fetchExecutor() {
+        return fetchExecutor;
     }
 
     @Override
