@@ -27,9 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
-import java.util.function.UnaryOperator;
 
-import nextflow.lsp.ast.ProjectView;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.util.Logger;
 import nextflow.util.PathUtils;
@@ -218,13 +216,13 @@ public final class Workspace implements EngineState {
         engine.checkEngineThread();
         plugins.retryFailed();
         if( spec.need() == Need.ALL )
-            return Optional.of(new WorkspaceRoute(spec.need(), projects(), null, null, null));
+            return Optional.of(new WorkspaceRoute(this, spec.need(), projects(), null, null, null));
         if( spec.uri() == null ) {
             if( spec.projectName() != null ) {
                 return folder(spec.projectName())
-                    .map(p -> new WorkspaceRoute(spec.need(), List.of(p), p, null, null));
+                    .map(p -> new WorkspaceRoute(this, spec.need(), List.of(p), p, null, null));
             }
-            return Optional.of(new WorkspaceRoute(spec.need(), List.of(), null, null, null));
+            return Optional.of(new WorkspaceRoute(this, spec.need(), List.of(), null, null, null));
         }
         var uri = Uris.canonical(spec.uri());
         if( uri.isEmpty() )
@@ -237,7 +235,7 @@ public final class Workspace implements EngineState {
         // excludes apply to the scan, not to files that the client opened
         if( project.isExcluded(path) && !engine.documents().isOpen(uri.get()) )
             return Optional.empty();
-        return Optional.of(new WorkspaceRoute(spec.need(), List.of(project), project, uri.get(), kind.get()));
+        return Optional.of(new WorkspaceRoute(this, spec.need(), List.of(project), project, uri.get(), kind.get()));
     }
 
     @Override
@@ -467,7 +465,7 @@ public final class Workspace implements EngineState {
                     startWalk(project);
             }
         }
-        scheduleBackground(Duration.ZERO);
+        engine.scheduleBackground(Duration.ZERO);
     }
 
     private void startWalk(Project project) {
@@ -509,7 +507,7 @@ public final class Workspace implements EngineState {
         if( event.error() != null ) {
             // keep the current file set, and retry on the next re-walk
             engine.logError("Failed to scan workspace folder " + project.root, event.error());
-            scheduleBackground(Duration.ZERO);
+            engine.scheduleBackground(Duration.ZERO);
             return;
         }
         var discovered = new TreeSet<URI>();
@@ -539,7 +537,7 @@ public final class Workspace implements EngineState {
         }
         project.addedDuringWalk.clear();
         ledger.publish(removed);
-        scheduleBackground(Duration.ZERO);
+        engine.scheduleBackground(Duration.ZERO);
     }
 
     private static boolean hasDependents(Project project, FileEntry entry) {
@@ -724,7 +722,7 @@ public final class Workspace implements EngineState {
         });
     }
 
-    private static void noteAdded(Project project, URI uri) {
+    static void noteAdded(Project project, URI uri) {
         if( project.index == Project.IndexStatus.WALKING )
             project.addedDuringWalk.add(uri);
     }
@@ -804,7 +802,7 @@ public final class Workspace implements EngineState {
                     project.bump(entry);
             }
         }
-        scheduleBackground(Duration.ZERO);
+        engine.scheduleBackground(Duration.ZERO);
     }
 
     // -- building
@@ -812,11 +810,7 @@ public final class Workspace implements EngineState {
     private void scheduleEdit() {
         // while indexing, background slices keep running without delay,
         // so that an edit doesn't pause indexing for the debounce period
-        scheduleBackground(isIndexing() ? Duration.ZERO : engine.debounce());
-    }
-
-    private void scheduleBackground(Duration delay) {
-        engine.scheduleBackground(delay);
+        engine.scheduleBackground(isIndexing() ? Duration.ZERO : engine.debounce());
     }
 
     /**
@@ -842,7 +836,7 @@ public final class Workspace implements EngineState {
         return false;
     }
 
-    private void markReadyIfDone(Project project) {
+    void markReadyIfDone(Project project) {
         if( project.index == Project.IndexStatus.BUILDING && project.isFresh() )
             project.index = Project.IndexStatus.READY;
     }
@@ -896,7 +890,7 @@ public final class Workspace implements EngineState {
      * without yielding. Each slice is committed as a whole, so the
      * build can stop between slices if the request is cancelled.
      */
-    private void buildClosure(Project project, Collection<FileEntry> roots, CancelChecker cancelChecker) {
+    void buildClosure(Project project, Collection<FileEntry> roots, CancelChecker cancelChecker) {
         for( int i = 0; i <= project.size() + 1; i++ ) {
             var live = roots.stream().filter(e -> project.entry(e.uri) == e).toList();
             var stale = project.staleClosure(live);
@@ -911,7 +905,7 @@ public final class Workspace implements EngineState {
      * Build every stale entry of a project, in slices, without
      * yielding, until done or the request is cancelled.
      */
-    private void buildAll(Project project, CancelChecker cancelChecker) {
+    void buildAll(Project project, CancelChecker cancelChecker) {
         for( int i = 0; i <= project.size() + 1; i++ ) {
             var stale = project.staleEntries(engine.documents().uris());
             if( stale.isEmpty() )
@@ -922,7 +916,7 @@ public final class Workspace implements EngineState {
         markReadyIfDone(project);
     }
 
-    private void updateProgress() {
+    void updateProgress() {
         var indexing = isIndexing();
         var done = 0;
         var total = 0;
@@ -935,103 +929,6 @@ public final class Workspace implements EngineState {
             }
         }
         progress.update(indexing, done, total);
-    }
-
-    // -- routing
-
-    private final class WorkspaceRoute implements Route {
-
-        private final Need need;
-
-        private final List<Project> targets;
-
-        private final Project project;
-
-        private final URI uri;
-
-        private final FileKind kind;
-
-        WorkspaceRoute(Need need, List<Project> targets, Project project, URI uri, FileKind kind) {
-            this.need = need;
-            this.targets = targets;
-            this.project = project;
-            this.uri = uri;
-            this.kind = kind;
-        }
-
-        @Override
-        public void prepare(CancelChecker cancelChecker) {
-            engine.checkEngineThread();
-            try {
-                switch( need ) {
-                    case FILE -> prepareFile(false, cancelChecker);
-                    case PROJECT_CONFIGS -> prepareFile(true, cancelChecker);
-                    case PROJECT, ALL -> targets.forEach(p -> buildAll(p, cancelChecker));
-                }
-            }
-            finally {
-                updateProgress();
-            }
-        }
-
-        private void prepareFile(boolean configs, CancelChecker cancelChecker) {
-            if( project == null )
-                return;
-            var roots = new ArrayList<FileEntry>();
-            if( configs ) {
-                // the main config is loaded on demand while the folder is walked
-                if( project.root != null )
-                    loadOnDemand(project, project.root.resolve(Builder.MAIN_CONFIG).toUri());
-                for( var entry : project.entries() ) {
-                    if( entry.kind == FileKind.CONFIG )
-                        roots.add(entry);
-                }
-            }
-            if( uri != null ) {
-                var entry = loadOnDemand(project, uri);
-                if( entry != null && !roots.contains(entry) )
-                    roots.add(entry);
-            }
-            buildClosure(project, roots, cancelChecker);
-            markReadyIfDone(project);
-        }
-
-        /**
-         * Get the entry of a file, and create it if it is not known
-         * yet. The build removes it if the file doesn't exist.
-         */
-        private FileEntry loadOnDemand(Project project, URI uri) {
-            var entry = project.entry(uri);
-            if( entry == null ) {
-                entry = project.getOrCreate(uri, project.isDefault() ? FileEntry.Role.DEPENDENCY : FileEntry.Role.WORKSPACE);
-                noteAdded(project, uri);
-            }
-            return entry;
-        }
-
-        @Override
-        public boolean isSatisfied() {
-            return targets.stream().allMatch(p -> p.isIndexed() && p.isFresh());
-        }
-
-        @Override
-        public boolean isIndexed() {
-            return targets.stream().allMatch(Project::isIndexed);
-        }
-
-        @Override
-        public RequestContext context(CancelChecker cancelChecker) {
-            var configuration = Workspace.this.configuration;
-            var view = project != null ? new ProjectHandle(engine, project, kind) : null;
-            var all = projects().stream()
-                .map(p -> (ProjectView) new ProjectHandle(engine, p, null))
-                .toList();
-            UnaryOperator<String> clientUri = (uri) -> Uris.canonical(uri)
-                .flatMap(engine.documents()::get)
-                .map(DocumentStore.OpenDocument::clientUri)
-                .orElse(uri);
-            return new RequestContext(configuration, view, all, cancelChecker, clientUri);
-        }
     }
 
 }
