@@ -73,7 +73,7 @@ abstract class EntryView implements AstView {
         if( entries == null ) {
             var result = new LinkedHashMap<URI, FileEntry>();
             for( var entry : project.builtEntries(kind) )
-                result.put(entry.uri(), entry);
+                result.put(entry.uri, entry);
             entries = Collections.unmodifiableMap(result);
         }
         return entries;
@@ -102,7 +102,7 @@ abstract class EntryView implements AstView {
     private FileEntry ownerOf(ASTNode node) {
         engine.checkEngineThread();
         var owner = project.ownerOf(node);
-        return owner != null && owner.kind() == kind ? owner : null;
+        return owner != null && owner.kind == kind ? owner : null;
     }
 
     @Override
@@ -114,14 +114,14 @@ abstract class EntryView implements AstView {
     public Collection<SourceUnit> getSourceUnits() {
         var result = new ArrayList<SourceUnit>();
         for( var entry : entries().values() )
-            result.add(entry.unit());
+            result.add(entry.unit);
         return result;
     }
 
     @Override
     public SourceUnit getSourceUnit(URI uri) {
         var entry = entry(uri);
-        return entry != null ? entry.unit() : null;
+        return entry != null ? entry.unit : null;
     }
 
     @Override
@@ -133,7 +133,7 @@ abstract class EntryView implements AstView {
     @Override
     public boolean hasErrors(URI uri) {
         var entry = entry(uri);
-        return entry != null && (!entry.errors().isEmpty() || entry.internalError() != null);
+        return entry != null && (!entry.errors.isEmpty() || entry.internalError != null);
     }
 
     @Override
@@ -144,13 +144,13 @@ abstract class EntryView implements AstView {
     @Override
     public List<SyntaxException> getErrors(URI uri) {
         var entry = entry(uri);
-        return entry != null ? entry.errors() : List.of();
+        return entry != null ? entry.errors : List.of();
     }
 
     @Override
     public List<WarningMessage> getWarnings(URI uri) {
         var entry = entry(uri);
-        return entry != null ? entry.warnings() : List.of();
+        return entry != null ? entry.warnings : List.of();
     }
 
     /**
@@ -167,20 +167,20 @@ abstract class EntryView implements AstView {
     public Collection<ASTNode> getNodes() {
         var result = new ArrayList<ASTNode>();
         for( var entry : entries().values() )
-            result.addAll(entry.nodes());
+            result.addAll(entry.nodes);
         return result;
     }
 
     @Override
     public Collection<ASTNode> getNodes(URI uri) {
         var entry = entry(uri);
-        return entry != null ? entry.nodes() : List.of();
+        return entry != null ? entry.nodes : List.of();
     }
 
     @Override
     public URI getURI(ASTNode node) {
         var owner = ownerOf(node);
-        return owner != null ? owner.uri() : null;
+        return owner != null ? owner.uri : null;
     }
 
     @Override
@@ -188,7 +188,7 @@ abstract class EntryView implements AstView {
         if( child == null )
             return null;
         var owner = ownerOf(child);
-        return owner != null ? owner.parents().get(child) : null;
+        return owner != null ? owner.parents.get(child) : null;
     }
 
     @Override
@@ -197,7 +197,7 @@ abstract class EntryView implements AstView {
         if( entry == null )
             return null;
         var nodeToRange = new HashMap<ASTNode, Range>();
-        return entry.nodes().stream()
+        return entry.nodes.stream()
             .filter((node) -> {
                 if( node.getLineNumber() == -1 )
                     return false;

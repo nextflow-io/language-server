@@ -28,7 +28,7 @@ import nextflow.lsp.ast.ScriptView;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public final class ProjectHandle implements ProjectView {
+final class ProjectHandle implements ProjectView {
 
     private final Engine engine;
 

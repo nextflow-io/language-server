@@ -50,7 +50,7 @@ final class ScriptEntryView extends EntryView implements ScriptView {
     public List<ScriptNode> getScriptNodes() {
         var result = new ArrayList<ScriptNode>();
         for( var entry : entries().values() ) {
-            if( entry.unit().getAST() instanceof ScriptNode sn )
+            if( entry.unit.getAST() instanceof ScriptNode sn )
                 result.add(sn);
         }
         return result;

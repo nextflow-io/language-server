@@ -194,7 +194,7 @@ public final class Engine {
     /**
      * Throw an IllegalStateException unless called on the engine thread.
      */
-    public void checkEngineThread() {
+    void checkEngineThread() {
         executor.checkThread();
     }
 
@@ -205,7 +205,7 @@ public final class Engine {
      *
      * @param delay
      */
-    public void scheduleBackground(Duration delay) {
+    void scheduleBackground(Duration delay) {
         checkEngineThread();
         if( shutdown )
             return;
@@ -224,7 +224,7 @@ public final class Engine {
      * @param description
      * @param work
      */
-    public void submitIo(String description, Callable<Event> work) {
+    void submitIo(String description, Callable<Event> work) {
         runOn(env.ioExecutor(), description, work);
     }
 

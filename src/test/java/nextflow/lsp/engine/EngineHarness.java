@@ -282,7 +282,7 @@ public final class EngineHarness implements AutoCloseable {
         var result = new TreeMap<String, Integer>();
         for( var project : workspace.projects() ) {
             for( var entry : project.entries() ) {
-                var path = root.relativize(Path.of(entry.uri())).toString().replace('\\', '/');
+                var path = root.relativize(Path.of(entry.uri)).toString().replace('\\', '/');
                 result.merge(path, entry.parses, Integer::sum);
             }
         }

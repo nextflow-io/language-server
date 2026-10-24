@@ -47,7 +47,7 @@ import org.codehaus.groovy.ast.ASTNode;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public final class Project {
+final class Project {
 
     enum IndexStatus {
         /** Waiting for the client to send `initialized`. */
@@ -101,29 +101,29 @@ public final class Project {
     /**
      * The workspace folder name, or "" for the default project.
      */
-    public String name() {
+    String name() {
         return name;
     }
 
     /**
      * The workspace folder, or null for the default project.
      */
-    public Path root() {
+    Path root() {
         return root;
     }
 
-    public boolean isDefault() {
+    boolean isDefault() {
         return root == null;
     }
 
-    public FileEntry entry(URI uri) {
+    FileEntry entry(URI uri) {
         return files.get(uri);
     }
 
     /**
      * Get every entry, sorted by URI.
      */
-    public List<FileEntry> entries() {
+    List<FileEntry> entries() {
         var result = new ArrayList<>(files.values());
         result.sort((a, b) -> a.uri.compareTo(b.uri));
         return result;
@@ -135,7 +135,7 @@ public final class Project {
      *
      * @param kind
      */
-    public List<FileEntry> builtEntries(FileKind kind) {
+    List<FileEntry> builtEntries(FileKind kind) {
         var result = new ArrayList<FileEntry>();
         for( var entry : entries() ) {
             if( entry.kind == kind && entry.unit != null )
@@ -150,7 +150,7 @@ public final class Project {
      *
      * @param node
      */
-    public FileEntry ownerOf(ASTNode node) {
+    FileEntry ownerOf(ASTNode node) {
         return node != null ? nodeOwner.get(node) : null;
     }
 

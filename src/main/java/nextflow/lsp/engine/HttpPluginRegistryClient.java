@@ -37,7 +37,7 @@ import static java.net.http.HttpResponse.BodyHandlers;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public class HttpPluginRegistryClient implements PluginRegistryClient {
+class HttpPluginRegistryClient implements PluginRegistryClient {
 
     private static Logger log = Logger.getInstance();
 
@@ -47,7 +47,7 @@ public class HttpPluginRegistryClient implements PluginRegistryClient {
 
     private HttpClient client;
 
-    public HttpPluginRegistryClient(String registryUrl) {
+    HttpPluginRegistryClient(String registryUrl) {
         this.registryUrl = registryUrl;
     }
 

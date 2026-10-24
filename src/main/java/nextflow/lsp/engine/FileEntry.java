@@ -41,9 +41,9 @@ import org.codehaus.groovy.syntax.SyntaxException;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public final class FileEntry {
+final class FileEntry {
 
-    public enum Role {
+    enum Role {
         /** Part of the project's file set (discovered, or open). */
         WORKSPACE,
         /** Loaded only because a managed file depends on it. */
@@ -109,62 +109,11 @@ public final class FileEntry {
         this.role = role;
     }
 
-    public URI uri() {
-        return uri;
-    }
-
-    public FileKind kind() {
-        return kind;
-    }
-
     /**
      * Whether the entry has been built at least once.
      */
-    public boolean isBuilt() {
+    boolean isBuilt() {
         return builtInputVersion != UNBUILT;
-    }
-
-    /**
-     * The source unit of the last build, or null if the entry has
-     * not been built.
-     */
-    public SourceUnit unit() {
-        return unit;
-    }
-
-    /**
-     * The errors of the last build. Immutable.
-     */
-    public List<SyntaxException> errors() {
-        return errors;
-    }
-
-    /**
-     * The warnings of the last build. Immutable.
-     */
-    public List<WarningMessage> warnings() {
-        return warnings;
-    }
-
-    /**
-     * The indexed AST nodes of the last build. Immutable.
-     */
-    public List<ASTNode> nodes() {
-        return nodes;
-    }
-
-    /**
-     * The parent of each indexed AST node. Immutable.
-     */
-    public Map<ASTNode, ASTNode> parents() {
-        return parents;
-    }
-
-    /**
-     * The exception that interrupted the last build of this file, if any.
-     */
-    public Throwable internalError() {
-        return internalError;
     }
 
     @Override

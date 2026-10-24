@@ -140,7 +140,7 @@ public final class Workspace implements EngineState {
 
     // -- read API
 
-    public LanguageServerConfiguration configuration() {
+    LanguageServerConfiguration configuration() {
         return configuration;
     }
 
@@ -148,14 +148,14 @@ public final class Workspace implements EngineState {
      * Get every project: the workspace folders in folder order,
      * then the default project.
      */
-    public List<Project> projects() {
+    List<Project> projects() {
         var result = new ArrayList<Project>(folders.size() + 1);
         result.addAll(folders);
         result.add(defaultProject);
         return result;
     }
 
-    public Project defaultProject() {
+    Project defaultProject() {
         return defaultProject;
     }
 
@@ -164,7 +164,7 @@ public final class Workspace implements EngineState {
      *
      * @param name
      */
-    public Optional<Project> folder(String name) {
+    Optional<Project> folder(String name) {
         return folders.stream().filter(p -> p.name.equals(name)).findFirst();
     }
 
@@ -174,7 +174,7 @@ public final class Workspace implements EngineState {
      *
      * @param path
      */
-    public Project projectFor(Path path) {
+    Project projectFor(Path path) {
         Project result = defaultProject;
         for( var project : folders ) {
             if( project.contains(path) && (result.root == null || project.root.getNameCount() > result.root.getNameCount()) )
