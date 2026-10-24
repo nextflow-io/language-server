@@ -67,11 +67,4 @@ public interface EngineEnvironment {
      */
     IntConsumer exiter();
 
-    /**
-     * Create the production environment, with daemon threads.
-     */
-    static EngineEnvironment system() {
-        return new DefaultEngineEnvironment();
-    }
-
 }

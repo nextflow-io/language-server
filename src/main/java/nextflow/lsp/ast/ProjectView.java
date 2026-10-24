@@ -26,11 +26,6 @@ import java.util.Optional;
 public interface ProjectView {
 
     /**
-     * The workspace folder name, or "" for the default project.
-     */
-    String name();
-
-    /**
      * The scripts of the project, if the request file is a script,
      * or for project-wide requests.
      */

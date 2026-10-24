@@ -55,10 +55,6 @@ public class ScriptReferenceProvider implements ReferenceProvider, RenameProvide
 
     private CancelChecker cancelChecker;
 
-    public ScriptReferenceProvider(ScriptView ast) {
-        this(ast, () -> {});
-    }
-
     public ScriptReferenceProvider(ScriptView ast, CancelChecker cancelChecker) {
         this.ast = ast;
         this.cancelChecker = cancelChecker;

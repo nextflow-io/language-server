@@ -41,15 +41,6 @@ public interface ScriptView extends AstView {
     Path getProjectDir();
 
     /**
-     * Check whether a file has syntax errors.
-     *
-     * @param uri
-     */
-    boolean hasSyntaxErrors(URI uri);
-
-    List<ScriptNode> getScriptNodes();
-
-    /**
      * Get the AST of a script, or null if the script is unknown.
      *
      * @param uri

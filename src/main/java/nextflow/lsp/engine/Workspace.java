@@ -153,10 +153,6 @@ public final class Workspace implements EngineState {
         return result;
     }
 
-    Project defaultProject() {
-        return defaultProject;
-    }
-
     /**
      * Get the workspace folder with the given name.
      *

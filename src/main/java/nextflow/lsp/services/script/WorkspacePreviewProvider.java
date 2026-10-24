@@ -37,10 +37,6 @@ public class WorkspacePreviewProvider {
 
     private CancelChecker cancelChecker;
 
-    public WorkspacePreviewProvider(ScriptView ast) {
-        this(ast, () -> {});
-    }
-
     public WorkspacePreviewProvider(ScriptView ast, CancelChecker cancelChecker) {
         this.ast = ast;
         this.cancelChecker = cancelChecker;

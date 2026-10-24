@@ -45,8 +45,6 @@ public interface AstView {
      */
     Set<URI> getUris();
 
-    Collection<SourceUnit> getSourceUnits();
-
     /**
      * Get the source unit of a file, or null if the file is unknown.
      *
@@ -64,7 +62,12 @@ public interface AstView {
      */
     boolean hasErrors(URI uri);
 
-    boolean hasWarnings(URI uri);
+    /**
+     * Check whether a file has syntax errors.
+     *
+     * @param uri
+     */
+    boolean hasSyntaxErrors(URI uri);
 
     List<SyntaxException> getErrors(URI uri);
 

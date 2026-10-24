@@ -47,12 +47,6 @@ final class ProjectHandle implements ProjectView {
     }
 
     @Override
-    public String name() {
-        engine.checkEngineThread();
-        return project.name();
-    }
-
-    @Override
     public Optional<ScriptView> scripts() {
         return kind == null || kind == FileKind.SCRIPT ? Optional.of(scriptView()) : Optional.empty();
     }

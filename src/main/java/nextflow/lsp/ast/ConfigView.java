@@ -27,13 +27,6 @@ import nextflow.config.ast.ConfigNode;
 public interface ConfigView extends AstView {
 
     /**
-     * Check whether a file has syntax errors.
-     *
-     * @param uri
-     */
-    boolean hasSyntaxErrors(URI uri);
-
-    /**
      * Check whether a file has any unresolved includes.
      *
      * @param uri

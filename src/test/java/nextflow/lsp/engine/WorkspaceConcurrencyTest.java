@@ -131,7 +131,7 @@ class WorkspaceConcurrencyTest {
         };
         var f = TestServer.start((o) -> o.settle = false);
         writeWorkspace(f);
-        var env = EngineEnvironment.system();
+        var env = new DefaultEngineEnvironment();
         var engine = new Engine(env, client, Duration.ofMillis(5), Workspace.factory(8));
         try {
             var params = new InitializeParams();

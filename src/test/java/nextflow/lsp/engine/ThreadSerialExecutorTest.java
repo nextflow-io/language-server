@@ -71,7 +71,7 @@ class ThreadSerialExecutorTest {
 
     @Test
     void stopTheEngineThreadOnShutdown() throws Exception {
-        var env = EngineEnvironment.system();
+        var env = new DefaultEngineEnvironment();
         try {
             var engine = new Engine(env, new TestLanguageClient(), Engine.DEFAULT_DEBOUNCE, FakeState::new);
             var spec = new RequestSpec("test", null, null, Need.FILE, false);
@@ -91,7 +91,7 @@ class ThreadSerialExecutorTest {
 
     @Test
     void runRequestsOnTheEngineThreadOfTheSystemEnvironment() throws Exception {
-        var env = EngineEnvironment.system();
+        var env = new DefaultEngineEnvironment();
         try {
             var engine = new Engine(env, new TestLanguageClient(), Engine.DEFAULT_DEBOUNCE, FakeState::new);
             var spec = new RequestSpec("test", null, null, Need.FILE, false);

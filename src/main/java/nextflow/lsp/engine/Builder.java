@@ -779,7 +779,6 @@ final class Builder {
             project.unindex(entry);
             entry.unit = parsed.unit;
             entry.builtText = parsed.unit != null ? parsed.text : null;
-            entry.internalError = parsed.internalError;
             entry.errors = parsed.unit != null ? errors(parsed.unit) : List.of();
             entry.warnings = parsed.unit != null ? warnings(parsed.unit) : List.of();
             contained(parsed, "indexing", () -> {

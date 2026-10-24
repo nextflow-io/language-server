@@ -18,6 +18,7 @@ package nextflow.lsp.engine;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -154,15 +155,15 @@ class ProjectViewTest {
         f.write("main.nf", MAIN);
         f.write("mod.nf", MOD);
         f.settle();
-        var names = f.call(Need.ALL, null, List.<String>of(), (context) -> {
-            var result = new ArrayList<String>();
+        var roots = f.call(Need.ALL, null, List.<Path>of(), (context) -> {
+            var result = new ArrayList<Path>();
             for( var project : context.allProjects() ) {
                 assertThat(project.scripts()).isPresent();
-                result.add(project.name());
+                result.add(project.scripts().get().getProjectDir());
             }
             return result;
         });
-        assertThat(names).containsExactly("root", "");
+        assertThat(roots).containsExactly(TestWorkspace.root(), null);
     }
 
     @Test

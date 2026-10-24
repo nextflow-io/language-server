@@ -115,17 +115,6 @@ public class LanguageServerASTUtils {
     }
 
     /**
-     * Get the ast nodes corresponding to references of a node.
-     *
-     * @param node
-     * @param ast
-     * @param includeDeclaration
-     */
-    public static Iterator<ASTNode> getReferences(ASTNode node, AstView ast, boolean includeDeclaration) {
-        return getReferences(node, ast, includeDeclaration, () -> {});
-    }
-
-    /**
      * Get the ast nodes corresponding to references of a node,
      * checking for cancellation every 1,024 nodes.
      *

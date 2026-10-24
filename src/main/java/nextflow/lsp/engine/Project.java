@@ -97,20 +97,6 @@ final class Project {
 
     // -- read API
 
-    /**
-     * The workspace folder name, or "" for the default project.
-     */
-    String name() {
-        return name;
-    }
-
-    /**
-     * The workspace folder, or null for the default project.
-     */
-    Path root() {
-        return root;
-    }
-
     boolean isDefault() {
         return root == null;
     }

@@ -66,10 +66,10 @@ class WorkspaceEventsTest {
     void routeToTheInnermostFolderBySegment() {
         var f = TestServer.start((o) -> o.folders("a", "a/inner", "a/foo"));
         var workspace = f.workspace();
-        assertThat(workspace.projectFor(f.path("a/main.nf")).name()).isEqualTo("a");
-        assertThat(workspace.projectFor(f.path("a/inner/main.nf")).name()).isEqualTo("a/inner");
-        assertThat(workspace.projectFor(f.path("a/foo/main.nf")).name()).isEqualTo("a/foo");
-        assertThat(workspace.projectFor(f.path("a/foobar/main.nf")).name()).isEqualTo("a");
+        assertThat(workspace.projectFor(f.path("a/main.nf")).name).isEqualTo("a");
+        assertThat(workspace.projectFor(f.path("a/inner/main.nf")).name).isEqualTo("a/inner");
+        assertThat(workspace.projectFor(f.path("a/foo/main.nf")).name).isEqualTo("a/foo");
+        assertThat(workspace.projectFor(f.path("a/foobar/main.nf")).name).isEqualTo("a");
         assertThat(workspace.projectFor(f.path("b/main.nf")).isDefault()).isTrue();
     }
 
@@ -135,7 +135,7 @@ class WorkspaceEventsTest {
         f.addFolder("a");
         f.settle();
         var path = f.path("a/main.nf");
-        assertThat(f.workspace().projectFor(path).name()).isEqualTo("a");
+        assertThat(f.workspace().projectFor(path).name).isEqualTo("a");
         assertThat(f.parses()).isEqualTo(Map.of("a/main.nf", 1));
         assertThat(f.publishes("a/main.nf")).noneMatch(List::isEmpty);
         assertThat(f.messages("a/main.nf")).containsExactly(UNUSED);
@@ -209,7 +209,7 @@ class WorkspaceEventsTest {
         assertThat(f.publishes("a/open.nf")).noneMatch(List::isEmpty);
         assertThat(f.messages("a/open.nf")).containsExactly(UNUSED);
         assertThat(f.messages("b/z.nf")).containsExactly(UNUSED);
-        assertThat(f.workspace().projects()).extracting(Project::name).containsExactly("b", "");
+        assertThat(f.workspace().projects()).extracting(p -> p.name).containsExactly("b", "");
         assertThat(f.engine().isIdle()).isTrue();
     }
 
@@ -713,7 +713,7 @@ class WorkspaceEventsTest {
     void rejectProjectAccessOutsideTheEngineThread() throws Exception {
         var f = TestServer.start();
         var view = f.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
-        assertThat(thrownOnAnotherThread(view::name)).isInstanceOf(IllegalStateException.class);
+        assertThat(thrownOnAnotherThread(view::configView)).isInstanceOf(IllegalStateException.class);
     }
 
 }

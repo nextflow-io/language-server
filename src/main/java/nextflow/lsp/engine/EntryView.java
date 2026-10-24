@@ -111,14 +111,6 @@ abstract class EntryView implements AstView {
     }
 
     @Override
-    public Collection<SourceUnit> getSourceUnits() {
-        var result = new ArrayList<SourceUnit>();
-        for( var entry : entries().values() )
-            result.add(entry.unit);
-        return result;
-    }
-
-    @Override
     public SourceUnit getSourceUnit(URI uri) {
         var entry = entry(uri);
         return entry != null ? entry.unit : null;
@@ -137,11 +129,6 @@ abstract class EntryView implements AstView {
     }
 
     @Override
-    public boolean hasWarnings(URI uri) {
-        return !getWarnings(uri).isEmpty();
-    }
-
-    @Override
     public List<SyntaxException> getErrors(URI uri) {
         var entry = entry(uri);
         return entry != null ? entry.errors : List.of();
@@ -153,11 +140,7 @@ abstract class EntryView implements AstView {
         return entry != null ? entry.warnings : List.of();
     }
 
-    /**
-     * Check whether a file has syntax errors.
-     *
-     * @param uri
-     */
+    @Override
     public boolean hasSyntaxErrors(URI uri) {
         return getErrors(uri).stream()
             .anyMatch(error -> error instanceof PhaseAware pa ? pa.getPhase() == Phases.SYNTAX : true);

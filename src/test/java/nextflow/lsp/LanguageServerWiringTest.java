@@ -30,7 +30,6 @@ import java.util.function.Predicate;
 
 import com.sun.net.httpserver.HttpServer;
 import nextflow.lsp.engine.DefaultEngineEnvironment;
-import nextflow.lsp.engine.Engine;
 import nextflow.lsp.engine.ForwardingFileAccess;
 import nextflow.lsp.engine.Workspace;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
@@ -160,7 +159,7 @@ class LanguageServerWiringTest {
 
         var toServer = Pipe.open();
         var toClient = Pipe.open();
-        var server = new NextflowLanguageServer(new DefaultEngineEnvironment(files), Engine.DEFAULT_DEBOUNCE, Workspace.factory());
+        var server = new NextflowLanguageServer(new DefaultEngineEnvironment(files), Workspace.factory());
         var serverLauncher = Launcher.createLauncher(
             server, LanguageClient.class,
             Channels.newInputStream(toServer.source()), Channels.newOutputStream(toClient.sink()));

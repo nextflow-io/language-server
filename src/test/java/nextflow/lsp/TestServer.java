@@ -117,7 +117,7 @@ public final class TestServer {
         this.env = options.environment != null
             ? options.environment
             : new TestEnvironment().withRegistry((url) -> registry);
-        this.server = new NextflowLanguageServer(env, Engine.DEFAULT_DEBOUNCE, (engine) -> workspace = (Workspace) Workspace.factory(options.maxSliceFiles).create(engine));
+        this.server = new NextflowLanguageServer(env, (engine) -> workspace = (Workspace) Workspace.factory(options.maxSliceFiles).create(engine));
         server.connect(options.client);
         this.harness = EngineHarness.attach(server.engine(), env, options.client);
     }

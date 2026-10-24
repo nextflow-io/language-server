@@ -46,8 +46,7 @@ final class ScriptEntryView extends EntryView implements ScriptView {
         return project.root;
     }
 
-    @Override
-    public List<ScriptNode> getScriptNodes() {
+    private List<ScriptNode> getScriptNodes() {
         var result = new ArrayList<ScriptNode>();
         for( var entry : entries().values() ) {
             if( entry.unit.getAST() instanceof ScriptNode sn )

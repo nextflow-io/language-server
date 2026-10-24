@@ -17,7 +17,6 @@ package nextflow.lsp;
 
 import java.net.URI;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -152,8 +151,6 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     private final EngineEnvironment environment;
 
-    private final Duration debounce;
-
     private final EngineState.Factory stateFactory;
 
     private volatile Engine engine;
@@ -161,20 +158,18 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     private volatile boolean shutdownReceived;
 
     public NextflowLanguageServer() {
-        this(new DefaultEngineEnvironment(), Engine.DEFAULT_DEBOUNCE, Workspace.factory());
+        this(new DefaultEngineEnvironment(), Workspace.factory());
     }
 
     /**
-     * Create a server with the given environment, debounce delay
-     * and engine state, for testing.
+     * Create a server with the given environment and engine state,
+     * for testing.
      *
      * @param environment
-     * @param debounce
      * @param stateFactory
      */
-    NextflowLanguageServer(EngineEnvironment environment, Duration debounce, EngineState.Factory stateFactory) {
+    NextflowLanguageServer(EngineEnvironment environment, EngineState.Factory stateFactory) {
         this.environment = environment;
-        this.debounce = debounce;
         this.stateFactory = stateFactory;
     }
 
@@ -277,7 +272,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         if( engine != null )
             throw new IllegalStateException("Language server is already connected to a client");
         log.initialize(client);
-        engine = new Engine(environment, client, debounce, stateFactory);
+        engine = new Engine(environment, client, Engine.DEFAULT_DEBOUNCE, stateFactory);
     }
 
     // -- TextDocumentService

@@ -91,10 +91,6 @@ public class ConfigPreviewProvider {
 
     private CancelChecker cancelChecker;
 
-    public ConfigPreviewProvider(ScriptView scriptAst, ConfigView configAst) {
-        this(scriptAst, configAst, () -> {});
-    }
-
     public ConfigPreviewProvider(ScriptView scriptAst, ConfigView configAst, CancelChecker cancelChecker) {
         this.scriptAst = scriptAst;
         this.configAst = configAst;
