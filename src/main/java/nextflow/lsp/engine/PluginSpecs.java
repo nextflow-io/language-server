@@ -28,7 +28,7 @@ import org.eclipse.lsp4j.MessageType;
 /**
  * Plugin specs fetched from a plugin registry.
  *
- * Specs are fetched asynchronously on the IO pool and cached per
+ * Specs are fetched asynchronously on the fetch pool and cached per
  * release, including releases that don't exist. A failed fetch is
  * retried at most once per {@link #RETRY_INTERVAL}. When a fetch
  * completes, the workspace bumps the files that looked it up.

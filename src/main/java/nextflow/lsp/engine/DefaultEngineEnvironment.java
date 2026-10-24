@@ -28,8 +28,8 @@ import java.util.function.IntConsumer;
 
 /**
  * Production environment: a dedicated engine thread, a read pool
- * with one thread per spare core, and a small IO pool. Every thread
- * is a daemon thread.
+ * with one thread per spare core, and small IO and fetch pools.
+ * Every thread is a daemon thread.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

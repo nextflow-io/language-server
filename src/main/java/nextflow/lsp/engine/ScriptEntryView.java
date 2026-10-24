@@ -42,8 +42,8 @@ final class ScriptEntryView extends EntryView implements ScriptView {
 
     @Override
     public Path getProjectDir() {
-        entries();
-        return project.root();
+        engine.checkEngineThread();
+        return project.root;
     }
 
     @Override

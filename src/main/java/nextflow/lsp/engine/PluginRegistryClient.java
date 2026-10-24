@@ -19,7 +19,7 @@ import nextflow.lsp.spec.PluginSpec;
 
 /**
  * Transport for fetching plugin specs from a plugin registry.
- * Called on the IO pool, so it may block.
+ * Called on the fetch pool, so it may block.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

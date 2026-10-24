@@ -51,7 +51,7 @@ import org.eclipse.lsp4j.util.Ranges;
  */
 abstract class EntryView implements AstView {
 
-    private final Engine engine;
+    protected final Engine engine;
 
     protected final Project project;
 
