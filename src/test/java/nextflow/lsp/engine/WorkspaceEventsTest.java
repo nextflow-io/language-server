@@ -210,16 +210,20 @@ class WorkspaceEventsTest {
             o.settle = false;
         }) ) {
             f.write("a/x.nf", WITH_WARNING);
-            f.write("a/y.nf", WITH_WARNING);
+            f.write("a/y.nf", "workflow {\n");
+            f.write("a/nextflow.config", "process {\n");
             f.write("b/z.nf", WITH_WARNING);
             f.open("a/open.nf", WITH_WARNING);
             f.settle();
             assertThat(f.messages("a/x.nf")).containsExactly(UNUSED);
+            assertThat(f.messages("a/y.nf")).isNotEmpty();
+            assertThat(f.messages("a/nextflow.config")).isNotEmpty();
 
             f.removeFolder("a");
             f.settle();
             assertThat(f.messages("a/x.nf")).isEmpty();
             assertThat(f.messages("a/y.nf")).isEmpty();
+            assertThat(f.messages("a/nextflow.config")).isEmpty();
             assertThat(f.publishes("a/x.nf")).hasSize(2);
             // the open document moves to the default project without flicker
             assertThat(f.publishes("a/open.nf")).noneMatch(List::isEmpty);

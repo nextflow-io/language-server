@@ -29,7 +29,6 @@ import org.eclipse.lsp4j.WorkDoneProgressEnd;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import static nextflow.lsp.TestUtils.UNUSED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -90,33 +89,6 @@ class IssueRegressionTest {
                 .extracting(Location::getUri)
                 .containsExactlyInAnyOrder(server.uri("modules/greet/main.nf"), server.uri("main.nf"), server.uri("main.nf"));
             assertThat(endedAtAnswer).containsExactly(true);
-        }
-    }
-
-    /**
-     * #108: editing an included module doesn't duplicate the warnings
-     * of the files that include it.
-     */
-    @Test
-    void noDuplicateWarningsAfterEditingAnIncludedModule() {
-        try( var server = TestServer.start() ) {
-            server.open("mod.nf", "workflow FOO {}\n");
-            server.open("main.nf", """
-                include { FOO } from './mod.nf'
-
-                workflow {
-                    def x = 1
-                    FOO()
-                }
-                """);
-            server.settle();
-            assertThat(server.messages("main.nf")).containsExactly(UNUSED);
-
-            for( int i = 0; i < 3; i++ ) {
-                server.change("mod.nf", "workflow FOO {}\n" + "// edit " + i + "\n");
-                server.settle();
-                assertThat(server.messages("main.nf")).containsExactly(UNUSED);
-            }
         }
     }
 

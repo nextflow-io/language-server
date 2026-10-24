@@ -155,6 +155,10 @@ class WorkspaceBuildTest {
         }
     }
 
+    /**
+     * #108: editing an included module doesn't duplicate the warnings
+     * of the files that include it.
+     */
     @Test
     void doNotDuplicateWarningsInDependentsWhenEditingAnIncludedModule() {
         try( var f = start() ) {

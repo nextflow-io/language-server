@@ -22,7 +22,6 @@ import org.eclipse.lsp4j.DocumentFormattingParams;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.FormattingOptions;
 import org.eclipse.lsp4j.HoverParams;
-import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SemanticTokensParams;
@@ -116,17 +115,6 @@ class DocumentUpdateTest {
             // the file is closed (it exists only in memory, not on disk)
             server.close("main.nf");
             assertThat(codeLensCount(server, "main.nf")).isEqualTo(0);
-        }
-    }
-
-    @Test
-    void keepUnsavedFileAfterIndexing() {
-        try( var server = TestServer.start((o) -> o.initialized = false) ) {
-            // the file is opened before the workspace is indexed, and is not on disk
-            server.open("new.nf", "workflow HELLO {\n}\n");
-            server.server().initialized(new InitializedParams());
-            server.settle();
-            assertThat(documentSymbolNames(server, "new.nf")).containsExactly("workflow HELLO");
         }
     }
 

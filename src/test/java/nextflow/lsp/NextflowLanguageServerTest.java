@@ -15,10 +15,7 @@
  */
 package nextflow.lsp;
 
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import nextflow.lsp.engine.QueuedExecutor;
 import nextflow.lsp.engine.TestEnvironment;
@@ -27,13 +24,9 @@ import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.ProgressParams;
-import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.eclipse.lsp4j.ReferenceContext;
 import org.eclipse.lsp4j.ReferenceParams;
 import org.eclipse.lsp4j.RenameParams;
-import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
-import org.eclipse.lsp4j.WorkDoneProgressEnd;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.junit.jupiter.api.Test;
@@ -152,44 +145,6 @@ class NextflowLanguageServerTest {
             server.server().initialized(new InitializedParams());
             server.settle();
             assertThat(server.client().getProgress().isEmpty()).isNotEqualTo(supported);
-        }
-    }
-
-    @Test
-    void endProgressOnlyAfterTheIndexIsComplete() {
-        var publishedAtEnd = new ArrayList<Set<String>>();
-        var published = new HashSet<String>();
-        var client = new TestLanguageClient() {
-            @Override
-            public void publishDiagnostics(PublishDiagnosticsParams params) {
-                super.publishDiagnostics(params);
-                published.add(params.getUri());
-            }
-
-            @Override
-            public void notifyProgress(ProgressParams params) {
-                super.notifyProgress(params);
-                if( params.getValue().getLeft() instanceof WorkDoneProgressEnd )
-                    publishedAtEnd.add(Set.copyOf(published));
-            }
-        };
-        try( var server = TestServer.start((o) -> {
-            o.client = client;
-            o.progress = true;
-            o.maxSliceFiles = 2;
-            o.initialized = false;
-        }) ) {
-            var files = new ArrayList<String>();
-            for( int i = 0; i < 7; i++ ) {
-                var path = "modules/mod" + i + ".nf";
-                server.write(path, "workflow MOD" + i + " { def x = 1 }\n");
-                files.add(server.uri(path));
-            }
-            server.server().initialized(new InitializedParams());
-            server.settle();
-            assertThat(client.getProgress()).first().isInstanceOf(WorkDoneProgressCreateParams.class);
-            assertThat(publishedAtEnd).hasSize(1);
-            assertThat(publishedAtEnd.get(0)).containsAll(files);
         }
     }
 

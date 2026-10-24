@@ -28,6 +28,7 @@ import java.util.function.Predicate;
 import nextflow.lsp.TestLanguageClient;
 import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
+import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.WorkDoneProgressBegin;
 import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
@@ -76,39 +77,6 @@ class WorkspaceIndexTest {
             }
         }
         return result;
-    }
-
-    @Test
-    void crossFileRequestWaitsForTheFullIndex() {
-        var io = new QueuedExecutor();
-        try( var f = TestServer.start((o) -> {
-            o.environment = new TestEnvironment().withIoExecutor(io);
-            o.progress = true;
-            o.settle = false;
-        }) ) {
-            f.write("modules/greet/main.nf", "workflow GREET {}\n");
-            f.write("main.nf", """
-                include { GREET } from './modules/greet/main.nf'
-                workflow {
-                    GREET()
-                }
-                """);
-            f.runPending();
-            f.open("modules/greet/main.nf", "workflow GREET {}\n");
-            var progressAtAnswer = new ArrayList<String>();
-            var references = f.send(Need.PROJECT, "modules/greet/main.nf", List.<URI>of(), (context) -> {
-                progressAtAnswer.addAll(progressKinds(f.client()));
-                return builtScripts(context);
-            });
-            f.runPending();
-            assertThat(references).isNotDone();
-
-            f.settle(io);
-            assertThat(references.join()).containsExactly(
-                URI.create(f.uri("main.nf")),
-                URI.create(f.uri("modules/greet/main.nf")));
-            assertThat(progressAtAnswer).last().isEqualTo("end");
-        }
     }
 
     @Test
@@ -295,6 +263,8 @@ class WorkspaceIndexTest {
             assertThat(f.messages("new.nf")).containsExactly(UNUSED);
             var scripts = f.call(Need.PROJECT, "main.nf", List.<URI>of(), WorkspaceIndexTest::builtScripts);
             assertThat(scripts).contains(URI.create(f.uri("new.nf")));
+            var symbols = f.call((s) -> s.documentSymbol(new DocumentSymbolParams(f.document("new.nf"))));
+            assertThat(symbols).extracting((symbol) -> symbol.getRight().getName()).containsExactly("workflow NEW");
         }
     }
 

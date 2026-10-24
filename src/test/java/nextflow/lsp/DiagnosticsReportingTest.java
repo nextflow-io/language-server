@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-
 package nextflow.lsp;
 
-import java.util.List;
 import java.util.Map;
 
 import nextflow.lsp.services.ErrorReportingMode;
@@ -105,26 +103,6 @@ class DiagnosticsReportingTest {
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).isNotEmpty();
         assertThat(diagnostics).allMatch(d -> "nextflow".equals(d.getSource()));
-    }
-
-    @Test
-    void clearDiagnosticsOfKnownFilesWhenTheirFolderIsRemoved() {
-        var client = new TestLanguageClient();
-        var server = TestServer.start((o) -> {
-            o.client = client;
-            o.folders("a");
-        });
-        server.writeAndNotify("a/nextflow.config", ERROR_SOURCE);
-        server.writeAndNotify("a/main.nf", "workflow {\n");
-        server.settle();
-        assertThat(server.diagnostics("a/nextflow.config")).isNotEmpty();
-        assertThat(server.diagnostics("a/main.nf")).isNotEmpty();
-
-        server.removeFolder("a");
-        server.settle();
-        assertThat(server.diagnostics("a/nextflow.config")).isEmpty();
-        assertThat(server.diagnostics("a/main.nf")).isEmpty();
-        assertThat(server.publishes("a/main.nf")).last().isEqualTo(List.of());
     }
 
 }
