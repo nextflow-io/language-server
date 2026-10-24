@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.ast.ProjectView;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.FileChangeType;
+import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.MessageType;
 import org.eclipse.lsp4j.WatchKind;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,32 @@ class WorkspaceEventsTest {
     static final String UNUSED = "Variable was declared but not used";
 
     static final String WITH_WARNING = "workflow { def x = 1 }\n";
+
+    @Test
+    void rejectWorkspaceAccessFromOtherThreads() throws Exception {
+        try( var f = WorkspaceFixture.start() ) {
+            var workspace = f.workspace();
+            var spec = new RequestSpec("test", f.uri("main.nf"), null, Need.FILE, false);
+            var errors = new ArrayList<Throwable>();
+            var thread = new Thread(() -> {
+                for( Runnable access : List.<Runnable>of(
+                    () -> workspace.apply(new Event.Initialized(new InitializedParams())),
+                    () -> workspace.route(spec),
+                    () -> workspace.runSlice()
+                ) ) {
+                    try {
+                        access.run();
+                    }
+                    catch( Throwable e ) {
+                        errors.add(e);
+                    }
+                }
+            });
+            thread.start();
+            thread.join();
+            assertThat(errors).hasSize(3).allMatch(e -> e instanceof IllegalStateException);
+        }
+    }
 
     @Test
     void routeToTheInnermostFolderBySegment() {

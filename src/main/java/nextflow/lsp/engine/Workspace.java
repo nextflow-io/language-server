@@ -51,7 +51,9 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
  * the background in slices: immediately while a project is
  * indexing, and after the debounce delay otherwise.
  *
- * Engine-confined: every method is called on the engine thread.
+ * Engine-confined: every method is called on the engine thread,
+ * which the entry points assert. {@link Project}, {@link Builder} and
+ * {@link FileEntry} are reached only through them.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -174,6 +176,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
     @Override
     public void apply(Event event) {
+        engine.checkEngineThread();
         if( event instanceof Event.Init e )
             onInit(e.params());
         else if( event instanceof Event.Initialized )
@@ -201,6 +204,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
     @Override
     public Optional<Route> route(RequestSpec spec) {
+        engine.checkEngineThread();
         plugins.retryFailed();
         if( spec.need() == Need.ALL )
             return Optional.of(new WorkspaceRoute(spec.need(), projects(), null, null, null));
@@ -227,6 +231,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
     @Override
     public boolean runSlice() {
+        engine.checkEngineThread();
         plugins.retryFailed();
         var open = engine.documents().uris();
         for( var project : projects() ) {
@@ -937,6 +942,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
         @Override
         public void prepare(CancelChecker cancelChecker) {
+            engine.checkEngineThread();
             try {
                 switch( need ) {
                     case FILE -> prepareFile(false, false, cancelChecker);
