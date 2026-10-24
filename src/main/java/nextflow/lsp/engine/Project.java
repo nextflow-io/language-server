@@ -250,6 +250,16 @@ final class Project {
     void remove(FileEntry entry) {
         if( files.remove(entry.uri) == null )
             return;
+        releaseBuild(entry);
+    }
+
+    /**
+     * Release the AST of an entry and its dependency edges, so that
+     * nothing still reaches the previous build.
+     *
+     * @param entry
+     */
+    void releaseBuild(FileEntry entry) {
         compilerFor(entry.kind).getSources().remove(entry.uri);
         unindex(entry);
         entry.unit = null;

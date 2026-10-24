@@ -132,15 +132,12 @@ final class Builder {
         for( var entry : batch ) {
             if( project.entry(entry.uri) != entry )
                 continue;
-            project.compilerFor(entry.kind).getSources().remove(entry.uri);
-            project.unindex(entry);
-            entry.unit = null;
+            project.releaseBuild(entry);
             entry.builtText = null;
             entry.otherInputChanged = false;
             entry.errors = List.of();
             entry.warnings = List.of();
             entry.internalError = error;
-            project.graph.setEdges(entry.uri, entry.depStamps.keySet(), List.of());
             entry.depStamps = Map.of();
             entry.pluginLookups = Set.of();
             entry.stamp = workspace.nextSeq();
@@ -480,8 +477,7 @@ final class Builder {
                     entry = project.getOrCreate(target, roleFor(Path.of(target)));
                 if( entry == null || batch.containsKey(target) )
                     continue;
-                if( entry.isBuilt() && project.isFresh(entry) )
-                    continue;
+                // a stale target is a member of its own stale closure
                 for( var component : project.staleClosure(List.of(entry)) ) {
                     for( var stale : component ) {
                         if( !batch.containsKey(stale.uri) ) {
@@ -489,10 +485,6 @@ final class Builder {
                             next.add(stale);
                         }
                     }
-                }
-                if( !batch.containsKey(target) ) {
-                    batch.put(target, null);
-                    next.add(entry);
                 }
             }
             // an entry whose file no longer exists is removed by the build
