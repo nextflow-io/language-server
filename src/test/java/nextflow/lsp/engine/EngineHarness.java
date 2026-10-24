@@ -59,7 +59,6 @@ public final class EngineHarness implements AutoCloseable {
     public static final class Options {
         TestEnvironment environment;
         TestLanguageClient client = new TestLanguageClient();
-        Duration debounce = Engine.DEFAULT_DEBOUNCE;
 
         public Options environment(TestEnvironment value) {
             environment = value;
@@ -68,11 +67,6 @@ public final class EngineHarness implements AutoCloseable {
 
         public Options client(TestLanguageClient value) {
             client = value;
-            return this;
-        }
-
-        public Options debounce(Duration value) {
-            debounce = value;
             return this;
         }
     }
@@ -88,7 +82,7 @@ public final class EngineHarness implements AutoCloseable {
     private EngineHarness(Options options, EngineState.Factory stateFactory) {
         this.env = options.environment != null ? options.environment : new TestEnvironment();
         this.client = options.client;
-        this.engine = new Engine(env, client, options.debounce, stateFactory);
+        this.engine = new Engine(env, client, Engine.DEFAULT_DEBOUNCE, stateFactory);
     }
 
     private EngineHarness(TestEnvironment env, TestLanguageClient client, Engine engine) {

@@ -58,8 +58,6 @@ public final class ManualExecutor implements SerialExecutor {
 
     private long seq;
 
-    private long executed;
-
     private boolean shutdown;
 
     public ManualExecutor(FakeClock clock) {
@@ -116,7 +114,6 @@ public final class ManualExecutor implements SerialExecutor {
             if( next == null || next.due.isAfter(clock.instant()) )
                 return false;
             queue.poll();
-            executed++;
         }
         next.task.run();
         return true;
@@ -168,20 +165,9 @@ public final class ManualExecutor implements SerialExecutor {
         return true;
     }
 
-    public synchronized Optional<Instant> nextDue() {
+    private synchronized Optional<Instant> nextDue() {
         var next = queue.peek();
         return next != null ? Optional.of(next.due) : Optional.empty();
-    }
-
-    public synchronized int pendingCount() {
-        return queue.size();
-    }
-
-    /**
-     * The number of tasks run so far.
-     */
-    public synchronized long executedCount() {
-        return executed;
     }
 
     private void checkOwner() {

@@ -17,7 +17,6 @@
 package nextflow.lsp.engine;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -44,12 +43,6 @@ public final class FakeClock extends Clock {
     @Override
     public Instant instant() {
         return now;
-    }
-
-    public void advance(Duration duration) {
-        if( duration.isNegative() )
-            throw new IllegalArgumentException("Cannot move the clock backwards");
-        now = now.plus(duration);
     }
 
     public void set(Instant instant) {

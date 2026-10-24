@@ -85,7 +85,6 @@ public final class TestServer implements AutoCloseable {
         public boolean settle = true;
         /** Settings sent with didChangeConfiguration after initialized, as dotted keys. */
         public Map<String, Object> settings = Map.of();
-        public Duration debounce = Engine.DEFAULT_DEBOUNCE;
         public int maxSliceFiles = 64;
         public PluginRegistryClient registry = new FixtureRegistry();
         public TestEnvironment environment;
@@ -115,7 +114,7 @@ public final class TestServer implements AutoCloseable {
         this.env = options.environment != null
             ? options.environment
             : new TestEnvironment().withRegistry((url) -> registry);
-        this.server = new NextflowLanguageServer(env, options.debounce, (engine) -> workspace = (Workspace) Workspace.factory(options.maxSliceFiles).create(engine));
+        this.server = new NextflowLanguageServer(env, Engine.DEFAULT_DEBOUNCE, (engine) -> workspace = (Workspace) Workspace.factory(options.maxSliceFiles).create(engine));
         server.connect(options.client);
         this.harness = EngineHarness.attach(server.engine(), env, options.client);
     }

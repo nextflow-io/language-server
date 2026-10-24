@@ -62,7 +62,6 @@ final class WorkspaceFixture implements AutoCloseable {
         boolean initialized = true;
         boolean settle = true;
         int maxSliceFiles = Workspace.DEFAULT_MAX_SLICE_FILES;
-        Duration debounce = Engine.DEFAULT_DEBOUNCE;
         TestEnvironment environment = new TestEnvironment();
         TestLanguageClient client = new TestLanguageClient();
 
@@ -79,7 +78,7 @@ final class WorkspaceFixture implements AutoCloseable {
     private WorkspaceFixture(Options options) {
         this.harness = EngineHarness.start(
             (engine) -> workspace = (Workspace) Workspace.factory(options.maxSliceFiles).create(engine),
-            (o) -> o.environment(options.environment).client(options.client).debounce(options.debounce));
+            (o) -> o.environment(options.environment).client(options.client));
     }
 
     static WorkspaceFixture start() {
