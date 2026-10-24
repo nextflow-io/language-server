@@ -16,6 +16,7 @@
 package nextflow.lsp.engine;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import nextflow.lsp.ast.ProjectView;
 import nextflow.lsp.services.LanguageServerConfiguration;
@@ -25,36 +26,22 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
  * What a request body can see. Valid only during the request body
  * and only on the engine thread.
  *
+ * @param configuration
+ * @param project the project that the request routes to, or null for
+ *   requests that are not tied to a project
+ * @param allProjects every project, in folder order
+ * @param cancelChecker throws a CancellationException once the request
+ *   is cancelled
+ * @param clientUri maps a URI to the URI that the client uses for the
+ *   file: the URI that it opened the document with, if it is open,
+ *   otherwise the given URI
+ *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public interface RequestContext {
-
-    LanguageServerConfiguration configuration();
-
-    /**
-     * The project that the request routes to, or null for
-     * requests that are not tied to a project.
-     */
-    ProjectView project();
-
-    /**
-     * Every project, in folder order.
-     */
-    List<ProjectView> allProjects();
-
-    /**
-     * Throws a CancellationException once the request is cancelled.
-     */
-    CancelChecker cancelChecker();
-
-    /**
-     * Get the URI that the client uses for a file: the URI that it
-     * opened the document with, if it is open, otherwise the given URI.
-     *
-     * @param uri
-     */
-    default String clientUri(String uri) {
-        return uri;
-    }
-
-}
+public record RequestContext(
+    LanguageServerConfiguration configuration,
+    ProjectView project,
+    List<ProjectView> allProjects,
+    CancelChecker cancelChecker,
+    UnaryOperator<String> clientUri
+) {}

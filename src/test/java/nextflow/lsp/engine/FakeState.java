@@ -21,8 +21,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
-import nextflow.lsp.ast.ProjectView;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
@@ -129,27 +129,7 @@ final class FakeState implements EngineState {
 
         @Override
         public RequestContext context(CancelChecker cancelChecker) {
-            return new RequestContext() {
-                @Override
-                public LanguageServerConfiguration configuration() {
-                    return LanguageServerConfiguration.defaults();
-                }
-
-                @Override
-                public ProjectView project() {
-                    return null;
-                }
-
-                @Override
-                public List<ProjectView> allProjects() {
-                    return List.of();
-                }
-
-                @Override
-                public CancelChecker cancelChecker() {
-                    return cancelChecker;
-                }
-            };
+            return new RequestContext(LanguageServerConfiguration.defaults(), null, List.of(), cancelChecker, UnaryOperator.identity());
         }
     }
 

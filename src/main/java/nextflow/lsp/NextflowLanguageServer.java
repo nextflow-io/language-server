@@ -310,7 +310,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/prepareCallHierarchy", textDocument.getUri(), null, (ctx) ->
             ctx.project().scripts()
-                .map(ast -> ClientUris.items(new ScriptCallHierarchyProvider(ast).prepare(textDocument, params.getPosition()), ctx::clientUri))
+                .map(ast -> ClientUris.items(new ScriptCallHierarchyProvider(ast).prepare(textDocument, params.getPosition()), ctx.clientUri()))
                 .orElse(Collections.emptyList()));
     }
 
@@ -321,7 +321,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             return CompletableFuture.completedFuture(Collections.emptyList());
         return request("callHierarchy/incomingCalls", item.getUri(), null, Need.PROJECT, true, null, (ctx) ->
             ctx.project().scripts()
-                .map(ast -> ClientUris.incoming(new ScriptCallHierarchyProvider(ast, ctx.cancelChecker()).incomingCalls(item), ctx::clientUri))
+                .map(ast -> ClientUris.incoming(new ScriptCallHierarchyProvider(ast, ctx.cancelChecker()).incomingCalls(item), ctx.clientUri()))
                 .orElse(Collections.emptyList()));
     }
 
@@ -330,7 +330,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var item = ClientUris.canonical(params.getItem());
         return fileRequest("callHierarchy/outgoingCalls", item.getUri(), null, (ctx) ->
             ctx.project().scripts()
-                .map(ast -> ClientUris.outgoing(new ScriptCallHierarchyProvider(ast).outgoingCalls(item), ctx::clientUri))
+                .map(ast -> ClientUris.outgoing(new ScriptCallHierarchyProvider(ast).outgoingCalls(item), ctx.clientUri()))
                 .orElse(Collections.emptyList()));
     }
 
@@ -342,7 +342,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         return fileRequest("textDocument/codeAction", textDocument.getUri(), Collections.emptyList(), (ctx) ->
             ctx.project().scripts()
                 .map(ast -> new ScriptCodeActionProvider(ast).codeAction(textDocument, params.getRange()).stream()
-                    .peek(action -> ClientUris.command(action.getCommand(), ctx::clientUri))
+                    .peek(action -> ClientUris.command(action.getCommand(), ctx.clientUri()))
                     .map(action -> Either.<Command,CodeAction>forRight(action))
                     .toList())
                 .orElse(Collections.emptyList()));
@@ -353,7 +353,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/codeLens", textDocument.getUri(), Collections.emptyList(), (ctx) ->
             ctx.project().scripts()
-                .<List<? extends CodeLens>>map(ast -> ClientUris.codeLenses(new ScriptCodeLensProvider(ast).codeLens(textDocument), ctx::clientUri))
+                .<List<? extends CodeLens>>map(ast -> ClientUris.codeLenses(new ScriptCodeLensProvider(ast).codeLens(textDocument), ctx.clientUri()))
                 .orElse(Collections.emptyList()));
     }
 
@@ -383,7 +383,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var textDocument = ClientUris.canonical(params.getTextDocument());
         return fileRequest("textDocument/definition", textDocument.getUri(), Either.forLeft(Collections.emptyList()), (ctx) ->
             ctx.project().scripts()
-                .map(ast -> ClientUris.definition(new ScriptDefinitionProvider(ast).definition(textDocument, params.getPosition()), ctx::clientUri))
+                .map(ast -> ClientUris.definition(new ScriptDefinitionProvider(ast).definition(textDocument, params.getPosition()), ctx.clientUri()))
                 .orElse(Either.forLeft(Collections.emptyList())));
     }
 
@@ -445,7 +445,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             return CompletableFuture.completedFuture(Collections.emptyList());
         return request("textDocument/references", textDocument.getUri(), null, Need.PROJECT, true, Collections.emptyList(), (ctx) ->
             ctx.project().scripts()
-                .<List<? extends Location>>map(ast -> ClientUris.locations(new ScriptReferenceProvider(ast, ctx.cancelChecker()).references(textDocument, params.getPosition(), params.getContext().isIncludeDeclaration()), ctx::clientUri))
+                .<List<? extends Location>>map(ast -> ClientUris.locations(new ScriptReferenceProvider(ast, ctx.cancelChecker()).references(textDocument, params.getPosition(), params.getContext().isIncludeDeclaration()), ctx.clientUri()))
                 .orElse(Collections.emptyList()));
     }
 
@@ -456,7 +456,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             return CompletableFuture.completedFuture(null);
         return request("textDocument/rename", textDocument.getUri(), null, Need.PROJECT, true, null, (ctx) ->
             ctx.project().scripts()
-                .map(ast -> ClientUris.edit(new ScriptReferenceProvider(ast, ctx.cancelChecker()).rename(textDocument, params.getPosition(), params.getNewName()), ctx::clientUri))
+                .map(ast -> ClientUris.edit(new ScriptReferenceProvider(ast, ctx.cancelChecker()).rename(textDocument, params.getPosition(), params.getNewName()), ctx.clientUri()))
                 .orElse(null));
     }
 
@@ -550,7 +550,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             var result = new LinkedHashSet<WorkspaceSymbol>();
             for( var project : ctx.allProjects() )
                 result.addAll(new ScriptSymbolProvider(project.scriptView(), ctx.cancelChecker()).symbol(query));
-            return Either.forRight(ClientUris.symbols(List.copyOf(result), ctx::clientUri));
+            return Either.forRight(ClientUris.symbols(List.copyOf(result), ctx.clientUri()));
         });
     }
 

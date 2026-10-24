@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 import nextflow.lsp.ast.ProjectView;
 import nextflow.lsp.services.LanguageServerConfiguration;
@@ -1025,35 +1026,11 @@ public final class Workspace implements EngineState {
             var all = projects().stream()
                 .map(p -> (ProjectView) new ProjectHandle(engine, p, null))
                 .toList();
-            return new RequestContext() {
-                @Override
-                public LanguageServerConfiguration configuration() {
-                    return configuration;
-                }
-
-                @Override
-                public ProjectView project() {
-                    return view;
-                }
-
-                @Override
-                public List<ProjectView> allProjects() {
-                    return all;
-                }
-
-                @Override
-                public CancelChecker cancelChecker() {
-                    return cancelChecker;
-                }
-
-                @Override
-                public String clientUri(String uri) {
-                    return Uris.canonical(uri)
-                        .flatMap(engine.documents()::get)
-                        .map(DocumentStore.OpenDocument::clientUri)
-                        .orElse(uri);
-                }
-            };
+            UnaryOperator<String> clientUri = (uri) -> Uris.canonical(uri)
+                .flatMap(engine.documents()::get)
+                .map(DocumentStore.OpenDocument::clientUri)
+                .orElse(uri);
+            return new RequestContext(configuration, view, all, cancelChecker, clientUri);
         }
     }
 
