@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.ast.ProjectView;
 import nextflow.lsp.ast.ScriptView;
@@ -68,7 +69,7 @@ class ProjectViewTest {
 
     @Test
     void showBuiltScriptsOfTheProject() {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             f.write("main.nf", MAIN);
             f.write("mod.nf", MOD);
             f.writeAndNotify("nextflow.config", "process.cpus = 1\n");
@@ -96,7 +97,7 @@ class ProjectViewTest {
 
     @Test
     void iterateEveryNodeWithoutCopying() {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             f.write("main.nf", MAIN);
             f.write("mod.nf", MOD);
             f.settle();
@@ -118,7 +119,7 @@ class ProjectViewTest {
 
     @Test
     void canonicaliseRequestUris() {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             f.write("main.nf", MAIN);
             f.write("mod.nf", MOD);
             f.settle();
@@ -134,7 +135,7 @@ class ProjectViewTest {
 
     @Test
     void showConfigFilesForConfigRequests() {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             f.write("nextflow.config", "includeConfig 'missing.config'\n");
             f.settle();
             var uri = f.path("nextflow.config").toUri();
@@ -153,7 +154,7 @@ class ProjectViewTest {
 
     @Test
     void showEveryKindForProjectWideRequests() {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             f.write("main.nf", MAIN);
             f.write("mod.nf", MOD);
             f.settle();
@@ -171,7 +172,7 @@ class ProjectViewTest {
 
     @Test
     void rejectViewAccessOutsideTheEngineThread() throws Exception {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             f.write("main.nf", MAIN);
             f.write("mod.nf", MOD);
             f.settle();

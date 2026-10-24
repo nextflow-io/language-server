@@ -26,6 +26,7 @@ import java.util.function.Predicate;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.Phases;
@@ -46,8 +47,8 @@ class WorkspaceBuildTest {
 
     static final String UNUSED = "Variable was declared but not used";
 
-    static WorkspaceFixture start() {
-        return WorkspaceFixture.start((o) -> o.settle = false);
+    static TestServer start() {
+        return TestServer.start((o) -> o.settle = false);
     }
 
     /**
@@ -55,7 +56,7 @@ class WorkspaceBuildTest {
      * files on disk plus the given open documents.
      */
     static Map<String, List<Diagnostic>> freshDiagnostics(Map<String, String> open) {
-        try( var fresh = WorkspaceFixture.start((o) -> o.settle = false) ) {
+        try( var fresh = TestServer.start((o) -> o.settle = false) ) {
             open.forEach(fresh::open);
             fresh.settle();
             return nonEmpty(fresh.client().getAllDiagnostics());
@@ -406,7 +407,7 @@ class WorkspaceBuildTest {
     void containReadFailureToOneFileAndRetryOnNextEvent() {
         var failing = new boolean[] { true };
         var files = new FailingFileAccess((path) -> failing[0] && path.endsWith("bad.nf"), false);
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withFiles(files);
             o.settle = false;
         }) ) {
@@ -428,7 +429,7 @@ class WorkspaceBuildTest {
     @Test
     void containInternalErrorToOneFile() {
         var files = new FailingFileAccess((path) -> path.endsWith("bad.nf"), true);
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withFiles(files);
             o.settle = false;
         }) ) {

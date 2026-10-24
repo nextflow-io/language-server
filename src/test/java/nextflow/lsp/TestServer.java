@@ -17,6 +17,7 @@ package nextflow.lsp;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -25,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -34,8 +34,11 @@ import com.google.gson.JsonObject;
 import nextflow.lsp.engine.Engine;
 import nextflow.lsp.engine.EngineHarness;
 import nextflow.lsp.engine.FixtureRegistry;
+import nextflow.lsp.engine.Need;
 import nextflow.lsp.engine.PluginRegistryClient;
 import nextflow.lsp.engine.QueuedExecutor;
+import nextflow.lsp.engine.RequestContext;
+import nextflow.lsp.engine.RequestSpec;
 import nextflow.lsp.engine.TestEnvironment;
 import nextflow.lsp.engine.Workspace;
 import org.eclipse.lsp4j.ClientCapabilities;
@@ -133,7 +136,7 @@ public final class TestServer implements AutoCloseable {
         var result = new TestServer(options);
         result.initialize();
         if( options.initialized ) {
-            result.server.initialized(new InitializedParams());
+            result.initialized();
             if( !options.settings.isEmpty() )
                 result.configure(options.settings);
         }
@@ -163,6 +166,10 @@ public final class TestServer implements AutoCloseable {
         server.initialize(params).join();
     }
 
+    public void initialized() {
+        server.initialized(new InitializedParams());
+    }
+
     private WorkspaceFolder folder(String path) {
         var root = path(path);
         try {
@@ -184,6 +191,18 @@ public final class TestServer implements AutoCloseable {
 
     public TestLanguageClient client() {
         return options.client;
+    }
+
+    public Engine engine() {
+        return server.engine();
+    }
+
+    public EngineHarness harness() {
+        return harness;
+    }
+
+    public Workspace workspace() {
+        return workspace;
     }
 
     // -- files
@@ -327,16 +346,38 @@ public final class TestServer implements AutoCloseable {
      * its result.
      */
     public <T> T call(Function<NextflowLanguageServer, CompletableFuture<T>> call) {
-        var future = send(call);
-        harness.runUntil(future);
-        try {
-            return future.join();
-        }
-        catch( CompletionException e ) {
-            if( e.getCause() instanceof RuntimeException re )
-                throw re;
-            throw e;
-        }
+        return harness.join(send(call));
+    }
+
+    /**
+     * Send a request with the given body directly to the engine,
+     * without running the engine.
+     */
+    public <T> CompletableFuture<T> send(Need need, String path, T emptyValue, Function<RequestContext, T> body) {
+        return harness.send(spec(need, path), emptyValue, body);
+    }
+
+    /**
+     * Send a request with the given body directly to the engine, run
+     * the engine until it completes, and return its result.
+     */
+    public <T> T call(Need need, String path, T emptyValue, Function<RequestContext, T> body) {
+        return harness.call(spec(need, path), emptyValue, body);
+    }
+
+    private RequestSpec spec(Need need, String path) {
+        return new RequestSpec("test/" + need, path != null ? uri(path) : null, null, need, false);
+    }
+
+    /**
+     * Get the resolved target of the first include of a script.
+     */
+    public URI includeTarget(String path) {
+        return call(Need.FILE, path, null, (context) -> {
+            var scripts = context.project().scriptView();
+            var include = scripts.getIncludeNodes(URI.create(uri(path))).get(0);
+            return scripts.getURI(include.entries.get(0).getTarget());
+        });
     }
 
     // -- engine
@@ -372,16 +413,7 @@ public final class TestServer implements AutoCloseable {
      * @param io
      */
     public void settle(QueuedExecutor io) {
-        var executor = env.manualExecutor();
-        for( int i = 0; i < 100_000; i++ ) {
-            io.runAll();
-            executor.runPending();
-            if( isIdle() && io.size() == 0 )
-                return;
-            if( io.size() == 0 && !executor.advanceToNextTimer() )
-                throw new IllegalStateException("Engine is not idle, but has no pending work");
-        }
-        throw new IllegalStateException("Engine did not settle");
+        harness.settle(io);
     }
 
     /**
@@ -409,6 +441,14 @@ public final class TestServer implements AutoCloseable {
      */
     public List<Diagnostic> diagnostics(String path) {
         return client().getDiagnostics(uri(path));
+    }
+
+    /**
+     * Get the messages of the most recently published diagnostics of
+     * a file.
+     */
+    public List<String> messages(String path) {
+        return diagnostics(path).stream().map(Diagnostic::getMessage).toList();
     }
 
     /**

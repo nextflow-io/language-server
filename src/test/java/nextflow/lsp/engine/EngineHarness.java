@@ -196,7 +196,16 @@ public final class EngineHarness implements AutoCloseable {
      * its result. Fails if the engine goes idle first.
      */
     public <T> T call(RequestSpec spec, T emptyValue, Function<RequestContext, T> body) {
-        var future = send(spec, emptyValue, body);
+        return join(send(spec, emptyValue, body));
+    }
+
+    /**
+     * Run the engine until a request completes, and return its
+     * result. Fails if the engine goes idle first.
+     *
+     * @param future
+     */
+    public <T> T join(CompletableFuture<T> future) {
         runUntil(future);
         try {
             return future.join();
@@ -247,12 +256,23 @@ public final class EngineHarness implements AutoCloseable {
      * Run tasks and fire timers until the engine is idle.
      */
     public void settle() {
+        settle(new QueuedExecutor());
+    }
+
+    /**
+     * Settle the engine while running the IO tasks held by the given
+     * executor.
+     *
+     * @param io
+     */
+    public void settle(QueuedExecutor io) {
         var executor = env.manualExecutor();
         for( int i = 0; i < MAX_STEPS; i++ ) {
+            io.runAll();
             executor.runPending();
-            if( engine.isIdle() )
+            if( engine.isIdle() && io.size() == 0 )
                 return;
-            if( !executor.advanceToNextTimer() )
+            if( io.size() == 0 && !executor.advanceToNextTimer() )
                 throw new IllegalStateException("Engine is not idle, but has no pending work");
         }
         throw new IllegalStateException("Engine did not settle after " + MAX_STEPS + " steps");

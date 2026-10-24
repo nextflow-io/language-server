@@ -19,6 +19,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,8 +51,8 @@ class WorkspacePluginTest {
         return "Plugin '" + plugin + "' does not exist or is not specified in the configuration file";
     }
 
-    static WorkspaceFixture start(FixtureRegistry registry) {
-        return WorkspaceFixture.start((o) -> {
+    static TestServer start(FixtureRegistry registry) {
+        return TestServer.start((o) -> {
             o.environment = new TestEnvironment().withRegistry((url) -> registry);
             o.settle = false;
         });
@@ -84,7 +85,7 @@ class WorkspacePluginTest {
     void suppressMissingPluginErrorWhileTheSpecIsPending() {
         var registry = new FixtureRegistry();
         var io = new QueuedExecutor();
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withRegistry((url) -> registry).withIoExecutor(io);
             o.settle = false;
         }) ) {
@@ -107,7 +108,7 @@ class WorkspacePluginTest {
     void suppressUnknownScopeWarningsWhileTheSpecIsPending() {
         var registry = new FixtureRegistry();
         var io = new QueuedExecutor();
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withRegistry((url) -> registry).withIoExecutor(io);
             o.settle = false;
         }) ) {
@@ -274,7 +275,7 @@ class WorkspacePluginTest {
         var first = new FixtureRegistry();
         first.overrides.put("nf-schema@2.7.3", new PluginRegistryClient.NotFound());
         var second = new FixtureRegistry();
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withRegistry((url) -> url.contains("second") ? second : first);
             o.settle = false;
         }) ) {

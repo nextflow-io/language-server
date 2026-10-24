@@ -30,6 +30,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestLanguageClient;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.ClientCapabilities;
@@ -76,7 +77,7 @@ class WorkspaceConcurrencyTest {
         // no longer exports the name that main.nf includes
         "workflow RENAMED%d {}\n");
 
-    static void writeWorkspace(WorkspaceFixture f) {
+    static void writeWorkspace(TestServer f) {
         f.write("modules/helper.nf", "workflow HELPER { def unused = 1 }\n");
         var main = new StringBuilder();
         for( int i = 0; i < MODULES; i++ ) {
@@ -105,13 +106,13 @@ class WorkspaceConcurrencyTest {
     @Timeout(120)
     void readOnARealPoolAndParseOnTheEngineThread() {
         Map<String, List<Diagnostic>> direct;
-        try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
+        try( var f = TestServer.start((o) -> o.settle = false) ) {
             writeWorkspace(f);
             f.settle();
             direct = nonEmpty(f.client().getAllDiagnostics());
         }
         var pool = new ForkJoinPool(4);
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withReadPool(pool);
             o.maxSliceFiles = 16;
             o.settle = false;
@@ -139,7 +140,7 @@ class WorkspaceConcurrencyTest {
                     unexpected.add(message.getMessage());
             }
         };
-        try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
+        try( var f = TestServer.start((o) -> o.settle = false) ) {
             writeWorkspace(f);
         }
         var env = EngineEnvironment.system();
@@ -242,7 +243,7 @@ class WorkspaceConcurrencyTest {
         }
 
         // the final diagnostics equal those of a fresh workspace
-        try( var fresh = WorkspaceFixture.start((o) -> o.settle = false) ) {
+        try( var fresh = TestServer.start((o) -> o.settle = false) ) {
             openDocuments.forEach(fresh::open);
             fresh.settle();
             assertThat(published).isEqualTo(nonEmpty(fresh.client().getAllDiagnostics()));

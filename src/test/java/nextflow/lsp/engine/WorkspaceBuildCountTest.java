@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,8 +49,8 @@ class WorkspaceBuildCountTest {
 
     static final List<String> FILES = List.of("mod_a.nf", "mod_b.nf", "sub.nf", "main.nf", "nextflow.config");
 
-    static WorkspaceFixture start() {
-        var f = WorkspaceFixture.start((o) -> o.settle = false);
+    static TestServer start() {
+        var f = TestServer.start((o) -> o.settle = false);
         f.write("mod_a.nf", MOD_A);
         f.write("mod_b.nf", MOD_B);
         f.write("sub.nf", """
@@ -66,7 +67,7 @@ class WorkspaceBuildCountTest {
         return f;
     }
 
-    static void requestEverything(WorkspaceFixture f, String path) {
+    static void requestEverything(TestServer f, String path) {
         for( var need : List.of(Need.FILE, Need.PROJECT_CONFIGS, Need.PROJECT) )
             f.call(need, path, null, (context) -> null);
         f.call(Need.ALL, null, null, (context) -> null);
@@ -135,7 +136,7 @@ class WorkspaceBuildCountTest {
                 return FileAccess.system().walk(root, excluded, matcher);
             }
         };
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withFiles(files);
             o.maxSliceFiles = 1;
             o.settle = false;

@@ -17,6 +17,7 @@ package nextflow.lsp.engine;
 
 import java.util.ArrayList;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.spec.PluginRef;
 import org.junit.jupiter.api.Test;
@@ -44,8 +45,8 @@ class PluginSpecsTest {
 
     static final String DOES_NOT_EXIST = "Plugin 'nf-schema' does not exist or is not specified in the configuration file";
 
-    static WorkspaceFixture start(FixtureRegistry registry, String... folders) {
-        return WorkspaceFixture.start((o) -> {
+    static TestServer start(FixtureRegistry registry, String... folders) {
+        return TestServer.start((o) -> {
             o.environment = new TestEnvironment().withRegistry((url) -> registry);
             o.settle = false;
             if( folders.length > 0 )
@@ -53,7 +54,7 @@ class PluginSpecsTest {
         });
     }
 
-    static PluginSpecs.Lookup lookup(WorkspaceFixture f, PluginRef ref) {
+    static PluginSpecs.Lookup lookup(TestServer f, PluginRef ref) {
         return f.call(Need.FILE, null, null, (context) -> f.workspace().plugins().lookup(ref));
     }
 

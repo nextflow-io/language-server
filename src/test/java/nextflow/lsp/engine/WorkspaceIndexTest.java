@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestLanguageClient;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.ProgressParams;
@@ -52,7 +53,7 @@ class WorkspaceIndexTest {
         return List.copyOf(context.project().scriptView().getUris());
     }
 
-    static void writeModules(WorkspaceFixture f, int count) {
+    static void writeModules(TestServer f, int count) {
         for( int i = 0; i < count; i++ )
             f.write("modules/mod" + i + ".nf", "workflow MOD" + i + " { def x = 1 }\n");
     }
@@ -81,7 +82,7 @@ class WorkspaceIndexTest {
     @Test
     void crossFileRequestWaitsForTheFullIndex() {
         var io = new QueuedExecutor();
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withIoExecutor(io);
             o.progress = true;
             o.settle = false;
@@ -128,7 +129,7 @@ class WorkspaceIndexTest {
                 }
             }
         };
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.client = client;
             o.progress = true;
             o.maxSliceFiles = 3;
@@ -159,7 +160,7 @@ class WorkspaceIndexTest {
         var client = new TestLanguageClient();
         client.setHoldProgressCreate(true);
         var io = new QueuedExecutor();
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.client = client;
             o.environment = new TestEnvironment().withIoExecutor(io);
             o.progress = true;
@@ -195,7 +196,7 @@ class WorkspaceIndexTest {
     void reportTheNumberOfFilesOnlyOnceItIsKnown() {
         var client = new TestLanguageClient();
         var io = new QueuedExecutor();
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.client = client;
             o.environment = new TestEnvironment().withIoExecutor(io);
             o.progress = true;
@@ -229,7 +230,7 @@ class WorkspaceIndexTest {
         var client = new TestLanguageClient();
         client.setHoldProgressCreate(true);
         var io = new QueuedExecutor();
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.client = client;
             o.environment = new TestEnvironment().withIoExecutor(io);
             o.progress = true;
@@ -256,7 +257,7 @@ class WorkspaceIndexTest {
 
     @Test
     void doNotReportProgressWithoutClientSupport() {
-        try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
+        try( var f = TestServer.start((o) -> o.settle = false) ) {
             writeModules(f, 3);
             f.settle();
             assertThat(f.client().getProgress()).isEmpty();
@@ -265,7 +266,7 @@ class WorkspaceIndexTest {
 
     @Test
     void buildOpenFilesFirst() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.maxSliceFiles = 2;
             o.initialized = false;
             o.settle = false;
@@ -284,7 +285,7 @@ class WorkspaceIndexTest {
 
     @Test
     void keepOpenFilesThatAreNotOnDisk() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.initialized = false;
             o.settle = false;
         }) ) {
@@ -300,7 +301,7 @@ class WorkspaceIndexTest {
 
     @Test
     void doNotPauseIndexingForTheDebounce() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.maxSliceFiles = 5;
             o.initialized = false;
             o.settle = false;
@@ -326,7 +327,7 @@ class WorkspaceIndexTest {
 
     @Test
     void debounceBackgroundBuildsAfterIndexing() {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             f.open("main.nf", "workflow {}\n");
             f.settle();
             var publishes = f.client().getPublishLog().size();
@@ -342,7 +343,7 @@ class WorkspaceIndexTest {
 
     @Test
     void requestBuildsWithoutWaitingForTheDebounce() {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             f.open("main.nf", "workflow {}\n");
             f.settle();
             f.change("main.nf", "workflow { def x = 1 }\n");
@@ -354,7 +355,7 @@ class WorkspaceIndexTest {
 
     @Test
     void yieldToRequestsBetweenSlices() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.maxSliceFiles = 10;
             o.initialized = false;
             o.settle = false;
@@ -409,7 +410,7 @@ class WorkspaceIndexTest {
     @Test
     void keepFilesCreatedDuringTheWalk() {
         var io = new QueuedExecutor();
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment()
                 .withIoExecutor(io)
                 .withFiles(new LaggingWalk((path) -> path.getFileName().toString().startsWith("late")));
@@ -448,7 +449,7 @@ class WorkspaceIndexTest {
                 throw new UncheckedIOException(new IOException("stale file handle"));
             }
         });
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = env;
             o.settle = false;
         }) ) {
@@ -463,7 +464,7 @@ class WorkspaceIndexTest {
 
     @Test
     void loadFileOnDemandBeforeTheScan() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.initialized = false;
         }) ) {
             f.write("main.nf", """
@@ -480,7 +481,7 @@ class WorkspaceIndexTest {
 
     @Test
     void buildEveryConfigForProjectConfigRequests() {
-        try( var f = WorkspaceFixture.start((o) -> o.initialized = false) ) {
+        try( var f = TestServer.start((o) -> o.initialized = false) ) {
             f.write("nextflow.config", "includeConfig 'conf/base.config'\n");
             f.write("conf/base.config", "process.cpus = 2\n");
             f.write("conf/other.config", "process.memory = '1 GB'\n");
@@ -502,7 +503,7 @@ class WorkspaceIndexTest {
 
     @Test
     void returnEmptyValueForUnmanagedFiles() {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             f.write("work/ab/main.nf", "workflow {}\n");
             f.write("notes.txt", "hello\n");
             assertThat(f.call(Need.FILE, "work/ab/main.nf", "empty", (context) -> "ran")).isEqualTo("empty");

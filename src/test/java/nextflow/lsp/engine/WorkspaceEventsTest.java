@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.ast.ProjectView;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
@@ -52,7 +53,7 @@ class WorkspaceEventsTest {
 
     @Test
     void rejectWorkspaceAccessFromOtherThreads() throws Exception {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             var workspace = f.workspace();
             var spec = new RequestSpec("test", f.uri("main.nf"), null, Need.FILE, false);
             var errors = new ArrayList<Throwable>();
@@ -78,7 +79,7 @@ class WorkspaceEventsTest {
 
     @Test
     void routeToTheInnermostFolderBySegment() {
-        try( var f = WorkspaceFixture.start((o) -> o.folders("a", "a/inner", "a/foo")) ) {
+        try( var f = TestServer.start((o) -> o.folders("a", "a/inner", "a/foo")) ) {
             var workspace = f.workspace();
             assertThat(workspace.projectFor(f.path("a/main.nf")).name()).isEqualTo("a");
             assertThat(workspace.projectFor(f.path("a/inner/main.nf")).name()).isEqualTo("a/inner");
@@ -90,7 +91,7 @@ class WorkspaceEventsTest {
 
     @Test
     void buildFilesOfNestedFoldersOnlyInTheInnermostFolder() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.folders("", "sub");
             o.settle = false;
         }) ) {
@@ -113,7 +114,7 @@ class WorkspaceEventsTest {
 
     @Test
     void moveFilesBetweenNestedFoldersWhenTheInnerFolderChanges() {
-        try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
+        try( var f = TestServer.start((o) -> o.settle = false) ) {
             f.write("sub/a.nf", WITH_WARNING);
             f.write("sub/b.nf", WITH_WARNING);
             f.open("sub/b.nf", WITH_WARNING);
@@ -143,7 +144,7 @@ class WorkspaceEventsTest {
 
     @Test
     void moveOpenDocumentToAnAddedFolder() {
-        try( var f = WorkspaceFixture.start((o) -> o.folders()) ) {
+        try( var f = TestServer.start((o) -> o.folders()) ) {
             f.open("a/main.nf", WITH_WARNING);
             f.settle();
             assertThat(f.messages("a/main.nf")).containsExactly(UNUSED);
@@ -161,7 +162,7 @@ class WorkspaceEventsTest {
 
     @Test
     void moveExcludedOpenDocumentToAnAddedFolder() {
-        try( var f = WorkspaceFixture.start((o) -> o.folders()) ) {
+        try( var f = TestServer.start((o) -> o.folders()) ) {
             f.open("a/work/x.nf", WITH_WARNING);
             f.settle();
             assertThat(f.messages("a/work/x.nf")).containsExactly(UNUSED);
@@ -177,7 +178,7 @@ class WorkspaceEventsTest {
 
     @Test
     void publishOpenExcludedFileOnlyWhileItIsOpen() {
-        try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
+        try( var f = TestServer.start((o) -> o.settle = false) ) {
             f.write("work/mod.nf", "workflow FOO { def x = 1 }\n");
             f.write("main.nf", """
                 include { FOO } from './work/mod.nf'
@@ -205,7 +206,7 @@ class WorkspaceEventsTest {
 
     @Test
     void clearDiagnosticsOfRemovedFolder() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.folders("a", "b");
             o.settle = false;
         }) ) {
@@ -232,7 +233,7 @@ class WorkspaceEventsTest {
 
     @Test
     void publishSharedDependencyOnlyFromItsOwner() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.folders("a", "b");
             o.settle = false;
         }) ) {
@@ -259,7 +260,7 @@ class WorkspaceEventsTest {
 
     @Test
     void republishWithoutRebuildingWhenErrorReportingModeChanges() {
-        try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
+        try( var f = TestServer.start((o) -> o.settle = false) ) {
             f.write("main.nf", WITH_WARNING);
             f.write("bad.nf", "workflow {\n");
             f.settle();
@@ -280,7 +281,7 @@ class WorkspaceEventsTest {
 
     @Test
     void doNotFlickerDiagnosticsOnConfigurationChange() {
-        try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
+        try( var f = TestServer.start((o) -> o.settle = false) ) {
             f.write("main.nf", WITH_WARNING);
             f.write("nextflow.config", "foo.bar = 1\n");
             f.settle();
@@ -299,7 +300,7 @@ class WorkspaceEventsTest {
 
     @Test
     void applyExcludeChangesIncrementally() {
-        try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
+        try( var f = TestServer.start((o) -> o.settle = false) ) {
             f.write("main.nf", WITH_WARNING);
             f.write("sub/x.nf", WITH_WARNING);
             f.write("tests/y.nf", WITH_WARNING);
@@ -320,7 +321,7 @@ class WorkspaceEventsTest {
     @Test
     void ignoreTheResultOfASupersededWalk() {
         var io = new QueuedExecutor();
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withIoExecutor(io);
             o.initialized = false;
             o.settle = false;
@@ -347,7 +348,7 @@ class WorkspaceEventsTest {
     @Test
     void publishNothingAfterShutdown() {
         var io = new QueuedExecutor();
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.folders("a");
             o.environment = new TestEnvironment().withIoExecutor(io);
             o.settle = false;
@@ -364,7 +365,7 @@ class WorkspaceEventsTest {
 
     @Test
     void ignoreInvalidSettingsButApplyTheOthers() {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             f.configure(Map.of(
                 "nextflow.errorReportingMode", "bogus",
                 "nextflow.completion.maxItems", "many",
@@ -384,7 +385,7 @@ class WorkspaceEventsTest {
 
     @Test
     void ignoreInvalidRegistryUrlButApplyTheOtherSettings() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withRegistry(HttpPluginRegistryClient::new);
             o.settle = false;
         }) ) {
@@ -408,7 +409,7 @@ class WorkspaceEventsTest {
 
     @Test
     void dropClosedFileFromTheDefaultProject() {
-        try( var f = WorkspaceFixture.start((o) -> o.folders()) ) {
+        try( var f = TestServer.start((o) -> o.folders()) ) {
             f.write("outside/main.nf", WITH_WARNING);
             f.open("outside/main.nf", WITH_WARNING);
             f.settle();
@@ -423,7 +424,7 @@ class WorkspaceEventsTest {
 
     @Test
     void keepClosedFileInTheDefaultProjectWhileItIsIncluded() {
-        try( var f = WorkspaceFixture.start((o) -> o.folders()) ) {
+        try( var f = TestServer.start((o) -> o.folders()) ) {
             f.write("outside/mod.nf", "workflow FOO { def x = 1 }\n");
             f.open("outside/mod.nf", "workflow FOO { def x = 1 }\n");
             f.open("outside/main.nf", """
@@ -448,7 +449,7 @@ class WorkspaceEventsTest {
 
     @Test
     void pickUpNewFilesFromWatcherEvents() {
-        try( var f = WorkspaceFixture.start((o) -> o.watchers = true) ) {
+        try( var f = TestServer.start((o) -> o.watchers = true) ) {
             assertThat(f.client().getRegistrations()).singleElement()
                 .satisfies(r -> assertThat(r.getRegistrations().get(0).getMethod()).isEqualTo("workspace/didChangeWatchedFiles"));
 
@@ -465,7 +466,7 @@ class WorkspaceEventsTest {
 
     @Test
     void deleteEveryFileOfADeletedDirectory() throws IOException {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.watchers = true;
             o.settle = false;
         }) ) {
@@ -499,7 +500,7 @@ class WorkspaceEventsTest {
      * like a client does. Globs are matched against the path relative
      * to the workspace root.
      */
-    private static void notifyIfWatched(WorkspaceFixture f, String path, FileChangeType type) {
+    private static void notifyIfWatched(TestServer f, String path, FileChangeType type) {
         var kind = switch( type ) {
             case Created -> WatchKind.Create;
             case Changed -> WatchKind.Change;
@@ -519,7 +520,7 @@ class WorkspaceEventsTest {
 
     @Test
     void discoverTheFilesOfAMovedDirectory() throws IOException {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.watchers = true;
             o.settle = false;
         }) ) {
@@ -546,7 +547,7 @@ class WorkspaceEventsTest {
 
     @Test
     void discoverTheFilesOfACreatedDirectory() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.watchers = true;
             o.settle = false;
         }) ) {
@@ -574,7 +575,7 @@ class WorkspaceEventsTest {
 
     @Test
     void resolveADirectoryIncludeWhenItsMainScriptIsCreated() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.watchers = true;
             o.settle = false;
         }) ) {
@@ -591,7 +592,7 @@ class WorkspaceEventsTest {
 
     @Test
     void resolveAnIncludeToADirectoryCreatedNextToTheScript() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.watchers = true;
             o.settle = false;
         }) ) {
@@ -612,7 +613,7 @@ class WorkspaceEventsTest {
 
     @Test
     void resolveARemoteModuleWhenItIsInstalled() {
-        try( var f = WorkspaceFixture.start((o) -> {
+        try( var f = TestServer.start((o) -> {
             o.watchers = true;
             o.settle = false;
         }) ) {
@@ -628,14 +629,14 @@ class WorkspaceEventsTest {
 
     @Test
     void doNotRegisterWatchersWithoutClientSupport() {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             assertThat(f.client().getRegistrations()).isEmpty();
         }
     }
 
     @Test
     void rejectProjectAccessOutsideTheEngineThread() throws Exception {
-        try( var f = WorkspaceFixture.start() ) {
+        try( var f = TestServer.start() ) {
             var view = f.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
             var error = new AtomicReference<Throwable>();
             var thread = new Thread(() -> {
