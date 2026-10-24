@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.engine;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -201,9 +202,9 @@ class WorkspaceConcurrencyTest {
                             engine.submit(new Event.DidClose(new DidCloseTextDocumentParams(new TextDocumentIdentifier(uri))));
                     }
                     case 3 -> futures.add(engine.request(new RequestSpec("file", uri, null, Need.FILE, false), -1,
-                        (context) -> ((ProjectHandle) context.project()).requestEntry() != null ? 1 : 0));
+                        (context) -> context.project().scriptView().hasAST(URI.create(uri)) ? 1 : 0));
                     case 4 -> futures.add(engine.request(new RequestSpec("project", uri, null, Need.PROJECT, random.nextBoolean()), -1,
-                        (context) -> ((ProjectHandle) context.project()).project().size()));
+                        (context) -> context.project().scriptView().getUris().size()));
                     default -> futures.add(engine.request(new RequestSpec("all", null, null, Need.ALL, false), -1,
                         (context) -> context.allProjects().size()));
                 }

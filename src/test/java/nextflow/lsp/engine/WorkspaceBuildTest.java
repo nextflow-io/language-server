@@ -17,13 +17,18 @@ package nextflow.lsp.engine;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import nextflow.lsp.TestWorkspace;
+import org.codehaus.groovy.control.CompilationUnit;
+import org.codehaus.groovy.control.Phases;
 import org.eclipse.lsp4j.Diagnostic;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -303,19 +308,29 @@ class WorkspaceBuildTest {
     }
 
     @Test
-    void rebuildEveryScriptWhenALibJarChanges() {
+    void rebuildEveryScriptWhenALibJarChanges() throws IOException {
         try( var f = start() ) {
-            f.write("main.nf", "workflow { def x = 1 }\n");
+            f.write("main.nf", """
+                workflow {
+                    def x = Greeter.greet('world')
+                }
+                """);
             f.write("other.nf", "workflow OTHER {}\n");
             f.write("nextflow.config", "process.cpus = 2\n");
             f.settle();
-            var compiler = f.workspace().projects().get(0).scriptCompiler();
-            var built = f.workspace().builtFileCount();
+            assertThat(f.messages("main.nf")).anyMatch(m -> m.contains("Greeter"));
+            var before = f.parses();
 
+            writeJar(f.path("lib/tools.jar"), """
+                class Greeter {
+                    static String greet(String name) {
+                        return "Hello, ${name}!"
+                    }
+                }
+                """);
             f.notify("lib/tools.jar", org.eclipse.lsp4j.FileChangeType.Created);
             f.settle();
-            assertThat(f.workspace().builtFileCount() - built).isEqualTo(2);
-            assertThat(f.workspace().projects().get(0).scriptCompiler()).isNotSameAs(compiler);
+            assertThat(f.parsesSince(before)).isEqualTo(Map.of("main.nf", 1, "other.nf", 1));
             assertThat(f.messages("main.nf")).containsExactly(UNUSED);
         }
     }
@@ -473,12 +488,12 @@ class WorkspaceBuildTest {
 
             f.open("mod.nf", "workflow BAR {}\n");
             f.open("main.nf", "include { BAR } from './mod.nf'\nworkflow { BAR() }\n");
-            var builds = f.workspace().buildCount();
+            var before = f.parses();
             var errors = f.call(Need.FILE, "main.nf", List.<String>of(), (context) ->
-                WorkspaceFixture.requestEntry(context).errors().stream().map(e -> e.getOriginalMessage()).toList());
+                context.project().scriptView().getErrors(URI.create(f.uri("main.nf"))).stream().map(e -> e.getOriginalMessage()).toList());
             assertThat(errors).isEmpty();
             // main.nf is never analysed against the previous build of mod.nf
-            assertThat(f.workspace().buildCount() - builds).isEqualTo(1);
+            assertThat(f.parsesSince(before)).isEqualTo(Map.of("main.nf", 1, "mod.nf", 1));
             assertThat(f.publishes("main.nf")).allMatch(List::isEmpty);
         }
     }
@@ -517,13 +532,13 @@ class WorkspaceBuildTest {
             for( int i = 0; i < 5; i++ )
                 f.write("main" + i + ".nf", "include { FOO } from './mod.nf'\nworkflow W" + i + " { FOO() }\n");
             f.settle();
-            var built = f.workspace().builtFileCount();
+            var before = f.parses();
 
             f.open("mod.nf", module);
             f.settle();
             f.close("mod.nf");
             f.settle();
-            assertThat(f.workspace().builtFileCount()).isEqualTo(built);
+            assertThat(f.parsesSince(before)).isEmpty();
             assertThat(f.messages("mod.nf")).containsExactly(UNUSED);
             assertThat(f.client().getPublishLog()).last().satisfies(p -> assertThat(p.getVersion()).isNull());
 
@@ -538,7 +553,8 @@ class WorkspaceBuildTest {
             // a real change still rebuilds the dependents
             f.open("mod.nf", "workflow BAR {}\n");
             f.settle();
-            assertThat(f.workspace().builtFileCount() - built).isEqualTo(6);
+            assertThat(f.parsesSince(before)).isEqualTo(Map.of(
+                "mod.nf", 1, "main0.nf", 1, "main1.nf", 1, "main2.nf", 1, "main3.nf", 1, "main4.nf", 1));
             assertThat(f.messages("main0.nf")).isNotEmpty();
         }
     }
@@ -557,15 +573,20 @@ class WorkspaceBuildTest {
         }
     }
 
-    @Test
-    void doNothingWhenNothingIsStale() {
-        try( var f = start() ) {
-            f.write("main.nf", "workflow { def x = 1 }\n");
-            f.settle();
-            var builds = f.workspace().buildCount();
-            var result = f.call(Need.FILE, "main.nf", null, (context) -> WorkspaceFixture.requestEntry(context).unit() != null);
-            assertThat(result).isTrue();
-            assertThat(f.workspace().buildCount()).isEqualTo(builds);
+    /**
+     * Compile Groovy source into a jar file.
+     */
+    static void writeJar(Path path, String source) throws IOException {
+        var unit = new CompilationUnit();
+        unit.addSource("Source.groovy", source);
+        unit.compile(Phases.CLASS_GENERATION);
+        Files.createDirectories(path.getParent());
+        try( var jar = new JarOutputStream(Files.newOutputStream(path)) ) {
+            for( var c : unit.getClasses() ) {
+                jar.putNextEntry(new JarEntry(c.getName().replace('.', '/') + ".class"));
+                jar.write(c.getBytes());
+                jar.closeEntry();
+            }
         }
     }
 

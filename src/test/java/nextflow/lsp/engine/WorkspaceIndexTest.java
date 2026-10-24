@@ -48,7 +48,7 @@ class WorkspaceIndexTest {
     static final String UNUSED = "Variable was declared but not used";
 
     static List<URI> builtScripts(RequestContext context) {
-        return WorkspaceFixture.project(context).builtEntries(FileKind.SCRIPT).stream().map(FileEntry::uri).toList();
+        return List.copyOf(context.project().scriptView().getUris());
     }
 
     static void writeModules(WorkspaceFixture f, int count) {
@@ -112,15 +112,18 @@ class WorkspaceIndexTest {
 
     @Test
     void endProgressOnlyWhenEveryProjectIsIndexed() {
-        var builtAtEnd = new ArrayList<String>();
-        var fixture = new WorkspaceFixture[1];
+        var publishedAtEnd = new ArrayList<String>();
         var client = new TestLanguageClient() {
             @Override
             public void notifyProgress(ProgressParams params) {
                 super.notifyProgress(params);
                 if( params.getValue().getLeft() instanceof WorkDoneProgressEnd ) {
-                    for( var project : fixture[0].workspace().projects() )
-                        builtAtEnd.add(project.name() + " " + project.builtCount() + "/" + project.size() + " " + project.index());
+                    synchronized (getPublishLog()) {
+                        for( var publish : getPublishLog() ) {
+                            if( !publish.getDiagnostics().isEmpty() )
+                                publishedAtEnd.add(publish.getUri());
+                        }
+                    }
                 }
             }
         };
@@ -132,10 +135,12 @@ class WorkspaceIndexTest {
             o.initialized = false;
             o.settle = false;
         }) ) {
-            fixture[0] = f;
+            var files = new ArrayList<String>();
             for( int i = 0; i < 10; i++ ) {
-                f.write("a/mod" + i + ".nf", "workflow A" + i + " {}\n");
-                f.write("b/mod" + i + ".nf", "workflow B" + i + " {}\n");
+                f.write("a/mod" + i + ".nf", "workflow A" + i + " { def x = 1 }\n");
+                f.write("b/mod" + i + ".nf", "workflow B" + i + " { def x = 1 }\n");
+                files.add(f.uri("a/mod" + i + ".nf"));
+                files.add(f.uri("b/mod" + i + ".nf"));
             }
             f.initialized();
             f.settle();
@@ -144,7 +149,7 @@ class WorkspaceIndexTest {
             assertThat(progressKinds(client)).contains("report");
             assertThat(progressKinds(client)).last().isEqualTo("end");
             assertThat(progressKinds(client)).filteredOn("end"::equals).hasSize(1);
-            assertThat(builtAtEnd).containsExactly("a 10/10 READY", "b 10/10 READY", " 0/0 READY");
+            assertThat(publishedAtEnd).containsExactlyInAnyOrderElementsOf(files);
         }
     }
 
@@ -340,7 +345,7 @@ class WorkspaceIndexTest {
             f.open("main.nf", "workflow {}\n");
             f.settle();
             f.change("main.nf", "workflow { def x = 1 }\n");
-            var warnings = f.call(Need.FILE, "main.nf", 0, (context) -> WorkspaceFixture.requestEntry(context).warnings().size());
+            var warnings = f.call(Need.FILE, "main.nf", 0, (context) -> context.project().scriptView().getWarnings(URI.create(f.uri("main.nf"))).size());
             assertThat(warnings).isEqualTo(1);
             assertThat(f.messages("main.nf")).containsExactly(UNUSED);
         }
@@ -359,11 +364,12 @@ class WorkspaceIndexTest {
             // the walk runs inline, so its result is the next task
             f.env().manualExecutor().runNext();
             f.env().manualExecutor().runNext();
-            var buildsAtAnswer = f.call(Need.FILE, "main.nf", -1L, (context) -> {
+            var parsesAtAnswer = f.call(Need.FILE, "main.nf", -1, (context) -> {
                 assertThat(f.workspace().isIndexing()).isTrue();
-                return f.workspace().buildCount();
+                return f.parses().values().stream().mapToInt(Integer::intValue).sum();
             });
-            assertThat(buildsAtAnswer).isLessThan(3);
+            // at most two slices
+            assertThat(parsesAtAnswer).isLessThanOrEqualTo(20);
             f.settle();
             assertThat(f.workspace().isIndexing()).isFalse();
         }
@@ -450,14 +456,14 @@ class WorkspaceIndexTest {
             f.open("main.nf", "workflow {}\n");
             // before the scan, the main config and its includes are loaded on demand
             var configs = f.call(Need.PROJECT_CONFIGS, "main.nf", List.<URI>of(), (context) ->
-                WorkspaceFixture.project(context).builtEntries(FileKind.CONFIG).stream().map(FileEntry::uri).toList());
+                List.copyOf(context.project().configView().getUris()));
             assertThat(configs).containsExactly(URI.create(f.uri("conf/base.config")), URI.create(f.uri("nextflow.config")));
 
             // other configs are known once the scan has found them
             f.initialized();
             f.runPending();
             configs = f.call(Need.PROJECT_CONFIGS, "main.nf", List.<URI>of(), (context) ->
-                WorkspaceFixture.project(context).builtEntries(FileKind.CONFIG).stream().map(FileEntry::uri).toList());
+                List.copyOf(context.project().configView().getUris()));
             assertThat(configs).hasSize(3);
         }
     }

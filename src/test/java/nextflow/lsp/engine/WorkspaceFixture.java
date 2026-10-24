@@ -17,12 +17,14 @@ package nextflow.lsp.engine;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -245,14 +247,50 @@ final class WorkspaceFixture implements AutoCloseable {
     }
 
     /**
-     * Get the project and entry of the request file in a body.
+     * Get the resolved target of the first include of a script.
+     *
+     * @param path
      */
-    static FileEntry requestEntry(RequestContext context) {
-        return ((ProjectHandle) context.project()).requestEntry();
+    URI includeTarget(String path) {
+        return call(Need.FILE, path, null, (context) -> {
+            var scripts = context.project().scriptView();
+            var include = scripts.getIncludeNodes(URI.create(uri(path))).get(0);
+            return scripts.getURI(include.entries.get(0).getTarget());
+        });
     }
 
-    static Project project(RequestContext context) {
-        return ((ProjectHandle) context.project()).project();
+    // -- parses
+
+    /**
+     * Get the number of parses of each file so far, summed over the
+     * projects that contain it.
+     */
+    Map<String, Integer> parses() {
+        var root = TestWorkspace.root();
+        var result = new TreeMap<String, Integer>();
+        for( var project : workspace.projects() ) {
+            for( var entry : project.entries() ) {
+                var path = root.relativize(Path.of(entry.uri())).toString().replace('\\', '/');
+                result.merge(path, entry.parses, Integer::sum);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Get the number of parses of each file since the given counts,
+     * omitting the files that were not parsed.
+     *
+     * @param before
+     */
+    Map<String, Integer> parsesSince(Map<String, Integer> before) {
+        var result = new TreeMap<String, Integer>();
+        parses().forEach((path, count) -> {
+            var delta = count - before.getOrDefault(path, 0);
+            if( delta != 0 )
+                result.put(path, delta);
+        });
+        return result;
     }
 
     // -- engine

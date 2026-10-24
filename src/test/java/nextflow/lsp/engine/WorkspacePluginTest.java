@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.engine;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
 
@@ -90,7 +91,7 @@ class WorkspacePluginTest {
             f.open("nextflow.config", SCHEMA_CONFIG);
             f.open("main.nf", SCRIPT);
             // build the open files while the fetch is held
-            var built = f.call(Need.FILE, "main.nf", false, (context) -> WorkspaceFixture.requestEntry(context).isBuilt());
+            var built = f.call(Need.FILE, "main.nf", false, (context) -> context.project().scriptView().getUris().contains(URI.create(f.uri("main.nf"))));
             assertThat(built).isTrue();
             assertThat(registry.fetches).isEmpty();
             f.advance(Duration.ofSeconds(1));

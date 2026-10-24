@@ -72,15 +72,8 @@ class WorkspaceEventsTest {
                 }
                 """);
             f.settle();
-            var outer = f.workspace().folder("root").get();
-            var inner = f.workspace().folder("sub").get();
-            var a = f.path("sub/a.nf").toUri();
-            var b = f.path("sub/b.nf").toUri();
             // the outer folder loads only what its own files include
-            assertThat(outer.entries()).extracting(FileEntry::uri).containsExactly(f.path("main.nf").toUri(), a);
-            assertThat(outer.entry(a).role()).isEqualTo(FileEntry.Role.DEPENDENCY);
-            assertThat(inner.entries()).extracting(FileEntry::uri).containsExactly(a, b);
-            assertThat(inner.entry(a).role()).isEqualTo(FileEntry.Role.WORKSPACE);
+            assertThat(f.parses()).isEqualTo(Map.of("main.nf", 1, "sub/a.nf", 2, "sub/b.nf", 1));
             assertThat(f.publishes("sub/a.nf")).hasSize(1);
             assertThat(f.messages("sub/b.nf")).containsExactly(UNUSED);
             assertThat(f.messages("main.nf")).isEmpty();
@@ -94,28 +87,26 @@ class WorkspaceEventsTest {
             f.write("sub/b.nf", WITH_WARNING);
             f.open("sub/b.nf", WITH_WARNING);
             f.settle();
-            var a = f.path("sub/a.nf").toUri();
-            var b = f.path("sub/b.nf").toUri();
-            var outer = f.workspace().folder("root").get();
-            assertThat(outer.entry(a)).isNotNull();
+            assertThat(f.parses()).isEqualTo(Map.of("sub/a.nf", 1, "sub/b.nf", 1));
 
+            // each file is held by one folder at a time
             f.addFolder("sub");
             f.settle();
-            var inner = f.workspace().folder("sub").get();
-            assertThat(outer.entry(a)).isNull();
-            assertThat(outer.entry(b)).isNull();
-            assertThat(inner.entry(a).isBuilt()).isTrue();
-            assertThat(inner.entry(b).isBuilt()).isTrue();
+            assertThat(f.parses()).isEqualTo(Map.of("sub/a.nf", 1, "sub/b.nf", 1));
             assertThat(f.messages("sub/a.nf")).containsExactly(UNUSED);
             assertThat(f.messages("sub/b.nf")).containsExactly(UNUSED);
 
             f.removeFolder("sub");
             f.settle();
-            assertThat(outer.entry(a).role()).isEqualTo(FileEntry.Role.WORKSPACE);
-            assertThat(outer.entry(b).role()).isEqualTo(FileEntry.Role.WORKSPACE);
+            assertThat(f.parses()).isEqualTo(Map.of("sub/a.nf", 1, "sub/b.nf", 1));
             assertThat(f.messages("sub/a.nf")).containsExactly(UNUSED);
             assertThat(f.messages("sub/b.nf")).containsExactly(UNUSED);
             assertThat(f.publishes("sub/a.nf")).noneMatch(List::isEmpty);
+
+            // the outer folder serves the files again
+            f.writeAndNotify("sub/a.nf", "workflow {\n");
+            f.settle();
+            assertThat(f.messages("sub/a.nf")).hasSize(1).doesNotContain(UNUSED);
         }
     }
 
@@ -131,8 +122,7 @@ class WorkspaceEventsTest {
             f.settle();
             var path = f.path("a/main.nf");
             assertThat(f.workspace().projectFor(path).name()).isEqualTo("a");
-            assertThat(f.workspace().projectFor(path).entry(path.toUri()).isBuilt()).isTrue();
-            assertThat(f.workspace().defaultProject().entry(path.toUri())).isNull();
+            assertThat(f.parses()).isEqualTo(Map.of("a/main.nf", 1));
             assertThat(f.publishes("a/main.nf")).noneMatch(List::isEmpty);
             assertThat(f.messages("a/main.nf")).containsExactly(UNUSED);
         }
@@ -147,9 +137,7 @@ class WorkspaceEventsTest {
 
             f.addFolder("a");
             f.settle();
-            var uri = f.path("a/work/x.nf").toUri();
-            assertThat(f.workspace().defaultProject().entry(uri)).isNull();
-            assertThat(f.workspace().folder("a").get().entry(uri).isBuilt()).isTrue();
+            assertThat(f.parses()).isEqualTo(Map.of("a/work/x.nf", 1));
             f.change("a/work/x.nf", "workflow {\n");
             f.settle();
             assertThat(f.messages("a/work/x.nf")).hasSize(1).doesNotContain(UNUSED);
@@ -168,7 +156,7 @@ class WorkspaceEventsTest {
                 """);
             f.settle();
             // an included excluded file is loaded but not published
-            assertThat(f.workspace().projects().get(0).entry(f.path("work/mod.nf").toUri()).role()).isEqualTo(FileEntry.Role.DEPENDENCY);
+            assertThat(f.includeTarget("main.nf")).isEqualTo(f.path("work/mod.nf").toUri());
             assertThat(f.publishes("work/mod.nf")).isEmpty();
 
             f.open("work/mod.nf", "workflow FOO { def x = 1 }\n");
@@ -180,7 +168,7 @@ class WorkspaceEventsTest {
             f.settle();
             assertThat(f.messages("work/mod.nf")).isEmpty();
             assertThat(f.messages("main.nf")).isEmpty();
-            assertThat(f.workspace().projects().get(0).entry(f.path("work/mod.nf").toUri()).role()).isEqualTo(FileEntry.Role.DEPENDENCY);
+            assertThat(f.includeTarget("main.nf")).isEqualTo(f.path("work/mod.nf").toUri());
         }
     }
 
@@ -227,9 +215,8 @@ class WorkspaceEventsTest {
             f.settle();
             assertThat(f.publishes("b/x.nf")).hasSize(1);
             assertThat(f.messages("b/x.nf")).containsExactly(UNUSED);
-            var uri = f.path("b/x.nf").toUri();
-            assertThat(f.workspace().folder("a").get().entry(uri).role()).isEqualTo(FileEntry.Role.DEPENDENCY);
-            assertThat(f.workspace().folder("b").get().entry(uri).role()).isEqualTo(FileEntry.Role.WORKSPACE);
+            // both folders load it
+            assertThat(f.parses()).isEqualTo(Map.of("a/main.nf", 1, "b/x.nf", 2));
 
             // the dependency is still published after its owner goes away
             f.removeFolder("b");
@@ -245,7 +232,7 @@ class WorkspaceEventsTest {
             f.write("main.nf", WITH_WARNING);
             f.write("bad.nf", "workflow {\n");
             f.settle();
-            var builds = f.workspace().buildCount();
+            var before = f.parses();
             assertThat(f.messages("main.nf")).containsExactly(UNUSED);
 
             f.configure(Map.of("nextflow.errorReportingMode", "errors"));
@@ -256,7 +243,7 @@ class WorkspaceEventsTest {
             f.configure(Map.of("nextflow.errorReportingMode", "warnings"));
             f.settle();
             assertThat(f.messages("main.nf")).containsExactly(UNUSED);
-            assertThat(f.workspace().buildCount()).isEqualTo(builds);
+            assertThat(f.parsesSince(before)).isEmpty();
         }
     }
 
@@ -399,7 +386,7 @@ class WorkspaceEventsTest {
             f.close("outside/main.nf");
             f.settle();
             assertThat(f.messages("outside/main.nf")).isEmpty();
-            assertThat(f.workspace().defaultProject().size()).isZero();
+            assertThat(f.parses()).isEmpty();
         }
     }
 
@@ -424,7 +411,7 @@ class WorkspaceEventsTest {
             f.close("outside/main.nf");
             f.settle();
             assertThat(f.messages("outside/mod.nf")).isEmpty();
-            assertThat(f.workspace().defaultProject().size()).isZero();
+            assertThat(f.parses()).isEmpty();
         }
     }
 
@@ -441,7 +428,7 @@ class WorkspaceEventsTest {
             f.delete("new.nf");
             f.settle();
             assertThat(f.messages("new.nf")).isEmpty();
-            assertThat(f.workspace().projects().get(0).size()).isZero();
+            assertThat(f.parses()).isEmpty();
         }
     }
 
@@ -472,7 +459,7 @@ class WorkspaceEventsTest {
             assertThat(f.messages("modules/a.nf")).isEmpty();
             assertThat(f.messages("modules/sub/b.nf")).isEmpty();
             assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
-            assertThat(f.workspace().projects().get(0).entries()).extracting(FileEntry::uri).containsExactly(f.path("main.nf").toUri());
+            assertThat(f.parses()).containsOnlyKeys("main.nf");
         }
     }
 
