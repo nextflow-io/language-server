@@ -92,8 +92,6 @@ public final class Workspace implements EngineState {
     // source of input versions and build stamps
     private long seq;
 
-    private int projectCount;
-
     private boolean initialized;
 
     private boolean watchersSupported;
@@ -104,7 +102,7 @@ public final class Workspace implements EngineState {
     private Workspace(Engine engine, int maxSliceFiles) {
         this.engine = engine;
         this.maxSliceFiles = maxSliceFiles;
-        this.defaultProject = new Project("default", DEFAULT_PROJECT_NAME, null, this);
+        this.defaultProject = new Project(DEFAULT_PROJECT_NAME, null, this);
         this.plugins = new PluginSpecs(engine, configuration.pluginRegistryUrl());
         this.ledger = new DiagnosticsLedger(engine, this);
         this.progress = new IndexProgress(engine);
@@ -337,7 +335,7 @@ public final class Workspace implements EngineState {
         var root = Path.of(uri.get());
         if( folders.stream().anyMatch(p -> p.root.equals(root)) )
             return null;
-        var project = new Project("p" + (++projectCount), folderName(folder, root), root, this);
+        var project = new Project(folderName(folder, root), root, this);
         folders.add(project);
         updateInnerRoots();
         // open documents under the new folder move to it, and so do the
@@ -406,7 +404,7 @@ public final class Workspace implements EngineState {
             var moved = documents.isOpen(entry.uri)
                 || (entry.role == FileEntry.Role.WORKSPACE && !target.isDefault() && !target.isExcluded(entry.path));
             if( moved )
-                target.getOrCreate(entry.uri, FileEntry.Role.WORKSPACE).role = FileEntry.Role.WORKSPACE;
+                target.getOrCreate(entry.uri, FileEntry.Role.WORKSPACE);
         }
         ledger.publish(touched);
     }
@@ -441,18 +439,17 @@ public final class Workspace implements EngineState {
         var generation = ++project.walkGeneration;
         project.index = Project.IndexStatus.WALKING;
         project.addedDuringWalk.clear();
-        var id = project.id;
         var root = project.root;
         var excluded = walkExclusions(project);
         var files = engine.environment().files();
         engine.submitIo("walk " + root, () -> {
             try {
                 var result = files.walk(root, excluded, FileKind::isManaged);
-                return new Event.WalkDone(id, generation, result, null);
+                return new Event.WalkDone(project, generation, result, null);
             }
             catch( IOException | RuntimeException e ) {
                 // the folder stays WALKING until it gets an event
-                return new Event.WalkDone(id, generation, null, e);
+                return new Event.WalkDone(project, generation, null, e);
             }
         });
     }
@@ -470,8 +467,8 @@ public final class Workspace implements EngineState {
     }
 
     private void onWalkDone(Event.WalkDone event) {
-        var project = folders.stream().filter(p -> p.id.equals(event.projectId())).findFirst().orElse(null);
-        if( project == null || project.walkGeneration != event.generation() || project.index != Project.IndexStatus.WALKING )
+        var project = event.project();
+        if( !folders.contains(project) || project.walkGeneration != event.generation() || project.index != Project.IndexStatus.WALKING )
             return;
         project.index = Project.IndexStatus.BUILDING;
         if( event.error() != null ) {
@@ -486,9 +483,7 @@ public final class Workspace implements EngineState {
         for( var uri : discovered ) {
             if( project.entry(uri) == null )
                 bumpIncluders(uri);
-            var entry = project.getOrCreate(uri, FileEntry.Role.WORKSPACE);
-            if( entry != null )
-                entry.role = FileEntry.Role.WORKSPACE;
+            project.getOrCreate(uri, FileEntry.Role.WORKSPACE);
         }
         // files that are no longer in the set (deleted or newly excluded)
         var documents = engine.documents();
@@ -529,7 +524,7 @@ public final class Workspace implements EngineState {
         bumpAll(uri);
         bumpIncluders(uri);
         // an open file is part of the project, even if it is excluded
-        projectFor(path).getOrCreate(uri, FileEntry.Role.WORKSPACE).role = FileEntry.Role.WORKSPACE;
+        projectFor(path).getOrCreate(uri, FileEntry.Role.WORKSPACE);
         scheduleEdit();
     }
 

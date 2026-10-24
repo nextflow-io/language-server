@@ -55,7 +55,7 @@ public sealed interface Event {
     /**
      * A directory walk finished. Either files or error is set.
      */
-    record WalkDone(String projectId, long generation, List<Path> files, Exception error) implements Event {}
+    record WalkDone(Project project, long generation, List<Path> files, Exception error) implements Event {}
 
     /**
      * A plugin spec fetch finished. The registry URL identifies the

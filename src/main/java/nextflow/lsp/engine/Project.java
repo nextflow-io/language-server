@@ -60,8 +60,6 @@ public final class Project {
         READY
     }
 
-    final String id;
-
     final String name;
 
     final Path root;
@@ -89,8 +87,7 @@ public final class Project {
     // the walk result may not include
     final Set<URI> addedDuringWalk = new HashSet<>();
 
-    Project(String id, String name, Path root, Workspace workspace) {
-        this.id = id;
+    Project(String name, Path root, Workspace workspace) {
         this.name = name;
         this.root = root;
         this.workspace = workspace;
@@ -200,16 +197,20 @@ public final class Project {
 
     /**
      * Get the entry for a file, or create it (unbuilt) if the file is
-     * of a managed kind.
+     * of a managed kind. An existing entry is promoted to WORKSPACE
+     * if that role is requested.
      *
      * @param uri
-     * @param role role of a new entry
+     * @param role
      * @return the entry, or null if the file is not of a managed kind
      */
     FileEntry getOrCreate(URI uri, FileEntry.Role role) {
         var entry = files.get(uri);
-        if( entry != null )
+        if( entry != null ) {
+            if( role == FileEntry.Role.WORKSPACE )
+                entry.role = role;
             return entry;
+        }
         var path = Path.of(uri);
         var kind = FileKind.of(path);
         if( kind.isEmpty() )
