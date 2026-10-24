@@ -72,7 +72,7 @@ class ScriptSemanticTokensTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             include { HELLO } from './module.nf'
 
             workflow {
@@ -92,7 +92,7 @@ class ScriptSemanticTokensTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 def x = 1
                 println "${x}${x}"

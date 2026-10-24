@@ -16,9 +16,6 @@
 
 package nextflow.lsp.engine;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
@@ -31,6 +28,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import nextflow.lsp.TestLanguageClient;
+import nextflow.lsp.TestUtils;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 import org.eclipse.lsp4j.DidCloseTextDocumentParams;
@@ -128,24 +126,7 @@ public final class EngineHarness implements AutoCloseable {
     // -- workspace files
 
     public String uri(String path) {
-        return TestWorkspace.root().resolve(path).toUri().toString();
-    }
-
-    /**
-     * Write a file to disk, without notifying the engine.
-     *
-     * @param path
-     * @param text
-     */
-    public void write(String path, String text) {
-        var file = TestWorkspace.root().resolve(path);
-        try {
-            Files.createDirectories(file.getParent());
-            Files.writeString(file, text);
-        }
-        catch( IOException e ) {
-            throw new UncheckedIOException(e);
-        }
+        return TestUtils.getUri(path);
     }
 
     // -- documents

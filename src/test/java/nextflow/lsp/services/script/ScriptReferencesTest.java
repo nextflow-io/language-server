@@ -67,7 +67,7 @@ class ScriptReferencesTest {
                 HELLO()
             }
             """;
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         var references = getReferences(server, uri, new Position(0, 9));
 
         assertThat(references.get(uri)).hasSize(2);
@@ -83,11 +83,11 @@ class ScriptReferencesTest {
         var mainUri = getUri("main.nf");
         var moduleUri = getUri("module.nf");
 
-        open(server, moduleUri, """
+        server.open("module.nf", """
             workflow HELLO {
             }
             """);
-        open(server, mainUri, """
+        server.open("main.nf", """
             include { HELLO } from './module.nf'
 
             workflow {

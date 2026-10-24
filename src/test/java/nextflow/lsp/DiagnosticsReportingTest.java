@@ -55,7 +55,7 @@ class DiagnosticsReportingTest {
         var server = serverWithMode(client, ErrorReportingMode.OFF);
         var uri = getUri("nextflow.config");
 
-        open(server, uri, ERROR_SOURCE);
+        server.open("nextflow.config", ERROR_SOURCE);
         server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
@@ -67,12 +67,12 @@ class DiagnosticsReportingTest {
         var uri = getUri("nextflow.config");
 
         // a syntax error
-        open(server, uri, ERROR_SOURCE);
+        server.open("nextflow.config", ERROR_SOURCE);
         server.settle();
         assertThat(client.getDiagnostics(uri)).anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Error);
 
         // an unrecognized-option warning
-        open(server, uri, WARNING_SOURCE);
+        server.open("nextflow.config", WARNING_SOURCE);
         server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
@@ -84,12 +84,12 @@ class DiagnosticsReportingTest {
         var uri = getUri("nextflow.config");
 
         // an unrecognized-option warning
-        open(server, uri, WARNING_SOURCE);
+        server.open("nextflow.config", WARNING_SOURCE);
         server.settle();
         assertThat(client.getDiagnostics(uri)).anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Warning);
 
         // a syntax error
-        open(server, uri, ERROR_SOURCE);
+        server.open("nextflow.config", ERROR_SOURCE);
         server.settle();
         assertThat(client.getDiagnostics(uri)).anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Error);
     }
@@ -100,7 +100,7 @@ class DiagnosticsReportingTest {
         var server = serverWithMode(client, ErrorReportingMode.WARNINGS);
         var uri = getUri("nextflow.config");
 
-        open(server, uri, WARNING_SOURCE);
+        server.open("nextflow.config", WARNING_SOURCE);
         server.settle();
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).isNotEmpty();

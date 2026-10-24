@@ -72,7 +72,7 @@ class ConfigSemanticTokensTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, """
+        server.open("nextflow.config", """
             process.clusterOptions = "--account=${params.account}"
             """);
         var tokens = getTokens(server, uri);
@@ -90,7 +90,7 @@ class ConfigSemanticTokensTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, """
+        server.open("nextflow.config", """
             includeConfig 'extra.config'
             process.cpus = 2
             """);

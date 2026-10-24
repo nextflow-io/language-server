@@ -46,7 +46,7 @@ class ScriptHoverTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             /**
              * Greet someone.
              */
@@ -68,7 +68,7 @@ class ScriptHoverTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             nextflow.enable.types = true
 
             def make() {
@@ -89,7 +89,7 @@ class ScriptHoverTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow HELLO {
             }
 
@@ -108,7 +108,7 @@ class ScriptHoverTest {
         var uri = getUri("main.nf");
 
         // destructured record inputs/outputs
-        open(server, uri, """
+        server.open("main.nf", """
             nextflow.enable.types = true
 
             process SAMTOOLS_INDEX {
@@ -147,7 +147,7 @@ class ScriptHoverTest {
             ```""");
 
         // named record type input
-        open(server, uri, """
+        server.open("main.nf", """
             nextflow.enable.types = true
 
             record SamtoolsIndexInput {
@@ -190,7 +190,7 @@ class ScriptHoverTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println('Hello!')
             }

@@ -47,7 +47,7 @@ class ScriptDiagnosticsTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println('Hello!')
             }
@@ -62,7 +62,7 @@ class ScriptDiagnosticsTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 def json = new groovy.json.JsonSlurper().parseText('{}')
                 def text = new groovy.text.SimpleTemplateEngine().createTemplate('$x').make([x: 1]).toString()
@@ -83,7 +83,7 @@ class ScriptDiagnosticsTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
             """);
         server.settle();
@@ -99,7 +99,7 @@ class ScriptDiagnosticsTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             include { FOO } from './does-not-exist.nf'
 
             workflow {
@@ -119,10 +119,8 @@ class ScriptDiagnosticsTest {
         // filenames chosen so the entry file iterates before its modules in
         // the unordered change set, exercising the check-ordering bug
         var mainUri = getUri("workflow.nf");
-        var producerUri = getUri("producer.nf");
-        var consumerUri = getUri("consumer.nf");
 
-        open(server, producerUri, """
+        server.open("producer.nf", """
             nextflow.enable.types = true
 
             process PRODUCER {
@@ -138,7 +136,7 @@ class ScriptDiagnosticsTest {
                 \"""
             }
             """);
-        open(server, consumerUri, """
+        server.open("consumer.nf", """
             nextflow.enable.types = true
 
             process CONSUMER {
@@ -154,7 +152,7 @@ class ScriptDiagnosticsTest {
                 \"""
             }
             """);
-        open(server, mainUri, """
+        server.open("workflow.nf", """
             nextflow.enable.types = true
 
             include { PRODUCER } from './producer.nf'
@@ -179,14 +177,14 @@ class ScriptDiagnosticsTest {
         var uri = getUri("main.nf");
 
         // a file with a syntax error is opened
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
             """);
         server.settle();
         assertThat(client.getDiagnostics(uri)).isNotEmpty();
 
         // the error is fixed
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println('Hello!')
             }
@@ -201,10 +199,10 @@ class ScriptDiagnosticsTest {
     static List<String> pluginErrors(String plugin, String script) {
         var client = new TestLanguageClient();
         var server = TestServer.start((o) -> o.client = client);
-        open(server, getUri("nextflow.config"), "plugins { id '" + plugin + "' }");
+        server.open("nextflow.config", "plugins { id '" + plugin + "' }");
         server.settle();
         var uri = getUri("main.nf");
-        open(server, uri, script);
+        server.open("main.nf", script);
         server.settle();
         var diagnostics = client.getDiagnostics(uri);
         // otherwise type checking is skipped and the test passes vacuously
@@ -235,8 +233,8 @@ class ScriptDiagnosticsTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, getUri("nextflow.config"), "plugins { id 'nf-schema@2.7.3' }");
-        open(server, uri, """
+        server.open("nextflow.config", "plugins { id 'nf-schema@2.7.3' }");
+        server.open("main.nf", """
             include { paramsHelp } from 'plugin/nf-schema'
 
             workflow {

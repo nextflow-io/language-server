@@ -22,15 +22,14 @@ import java.util.List;
 import java.util.Map;
 
 import nextflow.script.formatter.FormattingOptions;
-import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.DocumentFormattingParams;
 import org.eclipse.lsp4j.ExecuteCommandParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
-import org.eclipse.lsp4j.TextDocumentItem;
 import org.eclipse.lsp4j.TextEdit;
 
 /**
- * Helpers for tests that drive a {@link TestServer} with URIs.
+ * Helpers for tests that use the {@link TestWorkspace} of the current
+ * test, with or without a {@link TestServer}.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -69,29 +68,6 @@ public class TestUtils {
      */
     public static String getUri(String path) {
         return TestWorkspace.root().resolve(path).toUri().toString();
-    }
-
-    /**
-     * Open a document in a test server, with its indentation stripped.
-     *
-     * @param server
-     * @param uri
-     * @param contents
-     */
-    public static void open(TestServer server, String uri, String contents) {
-        openVerbatim(server, uri, contents.stripIndent());
-    }
-
-    /**
-     * Open a document in a test server with exactly the given contents.
-     *
-     * @param server
-     * @param uri
-     * @param contents
-     */
-    public static void openVerbatim(TestServer server, String uri, String contents) {
-        var textDocumentItem = new TextDocumentItem(uri, "nextflow", 1, contents);
-        server.server().didOpen(new DidOpenTextDocumentParams(textDocumentItem));
     }
 
     /**

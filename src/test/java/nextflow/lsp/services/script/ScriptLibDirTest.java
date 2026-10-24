@@ -60,7 +60,7 @@ class ScriptLibDirTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println(Greeter.greet('world'))
             }
@@ -76,7 +76,7 @@ class ScriptLibDirTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println(new acme.Widget(name: 'sprocket').name)
             }
@@ -92,7 +92,7 @@ class ScriptLibDirTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println(new Widget(name: 'sprocket').name)
             }
@@ -110,7 +110,7 @@ class ScriptLibDirTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             def describe(Greeter greeter) {
                 return greeter.toString()
             }
@@ -130,7 +130,7 @@ class ScriptLibDirTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println(Gruter.greet('world'))
             }
@@ -147,7 +147,7 @@ class ScriptLibDirTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println(Greeter.greet('world'))
             }
@@ -165,7 +165,7 @@ class ScriptLibDirTest {
         var uri = getUri("main.nf");
 
         writeLib("Greeter.groovy", GREETER);
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println(Greeter.greet('world'))
             }
@@ -186,7 +186,7 @@ class ScriptLibDirTest {
             }
             """;
 
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
 
@@ -205,7 +205,7 @@ class ScriptLibDirTest {
         var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println(Greeter.greet('world'))
                 foo()
@@ -225,7 +225,7 @@ class ScriptLibDirTest {
         });
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow {
                 println('Hello!')
             }

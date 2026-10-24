@@ -53,7 +53,7 @@ class ConfigHoverTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, """
+        server.open("nextflow.config", """
             executor {
             }
             """);
@@ -67,7 +67,7 @@ class ConfigHoverTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, """
+        server.open("nextflow.config", """
             process {
                 arch = 'linux/x86_64'
             }
@@ -92,7 +92,7 @@ class ConfigHoverTest {
                 ? new PluginRegistryClient.Found(provSpec)
                 : registry.fetch(name, version));
 
-        open(server, uri, """
+        server.open("nextflow.config", """
             plugins {
                 id 'nf-prov@1.6.0'
             }

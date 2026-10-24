@@ -57,13 +57,13 @@ class ConfigFormattingTest {
         var options = new FormattingOptions(4, true);
 
         return Golden.inputs("format/config", ".config").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
-            openVerbatim(server, uri, Golden.read(input));
+            server.openVerbatim("nextflow.config", Golden.read(input));
             var textEdits = formatting(server, uri, options);
             assertThat(textEdits).isNotEmpty();
             var formatted = textEdits.get(0).getNewText();
             Golden.check(Golden.sibling(input, ".formatted"), formatted);
 
-            openVerbatim(server, uri, formatted);
+            server.openVerbatim("nextflow.config", formatted);
             var reformatted = formatting(server, uri, options);
             if( !reformatted.isEmpty() )
                 assertThat(reformatted.get(0).getNewText()).isEqualTo(formatted);
@@ -87,7 +87,7 @@ class ConfigFormattingTest {
             """;
         var expected = contents.replace("cpus=2", "cpus = 2");
 
-        open(server, uri, contents);
+        server.open("nextflow.config", contents);
         var texts = new ArrayList<String>();
         for( int i = 0; i < 3; i++ ) {
             var edits = formatting(server, uri, new FormattingOptions(4, true));

@@ -115,7 +115,7 @@ class ConfigPreviewTest {
         var server = TestServer.start();
 
         var uri = getUri("main.nf");
-        open(server, uri, SCRIPT);
+        server.open("main.nf", SCRIPT);
         var arguments = List.<Object>of(asJson(uri), asJson("ALIGN"), asJson(profiles), asJson(null));
         return (Map<?,?>) executeCommand(server, "nextflow.server.previewConfig", arguments);
     }
@@ -132,10 +132,10 @@ class ConfigPreviewTest {
      */
     static Map<?,?> preview(String config, String script, String process, List<String> profiles, String qualifiedName) {
         var server = TestServer.start();
-        open(server, getUri("nextflow.config"), config);
+        server.open("nextflow.config", config);
 
         var uri = getUri("main.nf");
-        open(server, uri, script);
+        server.open("main.nf", script);
         var arguments = List.<Object>of(asJson(uri), asJson(process), asJson(profiles), asJson(qualifiedName));
         return (Map<?,?>) executeCommand(server, "nextflow.server.previewConfig", arguments);
     }
@@ -389,7 +389,7 @@ class ConfigPreviewTest {
     void offerCodeActionForEachQualifiedNameOfInvocation(String location, int line, int character, List<String> expected) {
         var server = TestServer.start();
         var uri = getUri("main.nf");
-        open(server, uri, """
+        server.open("main.nf", """
             process ALIGN {
                 script:
                 \"""

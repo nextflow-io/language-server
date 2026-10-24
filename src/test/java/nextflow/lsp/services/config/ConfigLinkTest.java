@@ -45,7 +45,7 @@ class ConfigLinkTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, """
+        server.open("nextflow.config", """
             includeConfig 'conf/base.config'
             """);
         var links = getLinks(server, uri);
@@ -59,7 +59,7 @@ class ConfigLinkTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, """
+        server.open("nextflow.config", """
             includeConfig 'https://example.com/shared.config'
             """);
         var links = getLinks(server, uri);
@@ -73,7 +73,7 @@ class ConfigLinkTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, """
+        server.open("nextflow.config", """
             process.cpus = 2
             """);
 

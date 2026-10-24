@@ -57,7 +57,7 @@ class ScriptCallHierarchyTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, CONTENTS);
+        server.open("main.nf", CONTENTS);
         var atDef = prepare(server, uri, new Position(0, 9));
         var atCall = prepare(server, uri, new Position(4, 4));
 
@@ -75,7 +75,7 @@ class ScriptCallHierarchyTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, CONTENTS);
+        server.open("main.nf", CONTENTS);
         var item = prepare(server, uri, new Position(0, 9)).get(0);
         var incoming = server.call(s -> s.callHierarchyIncomingCalls(new CallHierarchyIncomingCallsParams(item)));
 
@@ -90,7 +90,7 @@ class ScriptCallHierarchyTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, CONTENTS);
+        server.open("main.nf", CONTENTS);
         var item = prepare(server, uri, new Position(3, 0)).get(0);
         var outgoing = server.call(s -> s.callHierarchyOutgoingCalls(new CallHierarchyOutgoingCallsParams(item)));
 
@@ -105,7 +105,7 @@ class ScriptCallHierarchyTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, CONTENTS);
+        server.open("main.nf", CONTENTS);
 
         // the blank line between the two workflows is not a method or call
         assertThat(prepare(server, uri, new Position(2, 0))).isEmpty();

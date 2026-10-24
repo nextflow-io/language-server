@@ -42,7 +42,7 @@ class ScriptCodeLensTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             workflow HELLO {
             }
 
@@ -62,10 +62,9 @@ class ScriptCodeLensTest {
     @SuppressWarnings("unchecked")
     void previewWorkspaceViaExecuteCommand() {
         var server = TestServer.start();
-        var uri = getUri("main.nf");
 
         // the request builds the workspace
-        open(server, uri, """
+        server.open("main.nf", """
             process FOO {
                 script:
                 "echo foo"

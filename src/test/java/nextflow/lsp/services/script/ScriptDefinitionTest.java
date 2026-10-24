@@ -55,7 +55,7 @@ class ScriptDefinitionTest {
                 HELLO()
             }
             """;
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         var location = getDefinition(server, uri, new Position(4, 4));
 
         assertThat(location).isNotNull();
@@ -70,7 +70,7 @@ class ScriptDefinitionTest {
         var mainUri = getUri("main.nf");
         var moduleUri = getUri("module.nf");
 
-        open(server, moduleUri, """
+        server.open("module.nf", """
             workflow HELLO {
                 take:
                 target
@@ -79,7 +79,7 @@ class ScriptDefinitionTest {
                 println "Hello, ${target}!"
             }
             """);
-        open(server, mainUri, """
+        server.open("main.nf", """
             include { HELLO } from './module.nf'
 
             workflow {

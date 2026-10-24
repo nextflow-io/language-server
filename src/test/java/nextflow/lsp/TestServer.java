@@ -212,7 +212,7 @@ public final class TestServer implements AutoCloseable {
     }
 
     public String uri(String path) {
-        return path(path).toUri().toString();
+        return TestUtils.getUri(path);
     }
 
     public TextDocumentIdentifier document(String path) {
@@ -223,14 +223,7 @@ public final class TestServer implements AutoCloseable {
      * Write a file to disk, without notifying the server.
      */
     public void write(String path, String text) {
-        var file = path(path);
-        try {
-            Files.createDirectories(file.getParent());
-            Files.writeString(file, text.stripIndent());
-        }
-        catch( IOException e ) {
-            throw new UncheckedIOException(e);
-        }
+        TestUtils.writeWorkspaceFile(path, text);
     }
 
     /**

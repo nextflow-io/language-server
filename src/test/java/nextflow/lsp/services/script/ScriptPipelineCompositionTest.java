@@ -64,7 +64,7 @@ class ScriptPipelineCompositionTest {
 
     static TestServer pipelineService(TestLanguageClient client) {
         var server = TestServer.start((o) -> o.client = client);
-        open(server, getUri("rnaseq.nf"), PIPELINE);
+        server.open("rnaseq.nf", PIPELINE);
         return server;
     }
 
@@ -74,7 +74,7 @@ class ScriptPipelineCompositionTest {
         var server = pipelineService(client);
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             nextflow.enable.types = true
 
             include {
@@ -108,7 +108,7 @@ class ScriptPipelineCompositionTest {
         var server = pipelineService();
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             nextflow.enable.types = true
 
             include { workflow as RNASEQ } from './rnaseq.nf'

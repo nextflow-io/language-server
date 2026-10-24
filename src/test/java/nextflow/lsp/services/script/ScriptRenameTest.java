@@ -67,7 +67,7 @@ class ScriptRenameTest {
                 HELLO()
             }
             """;
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         var changes = rename(server, uri, new Position(0, 9), "hi");
 
         assertThat(changes.get(uri)).hasSize(2);
@@ -93,7 +93,7 @@ class ScriptRenameTest {
                 greeting.view()
             }
             """;
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         var changes = rename(server, uri, new Position(2, 4), "message");
 
         assertThat(changes.get(uri)).hasSize(2);
@@ -120,7 +120,7 @@ class ScriptRenameTest {
                 HELLO()
             }
             """;
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         var changes = rename(server, uri, new Position(0, 8), "hi");
 
         assertThat(changes.get(uri)).hasSize(2);
@@ -146,7 +146,7 @@ class ScriptRenameTest {
                 "echo $greeting"
             }
             """;
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         var changes = rename(server, uri, new Position(2, 8), "message");
 
         assertThat(changes.get(uri)).hasSize(2);
@@ -167,7 +167,7 @@ class ScriptRenameTest {
             def msg = 'hello'
             println msg
             """;
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         var changes = rename(server, uri, new Position(0, 4), "message");
 
         assertThat(changes.get(uri)).hasSize(2);
@@ -192,7 +192,7 @@ class ScriptRenameTest {
                 hello()
             }
             """;
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         var changes = rename(server, uri, new Position(0, 4), "hi");
 
         assertThat(changes.get(uri)).hasSize(2);
@@ -214,7 +214,7 @@ class ScriptRenameTest {
                 println greeting
             }
             """;
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         var changes = rename(server, uri, new Position(0, 10), "message");
 
         assertThat(changes.get(uri)).hasSize(2);

@@ -69,7 +69,7 @@ class ConfigCompletionTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, "wor\n");
+        server.open("nextflow.config", "wor\n");
         var completions = getCompletions(server, uri, new Position(0, 3));
         var byLabel = byLabel(completions);
 
@@ -85,7 +85,7 @@ class ConfigCompletionTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, "process.\n");
+        server.open("nextflow.config", "process.\n");
         var completions = getCompletions(server, uri, new Position(0, 8));
         var cpus = findByLabel(completions, "cpus");
 
@@ -99,7 +99,7 @@ class ConfigCompletionTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, "process.\n");
+        server.open("nextflow.config", "process.\n");
         var completions = getCompletions(server, uri, new Position(0, 8));
         var byLabel = byLabel(completions);
 
@@ -113,7 +113,7 @@ class ConfigCompletionTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, """
+        server.open("nextflow.config", """
             profiles {
                 standard {
                     process.
@@ -131,7 +131,7 @@ class ConfigCompletionTest {
         var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(server, uri, "process.\n");
+        server.open("nextflow.config", "process.\n");
         var result = either(server, uri, new Position(0, 8), 1);
 
         assertThat(result.isRight()).isTrue();

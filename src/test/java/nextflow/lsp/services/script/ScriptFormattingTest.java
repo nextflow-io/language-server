@@ -43,10 +43,10 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 @ExtendWith(TestWorkspace.class)
 class ScriptFormattingTest {
 
-    static void checkFormat(TestServer server, String uri, FormattingOptions options, String before, String after) {
+    static void checkFormat(TestServer server, FormattingOptions options, String before, String after) {
         // open verbatim to preserve CRLF line endings
-        openVerbatim(server, uri, before);
-        var textEdits = formatting(server, uri, options);
+        server.openVerbatim("main.nf", before);
+        var textEdits = formatting(server, server.uri("main.nf"), options);
         // the provider returns no edits both when the document is already
         // formatted and when it refuses to format (e.g. a comment would be
         // lost), so a document that should change must produce an edit
@@ -56,8 +56,8 @@ class ScriptFormattingTest {
         assertThat(newText).isEqualTo(after);
     }
 
-    static void checkFormat(TestServer server, String uri, String before, String after) {
-        checkFormat(server, uri, new FormattingOptions(4, true), before, after);
+    static void checkFormat(TestServer server, String before, String after) {
+        checkFormat(server, new FormattingOptions(4, true), before, after);
     }
 
     /**
@@ -74,13 +74,13 @@ class ScriptFormattingTest {
         var options = new FormattingOptions(4, true);
 
         return Golden.inputs("format/script", ".nf").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
-            openVerbatim(server, uri, Golden.read(input));
+            server.openVerbatim("main.nf", Golden.read(input));
             var textEdits = formatting(server, uri, options);
             assertThat(textEdits).isNotEmpty();
             var formatted = textEdits.get(0).getNewText();
             Golden.check(Golden.sibling(input, ".formatted"), formatted);
 
-            openVerbatim(server, uri, formatted);
+            server.openVerbatim("main.nf", formatted);
             var reformatted = formatting(server, uri, options);
             if( !reformatted.isEmpty() )
                 assertThat(reformatted.get(0).getNewText()).isEqualTo(formatted);
@@ -90,10 +90,9 @@ class ScriptFormattingTest {
     @Test
     void reindentMultiLineStrings() {
         var server = TestServer.start();
-        var uri = getUri("main.nf");
         var options = new FormattingOptions(2, true);
 
-        checkFormat(server, uri, options,
+        checkFormat(server, options,
             """
             process foo {
                 script:
@@ -116,9 +115,8 @@ class ScriptFormattingTest {
     @Test
     void formatLeadingCommentsInFileWithCrlfLineEndings() {
         var server = TestServer.start();
-        var uri = getUri("main.nf");
 
-        checkFormat(server, uri,
+        checkFormat(server,
             "workflow {\r\n    // ALIGN reads to reference genome\r\n    BWA_ALIGN(sample_id, library_id)\r\n}\r\n",
             """
             workflow {
@@ -153,7 +151,7 @@ class ScriptFormattingTest {
             """;
         var expected = contents.replace("y=1", "y = 1");
 
-        open(server, uri, contents);
+        server.open("main.nf", contents);
         var texts = new ArrayList<String>();
         for( int i = 0; i < 3; i++ ) {
             var edits = formatting(server, uri, new FormattingOptions(4, true));

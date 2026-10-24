@@ -57,7 +57,7 @@ class PreviewDagTest {
         var rootUri = workspaceRootUri();
 
         return Golden.inputs("dag", ".nf").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
-            openVerbatim(server, uri, Golden.read(input));
+            server.openVerbatim("main.nf", Golden.read(input));
             var lenses = server.call(s -> s.codeLens(new CodeLensParams(new TextDocumentIdentifier(uri)))).stream()
                 .filter(lens -> "nextflow.previewDag".equals(lens.getCommand().getCommand()))
                 .toList();

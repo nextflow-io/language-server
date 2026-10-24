@@ -62,7 +62,7 @@ class ScriptSymbolTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, """
+        server.open("main.nf", """
             record Sample {
                 id: String
             }
@@ -104,7 +104,7 @@ class ScriptSymbolTest {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(server, uri, "");
+        server.open("main.nf", "");
 
         assertThat(getDocumentSymbols(server, uri)).isEmpty();
     }
@@ -112,10 +112,8 @@ class ScriptSymbolTest {
     @Test
     void findWorkspaceSymbolsByCaseInsensitiveSubstring() {
         var server = TestServer.start();
-        var mainUri = getUri("main.nf");
-        var moduleUri = getUri("module.nf");
 
-        open(server, moduleUri, """
+        server.open("module.nf", """
             process ALIGN {
                 script:
                 \"""
@@ -123,7 +121,7 @@ class ScriptSymbolTest {
                 \"""
             }
             """);
-        open(server, mainUri, """
+        server.open("main.nf", """
             workflow ALIGN_READS {
             }
 
