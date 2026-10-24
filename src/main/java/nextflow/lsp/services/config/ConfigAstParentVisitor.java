@@ -33,7 +33,7 @@ import org.codehaus.groovy.control.SourceUnit;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-class ConfigAstParentVisitor extends ConfigVisitorSupport {
+public class ConfigAstParentVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit;
 

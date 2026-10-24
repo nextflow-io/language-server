@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import nextflow.lsp.ast.LanguageServerASTUtils;
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.CallHierarchyProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
@@ -37,6 +38,7 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SymbolKind;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 /**
  * Provide the hierarchy of incoming/outgoing calls
@@ -48,10 +50,17 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public ScriptCallHierarchyProvider(ScriptAstCache ast) {
+    private CancelChecker cancelChecker;
+
+    public ScriptCallHierarchyProvider(ScriptView ast) {
+        this(ast, () -> {});
+    }
+
+    public ScriptCallHierarchyProvider(ScriptView ast, CancelChecker cancelChecker) {
         this.ast = ast;
+        this.cancelChecker = cancelChecker;
     }
 
     /**
@@ -121,7 +130,7 @@ public class ScriptCallHierarchyProvider implements CallHierarchyProvider {
         if( offsetNode == null )
             return Collections.emptyList();
 
-        var references = LanguageServerASTUtils.getReferences(offsetNode, ast, false);
+        var references = LanguageServerASTUtils.getReferences(offsetNode, ast, false, cancelChecker);
         var referencesMap = new HashMap<MethodNode, List<Range>>();
         references.forEachRemaining((refNode) -> {
             if( !(refNode instanceof MethodCallExpression || refNode instanceof VariableExpression) )

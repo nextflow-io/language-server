@@ -27,6 +27,7 @@ import nextflow.config.ast.ConfigIncompleteNode;
 import nextflow.config.dsl.ConfigDsl;
 import nextflow.config.spec.SpecNode;
 import nextflow.lsp.ast.CompletionHelper;
+import nextflow.lsp.ast.ConfigView;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.script.dsl.Types;
@@ -64,10 +65,10 @@ public class ConfigCompletionProvider implements CompletionProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ConfigAstCache ast;
+    private ConfigView ast;
     private CompletionHelper ch;
 
-    public ConfigCompletionProvider(ConfigAstCache ast, int maxItems) {
+    public ConfigCompletionProvider(ConfigView ast, int maxItems) {
         this.ast = ast;
         this.ch = new CompletionHelper(maxItems);
     }

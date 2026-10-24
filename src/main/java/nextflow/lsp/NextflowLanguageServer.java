@@ -17,27 +17,45 @@ package nextflow.lsp;
 
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
+import nextflow.lsp.engine.DefaultEngineEnvironment;
+import nextflow.lsp.engine.Engine;
+import nextflow.lsp.engine.EngineEnvironment;
+import nextflow.lsp.engine.EngineState;
+import nextflow.lsp.engine.Event;
+import nextflow.lsp.engine.FileKind;
+import nextflow.lsp.engine.Need;
+import nextflow.lsp.engine.RequestContext;
+import nextflow.lsp.engine.RequestSpec;
+import nextflow.lsp.engine.Uris;
+import nextflow.lsp.engine.Workspace;
+import nextflow.lsp.services.SemanticTokensVisitor;
+import nextflow.lsp.services.config.ConfigCompletionProvider;
+import nextflow.lsp.services.config.ConfigFormattingProvider;
+import nextflow.lsp.services.config.ConfigHoverProvider;
+import nextflow.lsp.services.config.ConfigLinkProvider;
+import nextflow.lsp.services.config.ConfigSemanticTokensProvider;
+import nextflow.lsp.services.script.ConfigPreviewProvider;
+import nextflow.lsp.services.script.ScriptCallHierarchyProvider;
+import nextflow.lsp.services.script.ScriptCodeActionProvider;
+import nextflow.lsp.services.script.ScriptCodeLensProvider;
+import nextflow.lsp.services.script.ScriptCompletionProvider;
+import nextflow.lsp.services.script.ScriptDefinitionProvider;
+import nextflow.lsp.services.script.ScriptFormattingProvider;
+import nextflow.lsp.services.script.ScriptHoverProvider;
+import nextflow.lsp.services.script.ScriptLinkProvider;
+import nextflow.lsp.services.script.ScriptReferenceProvider;
+import nextflow.lsp.services.script.ScriptSemanticTokensProvider;
+import nextflow.lsp.services.script.ScriptSymbolProvider;
+import nextflow.lsp.services.script.WorkspacePreviewProvider;
 import nextflow.lsp.util.JsonUtils;
 import nextflow.lsp.util.Logger;
-import nextflow.lsp.util.ProgressNotification;
-import nextflow.lsp.services.ErrorReportingMode;
-import nextflow.lsp.services.LanguageServerConfiguration;
-import nextflow.lsp.services.LanguageService;
-import nextflow.lsp.services.SemanticTokensVisitor;
-import nextflow.lsp.services.config.ConfigService;
-import nextflow.lsp.services.script.ScriptService;
 import nextflow.script.formatter.FormattingOptions;
-import nextflow.util.PathUtils;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.eclipse.lsp4j.CallHierarchyIncomingCall;
 import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams;
 import org.eclipse.lsp4j.CallHierarchyItem;
@@ -75,12 +93,12 @@ import org.eclipse.lsp4j.ExecuteCommandParams;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.InitializeParams;
-import org.eclipse.lsp4j.RenameFilesParams;
 import org.eclipse.lsp4j.InitializeResult;
 import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.ReferenceParams;
+import org.eclipse.lsp4j.RenameFilesParams;
 import org.eclipse.lsp4j.RenameParams;
 import org.eclipse.lsp4j.SemanticTokens;
 import org.eclipse.lsp4j.SemanticTokensLegend;
@@ -92,12 +110,10 @@ import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
-import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersOptions;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceSymbol;
 import org.eclipse.lsp4j.WorkspaceSymbolParams;
-import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -107,6 +123,12 @@ import org.eclipse.lsp4j.services.TextDocumentService;
 import org.eclipse.lsp4j.services.WorkspaceService;
 
 /**
+ * Adapter from lsp4j to the language service engine.
+ *
+ * Every notification is submitted to the engine as an event, and
+ * every request as a request with its freshness need, so that the
+ * lsp4j reader thread never blocks. The engine is created when the
+ * client is connected.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -119,55 +141,54 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         launcher.startListening();
     }
 
-    private static final String DEFAULT_WORKSPACE_FOLDER_NAME = "";
+    private static final String PREVIEW_CONFIG = "nextflow.server.previewConfig";
+
+    private static final String PREVIEW_DAG = "nextflow.server.previewDag";
+
+    private static final String PREVIEW_WORKSPACE = "nextflow.server.previewWorkspace";
 
     private static Logger log = Logger.getInstance();
 
-    private LanguageClient client = null;
+    private final EngineEnvironment environment;
 
-    private Map<String, String> workspaceRoots = new HashMap<>();
-    private Map<String, ConfigService> configServices = new HashMap<>();
-    private Map<String, ScriptService> scriptServices = new HashMap<>();
+    private final EngineState.Factory stateFactory;
 
-    private LanguageServerConfiguration configuration = LanguageServerConfiguration.defaults();
+    private volatile Engine engine;
 
-    private boolean workDoneProgress;
-
-    private long debounceMillis;
+    private volatile boolean shutdownReceived;
 
     public NextflowLanguageServer() {
-        this(LanguageService.DEFAULT_DEBOUNCE_MILLIS);
+        this(new DefaultEngineEnvironment(), Workspace.factory());
     }
 
-    public NextflowLanguageServer(long debounceMillis) {
-        this.debounceMillis = debounceMillis;
+    /**
+     * Create a server with the given environment and engine state,
+     * for testing.
+     *
+     * @param environment
+     * @param stateFactory
+     */
+    NextflowLanguageServer(EngineEnvironment environment, EngineState.Factory stateFactory) {
+        this.environment = environment;
+        this.stateFactory = stateFactory;
+    }
+
+    /**
+     * The engine, once the client is connected.
+     */
+    Engine engine() {
+        var result = engine;
+        if( result == null )
+            throw new IllegalStateException("Language server is not connected to a client");
+        return result;
     }
 
     // -- LanguageServer
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
-        var window = params.getCapabilities() != null ? params.getCapabilities().getWindow() : null;
-        workDoneProgress = window != null && Boolean.TRUE.equals(window.getWorkDoneProgress());
-
-        addWorkspaceFolder(DEFAULT_WORKSPACE_FOLDER_NAME, null);
-
-        var workspaceFolders = params.getWorkspaceFolders();
-        if( workspaceFolders != null && !workspaceFolders.isEmpty() ) {
-            for( var workspaceFolder : workspaceFolders ) {
-                var name = workspaceFolderName(workspaceFolder);
-                var uri = workspaceFolder.getUri();
-                addWorkspaceFolder(name, uri);
-            }
-        }
-        else if( params.getRootUri() != null ) {
-            // fallback for clients that only send the (deprecated) root URI
-            var workspaceFolder = new WorkspaceFolder(params.getRootUri(), DEFAULT_WORKSPACE_FOLDER_NAME);
-            addWorkspaceFolder(workspaceFolderName(workspaceFolder), workspaceFolder.getUri());
-        }
-
-        var initializeResult = new InitializeResult(serverCapabilities());
-        return CompletableFuture.completedFuture(initializeResult);
+        engine().submit(new Event.Init(params));
+        return CompletableFuture.completedFuture(new InitializeResult(serverCapabilities()));
     }
 
     private static ServerCapabilities serverCapabilities() {
@@ -192,9 +213,9 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         result.setDocumentLinkProvider(documentLinkOptions);
         result.setDocumentSymbolProvider(true);
         var commands = List.of(
-            "nextflow.server.previewConfig",
-            "nextflow.server.previewDag",
-            "nextflow.server.previewWorkspace"
+            PREVIEW_CONFIG,
+            PREVIEW_DAG,
+            PREVIEW_WORKSPACE
         );
         var executeCommandOptions = new ExecuteCommandOptions(commands);
         result.setExecuteCommandProvider(executeCommandOptions);
@@ -215,8 +236,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public void initialized(InitializedParams params) {
-        // initialize with the default configuration, since some clients never send one
-        initializeWorkspaces();
+        engine().submit(new Event.Initialized(params));
     }
 
     @Override
@@ -226,12 +246,13 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<Object> shutdown() {
-        return CompletableFuture.completedFuture(new Object());
+        shutdownReceived = true;
+        return engine().shutdown();
     }
 
     @Override
     public void exit() {
-        System.exit(0);
+        environment.exiter().accept(shutdownReceived ? 0 : 1);
     }
 
     @Override
@@ -248,176 +269,144 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public void connect(LanguageClient client) {
-        this.client = client;
+        if( engine != null )
+            throw new IllegalStateException("Language server is already connected to a client");
         log.initialize(client);
+        engine = new Engine(environment, client, Engine.DEFAULT_DEBOUNCE, stateFactory);
     }
 
     // -- TextDocumentService
 
     @Override
     public void didOpen(DidOpenTextDocumentParams params) {
-        var uri = params.getTextDocument().getUri();
-        log.debug("textDocument/didOpen " + relativePath(uri));
-
-        var service = getLanguageService(uri);
-        if( service != null )
-            service.didOpen(params);
+        log.debug("textDocument/didOpen " + params.getTextDocument().getUri());
+        engine().submit(new Event.DidOpen(params));
     }
 
     @Override
     public void didChange(DidChangeTextDocumentParams params) {
-        var uri = params.getTextDocument().getUri();
-        log.debug("textDocument/didChange " + relativePath(uri));
-
-        var service = getLanguageService(uri);
-        if( service != null )
-            service.didChange(params);
+        log.debug("textDocument/didChange " + params.getTextDocument().getUri());
+        engine().submit(new Event.DidChange(params));
     }
 
     @Override
     public void didClose(DidCloseTextDocumentParams params) {
-        var uri = params.getTextDocument().getUri();
-        log.debug("textDocument/didClose " + relativePath(uri));
-
-        var service = getLanguageService(uri);
-        if( service != null )
-            service.didClose(params);
+        log.debug("textDocument/didClose " + params.getTextDocument().getUri());
+        engine().submit(new Event.DidClose(params));
     }
 
     @Override
     public void didSave(DidSaveTextDocumentParams params) {
-        var uri = params.getTextDocument().getUri();
-        log.debug("textDocument/didSave " + relativePath(uri));
+        log.debug("textDocument/didSave " + params.getTextDocument().getUri());
     }
 
     @Override
     public CompletableFuture<List<CallHierarchyItem>> prepareCallHierarchy(CallHierarchyPrepareParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            log.debug("textDocument/prepareCallHierarchy " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return null;
-            return service.prepareCallHierarchy(params);
-        });
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        return fileRequest("textDocument/prepareCallHierarchy", textDocument.getUri(), null, (ctx) ->
+            ctx.project().scripts()
+                .map(ast -> ClientUris.items(new ScriptCallHierarchyProvider(ast).prepare(textDocument, params.getPosition()), ctx.clientUri()))
+                .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<List<CallHierarchyIncomingCall>> callHierarchyIncomingCalls(CallHierarchyIncomingCallsParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var item = params.getItem();
-            var uri = item.getUri();
-            log.debug("textDocument/callHierarchyIncomingCalls " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return null;
-            return service.callHierarchyIncomingCalls(item);
-        });
+        var item = ClientUris.canonical(params.getItem());
+        if( !isScript(item.getUri()) )
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        return request("callHierarchy/incomingCalls", item.getUri(), null, Need.PROJECT, true, null, (ctx) ->
+            ctx.project().scripts()
+                .map(ast -> ClientUris.incoming(new ScriptCallHierarchyProvider(ast, ctx.cancelChecker()).incomingCalls(item), ctx.clientUri()))
+                .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<List<CallHierarchyOutgoingCall>> callHierarchyOutgoingCalls(CallHierarchyOutgoingCallsParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var item = params.getItem();
-            var uri = item.getUri();
-            log.debug("textDocument/callHierarchyOutgoingCalls " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return null;
-            return service.callHierarchyOutgoingCalls(item);
-        });
+        var item = ClientUris.canonical(params.getItem());
+        return fileRequest("callHierarchy/outgoingCalls", item.getUri(), null, (ctx) ->
+            ctx.project().scripts()
+                .map(ast -> ClientUris.outgoing(new ScriptCallHierarchyProvider(ast).outgoingCalls(item), ctx.clientUri()))
+                .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            log.debug("textDocument/codeAction " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return Collections.emptyList();
-            return service.codeAction(params).stream()
-                .map(action -> Either.<Command,CodeAction>forRight(action))
-                .toList();
-        });
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        // the call paths are read from the includers as last built, so they
+        // may be stale until the background build catches up
+        return fileRequest("textDocument/codeAction", textDocument.getUri(), Collections.emptyList(), (ctx) ->
+            ctx.project().scripts()
+                .map(ast -> new ScriptCodeActionProvider(ast).codeAction(textDocument, params.getRange()).stream()
+                    .peek(action -> ClientUris.command(action.getCommand(), ctx.clientUri()))
+                    .map(action -> Either.<Command,CodeAction>forRight(action))
+                    .toList())
+                .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            log.debug("textDocument/codeLens " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return Collections.emptyList();
-            return service.codeLens(params);
-        });
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        return fileRequest("textDocument/codeLens", textDocument.getUri(), Collections.emptyList(), (ctx) ->
+            ctx.project().scripts()
+                .<List<? extends CodeLens>>map(ast -> ClientUris.codeLenses(new ScriptCodeLensProvider(ast).codeLens(textDocument), ctx.clientUri()))
+                .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            var position = params.getPosition();
-            log.debug(String.format("textDocument/completion %s [ %d, %d ]", relativePath(uri), position.getLine(), position.getCharacter()));
-            var service = getLanguageService(uri);
-            if( service == null )
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        var position = params.getPosition();
+        return fileRequest("textDocument/completion", textDocument.getUri(), Either.forLeft(Collections.emptyList()), (ctx) -> {
+            var configuration = ctx.configuration();
+            var project = ctx.project();
+            var uri = URI.create(textDocument.getUri());
+            var scripts = project.scripts();
+            if( scripts.isPresent() ) {
+                if( scripts.get().isCommentPosition(uri, position) )
+                    return Either.forLeft(Collections.emptyList());
+                return new ScriptCompletionProvider(scripts.get(), configuration.maxCompletionItems(), configuration.extendedCompletion()).completion(textDocument, position);
+            }
+            var configs = project.configView();
+            if( configs.isCommentPosition(uri, position) )
                 return Either.forLeft(Collections.emptyList());
-            return service.completion(params, configuration.maxCompletionItems(), configuration.extendedCompletion());
+            return new ConfigCompletionProvider(configs, configuration.maxCompletionItems()).completion(textDocument, position);
         });
     }
 
     @Override
     public CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> definition(DefinitionParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            var position = params.getPosition();
-            log.debug(String.format("textDocument/definition %s [ %d, %d ]", relativePath(uri), position.getLine(), position.getCharacter()));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return Either.forLeft(Collections.emptyList());
-            return service.definition(params);
-        });
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        return fileRequest("textDocument/definition", textDocument.getUri(), Either.forLeft(Collections.emptyList()), (ctx) ->
+            ctx.project().scripts()
+                .map(ast -> ClientUris.definition(new ScriptDefinitionProvider(ast).definition(textDocument, params.getPosition()), ctx.clientUri()))
+                .orElse(Either.forLeft(Collections.emptyList())));
     }
 
     @Override
     public CompletableFuture<List<DocumentLink>> documentLink(DocumentLinkParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            log.debug("textDocument/documentLink " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return Collections.emptyList();
-            return service.documentLink(params);
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        return fileRequest("textDocument/documentLink", textDocument.getUri(), Collections.emptyList(), (ctx) -> {
+            var project = ctx.project();
+            return project.scripts()
+                .map(ast -> new ScriptLinkProvider(ast).documentLink(textDocument))
+                .orElseGet(() -> new ConfigLinkProvider(project.configView()).documentLink(textDocument));
         });
     }
 
     @Override
     public CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            log.debug("textDocument/symbol " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return Collections.emptyList();
-            return service.documentSymbol(params);
-        });
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        return fileRequest("textDocument/documentSymbol", textDocument.getUri(), Collections.emptyList(), (ctx) ->
+            ctx.project().scripts()
+                .map(ast -> new ScriptSymbolProvider(ast).documentSymbol(textDocument))
+                .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        return fileRequest("textDocument/formatting", textDocument.getUri(), Collections.emptyList(), (ctx) -> {
+            var configuration = ctx.configuration();
             var options = new FormattingOptions(
                 params.getOptions().getTabSize(),
                 params.getOptions().isInsertSpaces(),
@@ -425,158 +414,76 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 configuration.maheshForm(),
                 configuration.sortDeclarations()
             );
-            log.debug(String.format("textDocument/formatting %s %s %d", relativePath(uri), options.insertSpaces() ? "spaces" : "tabs", options.tabSize()));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return Collections.emptyList();
-            return service.formatting(URI.create(uri), options);
+            var project = ctx.project();
+            var uri = URI.create(textDocument.getUri());
+            return project.scripts()
+                .<List<? extends TextEdit>>map(ast -> new ScriptFormattingProvider(ast).formatting(uri, options))
+                .orElseGet(() -> new ConfigFormattingProvider(project.configView()).formatting(uri, options));
         });
     }
 
     @Override
     public CompletableFuture<Hover> hover(HoverParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            var service = getLanguageService(uri);
-            if( service == null )
-                return null;
-            return service.hover(params);
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        return fileRequest("textDocument/hover", textDocument.getUri(), null, (ctx) -> {
+            var project = ctx.project();
+            return project.scripts()
+                .map(ast -> new ScriptHoverProvider(ast).hover(textDocument, params.getPosition()))
+                .orElseGet(() -> new ConfigHoverProvider(project.configView()).hover(textDocument, params.getPosition()));
         });
     }
 
     @Override
     public CompletableFuture<List<? extends Location>> references(ReferenceParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            var position = params.getPosition();
-            log.debug(String.format("textDocument/references %s [ %d, %d ]", relativePath(uri), position.getLine(), position.getCharacter()));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return Collections.emptyList();
-            return service.references(params);
-        });
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        if( !isScript(textDocument.getUri()) )
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        return request("textDocument/references", textDocument.getUri(), null, Need.PROJECT, true, Collections.emptyList(), (ctx) ->
+            ctx.project().scripts()
+                .<List<? extends Location>>map(ast -> ClientUris.locations(new ScriptReferenceProvider(ast, ctx.cancelChecker()).references(textDocument, params.getPosition(), params.getContext().isIncludeDeclaration()), ctx.clientUri()))
+                .orElse(Collections.emptyList()));
     }
 
     @Override
     public CompletableFuture<WorkspaceEdit> rename(RenameParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            var position = params.getPosition();
-            log.debug(String.format("textDocument/rename %s [ %d, %d ] -> %s", relativePath(uri), position.getLine(), position.getCharacter(), params.getNewName()));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return null;
-            return service.rename(params);
-        });
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        if( !isScript(textDocument.getUri()) )
+            return CompletableFuture.completedFuture(null);
+        return request("textDocument/rename", textDocument.getUri(), null, Need.PROJECT, true, null, (ctx) ->
+            ctx.project().scripts()
+                .map(ast -> ClientUris.edit(new ScriptReferenceProvider(ast, ctx.cancelChecker()).rename(textDocument, params.getPosition(), params.getNewName()), ctx.clientUri()))
+                .orElse(null));
     }
 
     @Override
     public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var uri = params.getTextDocument().getUri();
-            log.debug("textDocument/semanticTokens/full " + relativePath(uri));
-            var service = getLanguageService(uri);
-            if( service == null )
-                return null;
-            return service.semanticTokensFull(params);
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        return fileRequest("textDocument/semanticTokens/full", textDocument.getUri(), null, (ctx) -> {
+            var project = ctx.project();
+            return project.scripts()
+                .map(ast -> new ScriptSemanticTokensProvider(ast).semanticTokensFull(textDocument))
+                .orElseGet(() -> new ConfigSemanticTokensProvider(project.configView()).semanticTokensFull(textDocument));
         });
     }
 
-    // --- WorkspaceService
+    // -- WorkspaceService
 
     @Override
     public void didChangeConfiguration(DidChangeConfigurationParams params) {
-        var settings = params.getSettings();
-        log.debug("workspace/didChangeConfiguration " + settings);
-
-        var debug = JsonUtils.getBoolean(settings, "nextflow.debug");
-        if( debug != null )
-            Logger.setDebugEnabled(debug);
-
-        var oldConfiguration = configuration;
-        configuration = new LanguageServerConfiguration(
-            withDefault(JsonUtils.getString(settings, "nextflow.dag.direction"), configuration.dagDirection()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.dag.verbose"), configuration.dagVerbose()),
-            withDefault(errorReportingMode(settings), configuration.errorReportingMode()),
-            withDefault(JsonUtils.getStringArray(settings, "nextflow.files.exclude"), configuration.excludePatterns()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.completion.extended"), configuration.extendedCompletion()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.harshilAlignment"), configuration.harshilAlignment()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.maheshForm"), configuration.maheshForm()),
-            withDefault(JsonUtils.getInteger(settings, "nextflow.completion.maxItems"), configuration.maxCompletionItems()),
-            withDefault(JsonUtils.getString(settings, "nextflow.pluginRegistryUrl"), configuration.pluginRegistryUrl()),
-            withDefault(JsonUtils.getBoolean(settings, "nextflow.formatting.sortDeclarations"), configuration.sortDeclarations())
-        );
-
-        if( shouldInitialize(oldConfiguration, configuration) )
-            initializeWorkspaces();
-    }
-
-    private ErrorReportingMode errorReportingMode(Object settings) {
-        var string = JsonUtils.getString(settings, "nextflow.errorReportingMode");
-        if( string == null )
-            return null;
-        return ErrorReportingMode.valueOf(string.toUpperCase());
-    }
-
-    private <T> T withDefault(T value, T defaultValue) {
-        return value != null ? value : defaultValue;
-    }
-
-    private boolean shouldInitialize(LanguageServerConfiguration previous, LanguageServerConfiguration current) {
-        return previous.errorReportingMode() != current.errorReportingMode()
-            || !DefaultGroovyMethods.equals(previous.excludePatterns(), current.excludePatterns())
-            || !Objects.equals(previous.pluginRegistryUrl(), current.pluginRegistryUrl());
-    }
-
-    private void initializeWorkspaces() {
-        var progress = new ProgressNotification(client, "initialize", workDoneProgress);
-        progress.create();
-        progress.begin("Initializing", "Initializing workspace...");
-
-        var count = 0;
-        var total = workspaceRoots.keySet().size() - 1;
-        for( var name : workspaceRoots.keySet() ) {
-            // the default workspace contains files outside of the workspace folders
-            if( !DEFAULT_WORKSPACE_FOLDER_NAME.equals(name) ) {
-                var progressMessage = String.format("Initializing workspace: %s (%d / %d)", name, count + 1, total);
-                progress.update(progressMessage, count * 100 / total);
-                count++;
-            }
-
-            configServices.get(name).initialize(configuration);
-            scriptServices.get(name).initialize(configuration, configServices.get(name));
-        }
-
-        progress.end();
+        log.debug("workspace/didChangeConfiguration " + params.getSettings());
+        engine().submit(new Event.ConfigChanged(params));
     }
 
     @Override
     public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
         log.debug("workspace/didChangeWatchedFiles " + params);
+        engine().submit(new Event.WatchedFiles(params));
     }
 
     @Override
     public void didChangeWorkspaceFolders(DidChangeWorkspaceFoldersParams params) {
-        var event = params.getEvent();
-        for( var workspaceFolder : event.getRemoved() ) {
-            var name = workspaceFolderName(workspaceFolder);
-            log.debug("workspace/didChangeWorkspaceFolders remove " + name);
-            workspaceRoots.remove(name);
-            configServices.remove(name).clearDiagnostics();
-            scriptServices.remove(name).clearDiagnostics();
-        }
-        for( var workspaceFolder : event.getAdded() ) {
-            var name = workspaceFolderName(workspaceFolder);
-            var uri = workspaceFolder.getUri();
-            log.debug("workspace/didChangeWorkspaceFolders add " + name + " " + uri);
-            addWorkspaceFolder(name, uri);
-            configServices.get(name).initialize(configuration);
-            scriptServices.get(name).initialize(configuration, configServices.get(name));
-        }
+        log.debug("workspace/didChangeWorkspaceFolders " + params);
+        engine().submit(new Event.FoldersChanged(params));
     }
 
     @Override
@@ -596,105 +503,76 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public CompletableFuture<Object> executeCommand(ExecuteCommandParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            var command = params.getCommand();
-            var arguments = params.getArguments();
-            if( "nextflow.server.previewDag".equals(command) && arguments.size() == 2 ) {
-                log.debug(String.format("textDocument/previewDag %s", arguments.toString()));
-                var uri = JsonUtils.getString(arguments.get(0));
-                var service = getLanguageService(uri);
-                if( service != null )
-                    return service.executeCommand(command, arguments, configuration);
-            }
-            if( "nextflow.server.previewConfig".equals(command) && arguments.size() == 4 ) {
-                log.debug(String.format("textDocument/previewConfig %s", arguments.toString()));
-                var uri = JsonUtils.getString(arguments.get(0));
-                var service = getLanguageService(uri);
-                if( service != null )
-                    return service.executeCommand(command, arguments, configuration);
-            }
-            if( "nextflow.server.previewWorkspace".equals(command) && arguments.size() == 1 ) {
-                log.debug(String.format("textDocument/previewWorkspace %s", arguments.toString()));
-                var name = JsonUtils.getString(arguments.get(0));
-                var service = scriptServices.get(name);
-                if( service != null )
-                    return service.executeCommand(command, arguments, configuration);
-            }
-            return null;
-        });
+        var command = params.getCommand();
+        var arguments = params.getArguments() != null ? params.getArguments() : List.<Object>of();
+        if( PREVIEW_DAG.equals(command) && arguments.size() == 2 ) {
+            var uri = ClientUris.canonical(JsonUtils.getString(arguments.get(0)));
+            var name = JsonUtils.getString(arguments.get(1));
+            return fileRequest(PREVIEW_DAG, uri, null, (ctx) -> {
+                var configuration = ctx.configuration();
+                return ctx.project().scripts()
+                    .map(ast -> new ScriptCodeLensProvider(ast).previewDag(uri, name, configuration.dagDirection(), configuration.dagVerbose()))
+                    .orElse(null);
+            });
+        }
+        if( PREVIEW_CONFIG.equals(command) && arguments.size() == 4 ) {
+            var uri = ClientUris.canonical(JsonUtils.getString(arguments.get(0)));
+            var name = JsonUtils.getString(arguments.get(1));
+            var profiles = JsonUtils.getStringArray(arguments.get(2));
+            var qualifiedName = JsonUtils.getString(arguments.get(3));
+            return request(PREVIEW_CONFIG, uri, null, Need.PROJECT_CONFIGS, false, null, (ctx) -> {
+                var project = ctx.project();
+                return project.scripts()
+                    .map(ast -> new ConfigPreviewProvider(ast, project.configView(), ctx.cancelChecker()).previewConfig(uri, name, profiles, qualifiedName))
+                    .orElse(null);
+            });
+        }
+        if( PREVIEW_WORKSPACE.equals(command) && arguments.size() == 1 ) {
+            var name = JsonUtils.getString(arguments.get(0));
+            if( name == null )
+                return CompletableFuture.completedFuture(null);
+            return request(PREVIEW_WORKSPACE, null, name, Need.PROJECT, false, null, (ctx) ->
+                new WorkspacePreviewProvider(ctx.project().scriptView(), ctx.cancelChecker()).preview());
+        }
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Either<List<? extends SymbolInformation>, List<? extends WorkspaceSymbol>>> symbol(WorkspaceSymbolParams params) {
-        return CompletableFutures.computeAsync((cancelChecker) -> {
-            cancelChecker.checkCanceled();
-            log.debug("workspace/symbol " + params.getQuery());
-            var result = new ArrayList<WorkspaceSymbol>();
-            for( var scriptService : scriptServices.values() )
-                result.addAll(scriptService.symbol(params));
-            return Either.forRight(result);
+        var query = params.getQuery();
+        return request("workspace/symbol", null, null, Need.ALL, false, Either.forRight(Collections.emptyList()), (ctx) -> {
+            // a file included from another folder is in both projects
+            var result = new LinkedHashSet<WorkspaceSymbol>();
+            for( var project : ctx.allProjects() )
+                result.addAll(new ScriptSymbolProvider(project.scriptView(), ctx.cancelChecker()).symbol(query));
+            return Either.forRight(ClientUris.symbols(List.copyOf(result), ctx.clientUri()));
         });
     }
 
     // -- INTERNAL
 
-    private void addWorkspaceFolder(String name, String uri) {
-        workspaceRoots.put(name, uri);
-
-        var configService = new ConfigService(uri, debounceMillis);
-        configService.connect(client);
-        configServices.put(name, configService);
-
-        var scriptService = new ScriptService(uri, debounceMillis);
-        scriptService.connect(client);
-        scriptServices.put(name, scriptService);
+    /**
+     * Whether a request URI is a script. Project-wide requests that
+     * only apply to scripts don't need to wait for the index otherwise.
+     *
+     * @param uri
+     */
+    private static boolean isScript(String uri) {
+        return Uris.canonical(uri)
+            .flatMap(u -> FileKind.of(Path.of(u)))
+            .filter(kind -> kind == FileKind.SCRIPT)
+            .isPresent();
     }
 
-    private static String workspaceFolderName(WorkspaceFolder workspaceFolder) {
-        var name = workspaceFolder.getName();
-        var uri = workspaceFolder.getUri();
-        if( name == null || !name.isEmpty() || uri == null )
-            return name;
-
-        var path = Path.of(URI.create(uri)).getFileName();
-        return path != null ? path.toString() : name;
+    private <T> CompletableFuture<T> fileRequest(String method, String uri, T emptyValue, Function<RequestContext, T> body) {
+        return request(method, uri, null, Need.FILE, false, emptyValue, body);
     }
 
-    private String relativePath(String uri) {
-        return workspaceRoots.entrySet().stream()
-            .filter((entry) -> entry.getValue() != null && uri.startsWith(entry.getValue()))
-            .findFirst()
-            .map((entry) -> {
-                var name = entry.getKey();
-                var root = entry.getValue();
-                var prefix = (DEFAULT_WORKSPACE_FOLDER_NAME.equals(name)) ? "" : name + ":";
-                return uri.replace(root, prefix);
-            })
-            .orElse(uri);
-    }
-
-    private LanguageService getLanguageService(String uri) {
-        var service = Optional.ofNullable(getLanguageService0(uri, scriptServices)).orElse(getLanguageService0(uri, configServices));
-        if( service == null ) {
-            log.debug("No language service found for file: " + uri);
-            return null;
-        }
-        var path = Path.of(URI.create(uri));
-        if( PathUtils.isExcluded(path, configuration.excludePatterns()) )
-            return null;
-        return service;
-    }
-
-    private LanguageService getLanguageService0(String uri, Map<String, ? extends LanguageService> services) {
-        var service = workspaceRoots.entrySet().stream()
-            .filter((entry) -> entry.getValue() != null && uri.startsWith(entry.getValue()))
-            .findFirst()
-            .map((entry) -> (LanguageService) services.get(entry.getKey()))
-            .orElse((LanguageService) services.get(DEFAULT_WORKSPACE_FOLDER_NAME));
-        if( service == null || !service.matchesFile(uri) )
-            return null;
-        return service;
+    private <T> CompletableFuture<T> request(String method, String uri, String projectName, Need need, boolean positionBased, T emptyValue, Function<RequestContext, T> body) {
+        log.debug(method + " " + (uri != null ? uri : projectName != null ? projectName : ""));
+        if( need != Need.ALL && uri == null && projectName == null )
+            return CompletableFuture.completedFuture(emptyValue);
+        return engine().request(new RequestSpec(method, uri, projectName, need, positionBased), emptyValue, body);
     }
 
 }

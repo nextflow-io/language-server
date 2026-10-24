@@ -20,8 +20,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import nextflow.lsp.ast.ScriptView;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.WorkflowNode;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 import static nextflow.script.types.TypeCheckingUtils.*;
 
@@ -31,10 +33,13 @@ import static nextflow.script.types.TypeCheckingUtils.*;
  */
 public class WorkspacePreviewProvider {
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public WorkspacePreviewProvider(ScriptAstCache ast) {
+    private CancelChecker cancelChecker;
+
+    public WorkspacePreviewProvider(ScriptView ast, CancelChecker cancelChecker) {
         this.ast = ast;
+        this.cancelChecker = cancelChecker;
     }
 
     public Map<String,Object> preview() {
@@ -46,6 +51,7 @@ public class WorkspacePreviewProvider {
     }
 
     private Stream<? extends Object> definitions(URI uri) {
+        cancelChecker.checkCanceled();
         var processes = ast.getProcessNodes(uri).stream()
             .map(pn -> Map.of(
                 "name", pn.getName(),

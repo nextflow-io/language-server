@@ -16,6 +16,7 @@
 
 package nextflow.lsp.services.script;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.DefinitionParams;
 import org.eclipse.lsp4j.Location;
@@ -34,16 +35,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TestWorkspace.class)
 class ScriptDefinitionTest {
 
-    static Location getDefinition(ScriptService service, String uri, Position position) {
-        var locations = service
-            .definition(new DefinitionParams(new TextDocumentIdentifier(uri), position))
+    static Location getDefinition(TestServer server, String uri, Position position) {
+        var locations = server
+            .call(s -> s.definition(new DefinitionParams(new TextDocumentIdentifier(uri), position)))
             .getLeft();
         return locations.size() > 0 ? locations.get(0) : null;
     }
 
     @Test
     void getDefinitionOfWorkflowInSameFile() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
         var contents = """
@@ -54,9 +55,8 @@ class ScriptDefinitionTest {
                 HELLO()
             }
             """;
-        open(service, uri, contents);
-        service.updateNow();
-        var location = getDefinition(service, uri, new Position(4, 4));
+        server.open("main.nf", contents);
+        var location = getDefinition(server, uri, new Position(4, 4));
 
         assertThat(location).isNotNull();
         assertThat(location.getUri()).isEqualTo(uri);
@@ -66,11 +66,11 @@ class ScriptDefinitionTest {
 
     @Test
     void getDefinitionOfWorkflowInDifferentFile() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var mainUri = getUri("main.nf");
         var moduleUri = getUri("module.nf");
 
-        open(service, moduleUri, """
+        server.open("module.nf", """
             workflow HELLO {
                 take:
                 target
@@ -79,15 +79,14 @@ class ScriptDefinitionTest {
                 println "Hello, ${target}!"
             }
             """);
-        open(service, mainUri, """
+        server.open("main.nf", """
             include { HELLO } from './module.nf'
 
             workflow {
                 HELLO('World')
             }
             """);
-        service.updateNow();
-        var location = getDefinition(service, mainUri, new Position(3, 4));
+        var location = getDefinition(server, mainUri, new Position(3, 4));
 
         assertThat(location).isNotNull();
         assertThat(location.getUri()).isEqualTo(moduleUri);

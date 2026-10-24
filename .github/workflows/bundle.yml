@@ -139,12 +139,15 @@ jobs:
 
       - name: Check that the AOT cache is accepted
         run: |
-          # fails if the cache is rejected; stdout is the LSP channel, so it must stay silent
-          msg='{"jsonrpc":"2.0","method":"exit"}'
-          printf 'Content-Length: %d\r\n\r\n%s' "${#msg}" "$msg" \
+          # fails if the cache is rejected; stdout is the LSP channel, so the shutdown response must be all there is
+          shutdown='{"jsonrpc":"2.0","id":1,"method":"shutdown"}'
+          exit='{"jsonrpc":"2.0","method":"exit"}'
+          printf 'Content-Length: %d\r\n\r\n%s' "${#shutdown}" "$shutdown" "${#exit}" "$exit" \
             | NXF_LSP_JAVA_OPTS=-XX:AOTMode=on "$LSP_HOME/bin/nextflow-lsp" > stdout.txt
-          if [ -s stdout.txt ]; then
-            echo "Server wrote to stdout without a client:"
+          out=$(cat stdout.txt)
+          body=${out#*$'\r\n\r\n'}
+          if [ "${out%%$'\r\n\r\n'*}" != "Content-Length: ${#body}" ] || [[ "$body" != *'"id":1'* ]]; then
+            echo "Server wrote to stdout outside of JSON-RPC:"
             cat stdout.txt
             exit 1
           fi

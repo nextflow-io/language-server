@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.List;
 
 import nextflow.lsp.ast.LanguageServerASTUtils;
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.DefinitionProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
@@ -38,9 +39,9 @@ public class ScriptDefinitionProvider implements DefinitionProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public ScriptDefinitionProvider(ScriptAstCache ast) {
+    public ScriptDefinitionProvider(ScriptView ast) {
         this.ast = ast;
     }
 

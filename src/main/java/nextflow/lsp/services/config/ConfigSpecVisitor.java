@@ -34,7 +34,7 @@ import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.spec.SpecNode;
 import nextflow.lsp.spec.ConfigSpecFactory;
 import nextflow.lsp.spec.PluginRef;
-import nextflow.lsp.spec.PluginSpecCache;
+import nextflow.lsp.spec.PluginSpec;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.control.PhaseAware;
 import nextflow.script.control.Phases;
@@ -74,13 +74,35 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private PluginSpecCache pluginSpecCache;
+    private PluginLookup plugins;
 
     private Stack<String> scopes = new Stack<>();
 
-    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginSpecCache pluginSpecCache) {
+    /**
+     * Source of plugin specs for the plugins declared by a config file.
+     */
+    public interface PluginLookup {
+
+        /**
+         * Get the spec of a plugin release, or null if it is not
+         * available (unknown, or still being fetched).
+         *
+         * @param ref
+         */
+        PluginSpec get(PluginRef ref);
+
+        /**
+         * Whether the spec of a plugin release is not known yet,
+         * because it is still being fetched.
+         *
+         * @param ref
+         */
+        boolean isPending(PluginRef ref);
+    }
+
+    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginLookup plugins) {
         this.sourceUnit = sourceUnit;
-        this.pluginSpecCache = pluginSpecCache;
+        this.plugins = plugins;
     }
 
     @Override
@@ -90,12 +112,25 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private SpecNode.Scope spec;
 
+    // the plugins declared by the last visited config file
+    private List<PluginRef> pluginRefs = List.of();
+
+    // whether the config scopes of some declared plugins are not known yet
+    private boolean pendingScopes;
+
     /**
      * Synthetic type for the params declared by this config file. Fields are
      * added as param assignments are visited, so a params reference is typed
      * by the declarations above it.
      */
     private ClassNode paramsType;
+
+    /**
+     * Get the plugins declared by the config file, after {@link #visit}.
+     */
+    public List<PluginRef> getPluginRefs() {
+        return pluginRefs;
+    }
 
     public void visit() {
         var moduleNode = sourceUnit.getAST();
@@ -107,6 +142,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
         super.visit(cn);
         this.spec = null;
         this.paramsType = null;
+        this.pendingScopes = false;
     }
 
     private SpecNode.Scope getPluginScopes(ConfigNode cn) {
@@ -142,14 +178,13 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
         // fetch plugin specs from plugin registry
         var entries = refs.stream()
-            .map((ref) -> pluginSpecCache.get(ref.name(), ref.version()))
+            .map((ref) -> plugins.get(ref))
             .filter(spec -> spec != null)
             .map(spec -> spec.configScopes())
             .toList();
 
-        // save current versions to plugin cache
-        var uri = sourceUnit.getSource().getURI();
-        pluginSpecCache.setCurrentVersions(uri, refs);
+        pendingScopes = refs.stream().anyMatch(ref -> plugins.isPending(ref));
+        pluginRefs = refs;
 
         // collect config scopes from plugin specs
         var result = new HashMap<String, SpecNode>();
@@ -183,6 +218,9 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             return;
         var option = spec.getOption(names);
         if( option == null ) {
+            // the scope may be defined by a plugin whose spec is not known yet
+            if( pendingScopes && !ConfigSpecFactory.defaultScopes().containsKey(scope) )
+                return;
             var message = "Unrecognized config option '" + fqName + "'";
             addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
             return;

@@ -58,8 +58,8 @@ import org.eclipse.lsp4j.services.LanguageServer;
  * on the loopback, so that training does not need the network.
  *
  * Edits are compiled immediately by following each change with a
- * completion request (which calls updateNow()), instead of waiting
- * for the debounce.
+ * completion request (which builds the file it needs), instead of
+ * waiting for the debounce.
  *
  * Usage: AotTraining WORKSPACE [PASSES]
  *
@@ -146,7 +146,7 @@ public final class AotTraining {
 
     private AotTraining(Path workspace, String registryUrl) {
         this.workspace = workspace;
-        // settings shape as read by NextflowLanguageServer.didChangeConfiguration()
+        // settings shape as read by nextflow.lsp.engine.Settings
         this.settings = Map.of("nextflow", Map.of(
             "debug", false,
             "errorReportingMode", "warnings",
@@ -313,7 +313,7 @@ public final class AotTraining {
     }
 
     private List<Path> workspaceFiles() throws IOException {
-        // same files as ScriptService/ConfigService.matchesFile()
+        // same files as FileKind.isManaged()
         try( var stream = Files.walk(workspace) ) {
             return stream
                 .filter(p -> PATTERNS.containsKey(suffix(p)) && !p.getFileName().toString().equals("nf-test.config") && Files.isRegularFile(p))

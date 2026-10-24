@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.CodeLensProvider;
 import nextflow.lsp.services.script.dag.DataflowVisitor;
 import nextflow.lsp.services.script.dag.MermaidRenderer;
@@ -40,9 +41,9 @@ public class ScriptCodeLensProvider implements CodeLensProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public ScriptCodeLensProvider(ScriptAstCache ast) {
+    public ScriptCodeLensProvider(ScriptView ast) {
         this.ast = ast;
     }
 

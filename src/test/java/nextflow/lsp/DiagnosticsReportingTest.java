@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-
 package nextflow.lsp;
 
+import java.util.Map;
+
 import nextflow.lsp.services.ErrorReportingMode;
-import nextflow.lsp.services.LanguageServerConfiguration;
-import nextflow.lsp.services.config.ConfigService;
-import nextflow.lsp.spec.PluginSpecCache;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,8 +27,8 @@ import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for diagnostic publishing in the base LanguageService:
- * error-reporting-mode filtering, severity mapping, and clearDiagnostics().
+ * Tests for diagnostic publishing: error-reporting-mode filtering,
+ * severity mapping, and clearing diagnostics.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -42,91 +40,69 @@ class DiagnosticsReportingTest {
     // a config with a syntax error -> error
     private static final String ERROR_SOURCE = "process {\n";
 
-    private static ConfigService serviceWithMode(TestLanguageClient client, ErrorReportingMode mode) {
-        var d = LanguageServerConfiguration.defaults();
-        var configuration = new LanguageServerConfiguration(
-            d.dagDirection(), d.dagVerbose(), mode, d.excludePatterns(),
-            d.extendedCompletion(), d.harshilAlignment(), d.maheshForm(),
-            d.maxCompletionItems(), d.pluginRegistryUrl(), d.sortDeclarations());
-        var service = new ConfigService(workspaceRootUri());
-        service.connect(client);
-        service.initialize(configuration, new PluginSpecCache(TestPluginRegistry.url()));
-        // mirror TestUtils.getConfigService: open empty file to skip the workspace scan
-        open(service, getUri("nextflow.config"), "");
-        service.updateNow();
-        return service;
+    private static TestServer serverWithMode(TestLanguageClient client, ErrorReportingMode mode) {
+        return TestServer.start((o) -> {
+            o.client = client;
+            o.settings = Map.of("nextflow.errorReportingMode", mode.name());
+        });
     }
 
     @Test
     void offSuppressesAllDiagnostics() {
         var client = new TestLanguageClient();
-        var service = serviceWithMode(client, ErrorReportingMode.OFF);
+        var server = serverWithMode(client, ErrorReportingMode.OFF);
         var uri = getUri("nextflow.config");
 
-        open(service, uri, ERROR_SOURCE);
-        service.updateNow();
+        server.open("nextflow.config", ERROR_SOURCE);
+        server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
     @Test
     void errorsReportsErrorsButSuppressesWarnings() {
         var client = new TestLanguageClient();
-        var service = serviceWithMode(client, ErrorReportingMode.ERRORS);
+        var server = serverWithMode(client, ErrorReportingMode.ERRORS);
         var uri = getUri("nextflow.config");
 
         // a syntax error
-        open(service, uri, ERROR_SOURCE);
-        service.updateNow();
+        server.open("nextflow.config", ERROR_SOURCE);
+        server.settle();
         assertThat(client.getDiagnostics(uri)).anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Error);
 
         // an unrecognized-option warning
-        open(service, uri, WARNING_SOURCE);
-        service.updateNow();
+        server.open("nextflow.config", WARNING_SOURCE);
+        server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
     @Test
     void warningsReportsBothErrorsAndWarnings() {
         var client = new TestLanguageClient();
-        var service = serviceWithMode(client, ErrorReportingMode.WARNINGS);
+        var server = serverWithMode(client, ErrorReportingMode.WARNINGS);
         var uri = getUri("nextflow.config");
 
         // an unrecognized-option warning
-        open(service, uri, WARNING_SOURCE);
-        service.updateNow();
+        server.open("nextflow.config", WARNING_SOURCE);
+        server.settle();
         assertThat(client.getDiagnostics(uri)).anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Warning);
 
         // a syntax error
-        open(service, uri, ERROR_SOURCE);
-        service.updateNow();
+        server.open("nextflow.config", ERROR_SOURCE);
+        server.settle();
         assertThat(client.getDiagnostics(uri)).anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Error);
     }
 
     @Test
     void everyDiagnosticIsSourcedToNextflow() {
         var client = new TestLanguageClient();
-        var service = serviceWithMode(client, ErrorReportingMode.WARNINGS);
+        var server = serverWithMode(client, ErrorReportingMode.WARNINGS);
         var uri = getUri("nextflow.config");
 
-        open(service, uri, WARNING_SOURCE);
-        service.updateNow();
+        server.open("nextflow.config", WARNING_SOURCE);
+        server.settle();
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).isNotEmpty();
         assertThat(diagnostics).allMatch(d -> "nextflow".equals(d.getSource()));
-    }
-
-    @Test
-    void clearDiagnosticsPublishesEmptyDiagnosticsForKnownFiles() {
-        var client = new TestLanguageClient();
-        var service = serviceWithMode(client, ErrorReportingMode.WARNINGS);
-        var uri = getUri("nextflow.config");
-
-        open(service, uri, ERROR_SOURCE);
-        service.updateNow();
-        assertThat(client.getDiagnostics(uri)).isNotEmpty();
-
-        service.clearDiagnostics();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
 }

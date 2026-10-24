@@ -18,6 +18,7 @@ package nextflow.lsp.services.config;
 
 import java.util.List;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.DocumentLink;
 import org.eclipse.lsp4j.DocumentLinkParams;
@@ -35,20 +36,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TestWorkspace.class)
 class ConfigLinkTest {
 
-    static List<DocumentLink> getLinks(ConfigService service, String uri) {
-        return service.documentLink(new DocumentLinkParams(new TextDocumentIdentifier(uri)));
+    static List<DocumentLink> getLinks(TestServer server, String uri) {
+        return server.call(s -> s.documentLink(new DocumentLinkParams(new TextDocumentIdentifier(uri))));
     }
 
     @Test
     void resolveRelativeIncludeAgainstParentDirectory() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, """
+        server.open("nextflow.config", """
             includeConfig 'conf/base.config'
             """);
-        service.updateNow();
-        var links = getLinks(service, uri);
+        var links = getLinks(server, uri);
 
         assertThat(links).hasSize(1);
         assertThat(links.get(0).getTarget()).isEqualTo(getUri("conf/base.config"));
@@ -56,14 +56,13 @@ class ConfigLinkTest {
 
     @Test
     void passThroughAbsoluteIncludeUriUnchanged() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, """
+        server.open("nextflow.config", """
             includeConfig 'https://example.com/shared.config'
             """);
-        service.updateNow();
-        var links = getLinks(service, uri);
+        var links = getLinks(server, uri);
 
         assertThat(links).hasSize(1);
         assertThat(links.get(0).getTarget()).isEqualTo("https://example.com/shared.config");
@@ -71,15 +70,14 @@ class ConfigLinkTest {
 
     @Test
     void noLinksForConfigWithoutIncludes() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, """
+        server.open("nextflow.config", """
             process.cpus = 2
             """);
-        service.updateNow();
 
-        assertThat(getLinks(service, uri)).isEmpty();
+        assertThat(getLinks(server, uri)).isEmpty();
     }
 
 }

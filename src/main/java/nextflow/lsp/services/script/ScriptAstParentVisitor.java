@@ -41,7 +41,7 @@ import static nextflow.script.ast.ASTUtils.asFlatParams;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-class ScriptAstParentVisitor extends ScriptVisitorSupport {
+public class ScriptAstParentVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 

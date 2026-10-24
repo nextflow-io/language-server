@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.SymbolProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
@@ -35,6 +36,7 @@ import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.SymbolKind;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.WorkspaceSymbol;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 /**
@@ -47,10 +49,17 @@ public class ScriptSymbolProvider implements SymbolProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public ScriptSymbolProvider(ScriptAstCache ast) {
+    private CancelChecker cancelChecker;
+
+    public ScriptSymbolProvider(ScriptView ast) {
+        this(ast, () -> {});
+    }
+
+    public ScriptSymbolProvider(ScriptView ast, CancelChecker cancelChecker) {
         this.ast = ast;
+        this.cancelChecker = cancelChecker;
     }
 
     @Override
@@ -89,8 +98,10 @@ public class ScriptSymbolProvider implements SymbolProvider {
         }
 
         var result = new ArrayList<WorkspaceSymbol>();
-        for( var node : ast.getDefinitions() )
+        for( var node : ast.getDefinitions() ) {
+            cancelChecker.checkCanceled();
             addWorkspaceSymbol(node, query, result);
+        }
 
         return result;
     }

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.LinkProvider;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.LanguageServerUtils;
@@ -36,9 +37,9 @@ public class ScriptLinkProvider implements LinkProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public ScriptLinkProvider(ScriptAstCache ast) {
+    public ScriptLinkProvider(ScriptView ast) {
         this.ast = ast;
     }
 

@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 import nextflow.lsp.ast.CompletionHelper;
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.CompletionProvider;
 import nextflow.lsp.util.LanguageServerUtils;
 import nextflow.lsp.util.Logger;
@@ -71,12 +72,12 @@ public class ScriptCompletionProvider implements CompletionProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
     private boolean extended;
     private URI uri;
     private CompletionHelper ch;
 
-    public ScriptCompletionProvider(ScriptAstCache ast, int maxItems, boolean extended) {
+    public ScriptCompletionProvider(ScriptView ast, int maxItems, boolean extended) {
         this.ast = ast;
         this.extended = extended;
         this.ch = new CompletionHelper(maxItems);

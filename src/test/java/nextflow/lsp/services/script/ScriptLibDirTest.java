@@ -17,8 +17,8 @@
 package nextflow.lsp.services.script;
 
 import nextflow.lsp.TestLanguageClient;
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
-import nextflow.lsp.services.LanguageServerConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -57,15 +57,15 @@ class ScriptLibDirTest {
     void resolveClassInLibDirectory() {
         writeLib("Greeter.groovy", GREETER);
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 println(Greeter.greet('world'))
             }
             """);
-        service.updateNow();
+        server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
@@ -73,15 +73,15 @@ class ScriptLibDirTest {
     void resolveClassInLibSubdirectoryByFullyQualifiedName() {
         writeLib("acme/Widget.groovy", WIDGET);
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 println(new acme.Widget(name: 'sprocket').name)
             }
             """);
-        service.updateNow();
+        server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
@@ -89,15 +89,15 @@ class ScriptLibDirTest {
     void doNotResolvePackagedClassBySimpleName() {
         writeLib("acme/Widget.groovy", WIDGET);
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 println(new Widget(name: 'sprocket').name)
             }
             """);
-        service.updateNow();
+        server.settle();
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).hasSize(1);
         assertThat(diagnostics.get(0).getMessage()).contains("Widget");
@@ -107,10 +107,10 @@ class ScriptLibDirTest {
     void resolveLibClassUsedAsTypeAnnotation() {
         writeLib("Greeter.groovy", GREETER);
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             def describe(Greeter greeter) {
                 return greeter.toString()
             }
@@ -119,7 +119,7 @@ class ScriptLibDirTest {
                 println(describe(null))
             }
             """);
-        service.updateNow();
+        server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
@@ -127,15 +127,15 @@ class ScriptLibDirTest {
     void reportErrorForClassNotInLibDirectory() {
         writeLib("Greeter.groovy", GREETER);
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 println(Gruter.greet('world'))
             }
             """);
-        service.updateNow();
+        server.settle();
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).hasSize(1);
         assertThat(diagnostics.get(0).getMessage()).contains("Gruter");
@@ -144,15 +144,15 @@ class ScriptLibDirTest {
     @Test
     void reportErrorWhenThereIsNoLibDirectory() {
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 println(Greeter.greet('world'))
             }
             """);
-        service.updateNow();
+        server.settle();
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).hasSize(1);
         assertThat(diagnostics.get(0).getMessage()).contains("Greeter");
@@ -161,16 +161,16 @@ class ScriptLibDirTest {
     @Test
     void resolveLibClassWhenLibDirectoryIsCreatedAfterStartup() {
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
         writeLib("Greeter.groovy", GREETER);
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 println(Greeter.greet('world'))
             }
             """);
-        service.updateNow();
+        server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
@@ -178,7 +178,7 @@ class ScriptLibDirTest {
     void pickUpChangesToLibClassWithoutRestarting() {
         writeLib("Greeter.groovy", GREETER);
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
         var contents = """
             workflow {
@@ -186,13 +186,13 @@ class ScriptLibDirTest {
             }
             """;
 
-        open(service, uri, contents);
-        service.updateNow();
+        server.open("main.nf", contents);
+        server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
 
-        writeLib("Greeter.groovy", GREETER.replace("class Greeter", "class Salutation"));
-        open(service, uri, contents);
-        service.updateNow();
+        // the lib change arrives as a watcher event, without reopening the script
+        server.writeAndNotify("lib/Greeter.groovy", GREETER.replace("class Greeter", "class Salutation"));
+        server.settle();
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).hasSize(1);
         assertThat(diagnostics.get(0).getMessage()).contains("Greeter");
@@ -202,16 +202,16 @@ class ScriptLibDirTest {
     void reportDiagnosticsWhenLibClassHasSyntaxError() {
         writeLib("Greeter.groovy", "class Greeter {");
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 println(Greeter.greet('world'))
                 foo()
             }
             """);
-        service.updateNow();
+        server.settle();
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).anyMatch(d -> d.getMessage().contains("foo"));
     }
@@ -219,18 +219,18 @@ class ScriptLibDirTest {
     @Test
     void doNotFailWhenThereIsNoWorkspaceRoot() {
         var client = new TestLanguageClient();
-        var configuration = LanguageServerConfiguration.defaults();
-        var service = new ScriptService(null);
-        service.connect(client);
-        service.initialize(configuration, newConfigService());
+        var server = TestServer.start((o) -> {
+            o.client = client;
+            o.folders();
+        });
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 println('Hello!')
             }
             """);
-        service.updateNow();
+        server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 

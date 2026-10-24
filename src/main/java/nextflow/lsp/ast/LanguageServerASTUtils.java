@@ -17,6 +17,7 @@ package nextflow.lsp.ast;
 
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.FeatureFlagNode;
@@ -36,6 +37,7 @@ import org.codehaus.groovy.ast.expr.MapEntryExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 import static nextflow.script.ast.ASTUtils.*;
 import static nextflow.script.types.TypeCheckingUtils.*;
@@ -113,18 +115,23 @@ public class LanguageServerASTUtils {
     }
 
     /**
-     * Get the ast nodes corresponding to references of a node.
+     * Get the ast nodes corresponding to references of a node,
+     * checking for cancellation every 1,024 nodes.
      *
      * @param node
      * @param ast
      * @param includeDeclaration
+     * @param cancelChecker
      */
-    public static Iterator<ASTNode> getReferences(ASTNode node, ASTNodeCache ast, boolean includeDeclaration) {
+    public static Iterator<ASTNode> getReferences(ASTNode node, AstView ast, boolean includeDeclaration, CancelChecker cancelChecker) {
         var defNode = getDefinition(node);
         if( defNode == null )
             return Collections.emptyIterator();
+        var count = new AtomicInteger();
         return ast.getNodes().stream()
             .filter((otherNode) -> {
+                if( (count.incrementAndGet() & 1023) == 0 )
+                    cancelChecker.checkCanceled();
                 if( otherNode.getLineNumber() == -1 || otherNode.getColumnNumber() == -1 )
                     return false;
                 if( defNode == otherNode )

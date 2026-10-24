@@ -22,6 +22,7 @@ import nextflow.config.ast.ConfigAssignNode;
 import nextflow.config.ast.ConfigIncludeNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigVisitorSupport;
+import nextflow.lsp.ast.ConfigView;
 import nextflow.lsp.services.SemanticTokensProvider;
 import nextflow.lsp.services.SemanticTokensVisitor;
 import nextflow.lsp.util.Logger;
@@ -37,9 +38,9 @@ public class ConfigSemanticTokensProvider implements SemanticTokensProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ConfigAstCache ast;
+    private ConfigView ast;
 
-    public ConfigSemanticTokensProvider(ConfigAstCache ast) {
+    public ConfigSemanticTokensProvider(ConfigView ast) {
         this.ast = ast;
     }
 

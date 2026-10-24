@@ -13,179 +13,43 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package nextflow.lsp;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
 import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
-import nextflow.lsp.services.LanguageServerConfiguration;
-import nextflow.lsp.services.LanguageService;
-import nextflow.lsp.services.config.ConfigService;
-import nextflow.lsp.services.script.ScriptService;
-import nextflow.lsp.spec.PluginSpecCache;
-import org.eclipse.lsp4j.DidOpenTextDocumentParams;
-import org.eclipse.lsp4j.TextDocumentItem;
+import nextflow.script.formatter.FormattingOptions;
+import org.eclipse.lsp4j.DocumentFormattingParams;
+import org.eclipse.lsp4j.ExecuteCommandParams;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.TextEdit;
 
 /**
+ * Helpers for tests that use the {@link TestWorkspace} of the current
+ * test, with or without a {@link TestServer}.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public class TestUtils {
 
-    /**
-     * Test services don't use the debounce timer, so that a background
-     * update (e.g. the deferred workspace scan) can't fire mid-test.
-     * Changes are compiled by updateNow() or by a request that awaits
-     * an update.
-     */
-    private static final long DEBOUNCE_MILLIS = LanguageService.MANUAL_UPDATES;
+    public static final String UNUSED = "Variable was declared but not used";
 
     /**
-     * Get the URI of the workspace root of the current test.
-     */
-    public static String workspaceRootUri() {
-        return TestWorkspace.root().toUri().toString();
-    }
-
-    /**
-     * Get a recording language service for testing the update mechanics of
-     * the base LanguageService. The service is connected and initialized but
-     * NOT scanned, with no files open.
-     */
-    public static RecordingLanguageService recordingService() {
-        return recordingService(new TestLanguageClient());
-    }
-
-    /**
-     * Get a recording language service connected to the given client.
+     * Run an action on a new thread, and get what it threw, if anything.
      *
-     * @param client
+     * @param action
      */
-    public static RecordingLanguageService recordingService(TestLanguageClient client) {
-        return recordingService(workspaceRootUri(), client, DEBOUNCE_MILLIS);
-    }
-
-    /**
-     * Get a recording language service that debounces updates with the
-     * given delay.
-     *
-     * @param debounceMillis
-     */
-    public static RecordingLanguageService recordingService(long debounceMillis) {
-        return recordingService(workspaceRootUri(), new TestLanguageClient(), debounceMillis);
-    }
-
-    /**
-     * Get a recording language service with no workspace root.
-     */
-    public static RecordingLanguageService recordingServiceWithoutWorkspace() {
-        return recordingService(null, new TestLanguageClient(), DEBOUNCE_MILLIS);
-    }
-
-    private static RecordingLanguageService recordingService(String rootUri, TestLanguageClient client, long debounceMillis) {
-        var service = new RecordingLanguageService(rootUri, debounceMillis);
-        service.connect(client);
-        service.initialize(LanguageServerConfiguration.defaults(), newConfigService(client));
-        return service;
-    }
-
-    /**
-     * Get a language service instance for Nextflow config files.
-     */
-    public static ConfigService getConfigService() {
-        return getConfigService(new TestLanguageClient());
-    }
-
-    /**
-     * Get a language service instance for Nextflow config files, connected to
-     * the given client so that published diagnostics can be inspected.
-     *
-     * @param client
-     */
-    public static ConfigService getConfigService(TestLanguageClient client) {
-        var service = newConfigService(client);
-        // scan the (empty) workspace up front, so that later updates compile
-        // changed files directly instead of re-triggering the scan
-        service.updateNow();
-        open(service, getUri("nextflow.config"), "");
-        service.updateNow();
-        return service;
-    }
-
-    /**
-     * Get a language service instance for Nextflow config files which has not
-     * scanned the workspace yet, for testing against files on disk.
-     */
-    public static ConfigService newConfigService() {
-        return newConfigService(new TestLanguageClient());
-    }
-
-    /**
-     * Get a language service instance for Nextflow config files which has not
-     * scanned the workspace yet, connected to the given client.
-     *
-     * @param client
-     */
-    public static ConfigService newConfigService(TestLanguageClient client) {
-        var service = new ConfigService(workspaceRootUri(), DEBOUNCE_MILLIS);
-        service.connect(client);
-        service.initialize(LanguageServerConfiguration.defaults(), new PluginSpecCache(TestPluginRegistry.url()));
-        return service;
-    }
-
-    /**
-     * Get a language service instance for Nextflow scripts.
-     */
-    public static ScriptService getScriptService() {
-        return getScriptService(new TestLanguageClient());
-    }
-
-    /**
-     * Get a language service instance for Nextflow scripts, connected to the
-     * given client so that published diagnostics can be inspected.
-     *
-     * @param client
-     */
-    public static ScriptService getScriptService(TestLanguageClient client) {
-        return getScriptService(client, newConfigService());
-    }
-
-    /**
-     * Get a language service instance for Nextflow scripts, connected to the
-     * given client and reading config from the given config service.
-     *
-     * @param client
-     * @param configService
-     */
-    public static ScriptService getScriptService(TestLanguageClient client, ConfigService configService) {
-        var service = new ScriptService(workspaceRootUri(), DEBOUNCE_MILLIS);
-        service.connect(client);
-        service.initialize(LanguageServerConfiguration.defaults(), configService);
-        // skip workspace scan
-        open(service, getUri("main.nf"), "");
-        service.updateNow();
-        return service;
-    }
-
-    /**
-     * A script service and a config service that share a config AST cache.
-     */
-    public record ScriptAndConfig(ScriptService script, ConfigService config) {
-    }
-
-    /**
-     * Get a script service and a config service that share a config AST cache,
-     * so that script features which read the config (e.g. config preview) can
-     * be tested.
-     */
-    public static ScriptAndConfig getScriptAndConfigServices() {
-        var configService = getConfigService();
-        var scriptService = getScriptService(new TestLanguageClient(), configService);
-        return new ScriptAndConfig(scriptService, configService);
+    public static Throwable thrownOnAnotherThread(Runnable action) throws InterruptedException {
+        var error = new AtomicReference<Throwable>();
+        var thread = new Thread(action);
+        thread.setUncaughtExceptionHandler((t, e) -> error.set(e));
+        thread.start();
+        thread.join();
+        return error.get();
     }
 
     /**
@@ -215,48 +79,34 @@ public class TestUtils {
     }
 
     /**
-     * Open a file.
+     * Execute a command in a test server.
      *
-     * @param service
-     * @param uri
-     * @param contents
+     * @param server
+     * @param command
+     * @param arguments
      */
-    public static void open(LanguageService service, String uri, String contents) {
-        openVerbatim(service, uri, contents.stripIndent());
+    public static Object executeCommand(TestServer server, String command, List<Object> arguments) {
+        return server.call(s -> s.executeCommand(new ExecuteCommandParams(command, arguments)));
     }
 
     /**
-     * Open a file with exactly the given contents, without stripping
-     * indentation or normalizing line endings as open() does.
+     * Format a document in a test server, with the formatting settings
+     * of the given options.
      *
-     * @param service
+     * @param server
      * @param uri
-     * @param contents
+     * @param options
      */
-    public static void openVerbatim(LanguageService service, String uri, String contents) {
-        var textDocumentItem = new TextDocumentItem(uri, "nextflow", 1, contents);
-        service.didOpen(new DidOpenTextDocumentParams(textDocumentItem));
-    }
-
-    /**
-     * Open a file, also writing it to disk. Tests that issue multiple
-     * requests against the same file without a document change in between
-     * must use this instead of open() if they trigger the deferred workspace
-     * scan (an updateNow() with no pending changes): the scan re-scans from
-     * disk and would evict an in-memory-only file from the AST cache.
-     *
-     * @param service
-     * @param uri
-     * @param contents
-     */
-    public static void openOnDisk(LanguageService service, String uri, String contents) {
-        try {
-            Files.writeString(Path.of(URI.create(uri)), contents.stripIndent());
-        }
-        catch( IOException e ) {
-            throw new UncheckedIOException(e);
-        }
-        open(service, uri, contents);
+    public static List<? extends TextEdit> formatting(TestServer server, String uri, FormattingOptions options) {
+        server.configure(Map.of(
+            "nextflow.formatting.harshilAlignment", options.harshilAlignment(),
+            "nextflow.formatting.maheshForm", options.maheshForm(),
+            "nextflow.formatting.sortDeclarations", options.sortDeclarations()
+        ));
+        var params = new DocumentFormattingParams(
+            new TextDocumentIdentifier(uri),
+            new org.eclipse.lsp4j.FormattingOptions(options.tabSize(), options.insertSpaces()));
+        return server.call(s -> s.formatting(params));
     }
 
 }
