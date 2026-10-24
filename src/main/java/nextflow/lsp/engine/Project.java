@@ -41,7 +41,7 @@ import org.codehaus.groovy.ast.ASTNode;
  * graph and index status.
  *
  * Freshness is computed from build stamps (see {@link FileEntry})
- * and memoised until the next change to the project.
+ * on every query, so there is no cached state to invalidate.
  *
  * Engine-confined.
  *
@@ -86,20 +86,6 @@ public final class Project {
     final DependencyGraph graph = new DependencyGraph();
 
     final Map<ASTNode, FileEntry> nodeOwner = new IdentityHashMap<>();
-
-    // entries whose input changed since their last build
-    private final Set<URI> inputStale = new HashSet<>();
-
-    // set when an entry may be stale without an input change
-    private boolean dirty;
-
-    private long epoch;
-
-    private long memoEpoch = -1;
-
-    private final Map<URI, Boolean> freshMemo = new HashMap<>();
-
-    private Boolean projectFreshMemo;
 
     IndexStatus index;
 
@@ -240,8 +226,6 @@ public final class Project {
         entry = new FileEntry(uri, path, kind.get(), role);
         entry.inputVersion = context.nextInputVersion();
         files.put(uri, entry);
-        inputStale.add(uri);
-        changed();
         return entry;
     }
 
@@ -264,8 +248,6 @@ public final class Project {
      */
     void bumpText(FileEntry entry) {
         entry.inputVersion = context.nextInputVersion();
-        inputStale.add(entry.uri);
-        changed();
     }
 
     /**
@@ -281,10 +263,6 @@ public final class Project {
         unindex(entry);
         entry.unit = null;
         graph.setEdges(entry.uri, entry.depStamps.keySet(), List.of());
-        inputStale.remove(entry.uri);
-        if( !graph.dependents(entry.uri).isEmpty() )
-            dirty = true;
-        changed();
     }
 
     /**
@@ -329,27 +307,6 @@ public final class Project {
         return result;
     }
 
-    /**
-     * Record that an input of some entries changed without bumping
-     * their input versions (a dependency was rebuilt, or an external
-     * input changed).
-     */
-    void markDirty() {
-        dirty = true;
-        changed();
-    }
-
-    /**
-     * Record that an entry was built at its current input version.
-     *
-     * @param entry
-     */
-    void built(FileEntry entry) {
-        if( entry.builtInputVersion == entry.inputVersion )
-            inputStale.remove(entry.uri);
-        changed();
-    }
-
     void unindex(FileEntry entry) {
         for( var node : entry.nodes ) {
             if( nodeOwner.get(node) == entry )
@@ -363,10 +320,6 @@ public final class Project {
         return kind == FileKind.SCRIPT ? scriptCompiler : configCompiler;
     }
 
-    private void changed() {
-        epoch++;
-    }
-
     // -- freshness
 
     /**
@@ -376,21 +329,22 @@ public final class Project {
      * @param entry
      */
     boolean isFresh(FileEntry entry) {
-        resetMemo();
-        var memo = freshMemo.get(entry.uri);
-        if( memo != null )
-            return memo;
-        // members of a cycle are fresh iff all of them pass the local
-        // checks and every edge leaving the cycle points to a fresh entry
-        var components = DependencyGraph.components(List.of(entry.uri), (uri) -> {
-            if( freshMemo.containsKey(uri) )
-                return List.of();
-            var e = files.get(uri);
-            return e != null ? existingDependencies(e) : List.of();
-        });
+        return freshness(List.of(entry.uri)).get(entry.uri);
+    }
+
+    /**
+     * Compute the freshness of the entries reachable from the given
+     * roots. Members of a cycle are fresh iff all of them pass the
+     * local checks and every edge leaving the cycle points to a fresh
+     * entry.
+     *
+     * @param roots
+     */
+    private Map<URI, Boolean> freshness(Collection<URI> roots) {
+        var result = new HashMap<URI, Boolean>();
+        var components = DependencyGraph.components(roots, (uri) -> existingDependencies(files.get(uri)));
+        // dependencies come first
         for( var component : components ) {
-            if( freshMemo.containsKey(component.get(0)) )
-                continue;
             var fresh = true;
             for( var uri : component ) {
                 var e = files.get(uri);
@@ -399,7 +353,7 @@ public final class Project {
                     break;
                 }
                 for( var dep : existingDependencies(e) ) {
-                    if( !component.contains(dep) && !freshMemo.getOrDefault(dep, false) ) {
+                    if( !component.contains(dep) && !result.get(dep) ) {
                         fresh = false;
                         break;
                     }
@@ -408,9 +362,9 @@ public final class Project {
                     break;
             }
             for( var uri : component )
-                freshMemo.put(uri, fresh);
+                result.put(uri, fresh);
         }
-        return freshMemo.get(entry.uri);
+        return result;
     }
 
     /**
@@ -443,28 +397,15 @@ public final class Project {
     }
 
     /**
-     * Whether every entry of the project is fresh. O(1) when nothing
-     * changed since the last check, or when no input changed and no
-     * dependency or external input was invalidated.
+     * Whether every entry of the project is fresh, which is the case
+     * iff every entry passes the local checks.
      */
     boolean isFresh() {
-        if( inputStale.isEmpty() && !dirty )
-            return true;
-        resetMemo();
-        if( projectFreshMemo == null ) {
-            projectFreshMemo = files.values().stream().allMatch(this::isFresh);
-            if( projectFreshMemo && inputStale.isEmpty() )
-                dirty = false;
+        for( var entry : files.values() ) {
+            if( !isLocallyFresh(entry) )
+                return false;
         }
-        return projectFreshMemo;
-    }
-
-    private void resetMemo() {
-        if( memoEpoch != epoch ) {
-            freshMemo.clear();
-            projectFreshMemo = null;
-            memoEpoch = epoch;
-        }
+        return true;
     }
 
     /**
@@ -475,11 +416,7 @@ public final class Project {
      */
     List<List<FileEntry>> staleClosure(Collection<FileEntry> roots) {
         var rootUris = roots.stream().map(e -> e.uri).sorted().toList();
-        var components = DependencyGraph.components(rootUris, (uri) -> {
-            var e = files.get(uri);
-            return e != null && !isFresh(e) ? existingDependencies(e) : List.of();
-        });
-        return staleComponents(components);
+        return staleComponents(rootUris, freshness(rootUris));
     }
 
     /**
@@ -504,21 +441,18 @@ public final class Project {
         var rest = new TreeSet<>(files.keySet());
         rest.removeAll(roots);
         roots.addAll(rest);
-        var components = DependencyGraph.components(roots, (uri) -> {
-            var e = files.get(uri);
-            return e != null && !isFresh(e) ? existingDependencies(e) : List.of();
-        });
-        return staleComponents(components);
+        return staleComponents(roots, freshness(roots));
     }
 
-    private List<List<FileEntry>> staleComponents(List<List<URI>> components) {
+    private List<List<FileEntry>> staleComponents(List<URI> roots, Map<URI, Boolean> fresh) {
+        var components = DependencyGraph.components(roots, (uri) ->
+            !fresh.get(uri) ? existingDependencies(files.get(uri)) : List.of());
         var result = new ArrayList<List<FileEntry>>();
         for( var component : components ) {
             var entries = new ArrayList<FileEntry>(component.size());
             for( var uri : component ) {
-                var e = files.get(uri);
-                if( e != null && !isFresh(e) )
-                    entries.add(e);
+                if( !fresh.get(uri) )
+                    entries.add(files.get(uri));
             }
             if( !entries.isEmpty() )
                 result.add(Collections.unmodifiableList(entries));

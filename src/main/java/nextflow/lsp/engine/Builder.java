@@ -153,9 +153,7 @@ final class Builder {
             entry.pluginLookups = Set.of();
             entry.stamp = context.nextStamp();
             entry.builtInputVersion = entry.inputVersion;
-            project.built(entry);
         }
-        project.markDirty();
     }
 
     /**
@@ -346,7 +344,6 @@ final class Builder {
                 }
                 entry.builtInputVersion = entry.inputVersion;
                 entry.builtFromVersion = documents.get(entry.uri).map(DocumentStore.OpenDocument::version).orElse(null);
-                project.built(entry);
                 result.add(entry);
             }
             return result;
@@ -846,7 +843,6 @@ final class Builder {
                 if( entry != null )
                     project.remove(entry);
             }
-            var invalidatesOthers = false;
             for( var parsed : analysed ) {
                 var entry = parsed.entry;
                 var depStamps = new TreeMap<URI, Long>();
@@ -859,14 +855,7 @@ final class Builder {
                 entry.otherInputChanged = false;
                 entry.pluginRefs = List.copyOf(parsed.pluginRefs);
                 entry.pluginLookups = Set.copyOf(parsed.pluginLookups);
-                project.built(entry);
-                for( var dependent : project.graph.dependents(entry.uri) ) {
-                    if( !batch.containsKey(dependent) )
-                        invalidatesOthers = true;
-                }
             }
-            if( invalidatesOthers )
-                project.markDirty();
         }
 
         /**

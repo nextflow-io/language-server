@@ -32,8 +32,10 @@ import org.codehaus.groovy.syntax.SyntaxException;
  *
  * An input event bumps the input version. A build records the
  * input version it observed, a new build stamp, and the stamps of
- * every dependency and external input it read, so that freshness
+ * every file that its includes could resolve to, so that freshness
  * can be verified later without pushing staleness to dependents.
+ * Other inputs (`lib/`, parameter schemas and plugin specs) bump
+ * the entries that read them.
  *
  * Engine-confined. Mutated only by {@link Project} and {@link Builder}.
  *
