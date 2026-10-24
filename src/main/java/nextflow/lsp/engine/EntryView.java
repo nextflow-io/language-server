@@ -16,16 +16,13 @@
 package nextflow.lsp.engine;
 
 import java.net.URI;
-import java.util.AbstractCollection;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
 
 import nextflow.lsp.ast.AstView;
@@ -168,13 +165,10 @@ abstract class EntryView implements AstView {
 
     @Override
     public Collection<ASTNode> getNodes() {
-        var lists = new ArrayList<List<ASTNode>>();
-        var size = 0;
-        for( var entry : entries().values() ) {
-            lists.add(entry.nodes());
-            size += entry.nodes().size();
-        }
-        return new ConcatenatedNodes(lists, size);
+        var result = new ArrayList<ASTNode>();
+        for( var entry : entries().values() )
+            result.addAll(entry.nodes());
+        return result;
     }
 
     @Override
@@ -315,51 +309,6 @@ abstract class EntryView implements AstView {
     @Override
     public String getSourceText(ASTNode node) {
         return getSourceText(node, true, -1);
-    }
-
-    /**
-     * Unmodifiable concatenation of the node lists of several files,
-     * so that iterating every node doesn't copy them.
-     */
-    private static final class ConcatenatedNodes extends AbstractCollection<ASTNode> {
-
-        private final List<List<ASTNode>> lists;
-
-        private final int size;
-
-        ConcatenatedNodes(List<List<ASTNode>> lists, int size) {
-            this.lists = lists;
-            this.size = size;
-        }
-
-        @Override
-        public int size() {
-            return size;
-        }
-
-        @Override
-        public Iterator<ASTNode> iterator() {
-            return new Iterator<>() {
-                private int list;
-                private int index;
-
-                @Override
-                public boolean hasNext() {
-                    while( list < lists.size() && index >= lists.get(list).size() ) {
-                        list++;
-                        index = 0;
-                    }
-                    return list < lists.size();
-                }
-
-                @Override
-                public ASTNode next() {
-                    if( !hasNext() )
-                        throw new NoSuchElementException();
-                    return lists.get(list).get(index++);
-                }
-            };
-        }
     }
 
 }
