@@ -643,7 +643,20 @@ final class Builder {
         private void analyseConfig(Parsed parsed) {
             var unit = parsed.unit;
             var errorCollector = unit.getErrorCollector();
-            var includes = new nextflow.config.control.ResolveIncludeVisitor(unit);
+            // an open document counts as present, as for scripts
+            var includes = new nextflow.config.control.ResolveIncludeVisitor(unit) {
+                @Override
+                public void visitConfigInclude(ConfigIncludeNode node) {
+                    if( !(node.source instanceof ConstantExpression) )
+                        return;
+                    var includeUri = getIncludeUri(unit.getSource().getURI(), node.source.getText());
+                    if( !isIncludeLocal(includeUri) )
+                        return;
+                    var path = Path.of(includeUri);
+                    if( !workspace.engine().documents().isOpen(includeUri) && !workspace.engine().environment().files().exists(path) )
+                        addError("Invalid include source: '" + includeUri.getPath() + "'", node);
+                }
+            };
             includes.visit();
             for( var error : includes.getErrors() )
                 errorCollector.addErrorAndContinue(error);

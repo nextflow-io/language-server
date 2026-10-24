@@ -293,6 +293,40 @@ class WorkspaceBuildTest {
     }
 
     @Test
+    void clearConfigIncludeErrorWhenAnOpenTargetIsSaved() {
+        var f = start();
+        f.write("nextflow.config", "includeConfig 'conf/base.config'\n");
+        f.settle();
+        assertThat(f.messages("nextflow.config")).singleElement().asString().startsWith("Invalid include source");
+
+        f.open("conf/base.config", "process.cpus = 2\n");
+        f.settle();
+
+        // the watcher event is ignored because the document is open
+        f.writeAndNotify("conf/base.config", "process.cpus = 2\n");
+        f.settle();
+        assertThat(f.messages("nextflow.config")).isEmpty();
+        assertThat(f.client().getNonEmptyDiagnostics())
+            .isEqualTo(freshDiagnostics(Map.of("conf/base.config", "process.cpus = 2\n")));
+    }
+
+    @Test
+    void keepConfigIncludeValidWhenAnOpenTargetIsDeleted() {
+        var f = start();
+        f.write("nextflow.config", "includeConfig 'conf/base.config'\n");
+        f.write("conf/base.config", "process.cpus = 2\n");
+        f.open("conf/base.config", "process.cpus = 2\n");
+        f.settle();
+        assertThat(f.messages("nextflow.config")).isEmpty();
+
+        f.delete("conf/base.config");
+        f.settle();
+        assertThat(f.messages("nextflow.config")).isEmpty();
+        assertThat(f.client().getNonEmptyDiagnostics())
+            .isEqualTo(freshDiagnostics(Map.of("conf/base.config", "process.cpus = 2\n")));
+    }
+
+    @Test
     void rebuildEveryScriptWhenALibJarChanges() throws IOException {
         var f = start();
         f.write("main.nf", """
