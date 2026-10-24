@@ -16,7 +16,6 @@
 
 package nextflow.lsp.services.config;
 
-import java.net.URI;
 import java.util.Comparator;
 import java.util.List;
 
@@ -48,7 +47,8 @@ class ConfigSpecTest {
         }
 
         @Override
-        public void declare(URI uri, List<PluginRef> refs) {
+        public boolean isPending(PluginRef ref) {
+            return false;
         }
     };
 

@@ -663,7 +663,7 @@ final class Builder {
             for( var error : includes.getErrors() )
                 errorCollector.addErrorAndContinue(error);
             new ConfigResolveVisitor(unit, project.configCompiler.compilationUnit(), Types.DEFAULT_CONFIG_IMPORTS).visit();
-            new ConfigSpecVisitor(unit, new ConfigSpecVisitor.PluginLookup() {
+            var specs = new ConfigSpecVisitor(unit, new ConfigSpecVisitor.PluginLookup() {
                 @Override
                 public PluginSpec get(PluginRef ref) {
                     var lookup = workspace.plugins().lookup(ref);
@@ -675,12 +675,9 @@ final class Builder {
                 public boolean isPending(PluginRef ref) {
                     return workspace.plugins().lookup(ref).pending();
                 }
-
-                @Override
-                public void declare(URI uri, List<PluginRef> refs) {
-                    parsed.pluginRefs.addAll(refs);
-                }
-            }).visit();
+            });
+            specs.visit();
+            parsed.pluginRefs.addAll(specs.getPluginRefs());
         }
 
         private void resolveIncludes(Parsed parsed) {

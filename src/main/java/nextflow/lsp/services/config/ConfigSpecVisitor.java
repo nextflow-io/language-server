@@ -18,7 +18,6 @@ package nextflow.lsp.services.config;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -98,17 +97,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
          *
          * @param ref
          */
-        default boolean isPending(PluginRef ref) {
-            return false;
-        }
-
-        /**
-         * Record the plugins declared by a config file.
-         *
-         * @param uri
-         * @param refs
-         */
-        void declare(URI uri, List<PluginRef> refs);
+        boolean isPending(PluginRef ref);
     }
 
     public ConfigSpecVisitor(SourceUnit sourceUnit, PluginLookup plugins) {
@@ -123,6 +112,9 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
 
     private SpecNode.Scope spec;
 
+    // the plugins declared by the last visited config file
+    private List<PluginRef> pluginRefs = List.of();
+
     // whether the config scopes of some declared plugins are not known yet
     private boolean pendingScopes;
 
@@ -132,6 +124,13 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
      * by the declarations above it.
      */
     private ClassNode paramsType;
+
+    /**
+     * Get the plugins declared by the config file, after {@link #visit}.
+     */
+    public List<PluginRef> getPluginRefs() {
+        return pluginRefs;
+    }
 
     public void visit() {
         var moduleNode = sourceUnit.getAST();
@@ -185,10 +184,7 @@ public class ConfigSpecVisitor extends ConfigVisitorSupport {
             .toList();
 
         pendingScopes = refs.stream().anyMatch(ref -> plugins.isPending(ref));
-
-        // save current versions to plugin cache
-        var uri = sourceUnit.getSource().getURI();
-        plugins.declare(uri, refs);
+        pluginRefs = refs;
 
         // collect config scopes from plugin specs
         var result = new HashMap<String, SpecNode>();

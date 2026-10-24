@@ -62,9 +62,7 @@ public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
          *
          * @param name
          */
-        default boolean isPending(String name) {
-            return false;
-        }
+        boolean isPending(String name);
     }
 
     public ResolvePluginIncludeVisitor(SourceUnit sourceUnit, PluginResolver plugins) {

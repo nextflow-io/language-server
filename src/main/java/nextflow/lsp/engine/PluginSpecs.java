@@ -74,21 +74,16 @@ final class PluginSpecs {
 
     /**
      * Look up the spec of a plugin release, and start fetching it if
-     * it has not been fetched yet, or if its last fetch failed long
-     * enough ago.
+     * it has not been fetched yet. Failed fetches are retried by
+     * {@link #retryFailed}, which runs before every build.
      *
      * @param ref
      */
     Lookup lookup(PluginRef ref) {
         var entry = cache.get(ref);
-        var now = engine.environment().clock().instant();
         if( entry == null ) {
             entry = new Entry();
             cache.put(ref, entry);
-            fetch(ref);
-        }
-        else if( entry.state == State.FAILED && !now.isBefore(entry.retryAt) ) {
-            entry.state = State.PENDING;
             fetch(ref);
         }
         return switch( entry.state ) {
