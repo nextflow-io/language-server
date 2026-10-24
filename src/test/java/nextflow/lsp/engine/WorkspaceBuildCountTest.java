@@ -67,7 +67,7 @@ class WorkspaceBuildCountTest {
     }
 
     static void requestEverything(WorkspaceFixture f, String path) {
-        for( var need : List.of(Need.FILE, Need.FILE_AND_DEPENDENTS, Need.PROJECT_CONFIGS, Need.PROJECT) )
+        for( var need : List.of(Need.FILE, Need.PROJECT_CONFIGS, Need.PROJECT) )
             f.call(need, path, null, (context) -> null);
         f.call(Need.ALL, null, null, (context) -> null);
     }
@@ -105,10 +105,8 @@ class WorkspaceBuildCountTest {
                 f.call(Need.FILE, "mod_a.nf", null, (context) -> null);
             assertThat(f.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1));
 
-            for( int i = 0; i < 3; i++ ) {
+            for( int i = 0; i < 3; i++ )
                 f.call(Need.PROJECT, "mod_a.nf", null, (context) -> null);
-                f.call(Need.FILE_AND_DEPENDENTS, "mod_a.nf", null, (context) -> null);
-            }
             f.settle();
             assertThat(f.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1, "sub.nf", 1, "main.nf", 1));
             assertThat(f.includeTarget("sub.nf")).isEqualTo(URI.create(f.uri("mod_a.nf")));

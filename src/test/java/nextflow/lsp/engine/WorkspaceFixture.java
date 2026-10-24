@@ -24,7 +24,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -266,15 +265,7 @@ final class WorkspaceFixture implements AutoCloseable {
      * projects that contain it.
      */
     Map<String, Integer> parses() {
-        var root = TestWorkspace.root();
-        var result = new TreeMap<String, Integer>();
-        for( var project : workspace.projects() ) {
-            for( var entry : project.entries() ) {
-                var path = root.relativize(Path.of(entry.uri())).toString().replace('\\', '/');
-                result.merge(path, entry.parses, Integer::sum);
-            }
-        }
-        return result;
+        return EngineHarness.parses(workspace);
     }
 
     /**
@@ -284,13 +275,7 @@ final class WorkspaceFixture implements AutoCloseable {
      * @param before
      */
     Map<String, Integer> parsesSince(Map<String, Integer> before) {
-        var result = new TreeMap<String, Integer>();
-        parses().forEach((path, count) -> {
-            var delta = count - before.getOrDefault(path, 0);
-            if( delta != 0 )
-                result.put(path, delta);
-        });
-        return result;
+        return EngineHarness.parsesSince(workspace, before);
     }
 
     // -- engine

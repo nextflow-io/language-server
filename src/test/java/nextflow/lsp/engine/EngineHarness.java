@@ -19,10 +19,12 @@ package nextflow.lsp.engine;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
@@ -264,6 +266,43 @@ public final class EngineHarness implements AutoCloseable {
     @Override
     public void close() {
         env.manualExecutor().shutdown();
+    }
+
+    // -- parses
+
+    /**
+     * Get the number of parses of each file so far, summed over the
+     * projects that contain it.
+     *
+     * @param workspace
+     */
+    public static Map<String, Integer> parses(Workspace workspace) {
+        var root = TestWorkspace.root();
+        var result = new TreeMap<String, Integer>();
+        for( var project : workspace.projects() ) {
+            for( var entry : project.entries() ) {
+                var path = root.relativize(Path.of(entry.uri())).toString().replace('\\', '/');
+                result.merge(path, entry.parses, Integer::sum);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Get the number of parses of each file since the given counts,
+     * omitting the files that were not parsed.
+     *
+     * @param workspace
+     * @param before
+     */
+    public static Map<String, Integer> parsesSince(Workspace workspace, Map<String, Integer> before) {
+        var result = new TreeMap<String, Integer>();
+        parses(workspace).forEach((path, count) -> {
+            var delta = count - before.getOrDefault(path, 0);
+            if( delta != 0 )
+                result.put(path, delta);
+        });
+        return result;
     }
 
 }

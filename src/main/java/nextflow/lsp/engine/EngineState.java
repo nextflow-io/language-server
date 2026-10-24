@@ -83,8 +83,7 @@ public interface EngineState {
 
         /**
          * Synchronously build what the request needs: the closure of
-         * the request file (FILE), plus its dependents
-         * (FILE_AND_DEPENDENTS) or the project configs
+         * the request file (FILE), plus the project configs
          * (PROJECT_CONFIGS), or every stale file of the target
          * projects (PROJECT, ALL; called only when they are indexed).
          *

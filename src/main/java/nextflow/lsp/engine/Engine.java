@@ -411,7 +411,7 @@ public final class Engine {
         }
         var r = route.get();
         switch( task.spec.need() ) {
-            case FILE, FILE_AND_DEPENDENTS, PROJECT_CONFIGS -> {
+            case FILE, PROJECT_CONFIGS -> {
                 r.prepare(cancelChecker(task.future));
                 run(task, r);
             }

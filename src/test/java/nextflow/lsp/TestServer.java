@@ -105,6 +105,8 @@ public final class TestServer implements AutoCloseable {
 
     private final EngineHarness harness;
 
+    private Workspace workspace;
+
     private final Map<String, Integer> versions = new HashMap<>();
 
     private TestServer(Options options) {
@@ -113,7 +115,7 @@ public final class TestServer implements AutoCloseable {
         this.env = options.environment != null
             ? options.environment
             : new TestEnvironment().withRegistry((url) -> registry);
-        this.server = new NextflowLanguageServer(env, options.debounce, Workspace.factory(options.maxSliceFiles));
+        this.server = new NextflowLanguageServer(env, options.debounce, (engine) -> workspace = (Workspace) Workspace.factory(options.maxSliceFiles).create(engine));
         server.connect(options.client);
         this.harness = EngineHarness.attach(server.engine(), env, options.client);
     }
@@ -345,6 +347,23 @@ public final class TestServer implements AutoCloseable {
      */
     public void settle() {
         harness.settle();
+    }
+
+    /**
+     * Get the number of parses of each file so far.
+     */
+    public Map<String, Integer> parses() {
+        return EngineHarness.parses(workspace);
+    }
+
+    /**
+     * Get the number of parses of each file since the given counts,
+     * omitting the files that were not parsed.
+     *
+     * @param before
+     */
+    public Map<String, Integer> parsesSince(Map<String, Integer> before) {
+        return EngineHarness.parsesSince(workspace, before);
     }
 
     /**

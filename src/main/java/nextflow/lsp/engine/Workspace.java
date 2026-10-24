@@ -945,9 +945,8 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
             engine.checkEngineThread();
             try {
                 switch( need ) {
-                    case FILE -> prepareFile(false, false, cancelChecker);
-                    case FILE_AND_DEPENDENTS -> prepareFile(false, true, cancelChecker);
-                    case PROJECT_CONFIGS -> prepareFile(true, false, cancelChecker);
+                    case FILE -> prepareFile(false, cancelChecker);
+                    case PROJECT_CONFIGS -> prepareFile(true, cancelChecker);
                     case PROJECT, ALL -> targets.forEach(p -> buildAll(p, cancelChecker));
                 }
             }
@@ -956,7 +955,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
             }
         }
 
-        private void prepareFile(boolean configs, boolean dependents, CancelChecker cancelChecker) {
+        private void prepareFile(boolean configs, CancelChecker cancelChecker) {
             if( project == null )
                 return;
             var roots = new ArrayList<FileEntry>();
@@ -975,15 +974,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                     roots.add(entry);
             }
             buildClosure(project, roots, cancelChecker);
-            if( dependents && uri != null ) {
-                var includers = new ArrayList<FileEntry>();
-                for( var dependent : project.graph.transitiveDependents(List.of(uri)) ) {
-                    var entry = project.entry(dependent);
-                    if( entry != null )
-                        includers.add(entry);
-                }
-                buildClosure(project, includers, cancelChecker);
-            }
             markReadyIfDone(project);
         }
 

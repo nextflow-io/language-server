@@ -336,8 +336,9 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     @Override
     public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
         var textDocument = ClientUris.canonical(params.getTextDocument());
-        // the actions depend on the call paths from the entry workflows
-        return request("textDocument/codeAction", textDocument.getUri(), null, Need.FILE_AND_DEPENDENTS, false, Collections.emptyList(), (ctx) ->
+        // the call paths are read from the includers as last built, so they
+        // may be stale until the background build catches up
+        return fileRequest("textDocument/codeAction", textDocument.getUri(), Collections.emptyList(), (ctx) ->
             ctx.project().scripts()
                 .map(ast -> new ScriptCodeActionProvider(ast).codeAction(textDocument, params.getRange()).stream()
                     .peek(action -> ClientUris.command(action.getCommand(), ctx::clientUri))
