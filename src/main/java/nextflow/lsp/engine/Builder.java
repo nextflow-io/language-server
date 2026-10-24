@@ -395,10 +395,10 @@ final class Builder {
                 }
             }
             for( var parsed : tasks ) {
-                if( parsed.text != null && parsed.internalError == null )
-                    parse(parsed);
                 if( parsed.internalError != null )
                     logInternalError(parsed, "parsing", parsed.internalError);
+                else if( parsed.text != null )
+                    parse(parsed);
                 if( parsed.readError != null )
                     workspace.engine().log(MessageType.Warning, "Failed to read " + parsed.entry.path + " -- " + parsed.readError);
             }
@@ -455,15 +455,7 @@ final class Builder {
             var compiler = project.compilerFor(entry.kind);
             var unit = compiler.createSourceUnit(entry.uri, parsed.text);
             parsed.unit = unit;
-            try {
-                compiler.parse(unit);
-            }
-            catch( VirtualMachineError e ) {
-                throw e;
-            }
-            catch( Throwable e ) {
-                parsed.internalError = e;
-            }
+            contained(parsed, "parsing", () -> compiler.parse(unit));
         }
 
         // -- register and discover
@@ -477,19 +469,12 @@ final class Builder {
         }
 
         private void discover(Parsed parsed, List<FileEntry> next) {
-            try {
+            contained(parsed, "resolving dependencies of", () -> {
                 if( parsed.entry.kind == FileKind.SCRIPT )
                     discoverScript(parsed);
                 else
                     discoverConfig(parsed);
-            }
-            catch( VirtualMachineError e ) {
-                throw e;
-            }
-            catch( Throwable e ) {
-                parsed.internalError = e;
-                logInternalError(parsed, "resolving dependencies of", e);
-            }
+            });
             for( var target : parsed.targets ) {
                 var entry = project.entry(target);
                 if( entry == null )
@@ -740,7 +725,7 @@ final class Builder {
             }
             catch( GroovyBugError | Exception e ) {
                 // a Groovy class in the lib directory failed to compile
-                System.err.println("Unexpected exception while resolving " + parsed.entry.uri.getPath() + ": " + e.toString());
+                workspace.engine().log(MessageType.Warning, "Unexpected exception while resolving " + parsed.entry.uri.getPath() + ": " + e);
             }
             new ParameterSchemaVisitor(unit).visit();
             new PluginCallVisitor(unit).visit();
@@ -784,9 +769,7 @@ final class Builder {
             entry.internalError = parsed.internalError;
             entry.errors = parsed.unit != null ? errors(parsed.unit) : List.of();
             entry.warnings = parsed.unit != null ? warnings(parsed.unit) : List.of();
-            if( parsed.internalError != null )
-                return;
-            try {
+            contained(parsed, "indexing", () -> {
                 var parents = entry.kind == FileKind.SCRIPT
                     ? scriptParents(parsed.unit)
                     : configParents(parsed.unit);
@@ -794,15 +777,8 @@ final class Builder {
                 entry.nodes = List.copyOf(parents.keySet());
                 for( var node : entry.nodes )
                     project.nodeOwner.put(node, entry);
-            }
-            catch( VirtualMachineError e ) {
-                throw e;
-            }
-            catch( Throwable e ) {
-                parsed.internalError = e;
-                entry.internalError = e;
-                logInternalError(parsed, "indexing", e);
-            }
+            });
+            entry.internalError = parsed.internalError;
         }
 
         private static Map<ASTNode, ASTNode> scriptParents(SourceUnit unit) {
