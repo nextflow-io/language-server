@@ -29,6 +29,7 @@ import nextflow.lsp.TestLanguageClient;
 import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.DocumentSymbolParams;
+import org.eclipse.lsp4j.FileChangeType;
 import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.WorkDoneProgressBegin;
 import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
@@ -371,6 +372,28 @@ class WorkspaceIndexTest {
         assertThat(f.messages("main.nf")).containsExactly(UNUSED);
         assertThat(f.messages("late.nf")).containsExactly(UNUSED);
         assertThat(f.messages("late-request.nf")).containsExactly(UNUSED);
+    }
+
+    @Test
+    void keepFilesOpenedAndClosedDuringTheWalk() {
+        var io = new QueuedExecutor();
+        var f = TestServer.start((o) -> {
+            o.environment = new TestEnvironment()
+                .withIoExecutor(io)
+                .withFiles(new LaggingWalk((path) -> path.getFileName().toString().startsWith("late")));
+            o.watchers = true;
+            o.settle = false;
+        });
+        f.write("main.nf", "workflow { def x = 1 }\n");
+        f.runPending();
+        // created and opened while the walk is in flight, with the
+        // watcher event arriving after the open
+        f.write("late.nf", "workflow LATE { def y = 1 }\n");
+        f.open("late.nf", "workflow LATE { def y = 1 }\n");
+        f.notify("late.nf", FileChangeType.Created);
+        f.close("late.nf");
+        f.settle(io);
+        assertThat(f.messages("late.nf")).containsExactly(UNUSED);
     }
 
     @Test

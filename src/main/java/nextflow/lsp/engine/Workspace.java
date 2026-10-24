@@ -549,7 +549,10 @@ public final class Workspace implements EngineState {
         bumpAll(uri);
         bumpIncluders(uri);
         // an open file is part of the project, even if it is excluded
-        projectFor(path).getOrCreate(uri, FileEntry.Role.WORKSPACE);
+        var project = projectFor(path);
+        project.getOrCreate(uri, FileEntry.Role.WORKSPACE);
+        // the walk may have listed the directory before the file was created
+        noteAdded(project, uri);
         scheduleEdit();
     }
 
