@@ -61,73 +61,68 @@ class PluginSpecsTest {
     @Test
     void fetchSpecOnFirstLookup() {
         var registry = new FixtureRegistry();
-        try( var f = start(registry) ) {
-            f.settle();
-            var ref = new PluginRef("nf-prov", "1.6.0");
-            var lookups = new ArrayList<PluginSpecs.Lookup>();
-            lookups.add(lookup(f, ref));
-            f.settle();
-            lookups.add(lookup(f, ref));
-            assertThat(lookups.get(1).pending()).isFalse();
-            assertThat(lookups.get(1).spec()).hasValueSatisfying(spec -> assertThat(spec.configScopes()).containsKey("prov"));
-            assertThat(registry.fetches).containsExactly("nf-prov@1.6.0");
-        }
+        var f = start(registry);
+        f.settle();
+        var ref = new PluginRef("nf-prov", "1.6.0");
+        var lookups = new ArrayList<PluginSpecs.Lookup>();
+        lookups.add(lookup(f, ref));
+        f.settle();
+        lookups.add(lookup(f, ref));
+        assertThat(lookups.get(1).pending()).isFalse();
+        assertThat(lookups.get(1).spec()).hasValueSatisfying(spec -> assertThat(spec.configScopes()).containsKey("prov"));
+        assertThat(registry.fetches).containsExactly("nf-prov@1.6.0");
     }
 
     @Test
     void cachePluginsThatAreNotFoundInRegistry() {
         var registry = new FixtureRegistry();
-        try( var f = start(registry) ) {
+        var f = start(registry);
+        f.settle();
+        var ref = new PluginRef("nf-missing", "1.0.0");
+        for( int i = 0; i < 3; i++ ) {
+            lookup(f, ref);
             f.settle();
-            var ref = new PluginRef("nf-missing", "1.0.0");
-            for( int i = 0; i < 3; i++ ) {
-                lookup(f, ref);
-                f.settle();
-            }
-            var result = lookup(f, ref);
-            assertThat(result.spec()).isEmpty();
-            assertThat(result.pending()).isFalse();
-            assertThat(registry.fetches).containsExactly("nf-missing@1.0.0");
         }
+        var result = lookup(f, ref);
+        assertThat(result.spec()).isEmpty();
+        assertThat(result.pending()).isFalse();
+        assertThat(registry.fetches).containsExactly("nf-missing@1.0.0");
     }
 
     @Test
     void onlyMainConfigFilesDeclarePluginsForScripts() {
         var registry = new FixtureRegistry();
-        try( var f = start(registry) ) {
-            f.write("other.config", SCHEMA_CONFIG);
-            f.write("main.nf", SCRIPT);
-            f.settle();
-            assertThat(f.messages("main.nf")).containsExactly(DOES_NOT_EXIST);
-            assertThat(registry.fetches).containsExactly("nf-schema@2.7.3");
-        }
+        var f = start(registry);
+        f.write("other.config", SCHEMA_CONFIG);
+        f.write("main.nf", SCRIPT);
+        f.settle();
+        assertThat(f.messages("main.nf")).containsExactly(DOES_NOT_EXIST);
+        assertThat(registry.fetches).containsExactly("nf-schema@2.7.3");
     }
 
     @Test
     void ignoreConfigFilesOutsideTheProject() {
         var registry = new FixtureRegistry();
-        try( var f = start(registry, "project") ) {
-            f.write("nextflow.config", SCHEMA_CONFIG);
-            f.write("project/main.nf", SCRIPT);
-            f.settle();
-            assertThat(f.messages("project/main.nf")).containsExactly(DOES_NOT_EXIST);
-        }
+        var f = start(registry, "project");
+        f.write("nextflow.config", SCHEMA_CONFIG);
+        f.write("project/main.nf", SCRIPT);
+        f.settle();
+        assertThat(f.messages("project/main.nf")).containsExactly(DOES_NOT_EXIST);
     }
 
     @Test
     void usePluginsOfTheNearestParentConfig() {
         var registry = new FixtureRegistry();
-        try( var f = start(registry) ) {
-            f.write("nextflow.config", SCHEMA_CONFIG);
-            f.write("main.nf", SCRIPT);
-            f.write("subdir/module.nf", SCRIPT);
-            f.write("other/nextflow.config", "plugins { id 'nf-prov@1.6.0' }\n");
-            f.write("other/module.nf", SCRIPT);
-            f.settle();
-            assertThat(f.messages("main.nf")).isEmpty();
-            assertThat(f.messages("subdir/module.nf")).isEmpty();
-            assertThat(f.messages("other/module.nf")).containsExactly(DOES_NOT_EXIST);
-        }
+        var f = start(registry);
+        f.write("nextflow.config", SCHEMA_CONFIG);
+        f.write("main.nf", SCRIPT);
+        f.write("subdir/module.nf", SCRIPT);
+        f.write("other/nextflow.config", "plugins { id 'nf-prov@1.6.0' }\n");
+        f.write("other/module.nf", SCRIPT);
+        f.settle();
+        assertThat(f.messages("main.nf")).isEmpty();
+        assertThat(f.messages("subdir/module.nf")).isEmpty();
+        assertThat(f.messages("other/module.nf")).containsExactly(DOES_NOT_EXIST);
     }
 
 }

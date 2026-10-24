@@ -46,7 +46,7 @@ import org.eclipse.lsp4j.VersionedTextDocumentIdentifier;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public final class EngineHarness implements AutoCloseable {
+public final class EngineHarness {
 
     /**
      * Upper bound on settle iterations, to turn a livelock into a failure.
@@ -256,11 +256,6 @@ public final class EngineHarness implements AutoCloseable {
                 throw new IllegalStateException("Engine is not idle, but has no pending work");
         }
         throw new IllegalStateException("Engine did not settle after " + MAX_STEPS + " steps");
-    }
-
-    @Override
-    public void close() {
-        env.manualExecutor().shutdown();
     }
 
     // -- parses

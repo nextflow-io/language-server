@@ -69,118 +69,112 @@ class ProjectViewTest {
 
     @Test
     void showBuiltScriptsOfTheProject() {
-        try( var f = TestServer.start() ) {
-            f.write("main.nf", MAIN);
-            f.write("mod.nf", MOD);
-            f.writeAndNotify("nextflow.config", "process.cpus = 1\n");
-            f.settle();
-            var mainUri = f.path("main.nf").toUri();
-            var modUri = f.path("mod.nf").toUri();
-            f.call(Need.FILE, "main.nf", null, (context) -> {
-                var project = context.project();
-                var scripts = project.scripts().orElseThrow();
-                assertThat(scripts.getUris()).containsExactly(mainUri, modUri);
-                assertThat(scripts.getProjectDir()).isEqualTo(TestWorkspace.root());
-                assertThat(scripts.hasAST(mainUri)).isTrue();
-                assertThat(scripts.getScriptNode(f.path("unknown.nf").toUri())).isNull();
-                assertThat(scripts.getIncludeNodes(f.path("unknown.nf").toUri())).isEmpty();
-                var process = scripts.getProcessNodes(modUri).get(0);
-                assertThat(scripts.getURI(process)).isEqualTo(modUri);
-                assertThat(scripts.getDefinitions()).hasAtLeastOneElementOfType(ProcessNode.class);
-                // the config view doesn't own script nodes
-                assertThat(project.configView().getURI(process)).isNull();
-                assertThat(project.configView().getUris()).containsExactly(f.path("nextflow.config").toUri());
-                return null;
-            });
-        }
+        var f = TestServer.start();
+        f.write("main.nf", MAIN);
+        f.write("mod.nf", MOD);
+        f.writeAndNotify("nextflow.config", "process.cpus = 1\n");
+        f.settle();
+        var mainUri = f.path("main.nf").toUri();
+        var modUri = f.path("mod.nf").toUri();
+        f.call(Need.FILE, "main.nf", null, (context) -> {
+            var project = context.project();
+            var scripts = project.scripts().orElseThrow();
+            assertThat(scripts.getUris()).containsExactly(mainUri, modUri);
+            assertThat(scripts.getProjectDir()).isEqualTo(TestWorkspace.root());
+            assertThat(scripts.hasAST(mainUri)).isTrue();
+            assertThat(scripts.getScriptNode(f.path("unknown.nf").toUri())).isNull();
+            assertThat(scripts.getIncludeNodes(f.path("unknown.nf").toUri())).isEmpty();
+            var process = scripts.getProcessNodes(modUri).get(0);
+            assertThat(scripts.getURI(process)).isEqualTo(modUri);
+            assertThat(scripts.getDefinitions()).hasAtLeastOneElementOfType(ProcessNode.class);
+            // the config view doesn't own script nodes
+            assertThat(project.configView().getURI(process)).isNull();
+            assertThat(project.configView().getUris()).containsExactly(f.path("nextflow.config").toUri());
+            return null;
+        });
     }
 
     @Test
     void iterateEveryNodeWithoutCopying() {
-        try( var f = TestServer.start() ) {
-            f.write("main.nf", MAIN);
-            f.write("mod.nf", MOD);
-            f.settle();
-            f.call(Need.FILE, "main.nf", null, (context) -> {
-                var scripts = context.project().scriptView();
-                var nodes = scripts.getNodes();
-                var expected = 0;
-                for( var uri : scripts.getUris() )
-                    expected += scripts.getNodes(uri).size();
-                var iterated = new ArrayList<ASTNode>();
-                nodes.forEach(iterated::add);
-                assertThat(nodes).hasSize(expected);
-                assertThat(iterated).hasSize(expected);
-                assertThat(iterated).allMatch(n -> scripts.getURI(n) != null);
-                return null;
-            });
-        }
+        var f = TestServer.start();
+        f.write("main.nf", MAIN);
+        f.write("mod.nf", MOD);
+        f.settle();
+        f.call(Need.FILE, "main.nf", null, (context) -> {
+            var scripts = context.project().scriptView();
+            var nodes = scripts.getNodes();
+            var expected = 0;
+            for( var uri : scripts.getUris() )
+                expected += scripts.getNodes(uri).size();
+            var iterated = new ArrayList<ASTNode>();
+            nodes.forEach(iterated::add);
+            assertThat(nodes).hasSize(expected);
+            assertThat(iterated).hasSize(expected);
+            assertThat(iterated).allMatch(n -> scripts.getURI(n) != null);
+            return null;
+        });
     }
 
     @Test
     void canonicaliseRequestUris() {
-        try( var f = TestServer.start() ) {
-            f.write("main.nf", MAIN);
-            f.write("mod.nf", MOD);
-            f.settle();
-            var raw = URI.create(TestWorkspace.root().toUri() + "sub/../mod.nf");
-            f.call(Need.FILE, "main.nf", null, (context) -> {
-                var scripts = context.project().scriptView();
-                assertThat(scripts.hasAST(raw)).isTrue();
-                assertThat(scripts.getProcessNodes(raw)).hasSize(1);
-                return null;
-            });
-        }
+        var f = TestServer.start();
+        f.write("main.nf", MAIN);
+        f.write("mod.nf", MOD);
+        f.settle();
+        var raw = URI.create(TestWorkspace.root().toUri() + "sub/../mod.nf");
+        f.call(Need.FILE, "main.nf", null, (context) -> {
+            var scripts = context.project().scriptView();
+            assertThat(scripts.hasAST(raw)).isTrue();
+            assertThat(scripts.getProcessNodes(raw)).hasSize(1);
+            return null;
+        });
     }
 
     @Test
     void showConfigFilesForConfigRequests() {
-        try( var f = TestServer.start() ) {
-            f.write("nextflow.config", "includeConfig 'missing.config'\n");
-            f.settle();
-            var uri = f.path("nextflow.config").toUri();
-            f.call(Need.FILE, "nextflow.config", null, (context) -> {
-                var project = context.project();
-                assertThat(project.scripts()).isEmpty();
-                var configs = project.configView();
-                assertThat(configs.getConfigNode(uri)).isNotNull();
-                assertThat(configs.hasIncludeErrors(uri)).isTrue();
-                assertThat(configs.hasErrors(uri)).isTrue();
-                assertThat(configs.hasSyntaxErrors(uri)).isFalse();
-                return null;
-            });
-        }
+        var f = TestServer.start();
+        f.write("nextflow.config", "includeConfig 'missing.config'\n");
+        f.settle();
+        var uri = f.path("nextflow.config").toUri();
+        f.call(Need.FILE, "nextflow.config", null, (context) -> {
+            var project = context.project();
+            assertThat(project.scripts()).isEmpty();
+            var configs = project.configView();
+            assertThat(configs.getConfigNode(uri)).isNotNull();
+            assertThat(configs.hasIncludeErrors(uri)).isTrue();
+            assertThat(configs.hasErrors(uri)).isTrue();
+            assertThat(configs.hasSyntaxErrors(uri)).isFalse();
+            return null;
+        });
     }
 
     @Test
     void showEveryKindForProjectWideRequests() {
-        try( var f = TestServer.start() ) {
-            f.write("main.nf", MAIN);
-            f.write("mod.nf", MOD);
-            f.settle();
-            var names = f.call(Need.ALL, null, List.<String>of(), (context) -> {
-                var result = new ArrayList<String>();
-                for( var project : context.allProjects() ) {
-                    assertThat(project.scripts()).isPresent();
-                    result.add(project.name());
-                }
-                return result;
-            });
-            assertThat(names).containsExactly("root", "");
-        }
+        var f = TestServer.start();
+        f.write("main.nf", MAIN);
+        f.write("mod.nf", MOD);
+        f.settle();
+        var names = f.call(Need.ALL, null, List.<String>of(), (context) -> {
+            var result = new ArrayList<String>();
+            for( var project : context.allProjects() ) {
+                assertThat(project.scripts()).isPresent();
+                result.add(project.name());
+            }
+            return result;
+        });
+        assertThat(names).containsExactly("root", "");
     }
 
     @Test
     void rejectViewAccessOutsideTheEngineThread() throws Exception {
-        try( var f = TestServer.start() ) {
-            f.write("main.nf", MAIN);
-            f.write("mod.nf", MOD);
-            f.settle();
-            var view = f.call(Need.FILE, "main.nf", (ScriptView) null, (context) -> context.project().scriptView());
-            var project = f.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
-            for( Runnable access : List.<Runnable>of(view::getUris, view::getNodes, () -> view.getURI(null), project::scriptView) )
-                assertThat(thrownOnAnotherThread(access)).isInstanceOf(IllegalStateException.class);
-        }
+        var f = TestServer.start();
+        f.write("main.nf", MAIN);
+        f.write("mod.nf", MOD);
+        f.settle();
+        var view = f.call(Need.FILE, "main.nf", (ScriptView) null, (context) -> context.project().scriptView());
+        var project = f.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
+        for( Runnable access : List.<Runnable>of(view::getUris, view::getNodes, () -> view.getURI(null), project::scriptView) )
+            assertThat(thrownOnAnotherThread(access)).isInstanceOf(IllegalStateException.class);
     }
 
 }

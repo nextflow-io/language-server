@@ -49,130 +49,121 @@ class NextflowLanguageServerTest {
 
     @Test
     void reportDiagnosticsWithoutConfiguration() {
-        try( var server = TestServer.start((o) -> o.settle = false) ) {
-            server.write("main.nf", INVALID_SCRIPT);
-            server.open("main.nf", INVALID_SCRIPT);
-            server.settle();
-            assertThat(server.diagnostics("main.nf")).isNotEmpty();
-        }
+        var server = TestServer.start((o) -> o.settle = false);
+        server.write("main.nf", INVALID_SCRIPT);
+        server.open("main.nf", INVALID_SCRIPT);
+        server.settle();
+        assertThat(server.diagnostics("main.nf")).isNotEmpty();
     }
 
     @Test
     void useRootUriIfThereAreNoWorkspaceFolders() {
-        try( var server = TestServer.start((o) -> o.rootUri = true) ) {
-            server.write("main.nf", INVALID_SCRIPT);
-            server.open("main.nf", INVALID_SCRIPT);
-            server.settle();
-            assertThat(server.diagnostics("main.nf")).isNotEmpty();
-        }
+        var server = TestServer.start((o) -> o.rootUri = true);
+        server.write("main.nf", INVALID_SCRIPT);
+        server.open("main.nf", INVALID_SCRIPT);
+        server.settle();
+        assertThat(server.diagnostics("main.nf")).isNotEmpty();
     }
 
     @Test
     void reportDiagnosticsForFilesOutsideOfWorkspaceFolders() {
-        try( var server = TestServer.start((o) -> o.folders()) ) {
-            server.write("main.nf", INVALID_SCRIPT);
-            server.open("main.nf", INVALID_SCRIPT);
-            server.settle();
-            assertThat(server.diagnostics("main.nf")).isNotEmpty();
-        }
+        var server = TestServer.start((o) -> o.folders());
+        server.write("main.nf", INVALID_SCRIPT);
+        server.open("main.nf", INVALID_SCRIPT);
+        server.settle();
+        assertThat(server.diagnostics("main.nf")).isNotEmpty();
     }
 
     @Test
     void excludeWorkDirectoryByDefault() {
-        try( var server = TestServer.start((o) -> o.initialized = false) ) {
-            server.write("main.nf", INVALID_SCRIPT);
-            server.write("work/ab/cdef/main.nf", INVALID_SCRIPT);
-            server.initialized();
-            server.open("main.nf", INVALID_SCRIPT);
-            server.settle();
-            assertThat(server.diagnostics("main.nf")).isNotEmpty();
-            assertThat(server.client().getAllDiagnostics()).doesNotContainKey(server.uri("work/ab/cdef/main.nf"));
-        }
+        var server = TestServer.start((o) -> o.initialized = false);
+        server.write("main.nf", INVALID_SCRIPT);
+        server.write("work/ab/cdef/main.nf", INVALID_SCRIPT);
+        server.initialized();
+        server.open("main.nf", INVALID_SCRIPT);
+        server.settle();
+        assertThat(server.diagnostics("main.nf")).isNotEmpty();
+        assertThat(server.client().getAllDiagnostics()).doesNotContainKey(server.uri("work/ab/cdef/main.nf"));
     }
 
     @Test
     void serveOpenFilesInExcludedDirectories() {
-        try( var server = TestServer.start() ) {
-            var text = "workflow HELLO {\n    def x = 1\n}\n";
-            server.write("work/ab/main.nf", text);
-            server.open("work/ab/main.nf", text);
-            var document = server.document("work/ab/main.nf");
-            var symbols = server.call((s) -> s.documentSymbol(new DocumentSymbolParams(document)));
-            assertThat(symbols).extracting(symbol -> symbol.getRight().getName()).containsExactly("workflow HELLO");
-            var hover = server.call((s) -> s.hover(new HoverParams(document, new Position(0, 10))));
-            assertThat(hover).isNotNull();
-            server.settle();
-            assertThat(server.diagnostics("work/ab/main.nf")).extracting(Diagnostic::getMessage).containsExactly(TestUtils.UNUSED);
+        var server = TestServer.start();
+        var text = "workflow HELLO {\n    def x = 1\n}\n";
+        server.write("work/ab/main.nf", text);
+        server.open("work/ab/main.nf", text);
+        var document = server.document("work/ab/main.nf");
+        var symbols = server.call((s) -> s.documentSymbol(new DocumentSymbolParams(document)));
+        assertThat(symbols).extracting(symbol -> symbol.getRight().getName()).containsExactly("workflow HELLO");
+        var hover = server.call((s) -> s.hover(new HoverParams(document, new Position(0, 10))));
+        assertThat(hover).isNotNull();
+        server.settle();
+        assertThat(server.diagnostics("work/ab/main.nf")).extracting(Diagnostic::getMessage).containsExactly(TestUtils.UNUSED);
 
-            // once closed, the file is excluded again
-            server.close("work/ab/main.nf");
-            server.settle();
-            assertThat(server.diagnostics("work/ab/main.nf")).isEmpty();
-            symbols = server.call((s) -> s.documentSymbol(new DocumentSymbolParams(document)));
-            assertThat(symbols).isEmpty();
-        }
+        // once closed, the file is excluded again
+        server.close("work/ab/main.nf");
+        server.settle();
+        assertThat(server.diagnostics("work/ab/main.nf")).isEmpty();
+        symbols = server.call((s) -> s.documentSymbol(new DocumentSymbolParams(document)));
+        assertThat(symbols).isEmpty();
     }
 
     @Test
     void answerScriptOnlyRequestsOnConfigFilesWithoutWaitingForTheIndex() {
         var io = new QueuedExecutor();
-        try( var server = TestServer.start((o) -> {
+        var server = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withIoExecutor(io);
             o.settle = false;
-        }) ) {
-            var config = "process.cpus = 2\n";
-            server.write("nextflow.config", config);
-            server.open("nextflow.config", config);
-            var document = server.document("nextflow.config");
-            var position = new Position(0, 0);
-            var references = server.send((s) -> s.references(new ReferenceParams(document, position, new ReferenceContext(true))));
-            var rename = server.send((s) -> s.rename(new RenameParams(document, position, "x")));
-            server.runPending();
-            assertThat(references).isCompletedWithValue(List.of());
-            assertThat(rename).isCompletedWithValue(null);
-        }
+        });
+        var config = "process.cpus = 2\n";
+        server.write("nextflow.config", config);
+        server.open("nextflow.config", config);
+        var document = server.document("nextflow.config");
+        var position = new Position(0, 0);
+        var references = server.send((s) -> s.references(new ReferenceParams(document, position, new ReferenceContext(true))));
+        var rename = server.send((s) -> s.rename(new RenameParams(document, position, "x")));
+        server.runPending();
+        assertThat(references).isCompletedWithValue(List.of());
+        assertThat(rename).isCompletedWithValue(null);
     }
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void reportProgressOnlyIfClientSupportsIt(boolean supported) {
-        try( var server = TestServer.start((o) -> {
+        var server = TestServer.start((o) -> {
             o.progress = supported;
             o.initialized = false;
-        }) ) {
-            server.write("main.nf", INVALID_SCRIPT);
-            server.initialized();
-            server.settle();
-            assertThat(server.client().getProgress().isEmpty()).isNotEqualTo(supported);
-        }
+        });
+        server.write("main.nf", INVALID_SCRIPT);
+        server.initialized();
+        server.settle();
+        assertThat(server.client().getProgress().isEmpty()).isNotEqualTo(supported);
     }
 
     @Test
     void exitWithStatusZeroOnlyAfterShutdown() {
-        try( var server = TestServer.start() ) {
-            server.server().exit();
-            assertThat(server.env().exits()).containsExactly(1);
-        }
-        try( var server = TestServer.start() ) {
-            assertThat(server.call(NextflowLanguageServer::shutdown)).isNull();
-            server.server().exit();
-            assertThat(server.env().exits()).containsExactly(0);
-        }
+        var abrupt = TestServer.start();
+        abrupt.server().exit();
+        assertThat(abrupt.env().exits()).containsExactly(1);
+
+        var server = TestServer.start();
+        assertThat(server.call(NextflowLanguageServer::shutdown)).isNull();
+        server.server().exit();
+        assertThat(server.env().exits()).containsExactly(0);
     }
 
     @Test
     void rejectRequestsAfterShutdown() {
-        try( var server = TestServer.start() ) {
-            server.open("main.nf", INVALID_SCRIPT);
-            server.call(NextflowLanguageServer::shutdown);
-            var hover = server.send(s -> s.hover(new HoverParams(server.document("main.nf"), new Position(0, 0))));
-            server.runPending();
-            assertThat(hover).isCompletedExceptionally();
-            assertThatThrownBy(hover::join)
-                .hasCauseInstanceOf(ResponseErrorException.class)
-                .cause()
-                .satisfies(e -> assertThat(((ResponseErrorException) e).getResponseError().getCode()).isEqualTo(ResponseErrorCode.InvalidRequest.getValue()));
-        }
+        var server = TestServer.start();
+        server.open("main.nf", INVALID_SCRIPT);
+        server.call(NextflowLanguageServer::shutdown);
+        var hover = server.send(s -> s.hover(new HoverParams(server.document("main.nf"), new Position(0, 0))));
+        server.runPending();
+        assertThat(hover).isCompletedExceptionally();
+        assertThatThrownBy(hover::join)
+            .hasCauseInstanceOf(ResponseErrorException.class)
+            .cause()
+            .satisfies(e -> assertThat(((ResponseErrorException) e).getResponseError().getCode()).isEqualTo(ResponseErrorCode.InvalidRequest.getValue()));
     }
 
 }

@@ -76,16 +76,15 @@ class ClientUriTest {
         "my@pipeline (copy)|my%40pipeline%20%28copy%29"
     })
     void findReferencesOfAnIncludeAlias(String dir, String encodedDir) {
-        try( var server = start(dir, encodedDir) ) {
-            var clientUri = server.uri("") + encodedDir + "/main.nf";
-            var document = new TextDocumentIdentifier(clientUri);
-            var references = server.call((s) -> s.references(new ReferenceParams(document, new Position(0, 20), new ReferenceContext(true))));
-            assertThat(references).isNotEmpty().extracting(Location::getUri).containsOnly(clientUri);
+        var server = start(dir, encodedDir);
+        var clientUri = server.uri("") + encodedDir + "/main.nf";
+        var document = new TextDocumentIdentifier(clientUri);
+        var references = server.call((s) -> s.references(new ReferenceParams(document, new Position(0, 20), new ReferenceContext(true))));
+        assertThat(references).isNotEmpty().extracting(Location::getUri).containsOnly(clientUri);
 
-            var edit = server.call((s) -> s.rename(new RenameParams(document, new Position(0, 20), "HI")));
-            assertThat(edit.getChanges()).containsOnlyKeys(clientUri);
-            assertThat(edit.getChanges().get(clientUri)).hasSize(references.size());
-        }
+        var edit = server.call((s) -> s.rename(new RenameParams(document, new Position(0, 20), "HI")));
+        assertThat(edit.getChanges()).containsOnlyKeys(clientUri);
+        assertThat(edit.getChanges().get(clientUri)).hasSize(references.size());
     }
 
     @ParameterizedTest
@@ -94,25 +93,24 @@ class ClientUriTest {
         "my@pipeline (copy)|my%40pipeline%20%28copy%29"
     })
     void referToOpenDocumentsByTheirClientUri(String dir, String encodedDir) {
-        try( var server = start(dir, encodedDir) ) {
-            var clientUri = server.uri("") + encodedDir + "/main.nf";
-            var document = new TextDocumentIdentifier(clientUri);
-            assertThat(server.client().getAllDiagnostics()).containsKey(clientUri);
+        var server = start(dir, encodedDir);
+        var clientUri = server.uri("") + encodedDir + "/main.nf";
+        var document = new TextDocumentIdentifier(clientUri);
+        assertThat(server.client().getAllDiagnostics()).containsKey(clientUri);
 
-            var definition = server.call((s) -> s.definition(new DefinitionParams(document, new Position(3, 6))));
-            assertThat(definition.getLeft()).extracting(Location::getUri).containsExactly(server.uri(dir + "/mod.nf"));
+        var definition = server.call((s) -> s.definition(new DefinitionParams(document, new Position(3, 6))));
+        assertThat(definition.getLeft()).extracting(Location::getUri).containsExactly(server.uri(dir + "/mod.nf"));
 
-            var items = server.call((s) -> s.prepareCallHierarchy(new CallHierarchyPrepareParams(document, new Position(3, 6))));
-            assertThat(items).extracting(item -> item.getUri()).containsExactly(clientUri);
+        var items = server.call((s) -> s.prepareCallHierarchy(new CallHierarchyPrepareParams(document, new Position(3, 6))));
+        assertThat(items).extracting(item -> item.getUri()).containsExactly(clientUri);
 
-            var symbols = server.call((s) -> s.symbol(new WorkspaceSymbolParams("")));
-            assertThat(symbols.getRight()).extracting(symbol -> symbol.getLocation().getLeft().getUri())
-                .containsExactlyInAnyOrder(clientUri, server.uri(dir + "/mod.nf"));
+        var symbols = server.call((s) -> s.symbol(new WorkspaceSymbolParams("")));
+        assertThat(symbols.getRight()).extracting(symbol -> symbol.getLocation().getLeft().getUri())
+            .containsExactlyInAnyOrder(clientUri, server.uri(dir + "/mod.nf"));
 
-            var lenses = server.call((s) -> s.codeLens(new CodeLensParams(document)));
-            assertThat(lenses).isNotEmpty().allSatisfy(lens ->
-                assertThat(lens.getCommand().getArguments().get(0).toString()).isEqualTo("\"" + clientUri + "\""));
-        }
+        var lenses = server.call((s) -> s.codeLens(new CodeLensParams(document)));
+        assertThat(lenses).isNotEmpty().allSatisfy(lens ->
+            assertThat(lens.getCommand().getArguments().get(0).toString()).isEqualTo("\"" + clientUri + "\""));
     }
 
 }

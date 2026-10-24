@@ -48,39 +48,38 @@ class IssueRegressionTest {
         var ended = new ArrayList<Boolean>();
         var client = new TestLanguageClient();
         client.onProgressEnd(() -> ended.add(true));
-        try( var server = TestServer.start((o) -> {
+        var server = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withIoExecutor(io);
             o.client = client;
             o.progress = true;
             o.initialized = false;
-        }) ) {
-            var module = "workflow GREET {}\n";
-            server.write("modules/greet/main.nf", module);
-            server.write("main.nf", """
-                include { GREET } from './modules/greet/main.nf'
+        });
+        var module = "workflow GREET {}\n";
+        server.write("modules/greet/main.nf", module);
+        server.write("main.nf", """
+            include { GREET } from './modules/greet/main.nf'
 
-                workflow {
-                    GREET()
-                }
-                """);
-            server.initialized();
-            server.runPending();
+            workflow {
+                GREET()
+            }
+            """);
+        server.initialized();
+        server.runPending();
 
-            server.open("modules/greet/main.nf", module);
-            var endedAtAnswer = new ArrayList<Boolean>();
-            var params = new ReferenceParams(server.document("modules/greet/main.nf"), new Position(0, 10), new ReferenceContext(true));
-            var references = server.send(s -> s.references(params));
-            references.whenComplete((result, error) -> endedAtAnswer.add(!ended.isEmpty()));
-            server.runPending();
-            assertThat(references).isNotDone();
+        server.open("modules/greet/main.nf", module);
+        var endedAtAnswer = new ArrayList<Boolean>();
+        var params = new ReferenceParams(server.document("modules/greet/main.nf"), new Position(0, 10), new ReferenceContext(true));
+        var references = server.send(s -> s.references(params));
+        references.whenComplete((result, error) -> endedAtAnswer.add(!ended.isEmpty()));
+        server.runPending();
+        assertThat(references).isNotDone();
 
-            server.settle(io);
-            // the definition, plus the include and the call in main.nf
-            assertThat(references.join())
-                .extracting(Location::getUri)
-                .containsExactlyInAnyOrder(server.uri("modules/greet/main.nf"), server.uri("main.nf"), server.uri("main.nf"));
-            assertThat(endedAtAnswer).containsExactly(true);
-        }
+        server.settle(io);
+        // the definition, plus the include and the call in main.nf
+        assertThat(references.join())
+            .extracting(Location::getUri)
+            .containsExactlyInAnyOrder(server.uri("modules/greet/main.nf"), server.uri("main.nf"), server.uri("main.nf"));
+        assertThat(endedAtAnswer).containsExactly(true);
     }
 
 }

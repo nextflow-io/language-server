@@ -96,20 +96,18 @@ class WorkspaceConcurrencyTest {
     @Test
     @Timeout(120)
     void readOnARealPoolAndParseOnTheEngineThread() {
-        Map<String, List<Diagnostic>> direct;
-        try( var f = TestServer.start((o) -> o.settle = false) ) {
-            writeWorkspace(f);
-            f.settle();
-            direct = f.client().getNonEmptyDiagnostics();
-        }
+        var direct = TestServer.start((o) -> o.settle = false);
+        writeWorkspace(direct);
+        direct.settle();
         var pool = new ForkJoinPool(4);
-        try( var f = TestServer.start((o) -> {
-            o.environment = new TestEnvironment().withReadPool(pool);
-            o.maxSliceFiles = 16;
-            o.settle = false;
-        }) ) {
+        try {
+            var f = TestServer.start((o) -> {
+                o.environment = new TestEnvironment().withReadPool(pool);
+                o.maxSliceFiles = 16;
+                o.settle = false;
+            });
             f.settle();
-            assertThat(f.client().getNonEmptyDiagnostics()).isEqualTo(direct).isNotEmpty();
+            assertThat(f.client().getNonEmptyDiagnostics()).isEqualTo(direct.client().getNonEmptyDiagnostics()).isNotEmpty();
             assertThat(f.client().getLogMessages()).noneMatch((m) -> m.getMessage().contains("Internal error"));
         }
         finally {
@@ -131,9 +129,8 @@ class WorkspaceConcurrencyTest {
                     unexpected.add(message.getMessage());
             }
         };
-        try( var f = TestServer.start((o) -> o.settle = false) ) {
-            writeWorkspace(f);
-        }
+        var f = TestServer.start((o) -> o.settle = false);
+        writeWorkspace(f);
         var env = EngineEnvironment.system();
         var engine = new Engine(env, client, Duration.ofMillis(5), Workspace.factory(8));
         try {
@@ -234,11 +231,10 @@ class WorkspaceConcurrencyTest {
         }
 
         // the final diagnostics equal those of a fresh workspace
-        try( var fresh = TestServer.start((o) -> o.settle = false) ) {
-            openDocuments.forEach(fresh::open);
-            fresh.settle();
-            assertThat(published).isEqualTo(fresh.client().getNonEmptyDiagnostics());
-        }
+        var fresh = TestServer.start((o) -> o.settle = false);
+        openDocuments.forEach(fresh::open);
+        fresh.settle();
+        assertThat(published).isEqualTo(fresh.client().getNonEmptyDiagnostics());
     }
 
 }

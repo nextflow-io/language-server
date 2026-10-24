@@ -75,43 +75,40 @@ class WorkspaceBuildCountTest {
 
     @Test
     void parseEveryFileOnceWhileIndexing() {
-        try( var f = start() ) {
-            assertThat(f.parses()).containsOnlyKeys(FILES).allSatisfy((path, count) -> assertThat(count).as(path).isEqualTo(1));
-        }
+        var f = start();
+        assertThat(f.parses()).containsOnlyKeys(FILES).allSatisfy((path, count) -> assertThat(count).as(path).isEqualTo(1));
     }
 
     @Test
     void parseNothingForRequestsOnAFreshProject() {
-        try( var f = start() ) {
-            var before = f.parses();
-            for( int i = 0; i < 3; i++ ) {
-                for( var path : FILES )
-                    requestEverything(f, path);
-            }
-            f.settle();
-            assertThat(f.parsesSince(before)).isEmpty();
+        var f = start();
+        var before = f.parses();
+        for( int i = 0; i < 3; i++ ) {
+            for( var path : FILES )
+                requestEverything(f, path);
         }
+        f.settle();
+        assertThat(f.parsesSince(before)).isEmpty();
     }
 
     @Test
     void parseAnEditedModuleOnceAndItsDependentsOnceForProjectRequests() {
-        try( var f = start() ) {
-            var before = f.parses();
-            f.open("mod_a.nf", MOD_A);
+        var f = start();
+        var before = f.parses();
+        f.open("mod_a.nf", MOD_A);
+        f.call(Need.FILE, "mod_a.nf", null, (context) -> null);
+        assertThat(f.parsesSince(before)).isEmpty();
+
+        f.change("mod_a.nf", "workflow A { def y = 1 }\n");
+        for( int i = 0; i < 3; i++ )
             f.call(Need.FILE, "mod_a.nf", null, (context) -> null);
-            assertThat(f.parsesSince(before)).isEmpty();
+        assertThat(f.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1));
 
-            f.change("mod_a.nf", "workflow A { def y = 1 }\n");
-            for( int i = 0; i < 3; i++ )
-                f.call(Need.FILE, "mod_a.nf", null, (context) -> null);
-            assertThat(f.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1));
-
-            for( int i = 0; i < 3; i++ )
-                f.call(Need.PROJECT, "mod_a.nf", null, (context) -> null);
-            f.settle();
-            assertThat(f.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1, "sub.nf", 1, "main.nf", 1));
-            assertThat(f.includeTarget("sub.nf")).isEqualTo(URI.create(f.uri("mod_a.nf")));
-        }
+        for( int i = 0; i < 3; i++ )
+            f.call(Need.PROJECT, "mod_a.nf", null, (context) -> null);
+        f.settle();
+        assertThat(f.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1, "sub.nf", 1, "main.nf", 1));
+        assertThat(f.includeTarget("sub.nf")).isEqualTo(URI.create(f.uri("mod_a.nf")));
     }
 
     @Test
@@ -126,38 +123,37 @@ class WorkspaceBuildCountTest {
                 return super.readText(path);
             }
         };
-        try( var f = TestServer.start((o) -> {
+        var f = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withFiles(files);
             o.maxSliceFiles = 1;
             o.settle = false;
-        }) ) {
-            var main = new StringBuilder();
-            for( int i = 0; i < 5; i++ ) {
-                f.write("mod" + i + ".nf", "workflow M" + i + " {}\n");
-                main.append("include { M" + i + " } from './mod" + i + ".nf'\n");
-            }
-            main.append("workflow { M0() }\n");
-            f.write("main.nf", main.toString());
-            f.settle();
-            var before = f.parses();
-
-            for( int i = 0; i < 5; i++ )
-                f.writeAndNotify("mod" + i + ".nf", "workflow M" + i + " { def x = 1 }\n");
-            var request = f.send(Need.FILE, "main.nf", "empty", (context) -> "done");
-            cancelOnRead.set(request);
-            f.runPending();
-
-            // the slice in progress is committed, and the rest is left stale
-            assertThat(request).isCancelled();
-            assertThat(f.parsesSince(before)).hasSize(1);
-
-            f.settle();
-            assertThat(f.parsesSince(before))
-                .hasSize(6)
-                .allSatisfy((path, count) -> assertThat(count).as(path).isEqualTo(1));
-            assertThat(f.messages("main.nf")).isEmpty();
-            assertThat(f.messages("mod4.nf")).containsExactly(TestUtils.UNUSED);
+        });
+        var main = new StringBuilder();
+        for( int i = 0; i < 5; i++ ) {
+            f.write("mod" + i + ".nf", "workflow M" + i + " {}\n");
+            main.append("include { M" + i + " } from './mod" + i + ".nf'\n");
         }
+        main.append("workflow { M0() }\n");
+        f.write("main.nf", main.toString());
+        f.settle();
+        var before = f.parses();
+
+        for( int i = 0; i < 5; i++ )
+            f.writeAndNotify("mod" + i + ".nf", "workflow M" + i + " { def x = 1 }\n");
+        var request = f.send(Need.FILE, "main.nf", "empty", (context) -> "done");
+        cancelOnRead.set(request);
+        f.runPending();
+
+        // the slice in progress is committed, and the rest is left stale
+        assertThat(request).isCancelled();
+        assertThat(f.parsesSince(before)).hasSize(1);
+
+        f.settle();
+        assertThat(f.parsesSince(before))
+            .hasSize(6)
+            .allSatisfy((path, count) -> assertThat(count).as(path).isEqualTo(1));
+        assertThat(f.messages("main.nf")).isEmpty();
+        assertThat(f.messages("mod4.nf")).containsExactly(TestUtils.UNUSED);
     }
 
 }

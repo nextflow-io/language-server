@@ -75,7 +75,7 @@ import org.eclipse.lsp4j.WorkspaceFoldersChangeEvent;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public final class TestServer implements AutoCloseable {
+public final class TestServer {
 
     public static final class Options {
         /** Workspace folders, relative to the workspace root. */
@@ -463,11 +463,6 @@ public final class TestServer implements AutoCloseable {
                 .map(p -> p.getDiagnostics())
                 .toList();
         }
-    }
-
-    @Override
-    public void close() {
-        harness.close();
     }
 
 }

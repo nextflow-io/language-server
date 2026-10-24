@@ -32,7 +32,6 @@ import org.eclipse.lsp4j.MessageType;
 import org.eclipse.lsp4j.TextDocumentItem;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -60,12 +59,6 @@ class EngineTest {
     private EngineHarness start(Consumer<EngineHarness.Options> configure) {
         harness = EngineHarness.start((engine) -> state = new FakeState(engine), configure);
         return harness;
-    }
-
-    @AfterEach
-    void close() {
-        if( harness != null )
-            harness.close();
     }
 
     private RequestSpec spec(String method, Need need) {

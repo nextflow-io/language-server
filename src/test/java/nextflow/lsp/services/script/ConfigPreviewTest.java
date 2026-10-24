@@ -473,21 +473,20 @@ class ConfigPreviewTest {
                 SUB()
             }
             """);
-        try( var server = TestServer.start() ) {
-            var uri = getUri("subworkflows/sub.nf");
-            server.open("subworkflows/sub.nf", sub);
-            var before = server.parses();
-            server.change("subworkflows/sub.nf", sub + "\n");
+        var server = TestServer.start();
+        var uri = getUri("subworkflows/sub.nf");
+        server.open("subworkflows/sub.nf", sub);
+        var before = server.parses();
+        server.change("subworkflows/sub.nf", sub + "\n");
 
-            // within the debounce, the includers still refer to the
-            // previous version of the subworkflow, so no call path matches
-            assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for ALIGN");
-            assertThat(server.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1));
+        // within the debounce, the includers still refer to the
+        // previous version of the subworkflow, so no call path matches
+        assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for ALIGN");
+        assertThat(server.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1));
 
-            server.settle();
-            assertThat(server.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1, "main.nf", 1));
-            assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for SUB:ALIGN_DNA");
-        }
+        server.settle();
+        assertThat(server.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1, "main.nf", 1));
+        assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for SUB:ALIGN_DNA");
     }
 
     @Test
@@ -518,15 +517,14 @@ class ConfigPreviewTest {
                 }
                 """);
         }
-        try( var server = TestServer.start() ) {
-            var uri = getUri("subworkflows/sub.nf");
-            server.open("subworkflows/sub.nf", sub);
-            var before = server.parses();
-            server.change("subworkflows/sub.nf", sub + "\n");
+        var server = TestServer.start();
+        var uri = getUri("subworkflows/sub.nf");
+        server.open("subworkflows/sub.nf", sub);
+        var before = server.parses();
+        server.change("subworkflows/sub.nf", sub + "\n");
 
-            assertThat(codeActionTitles(server, uri, 4, 4)).isNotEmpty();
-            assertThat(server.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1));
-        }
+        assertThat(codeActionTitles(server, uri, 4, 4)).isNotEmpty();
+        assertThat(server.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1));
     }
 
     @Test

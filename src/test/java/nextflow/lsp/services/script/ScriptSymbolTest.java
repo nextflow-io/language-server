@@ -142,21 +142,20 @@ class ScriptSymbolTest {
 
     @Test
     void listSymbolsOfNestedFoldersOnce() {
-        try( var server = TestServer.start((o) -> {
+        var server = TestServer.start((o) -> {
             o.folders("", "sub");
             o.settle = false;
-        }) ) {
-            server.write("sub/a.nf", "workflow A {}\n");
-            server.write("sub/b.nf", "workflow B {}\n");
-            server.write("main.nf", """
-                include { A } from './sub/a.nf'
-                workflow {
-                    A()
-                }
-                """);
-            server.settle();
-            assertThat(getWorkspaceSymbolNames(server, "")).containsExactlyInAnyOrder("workflow A", "workflow B", "workflow <entry>");
-        }
+        });
+        server.write("sub/a.nf", "workflow A {}\n");
+        server.write("sub/b.nf", "workflow B {}\n");
+        server.write("main.nf", """
+            include { A } from './sub/a.nf'
+            workflow {
+                A()
+            }
+            """);
+        server.settle();
+        assertThat(getWorkspaceSymbolNames(server, "")).containsExactlyInAnyOrder("workflow A", "workflow B", "workflow <entry>");
     }
 
 }
