@@ -37,12 +37,6 @@ public interface ProjectView {
     Optional<ScriptView> scripts();
 
     /**
-     * The config files of the project, if the request file is a
-     * config file, or for project-wide requests.
-     */
-    Optional<ConfigView> configs();
-
-    /**
      * The scripts of the project, regardless of the request file.
      */
     ScriptView scriptView();

@@ -17,7 +17,6 @@ package nextflow.lsp.engine;
 
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -107,16 +106,8 @@ public final class FileEntry {
         return uri;
     }
 
-    public Path path() {
-        return path;
-    }
-
     public FileKind kind() {
         return kind;
-    }
-
-    public Role role() {
-        return role;
     }
 
     /**
@@ -167,28 +158,6 @@ public final class FileEntry {
      */
     public Throwable internalError() {
         return internalError;
-    }
-
-    /**
-     * The document version of the last build, or null if it was
-     * built from disk.
-     */
-    public Integer builtFromVersion() {
-        return builtFromVersion;
-    }
-
-    /**
-     * The plugins declared by this config file in the last build.
-     */
-    public List<PluginRef> pluginRefs() {
-        return pluginRefs;
-    }
-
-    /**
-     * The dependencies recorded by the last build.
-     */
-    public Set<URI> dependencies() {
-        return Collections.unmodifiableSet(depStamps.keySet());
     }
 
     @Override

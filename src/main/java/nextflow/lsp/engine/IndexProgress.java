@@ -109,15 +109,14 @@ final class IndexProgress {
     }
 
     private void start() {
-        var client = engine.client();
-        if( !supported || client == null )
+        if( !supported )
             return;
         var current = TOKEN_PREFIX + (++runs);
         token = current;
         begun = false;
         lastDone = -1;
         lastTotal = -1;
-        client.createProgress(new WorkDoneProgressCreateParams(Either.forLeft(current)))
+        engine.client().createProgress(new WorkDoneProgressCreateParams(Either.forLeft(current)))
             .whenComplete((result, error) -> engine.submit(new Event.ProgressCreated(current, error)));
     }
 

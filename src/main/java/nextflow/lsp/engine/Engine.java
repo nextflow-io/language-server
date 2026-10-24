@@ -197,13 +197,6 @@ public final class Engine {
     }
 
     /**
-     * Schedule background work after the debounce delay.
-     */
-    public void scheduleBackground() {
-        scheduleBackground(debounce);
-    }
-
-    /**
      * Schedule background work after the given delay, replacing any
      * pending background work. The delay is ignored while requests
      * are parked, since they need the background work to finish.
@@ -259,11 +252,6 @@ public final class Engine {
         }
     }
 
-    int parkedCount() {
-        checkEngineThread();
-        return parked.size();
-    }
-
     // -- mailbox
 
     private boolean enqueue(String description, Runnable action) {
@@ -313,8 +301,7 @@ public final class Engine {
 
     void log(MessageType type, String message) {
         System.err.println(message);
-        if( client != null )
-            client.logMessage(new MessageParams(type, message));
+        client.logMessage(new MessageParams(type, message));
     }
 
     void logError(String message, Throwable e) {
@@ -322,8 +309,7 @@ public final class Engine {
         e.printStackTrace(new PrintWriter(trace));
         System.err.println(message);
         e.printStackTrace();
-        if( client != null )
-            client.logMessage(new MessageParams(MessageType.Error, message + "\n" + trace));
+        client.logMessage(new MessageParams(MessageType.Error, message + "\n" + trace));
     }
 
     // -- events
@@ -332,18 +318,18 @@ public final class Engine {
         if( shutdown )
             return;
         if( event instanceof Event.DidOpen e ) {
-            if( documents.open(e.params()).isEmpty() )
+            if( !documents.open(e.params()) )
                 return;
         }
         else if( event instanceof Event.DidChange e ) {
-            if( documents.change(e.params()).isEmpty() ) {
+            if( !documents.change(e.params()) ) {
                 log(MessageType.Warning, "Ignoring change of a document that is not open: " + e.params().getTextDocument().getUri());
                 return;
             }
         }
         else if( event instanceof Event.DidClose e ) {
             var uri = Uris.canonical(e.params().getTextDocument().getUri());
-            if( uri.isEmpty() || documents.close(uri.get()).isEmpty() )
+            if( uri.isEmpty() || !documents.close(uri.get()) )
                 return;
         }
         state.apply(event);
@@ -362,16 +348,11 @@ public final class Engine {
         parked.clear();
         for( var task : pending )
             fail(task, ResponseErrorCode.InvalidRequest, "Server is shutting down");
-        try {
-            state.shutdown();
-        }
-        finally {
-            env.compilePool().shutdownNow();
-            if( env.ioExecutor() instanceof ExecutorService io )
-                io.shutdownNow();
-            // tasks that are already queued still run, and fail their requests
-            executor.shutdown();
-        }
+        env.compilePool().shutdownNow();
+        if( env.ioExecutor() instanceof ExecutorService io )
+            io.shutdownNow();
+        // tasks that are already queued still run, and fail their requests
+        executor.shutdown();
     }
 
     // -- requests
@@ -396,7 +377,6 @@ public final class Engine {
         }
         var r = route.get();
         switch( task.spec.need() ) {
-            case NONE -> run(task, r);
             case FILE, FILE_AND_DEPENDENTS, PROJECT_CONFIGS -> {
                 r.prepare();
                 run(task, r);

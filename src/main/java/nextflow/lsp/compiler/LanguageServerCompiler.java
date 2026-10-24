@@ -15,12 +15,10 @@
  */
 package nextflow.lsp.compiler;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.config.control.StringReaderSourceWithURI;
@@ -113,28 +111,18 @@ public class LanguageServerCompiler extends Compiler {
     }
 
     /**
-     * Prepare a source file from the given text, or from the
-     * filesystem if no text is given.
-     *
-     * Returns null if no text is given and the file doesn't exist,
-     * so that the file is removed from any downstream caches.
+     * Prepare a source file from the given text.
      *
      * @param uri
      * @param text
      */
-    public SourceUnit createSourceUnit(URI uri, Optional<String> text) {
-        if( text.isPresent() ) {
-            return new SourceUnit(
-                    uri.toString(),
-                    new StringReaderSourceWithURI(text.get(), uri, configuration()),
-                    configuration(),
-                    classLoader(),
-                    createErrorCollector());
-        }
-        if( Files.exists(Path.of(uri)) ) {
-            return super.createSourceUnit(new File(uri));
-        }
-        return null;
+    public SourceUnit createSourceUnit(URI uri, String text) {
+        return new SourceUnit(
+                uri.toString(),
+                new StringReaderSourceWithURI(text, uri, configuration()),
+                configuration(),
+                classLoader(),
+                createErrorCollector());
     }
 
     @Override

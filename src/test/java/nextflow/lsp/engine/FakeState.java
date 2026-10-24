@@ -61,11 +61,7 @@ final class FakeState implements EngineState {
 
     RuntimeException sliceError;
 
-    RuntimeException shutdownError;
-
     int slices;
-
-    boolean shutdownCalled;
 
     FakeState(Engine engine) {
         this.engine = engine;
@@ -77,7 +73,7 @@ final class FakeState implements EngineState {
         if( applyError != null )
             throw applyError;
         if( event instanceof Event.DidOpen || event instanceof Event.DidChange || event instanceof Event.DidClose )
-            engine.scheduleBackground();
+            engine.scheduleBackground(engine.debounce());
     }
 
     @Override
@@ -102,14 +98,6 @@ final class FakeState implements EngineState {
                 satisfied = true;
         }
         return pendingSlices > 0;
-    }
-
-    @Override
-    public void shutdown() {
-        shutdownCalled = true;
-        log.add("shutdown");
-        if( shutdownError != null )
-            throw shutdownError;
     }
 
     private final class FakeRoute implements Route {

@@ -62,7 +62,7 @@ class WorkspaceBuildCountTest {
     }
 
     static void requestEverything(WorkspaceFixture f, String path) {
-        for( var need : List.of(Need.NONE, Need.FILE, Need.FILE_AND_DEPENDENTS, Need.PROJECT_CONFIGS, Need.PROJECT) )
+        for( var need : List.of(Need.FILE, Need.FILE_AND_DEPENDENTS, Need.PROJECT_CONFIGS, Need.PROJECT) )
             f.call(need, path, null, (context) -> null);
         f.call(Need.ALL, null, null, (context) -> null);
     }

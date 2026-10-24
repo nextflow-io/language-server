@@ -509,7 +509,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
         var command = params.getCommand();
         var arguments = params.getArguments() != null ? params.getArguments() : List.<Object>of();
         if( PREVIEW_DAG.equals(command) && arguments.size() == 2 ) {
-            var uri = canonical(JsonUtils.getString(arguments.get(0)));
+            var uri = ClientUris.canonical(JsonUtils.getString(arguments.get(0)));
             var name = JsonUtils.getString(arguments.get(1));
             return fileRequest(PREVIEW_DAG, uri, null, (ctx) -> {
                 var configuration = ctx.configuration();
@@ -519,7 +519,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             });
         }
         if( PREVIEW_CONFIG.equals(command) && arguments.size() == 4 ) {
-            var uri = canonical(JsonUtils.getString(arguments.get(0)));
+            var uri = ClientUris.canonical(JsonUtils.getString(arguments.get(0)));
             var name = JsonUtils.getString(arguments.get(1));
             var profiles = JsonUtils.getStringArray(arguments.get(2));
             var qualifiedName = JsonUtils.getString(arguments.get(3));
@@ -553,10 +553,6 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
     }
 
     // -- INTERNAL
-
-    private static String canonical(String uri) {
-        return uri != null ? ClientUris.canonical(uri) : null;
-    }
 
     /**
      * Whether a request URI is a script. Project-wide requests that

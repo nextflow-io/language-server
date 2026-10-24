@@ -37,6 +37,7 @@ import nextflow.config.ast.ConfigIncludeNode;
 import nextflow.config.ast.ConfigStatement;
 import nextflow.lsp.ast.ConfigView;
 import nextflow.lsp.ast.ScriptView;
+import nextflow.lsp.util.Includes;
 import nextflow.script.ast.ProcessNode;
 import nextflow.script.ast.ProcessNodeV1;
 import nextflow.script.ast.ProcessNodeV2;
@@ -517,7 +518,7 @@ public class ConfigPreviewProvider {
         private void visitInclude(ConfigIncludeNode node, URI uri, String profile, List<String> scope, String selector) {
             if( !(node.source instanceof ConstantExpression ce) )
                 return;
-            var includeUri = ConfigView.resolveIncludeUri(uri, ce.getText());
+            var includeUri = Includes.configIncludeUri(uri, ce.getText());
             if( includeUri != null )
                 walk(includeUri, profile, scope, selector);
         }

@@ -43,9 +43,8 @@ final class DocumentStore {
      * @param clientUri the URI as sent by the client, for publishing
      * @param text
      * @param version
-     * @param languageId
      */
-    record OpenDocument(URI uri, String clientUri, String text, int version, String languageId) {}
+    record OpenDocument(URI uri, String clientUri, String text, int version) {}
 
     private final SerialExecutor executor;
 
@@ -58,56 +57,54 @@ final class DocumentStore {
     /**
      * Open a document, replacing it if it is already open.
      *
-     * Returns empty if the URI is not a file URI.
+     * Returns false if the URI is not a file URI.
      *
      * @param params
      */
-    Optional<OpenDocument> open(DidOpenTextDocumentParams params) {
+    boolean open(DidOpenTextDocumentParams params) {
         EngineThread.check(executor);
         var item = params.getTextDocument();
         var uri = Uris.canonical(item.getUri());
         if( uri.isEmpty() )
-            return Optional.empty();
+            return false;
         var text = item.getText() != null ? item.getText() : "";
-        var document = new OpenDocument(uri.get(), item.getUri(), text, item.getVersion(), item.getLanguageId());
-        documents.put(document.uri(), document);
-        return Optional.of(document);
+        documents.put(uri.get(), new OpenDocument(uri.get(), item.getUri(), text, item.getVersion()));
+        return true;
     }
 
     /**
      * Apply the changes of a didChange notification in order, and
      * record the new version.
      *
-     * Returns empty if the document is not open.
+     * Returns false if the document is not open.
      *
      * @param params
      */
-    Optional<OpenDocument> change(DidChangeTextDocumentParams params) {
+    boolean change(DidChangeTextDocumentParams params) {
         EngineThread.check(executor);
         var identifier = params.getTextDocument();
         var uri = Uris.canonical(identifier.getUri());
         if( uri.isEmpty() )
-            return Optional.empty();
+            return false;
         var document = documents.get(uri.get());
         if( document == null )
-            return Optional.empty();
+            return false;
         var text = applyChanges(document.text(), params.getContentChanges());
         var version = identifier.getVersion() != null ? identifier.getVersion() : document.version();
-        var result = new OpenDocument(document.uri(), document.clientUri(), text, version, document.languageId());
-        documents.put(result.uri(), result);
-        return Optional.of(result);
+        documents.put(document.uri(), new OpenDocument(document.uri(), document.clientUri(), text, version));
+        return true;
     }
 
     /**
      * Close a document.
      *
-     * Returns empty if the document is not open.
+     * Returns false if the document is not open.
      *
      * @param uri canonical URI
      */
-    Optional<OpenDocument> close(URI uri) {
+    boolean close(URI uri) {
         EngineThread.check(executor);
-        return Optional.ofNullable(documents.remove(uri));
+        return documents.remove(uri) != null;
     }
 
     Optional<OpenDocument> get(URI uri) {

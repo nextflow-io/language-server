@@ -54,7 +54,7 @@ class PluginSpecsTest {
     }
 
     static PluginSpecs.Lookup lookup(WorkspaceFixture f, PluginRef ref) {
-        return f.call(Need.NONE, null, null, (context) -> f.workspace().plugins().lookup(ref));
+        return f.call(Need.FILE, null, null, (context) -> f.workspace().plugins().lookup(ref));
     }
 
     @Test

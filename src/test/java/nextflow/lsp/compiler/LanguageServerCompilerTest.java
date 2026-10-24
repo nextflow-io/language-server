@@ -17,7 +17,6 @@ package nextflow.lsp.compiler;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Optional;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.lsp.TestWorkspace;
@@ -53,7 +52,7 @@ class LanguageServerCompilerTest {
         var file = TestWorkspace.root().resolve("main.nf");
         Files.writeString(file, "on disk");
 
-        var unit = compiler.createSourceUnit(file.toUri(), Optional.of("in memory"));
+        var unit = compiler.createSourceUnit(file.toUri(), "in memory");
         assertThat(sourceText(unit)).isEqualTo("in memory");
         assertThat(unit.getSource().getURI()).isEqualTo(file.toUri());
         assertThat(unit.getErrorCollector()).isInstanceOf(LazyErrorCollector.class);
@@ -63,24 +62,8 @@ class LanguageServerCompilerTest {
     void createSourceUnitFromTextForFileThatIsNotOnDisk() throws IOException {
         var uri = TestWorkspace.root().resolve("unsaved.nf").toUri();
 
-        var unit = compiler.createSourceUnit(uri, Optional.of("unsaved"));
+        var unit = compiler.createSourceUnit(uri, "unsaved");
         assertThat(sourceText(unit)).isEqualTo("unsaved");
-    }
-
-    @Test
-    void createSourceUnitFromDiskWithoutText() throws IOException {
-        var file = TestWorkspace.root().resolve("main.nf");
-        Files.writeString(file, "on disk");
-
-        var unit = compiler.createSourceUnit(file.toUri(), Optional.empty());
-        assertThat(sourceText(unit)).isEqualTo("on disk");
-    }
-
-    @Test
-    void returnNullForMissingFileWithoutText() {
-        var uri = TestWorkspace.root().resolve("missing.nf").toUri();
-
-        assertThat(compiler.createSourceUnit(uri, Optional.empty())).isNull();
     }
 
 }

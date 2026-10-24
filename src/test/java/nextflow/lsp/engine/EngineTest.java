@@ -118,9 +118,9 @@ class EngineTest {
     void runEventsAndRequestsInSubmissionOrder() {
         var h = start();
         h.open("main.nf", "a");
-        var first = send("first", Need.NONE);
+        var first = send("first", Need.FILE);
         h.change("main.nf", "b");
-        var second = send("second", Need.NONE);
+        var second = send("second", Need.FILE);
 
         // nothing runs on the submitting thread
         assertThat(state.log).isEmpty();
@@ -129,9 +129,9 @@ class EngineTest {
         h.runPending();
         assertThat(state.log).containsExactly(
             "event DidOpen",
-            "route first", "body first",
+            "route first", "prepare first", "body first",
             "event DidChange",
-            "route second", "body second");
+            "route second", "prepare second", "body second");
         assertThat(first).isCompletedWithValue("first");
         assertThat(second).isCompletedWithValue("second");
     }
@@ -180,16 +180,13 @@ class EngineTest {
         var h = start();
         var file = send("hover", Need.FILE);
         var configs = send("previewConfig", Need.PROJECT_CONFIGS);
-        var none = send("none", Need.NONE);
 
         h.runPending();
         assertThat(state.log).containsExactly(
             "route hover", "prepare hover", "body hover",
-            "route previewConfig", "prepare previewConfig", "body previewConfig",
-            "route none", "body none");
+            "route previewConfig", "prepare previewConfig", "body previewConfig");
         assertThat(file).isCompletedWithValue("hover");
         assertThat(configs).isCompletedWithValue("previewConfig");
-        assertThat(none).isCompletedWithValue("none");
     }
 
     // -- parking and background
@@ -203,13 +200,12 @@ class EngineTest {
 
         h.env().manualExecutor().runNext();
         assertThat(result).isNotDone();
-        assertThat(h.engine().parkedCount()).isEqualTo(1);
+        assertThat(state.log).containsExactly("route references");
 
         // parking schedules background work without debounce
         h.runPending();
         assertThat(state.slices).isEqualTo(3);
         assertThat(result).isCompletedWithValue("references");
-        assertThat(h.engine().parkedCount()).isZero();
         assertThat(h.engine().isIdle()).isTrue();
     }
 
@@ -406,12 +402,11 @@ class EngineTest {
         state.indexed = false;
         var result = send("references", Need.PROJECT);
         h.runPending();
-        assertThat(h.engine().parkedCount()).isEqualTo(1);
+        assertThat(state.log).contains("route references").doesNotContain("body references");
         assertThat(h.engine().isIdle()).isFalse();
 
         result.cancel(true);
         h.runPending();
-        assertThat(h.engine().parkedCount()).isZero();
         assertThat(h.engine().isIdle()).isTrue();
 
         // the body never runs, even once the project is ready
@@ -560,23 +555,10 @@ class EngineTest {
         assertThat(shutdown).isCompletedWithValue(null);
         assertThat(errorCode(parked)).isEqualTo(ResponseErrorCode.InvalidRequest.getValue());
         assertThat(errorCode(later)).isEqualTo(ResponseErrorCode.InvalidRequest.getValue());
-        assertThat(state.shutdownCalled).isTrue();
         assertThat(state.log).doesNotContain("event DidOpen", "route hover");
         assertThat(h.env().compilePool().isShutdown()).isTrue();
         assertThat(h.env().manualExecutor().isShutdown()).isTrue();
         assertThat(h.engine().isIdle()).isTrue();
-    }
-
-    @Test
-    void completeShutdownEvenIfStateShutdownFails() {
-        var h = start();
-        state.shutdownError = new IllegalStateException("shutdown failed");
-        var shutdown = h.engine().shutdown();
-
-        h.runPending();
-        assertThat(shutdown).isCompletedWithValue(null);
-        assertThat(h.env().compilePool().isShutdown()).isTrue();
-        assertThat(errorLogs()).anyMatch(m -> m.contains("shutdown failed"));
     }
 
     // -- IO and idleness

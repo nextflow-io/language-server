@@ -15,7 +15,6 @@
  */
 package nextflow.lsp.engine;
 
-import java.net.URI;
 import java.util.Optional;
 
 import nextflow.lsp.ast.ConfigView;
@@ -23,8 +22,7 @@ import nextflow.lsp.ast.ProjectView;
 import nextflow.lsp.ast.ScriptView;
 
 /**
- * The project of a request, as seen by the request body: the
- * project itself plus the request file, if any.
+ * The project of a request, as seen by the request body.
  *
  * Valid only during the request body and only on the engine thread.
  *
@@ -36,18 +34,15 @@ public final class ProjectHandle implements ProjectView {
 
     private final Project project;
 
-    private final URI uri;
-
     private final FileKind kind;
 
     private ScriptView scriptView;
 
     private ConfigView configView;
 
-    ProjectHandle(Engine engine, Project project, URI uri, FileKind kind) {
+    ProjectHandle(Engine engine, Project project, FileKind kind) {
         this.engine = engine;
         this.project = project;
-        this.uri = uri;
         this.kind = kind;
     }
 
@@ -60,11 +55,6 @@ public final class ProjectHandle implements ProjectView {
     @Override
     public Optional<ScriptView> scripts() {
         return kind == null || kind == FileKind.SCRIPT ? Optional.of(scriptView()) : Optional.empty();
-    }
-
-    @Override
-    public Optional<ConfigView> configs() {
-        return kind == null || kind == FileKind.CONFIG ? Optional.of(configView()) : Optional.empty();
     }
 
     @Override
@@ -81,22 +71,6 @@ public final class ProjectHandle implements ProjectView {
         if( configView == null )
             configView = new ConfigEntryView(engine, project);
         return configView;
-    }
-
-    /**
-     * The project, for engine tests.
-     */
-    Project project() {
-        engine.checkEngineThread();
-        return project;
-    }
-
-    /**
-     * The entry of the request file, or null if there is none.
-     */
-    FileEntry requestEntry() {
-        engine.checkEngineThread();
-        return uri != null ? project.entry(uri) : null;
     }
 
 }

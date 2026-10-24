@@ -77,7 +77,6 @@ class ProjectViewTest {
             var modUri = f.path("mod.nf").toUri();
             f.call(Need.FILE, "main.nf", null, (context) -> {
                 var project = context.project();
-                assertThat(project.configs()).isEmpty();
                 var scripts = project.scripts().orElseThrow();
                 assertThat(scripts.getUris()).containsExactly(mainUri, modUri);
                 assertThat(scripts.getProjectDir()).isEqualTo(TestWorkspace.root());
@@ -142,7 +141,7 @@ class ProjectViewTest {
             f.call(Need.FILE, "nextflow.config", null, (context) -> {
                 var project = context.project();
                 assertThat(project.scripts()).isEmpty();
-                var configs = project.configs().orElseThrow();
+                var configs = project.configView();
                 assertThat(configs.getConfigNode(uri)).isNotNull();
                 assertThat(configs.hasIncludeErrors(uri)).isTrue();
                 assertThat(configs.hasErrors(uri)).isTrue();
@@ -162,7 +161,6 @@ class ProjectViewTest {
                 var result = new ArrayList<String>();
                 for( var project : context.allProjects() ) {
                     assertThat(project.scripts()).isPresent();
-                    assertThat(project.configs()).isPresent();
                     result.add(project.name());
                 }
                 return result;

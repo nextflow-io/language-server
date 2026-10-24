@@ -77,11 +77,6 @@ public interface EngineState {
     boolean runSlice();
 
     /**
-     * Release resources on shutdown. No further methods are called.
-     */
-    void shutdown();
-
-    /**
      * The target of a request, resolved by the state.
      */
     interface Route {

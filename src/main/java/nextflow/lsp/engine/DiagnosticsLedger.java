@@ -129,10 +129,7 @@ final class DiagnosticsLedger {
     }
 
     private void send(URI uri, List<Diagnostic> diagnostics, Integer version) {
-        var client = engine.client();
-        if( client == null )
-            return;
-        client.publishDiagnostics(new PublishDiagnosticsParams(clientUri(uri), diagnostics, version));
+        engine.client().publishDiagnostics(new PublishDiagnosticsParams(clientUri(uri), diagnostics, version));
     }
 
     private String clientUri(URI uri) {

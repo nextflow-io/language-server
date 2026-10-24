@@ -16,6 +16,8 @@
 package nextflow.lsp.engine;
 
 import java.net.URI;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +39,12 @@ class DependencyGraphTest {
             .toList();
     }
 
+    static List<List<String>> components(Map<String, List<String>> edges, String... roots) {
+        var rootUris = Arrays.stream(roots).map(DependencyGraphTest::uri).toList();
+        return names(DependencyGraph.components(rootUris, (u) ->
+            edges.getOrDefault(u.getPath().substring(3), List.of()).stream().map(DependencyGraphTest::uri).toList()));
+    }
+
     static DependencyGraph graph(Map<String, List<String>> edges) {
         var graph = new DependencyGraph();
         edges.forEach((from, targets) -> graph.setEdges(uri(from), targets.stream().map(DependencyGraphTest::uri).toList()));
@@ -45,22 +53,19 @@ class DependencyGraphTest {
 
     @Test
     void orderDependenciesFirst() {
-        var graph = graph(Map.of("a", List.of("c", "b"), "b", List.of("c")));
-        assertThat(names(graph.components(List.of(uri("a")))))
+        assertThat(components(Map.of("a", List.of("c", "b"), "b", List.of("c")), "a"))
             .containsExactly(List.of("c"), List.of("b"), List.of("a"));
     }
 
     @Test
     void keepCyclesTogether() {
-        var graph = graph(Map.of("a", List.of("b"), "b", List.of("c"), "c", List.of("b", "d")));
-        assertThat(names(graph.components(List.of(uri("a")))))
+        assertThat(components(Map.of("a", List.of("b"), "b", List.of("c"), "c", List.of("b", "d")), "a"))
             .containsExactly(List.of("d"), List.of("b", "c"), List.of("a"));
     }
 
     @Test
     void visitRootsInTheGivenOrder() {
-        var graph = graph(Map.of("a", List.of("x"), "b", List.of("y")));
-        assertThat(names(graph.components(List.of(uri("b"), uri("a")))))
+        assertThat(components(Map.of("a", List.of("x"), "b", List.of("y")), "b", "a"))
             .containsExactly(List.of("y"), List.of("b"), List.of("x"), List.of("a"));
     }
 
@@ -80,12 +85,12 @@ class DependencyGraphTest {
 
     @Test
     void handleLongChainsWithoutRecursion() {
-        var graph = new DependencyGraph();
         var count = 20_000;
-        IntStream.range(0, count - 1).forEach(i -> graph.setEdges(uri("n" + i), List.of(uri("n" + (i + 1)))));
-        var components = graph.components(List.of(uri("n0")));
+        var edges = new HashMap<String, List<String>>();
+        IntStream.range(0, count - 1).forEach(i -> edges.put("n" + i, List.of("n" + (i + 1))));
+        var components = components(edges, "n0");
         assertThat(components).hasSize(count);
-        assertThat(components.get(0)).containsExactly(uri("n" + (count - 1)));
+        assertThat(components.get(0)).containsExactly("n" + (count - 1));
     }
 
 }

@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Tests for workspace events: folders, routing, ownership,
@@ -501,7 +500,7 @@ class WorkspaceEventsTest {
     @Test
     void rejectProjectAccessOutsideTheEngineThread() throws Exception {
         try( var f = WorkspaceFixture.start() ) {
-            var view = f.call(Need.NONE, "main.nf", (ProjectView) null, RequestContext::project);
+            var view = f.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
             var error = new AtomicReference<Throwable>();
             var thread = new Thread(() -> {
                 try {
@@ -514,15 +513,6 @@ class WorkspaceEventsTest {
             thread.start();
             thread.join();
             assertThat(error.get()).isInstanceOf(IllegalStateException.class);
-            assertThatThrownBy(() -> {
-                var t = new Thread(() -> ((ProjectHandle) view).project());
-                var caught = new AtomicReference<Throwable>();
-                t.setUncaughtExceptionHandler((th, e) -> caught.set(e));
-                t.start();
-                t.join();
-                if( caught.get() != null )
-                    throw caught.get();
-            }).isInstanceOf(IllegalStateException.class);
         }
     }
 

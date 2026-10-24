@@ -178,18 +178,6 @@ public final class Project {
     }
 
     /**
-     * Get the compiler for scripts, whose sources map holds the
-     * source unit of every built script entry.
-     */
-    public LanguageServerCompiler scriptCompiler() {
-        return scriptCompiler;
-    }
-
-    public LanguageServerCompiler configCompiler() {
-        return configCompiler;
-    }
-
-    /**
      * Get the entry that contains an indexed AST node, or null if
      * the node is not indexed (built-in, plugin or superseded).
      *
@@ -197,20 +185,6 @@ public final class Project {
      */
     public FileEntry ownerOf(ASTNode node) {
         return node != null ? nodeOwner.get(node) : null;
-    }
-
-    /**
-     * Get the parent of an indexed AST node.
-     *
-     * @param node
-     */
-    public ASTNode parentOf(ASTNode node) {
-        var owner = ownerOf(node);
-        return owner != null ? owner.parents.get(node) : null;
-    }
-
-    IndexStatus index() {
-        return index;
     }
 
     boolean isIndexed() {

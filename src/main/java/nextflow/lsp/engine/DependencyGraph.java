@@ -79,15 +79,6 @@ final class DependencyGraph {
     }
 
     /**
-     * Get the direct dependencies of a node, in sorted order.
-     *
-     * @param node
-     */
-    Set<URI> dependencies(URI node) {
-        return Collections.unmodifiableSet(forward.getOrDefault(node, Collections.emptySet()));
-    }
-
-    /**
      * Get the direct dependents of a node, in sorted order.
      *
      * @param node
@@ -122,16 +113,6 @@ final class DependencyGraph {
      * The order is deterministic: roots are visited in the given
      * order, and neighbours in sorted order. Members of a component
      * are sorted.
-     *
-     * @param roots
-     */
-    List<List<URI>> components(Collection<URI> roots) {
-        return components(roots, this::dependencies);
-    }
-
-    /**
-     * Variant of {@link #components(Collection)} with explicit edges.
-     * Neighbours are visited in sorted order.
      *
      * @param roots
      * @param neighbours

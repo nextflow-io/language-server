@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import nextflow.lsp.TestLanguageClient;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.parallel.Isolated;
@@ -72,8 +73,8 @@ class ThreadSerialExecutorTest {
     void stopTheEngineThreadOnShutdown() throws Exception {
         var env = EngineEnvironment.system();
         try {
-            var engine = new Engine(env, null, Engine.DEFAULT_DEBOUNCE, FakeState::new);
-            var spec = new RequestSpec("test", null, null, Need.NONE, false);
+            var engine = new Engine(env, new TestLanguageClient(), Engine.DEFAULT_DEBOUNCE, FakeState::new);
+            var spec = new RequestSpec("test", null, null, Need.FILE, false);
             var thread = engine.request(spec, null, (ctx) -> Thread.currentThread()).get(30, TimeUnit.SECONDS);
             var shutdown = engine.shutdown();
             // a request queued behind the shutdown is still answered
@@ -92,8 +93,8 @@ class ThreadSerialExecutorTest {
     void runRequestsOnTheEngineThreadOfTheSystemEnvironment() throws Exception {
         var env = EngineEnvironment.system();
         try {
-            var engine = new Engine(env, null, Engine.DEFAULT_DEBOUNCE, FakeState::new);
-            var spec = new RequestSpec("test", null, null, Need.NONE, false);
+            var engine = new Engine(env, new TestLanguageClient(), Engine.DEFAULT_DEBOUNCE, FakeState::new);
+            var spec = new RequestSpec("test", null, null, Need.FILE, false);
             var result = engine.request(spec, null, (ctx) -> Thread.currentThread().getName() + " daemon=" + Thread.currentThread().isDaemon());
 
             assertThat(result.get(30, TimeUnit.SECONDS)).isEqualTo("nextflow-engine daemon=true");

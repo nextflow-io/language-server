@@ -25,6 +25,7 @@ import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.lsp.ast.ConfigView;
 import nextflow.lsp.services.LinkProvider;
+import nextflow.lsp.util.Includes;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.LanguageServerUtils;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
@@ -97,7 +98,7 @@ class ConfigLinkVisitor extends ConfigVisitorSupport {
             return;
         var source = ce.getText();
         var range = LanguageServerUtils.astNodeToRange(node.source);
-        var target = ConfigView.resolveIncludeUri(uri, source);
+        var target = Includes.configIncludeUri(uri, source);
         if( target != null )
             links.add(new DocumentLink(range, target.toString()));
     }

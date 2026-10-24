@@ -18,7 +18,6 @@ package nextflow.lsp.ast;
 import java.net.URI;
 
 import nextflow.config.ast.ConfigNode;
-import nextflow.lsp.util.Includes;
 
 /**
  * Read-only view of the built config files of a project.
@@ -47,16 +46,5 @@ public interface ConfigView extends AstView {
      * @param uri
      */
     ConfigNode getConfigNode(URI uri);
-
-    /**
-     * Resolve the URI of an include source against the including file.
-     *
-     * @param uri
-     * @param source
-     * @return the resolved URI, or null if it cannot be resolved
-     */
-    static URI resolveIncludeUri(URI uri, String source) {
-        return Includes.configIncludeUri(uri, source);
-    }
 
 }

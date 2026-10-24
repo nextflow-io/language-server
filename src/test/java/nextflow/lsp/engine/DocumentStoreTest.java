@@ -178,17 +178,17 @@ class DocumentStoreTest {
     void ignoreChangeOfUnknownDocument() {
         var result = store.change(change(URI_STRING, 2, edit(0, 0, 0, 0, "x")));
 
-        assertThat(result).isEmpty();
+        assertThat(result).isFalse();
         assertThat(store.get(CANONICAL)).isEmpty();
         assertThat(store.uris()).isEmpty();
     }
 
     @Test
     void closingUnknownDocumentIsNoOp() {
-        assertThat(store.close(CANONICAL)).isEmpty();
+        assertThat(store.close(CANONICAL)).isFalse();
 
         open(URI_STRING, 1, "x");
-        assertThat(store.close(CANONICAL)).isPresent();
+        assertThat(store.close(CANONICAL)).isTrue();
         assertThat(store.isOpen(CANONICAL)).isFalse();
         assertThat(store.version(CANONICAL)).isNull();
     }

@@ -105,10 +105,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
     // estimated build time per file, for sizing slices
     private double millisPerFile;
 
-    private long builds;
-
-    private long builtFiles;
-
     private Workspace(Engine engine, int maxSliceFiles) {
         this.engine = engine;
         this.maxSliceFiles = maxSliceFiles;
@@ -176,20 +172,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                 result = project;
         }
         return result;
-    }
-
-    /**
-     * The number of builds so far, for tests.
-     */
-    long buildCount() {
-        return builds;
-    }
-
-    /**
-     * The number of files built so far, for tests.
-     */
-    long builtFileCount() {
-        return builtFiles;
     }
 
     // -- EngineState
@@ -266,11 +248,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         }
         updateProgress();
         return false;
-    }
-
-    @Override
-    public void shutdown() {
-        folders.clear();
     }
 
     // -- Project.Context
@@ -438,7 +415,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         if( name != null && !name.isEmpty() )
             return name;
         var fileName = root.getFileName();
-        return fileName != null ? fileName.toString() : (name != null ? name : DEFAULT_PROJECT_NAME);
+        return fileName != null ? fileName.toString() : DEFAULT_PROJECT_NAME;
     }
 
     private void removeFolder(Project project) {
@@ -867,8 +844,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         var elapsed = clock.millis() - start;
         var count = Math.max(1, result.built().size());
         millisPerFile = millisPerFile == 0 ? (double) elapsed / count : 0.8 * millisPerFile + 0.2 * elapsed / count;
-        builds++;
-        builtFiles += result.built().size() - result.reused().size();
         if( log.isDebugEnabled() )
             log.debug("built " + result.built().size() + " files of " + project + " in " + elapsed + " ms");
         ledger.publish(result.touched());
@@ -941,7 +916,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         @Override
         public void prepare() {
             switch( need ) {
-                case NONE -> {}
                 case FILE -> prepareFile(false, false);
                 case FILE_AND_DEPENDENTS -> prepareFile(false, true);
                 case PROJECT_CONFIGS -> prepareFile(true, false);
@@ -1007,9 +981,9 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         @Override
         public RequestContext context(CancelChecker cancelChecker) {
             var configuration = Workspace.this.configuration;
-            var view = project != null ? new ProjectHandle(engine, project, uri, kind) : null;
+            var view = project != null ? new ProjectHandle(engine, project, kind) : null;
             var all = projects().stream()
-                .map(p -> (ProjectView) new ProjectHandle(engine, p, null, null))
+                .map(p -> (ProjectView) new ProjectHandle(engine, p, null))
                 .toList();
             return new RequestContext() {
                 @Override

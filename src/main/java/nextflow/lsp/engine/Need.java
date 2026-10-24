@@ -21,8 +21,6 @@ package nextflow.lsp.engine;
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public enum Need {
-    /** Run as is. */
-    NONE,
     /** The request file and its transitive dependencies are built first. */
     FILE,
     /** Like FILE, plus the files that depend on the request file. */

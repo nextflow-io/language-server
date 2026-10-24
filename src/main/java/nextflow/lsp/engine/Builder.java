@@ -97,11 +97,9 @@ final class Builder {
      * The result of a build.
      *
      * @param built the entries that were built, in build order
-     * @param reused the built entries whose text was unchanged, so
-     *   that their last build was kept
      * @param removed the URIs of entries that were removed
      */
-    record Result(List<FileEntry> built, List<FileEntry> reused, Set<URI> removed) {
+    record Result(List<FileEntry> built, Set<URI> removed) {
         Set<URI> touched() {
             var result = new TreeSet<URI>(removed);
             for( var entry : built )
@@ -268,7 +266,7 @@ final class Builder {
             }
 
             commit(analysed, removed);
-            return new Result(built, kept, collectGarbage(order, removed));
+            return new Result(built, collectGarbage(order, removed));
         }
 
         // -- unchanged files
@@ -427,7 +425,7 @@ final class Builder {
             }
             parsed.text = text;
             var compiler = project.compilerFor(entry.kind);
-            var unit = compiler.createSourceUnit(entry.uri, Optional.of(text));
+            var unit = compiler.createSourceUnit(entry.uri, text);
             parsed.unit = unit;
             try {
                 compiler.parse(unit);

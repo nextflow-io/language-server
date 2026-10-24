@@ -54,8 +54,6 @@ final class WatcherRegistration {
      */
     static void register(Engine engine) {
         var client = engine.client();
-        if( client == null )
-            return;
         var watchers = PATTERNS.stream()
             .map(pattern -> new FileSystemWatcher(Either.forLeft(pattern)))
             .toList();
