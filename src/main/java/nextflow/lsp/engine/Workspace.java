@@ -648,29 +648,37 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
     }
 
     /**
-     * Handle a watcher event that may be for a directory, since some
+     * Handle a watcher event that may be for a directory, since
      * clients report only the directory when it is deleted or moved.
-     * A deleted directory deletes every file under it, and the files
-     * under a created directory are discovered with a walk.
+     * A deleted directory deletes every file under it, and re-walks
+     * the folders that had files under it, which finds them at their
+     * new location if the directory was moved. The files under a
+     * created directory are discovered with a walk.
      *
      * @param path
      * @param type
      */
     private void directoryChanged(Path path, FileChangeType type) {
+        var project = projectFor(path);
+        if( project.isExcluded(path) )
+            return;
         var documents = engine.documents();
         if( type == FileChangeType.Deleted ) {
-            for( var project : projects() ) {
-                for( var entry : project.entries() ) {
-                    if( entry.path.startsWith(path) && !documents.isOpen(entry.uri) )
-                        project.bumpText(entry);
+            var rewalk = new ArrayList<Project>();
+            for( var other : projects() ) {
+                for( var entry : other.entries() ) {
+                    if( !entry.path.startsWith(path) )
+                        continue;
+                    if( !documents.isOpen(entry.uri) )
+                        other.bumpText(entry);
+                    if( !other.isDefault() && other.index != Project.IndexStatus.NOT_STARTED && !rewalk.contains(other) )
+                        rewalk.add(other);
                 }
             }
+            rewalk.forEach(this::startWalk);
             return;
         }
-        if( type != FileChangeType.Created )
-            return;
-        var project = projectFor(path);
-        if( project.isDefault() || project.isExcluded(path) )
+        if( type != FileChangeType.Created || project.isDefault() )
             return;
         var excluded = walkExclusions(project);
         var files = engine.environment().files();

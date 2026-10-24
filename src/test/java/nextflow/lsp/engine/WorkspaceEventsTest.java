@@ -16,7 +16,9 @@
 package nextflow.lsp.engine;
 
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -24,8 +26,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.ast.ProjectView;
+import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.FileChangeType;
 import org.eclipse.lsp4j.MessageType;
+import org.eclipse.lsp4j.WatchKind;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -459,6 +463,56 @@ class WorkspaceEventsTest {
             assertThat(f.messages("modules/sub/b.nf")).isEmpty();
             assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
             assertThat(f.parses()).containsOnlyKeys("main.nf");
+        }
+    }
+
+    /**
+     * Send a watcher event only if a registered watcher matches it,
+     * like a client does. Globs are matched against the path relative
+     * to the workspace root.
+     */
+    private static void notifyIfWatched(WorkspaceFixture f, String path, FileChangeType type) {
+        var kind = switch( type ) {
+            case Created -> WatchKind.Create;
+            case Changed -> WatchKind.Change;
+            case Deleted -> WatchKind.Delete;
+        };
+        var watched = f.client().getRegistrations().stream()
+            .flatMap(params -> params.getRegistrations().stream())
+            .flatMap(registration -> ((DidChangeWatchedFilesRegistrationOptions) registration.getRegisterOptions()).getWatchers().stream())
+            .anyMatch(watcher -> {
+                var watcherKind = watcher.getKind() != null ? watcher.getKind() : 7;
+                var matcher = FileSystems.getDefault().getPathMatcher("glob:" + watcher.getGlobPattern().getLeft());
+                return (watcherKind & kind) != 0 && matcher.matches(Path.of(path));
+            });
+        if( watched )
+            f.notify(path, type);
+    }
+
+    @Test
+    void discoverTheFilesOfAMovedDirectory() throws IOException {
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.watchers = true;
+            o.settle = false;
+        }) ) {
+            f.write("modules/local/a.nf", "workflow A { def x = 1 }\n");
+            f.write("main.nf", """
+                include { A } from './modules/local/a.nf'
+                workflow {
+                    A()
+                }
+                """);
+            f.settle();
+            assertThat(f.messages("modules/local/a.nf")).containsExactly(UNUSED);
+
+            // the client reports only the directories, and not the files under them
+            Files.move(f.path("modules/local"), f.path("modules/shared"));
+            notifyIfWatched(f, "modules/local", FileChangeType.Deleted);
+            notifyIfWatched(f, "modules/shared", FileChangeType.Created);
+            f.settle();
+            assertThat(f.messages("modules/local/a.nf")).isEmpty();
+            assertThat(f.messages("modules/shared/a.nf")).containsExactly(UNUSED);
+            assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
         }
     }
 

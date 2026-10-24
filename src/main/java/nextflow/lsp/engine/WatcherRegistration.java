@@ -15,12 +15,14 @@
  */
 package nextflow.lsp.engine;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.FileSystemWatcher;
 import org.eclipse.lsp4j.Registration;
 import org.eclipse.lsp4j.RegistrationParams;
+import org.eclipse.lsp4j.WatchKind;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 /**
@@ -43,6 +45,13 @@ final class WatcherRegistration {
         "**/lib/*.jar"
     );
 
+    /**
+     * Deletes of any path, since clients report only the directory
+     * when a directory is deleted or moved, and the patterns above
+     * don't match it.
+     */
+    static final String DELETE_PATTERN = "**/*";
+
     private WatcherRegistration() {
     }
 
@@ -54,9 +63,10 @@ final class WatcherRegistration {
      */
     static void register(Engine engine) {
         var client = engine.client();
-        var watchers = PATTERNS.stream()
-            .map(pattern -> new FileSystemWatcher(Either.forLeft(pattern)))
-            .toList();
+        var watchers = new ArrayList<FileSystemWatcher>();
+        for( var pattern : PATTERNS )
+            watchers.add(new FileSystemWatcher(Either.forLeft(pattern)));
+        watchers.add(new FileSystemWatcher(Either.forLeft(DELETE_PATTERN), WatchKind.Delete));
         var options = new DidChangeWatchedFilesRegistrationOptions(watchers);
         var registration = new Registration(ID, METHOD, options);
         var response = client.registerCapability(new RegistrationParams(List.of(registration)));
