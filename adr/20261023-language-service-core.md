@@ -90,7 +90,7 @@ The script and config services are merged into one `Project` per workspace folde
 
 ### Work off the engine thread
 
-- **Parsing** runs on a compile pool. Each source unit has its own parser, and the engine registers the results in the `Compiler` after joining. Name resolution and type checking stay on the engine, because they write across files and share non-thread-safe caches.
+- **File reads** for a build run on a read pool. Parsing, name resolution and type checking stay on the engine: nf-lang writes to Groovy's shared `ClassHelper` nodes while parsing, and analysis writes across files and shares non-thread-safe caches.
 - **I/O**, such as the directory walk and file reads, runs on an IO pool. Results return as events.
 - **Plugin spec fetches** run on the IO pool. While a spec is pending, the "plugin does not exist" error is suppressed. When the fetch completes, the configs that asked for it and the scripts that depend on them are rebuilt. Failed fetches are retried at most once every 5 minutes.
 

@@ -380,7 +380,7 @@ public final class Engine {
         parked.clear();
         for( var task : pending )
             fail(task, ResponseErrorCode.InvalidRequest, "Server is shutting down");
-        env.compilePool().shutdownNow();
+        env.readPool().shutdownNow();
         if( env.ioExecutor() instanceof ExecutorService io )
             io.shutdownNow();
         if( env.fetchExecutor() instanceof ExecutorService fetch )

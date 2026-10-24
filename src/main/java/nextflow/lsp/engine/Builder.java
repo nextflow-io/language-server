@@ -71,9 +71,10 @@ import org.eclipse.lsp4j.MessageType;
  *
  * Every entry in the batch is re-parsed from its current text and
  * analysed from scratch, so that its AST always reflects one
- * complete build. Parsing runs in parallel on the compile pool;
- * everything else runs on the engine thread, because analysis reads
- * and writes across files.
+ * complete build. Files are read in parallel on the read pool;
+ * everything else runs on the engine thread, because parsing writes
+ * to shared Groovy AST nodes and analysis reads and writes across
+ * files.
  *
  * An exception while building one file is contained to that file,
  * which gets an internal error instead of its analysis results.
@@ -281,7 +282,7 @@ final class Builder {
          */
         private List<FileEntry> keepUnchanged(Collection<FileEntry> initial) {
             var documents = context.engine().documents();
-            var pool = context.engine().environment().compilePool();
+            var pool = context.engine().environment().readPool();
             var files = context.engine().environment().files();
             var candidates = new ArrayList<FileEntry>();
             var reads = new ArrayList<Future<Read>>();
@@ -374,7 +375,7 @@ final class Builder {
 
         private List<Parsed> parseAll(List<FileEntry> entries) {
             var documents = context.engine().documents();
-            var pool = context.engine().environment().compilePool();
+            var pool = context.engine().environment().readPool();
             var tasks = new ArrayList<Parsed>(entries.size());
             var futures = new ArrayList<Future<?>>(entries.size());
             for( var entry : entries ) {
@@ -382,7 +383,7 @@ final class Builder {
                 var parsed = new Parsed(entry, entry.inputVersion, document.map(DocumentStore.OpenDocument::version).orElse(null));
                 var text = document.map(DocumentStore.OpenDocument::text).or(() -> Optional.ofNullable(texts.get(entry.uri)));
                 Callable<Void> task = () -> {
-                    parse(parsed, text);
+                    read(parsed, text);
                     return null;
                 };
                 tasks.add(parsed);
@@ -403,6 +404,8 @@ final class Builder {
                 }
             }
             for( var parsed : tasks ) {
+                if( parsed.text != null && parsed.internalError == null )
+                    parse(parsed);
                 if( parsed.internalError != null )
                     logInternalError(parsed, "parsing", parsed.internalError);
                 if( parsed.readError != null )
@@ -424,10 +427,10 @@ final class Builder {
         }
 
         /**
-         * Parse a file. Runs on the compile pool, so it must not touch
+         * Read a file. Runs on the read pool, so it must not touch
          * any shared state.
          */
-        private void parse(Parsed parsed, Optional<String> document) {
+        private void read(Parsed parsed, Optional<String> document) {
             var entry = parsed.entry;
             String text;
             if( document.isPresent() ) {
@@ -449,8 +452,17 @@ final class Builder {
                 }
             }
             parsed.text = text;
+        }
+
+        /**
+         * Parse a file. Runs on the engine thread, because nf-lang
+         * writes to shared Groovy AST nodes while parsing.
+         */
+        private void parse(Parsed parsed) {
+            context.engine().checkEngineThread();
+            var entry = parsed.entry;
             var compiler = project.compilerFor(entry.kind);
-            var unit = compiler.createSourceUnit(entry.uri, text);
+            var unit = compiler.createSourceUnit(entry.uri, parsed.text);
             parsed.unit = unit;
             try {
                 compiler.parse(unit);

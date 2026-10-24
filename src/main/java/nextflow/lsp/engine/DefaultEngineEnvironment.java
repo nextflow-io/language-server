@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Production environment: a dedicated engine thread, a compile pool
+ * Production environment: a dedicated engine thread, a read pool
  * with one thread per spare core, and a small IO pool. Every thread
  * is a daemon thread.
  *
@@ -40,7 +40,7 @@ public final class DefaultEngineEnvironment implements EngineEnvironment {
 
     private final SerialExecutor engineExecutor = new ThreadSerialExecutor("nextflow-engine");
 
-    private final ExecutorService compilePool = new ForkJoinPool(
+    private final ExecutorService readPool = new ForkJoinPool(
         Math.max(1, Runtime.getRuntime().availableProcessors() - 1),
         ForkJoinPool.defaultForkJoinWorkerThreadFactory,
         null,
@@ -93,8 +93,8 @@ public final class DefaultEngineEnvironment implements EngineEnvironment {
     }
 
     @Override
-    public ExecutorService compilePool() {
-        return compilePool;
+    public ExecutorService readPool() {
+        return readPool;
     }
 
     @Override

@@ -27,7 +27,7 @@ import java.util.function.Function;
 /**
  * Deterministic engine environment: the engine runs on the test
  * thread through a {@link ManualExecutor} with a {@link FakeClock},
- * and the compile pool and IO executor run tasks on the calling
+ * and the read pool and IO executor run tasks on the calling
  * thread. The file system is real by default.
  *
  * Must be created on the test thread.
@@ -40,7 +40,7 @@ public final class TestEnvironment implements EngineEnvironment {
 
     private final ManualExecutor executor = new ManualExecutor(clock);
 
-    private ExecutorService compilePool = new DirectExecutorService();
+    private ExecutorService readPool = new DirectExecutorService();
 
     private Executor ioExecutor = new DirectExecutorService();
 
@@ -53,8 +53,8 @@ public final class TestEnvironment implements EngineEnvironment {
 
     private final List<Integer> exits = Collections.synchronizedList(new ArrayList<>());
 
-    public TestEnvironment withCompilePool(ExecutorService compilePool) {
-        this.compilePool = compilePool;
+    public TestEnvironment withReadPool(ExecutorService readPool) {
+        this.readPool = readPool;
         return this;
     }
 
@@ -99,8 +99,8 @@ public final class TestEnvironment implements EngineEnvironment {
     }
 
     @Override
-    public ExecutorService compilePool() {
-        return compilePool;
+    public ExecutorService readPool() {
+        return readPool;
     }
 
     @Override

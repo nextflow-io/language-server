@@ -54,7 +54,7 @@ class DefaultEngineEnvironmentTest {
         finally {
             release.countDown();
             env.engineExecutor().shutdown();
-            env.compilePool().shutdownNow();
+            env.readPool().shutdownNow();
             ((ExecutorService) env.ioExecutor()).shutdownNow();
             ((ExecutorService) env.fetchExecutor()).shutdownNow();
         }

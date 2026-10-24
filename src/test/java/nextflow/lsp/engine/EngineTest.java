@@ -588,7 +588,7 @@ class EngineTest {
         assertThat(errorCode(parked)).isEqualTo(ResponseErrorCode.InvalidRequest.getValue());
         assertThat(errorCode(later)).isEqualTo(ResponseErrorCode.InvalidRequest.getValue());
         assertThat(state.log).doesNotContain("event DidOpen", "route hover");
-        assertThat(h.env().compilePool().isShutdown()).isTrue();
+        assertThat(h.env().readPool().isShutdown()).isTrue();
         assertThat(h.env().manualExecutor().isShutdown()).isTrue();
         assertThat(h.engine().isIdle()).isTrue();
     }

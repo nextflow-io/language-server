@@ -33,9 +33,9 @@ public interface EngineEnvironment {
     SerialExecutor engineExecutor();
 
     /**
-     * Pool for parsing files in parallel.
+     * Pool for reading files in parallel.
      */
-    ExecutorService compilePool();
+    ExecutorService readPool();
 
     /**
      * Pool for blocking file I/O (directory walks). Results return

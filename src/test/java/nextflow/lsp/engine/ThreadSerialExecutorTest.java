@@ -99,7 +99,7 @@ class ThreadSerialExecutorTest {
 
             assertThat(result.get(30, TimeUnit.SECONDS)).isEqualTo("nextflow-engine daemon=true");
             engine.shutdown().get(30, TimeUnit.SECONDS);
-            assertThat(env.compilePool().isShutdown()).isTrue();
+            assertThat(env.readPool().isShutdown()).isTrue();
         }
         finally {
             env.engineExecutor().shutdown();

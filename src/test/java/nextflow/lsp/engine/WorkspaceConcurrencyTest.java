@@ -54,7 +54,7 @@ import org.junit.jupiter.api.parallel.Isolated;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests with real threads: parsing on a real pool, and a stress test
+ * Tests with real threads: reading on a real pool, and a stress test
  * of the production engine with concurrent cancellation.
  *
  * Timeouts are only hang guards.
@@ -99,9 +99,11 @@ class WorkspaceConcurrencyTest {
         return result;
     }
 
+    // parsing must stay on the engine thread, because nf-lang writes to
+    // shared ClassHelper nodes (Builder.parse asserts the engine thread)
     @Test
     @Timeout(120)
-    void parseOnARealPoolLikeOnTheCallingThread() {
+    void readOnARealPoolAndParseOnTheEngineThread() {
         Map<String, List<Diagnostic>> direct;
         try( var f = WorkspaceFixture.start((o) -> o.settle = false) ) {
             writeWorkspace(f);
@@ -110,12 +112,13 @@ class WorkspaceConcurrencyTest {
         }
         var pool = new ForkJoinPool(4);
         try( var f = WorkspaceFixture.start((o) -> {
-            o.environment = new TestEnvironment().withCompilePool(pool);
+            o.environment = new TestEnvironment().withReadPool(pool);
             o.maxSliceFiles = 16;
             o.settle = false;
         }) ) {
             f.settle();
             assertThat(nonEmpty(f.client().getAllDiagnostics())).isEqualTo(direct).isNotEmpty();
+            assertThat(f.client().getLogMessages()).noneMatch((m) -> m.getMessage().contains("Internal error"));
         }
         finally {
             pool.shutdownNow();
