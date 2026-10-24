@@ -93,6 +93,9 @@ public final class FileEntry {
 
     List<PluginRef> pluginRefs = List.of();
 
+    // the number of times the file was parsed, for tests
+    int parses;
+
     FileEntry(URI uri, Path path, FileKind kind, Role role) {
         this.uri = uri;
         this.path = path;
