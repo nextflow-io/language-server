@@ -374,11 +374,7 @@ public final class Engine {
             background.cancel();
             background = null;
         }
-        cancelStarvationTimer();
-        var pending = new ArrayList<>(parked);
-        parked.clear();
-        for( var task : pending )
-            fail(task, ResponseErrorCode.InvalidRequest, "Server is shutting down");
+        failParked(ResponseErrorCode.InvalidRequest, "Server is shutting down");
         env.readPool().shutdownNow();
         if( env.ioExecutor() instanceof ExecutorService io )
             io.shutdownNow();
@@ -444,6 +440,14 @@ public final class Engine {
         }
     }
 
+    private void failParked(ResponseErrorCode code, String message) {
+        cancelStarvationTimer();
+        var pending = new ArrayList<>(parked);
+        parked.clear();
+        for( var task : pending )
+            fail(task, code, message);
+    }
+
     private void dropParked(RequestTask<?> task) {
         parked.remove(task);
         if( parked.isEmpty() )
@@ -497,18 +501,7 @@ public final class Engine {
         if( task.future.isDone() )
             return;
         var context = route.context(cancelChecker(task.future));
-        T result;
-        try {
-            result = task.body.apply(context);
-        }
-        catch( VirtualMachineError e ) {
-            throw e;
-        }
-        catch( Throwable e ) {
-            failExceptionally(task, e);
-            return;
-        }
-        task.future.complete(result);
+        guarded(task, () -> task.future.complete(task.body.apply(context)));
     }
 
     /**
@@ -570,16 +563,10 @@ public final class Engine {
             logError("Unexpected error in background work", e);
             // retry once, then release the parked requests, which would
             // otherwise wait for the next input event
-            if( ++backgroundFailures == 1 ) {
+            if( ++backgroundFailures == 1 )
                 scheduleBackground(debounce);
-            }
-            else {
-                var pending = new ArrayList<>(parked);
-                parked.clear();
-                cancelStarvationTimer();
-                for( var task : pending )
-                    fail(task, ResponseErrorCode.InternalError, "Background work failed; see the language server log");
-            }
+            else
+                failParked(ResponseErrorCode.InternalError, "Background work failed; see the language server log");
             return;
         }
         resumeParked();

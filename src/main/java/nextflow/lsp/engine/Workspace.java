@@ -227,8 +227,7 @@ public final class Workspace implements EngineState {
         if( kind.isEmpty() )
             return Optional.empty();
         var project = projectFor(path);
-        // excludes apply to the scan, not to files that the client opened
-        if( project.isExcluded(path) && !engine.documents().isOpen(uri.get()) )
+        if( !isServed(project, path, uri.get()) )
             return Optional.empty();
         return Optional.of(new WorkspaceRoute(this, spec.need(), List.of(project), project, uri.get(), kind.get()));
     }
@@ -239,7 +238,7 @@ public final class Workspace implements EngineState {
         plugins.retryFailed();
         var open = engine.documents().uris();
         for( var project : projects() ) {
-            if( !canBuild(project) )
+            if( !project.canBuild() )
                 continue;
             var stale = project.staleEntries(open);
             if( stale.isEmpty() ) {
@@ -278,6 +277,18 @@ public final class Workspace implements EngineState {
     }
 
     /**
+     * Whether a file of a project is served: excludes apply to the
+     * scan, not to files that the client opened.
+     *
+     * @param project
+     * @param path
+     * @param uri
+     */
+    private boolean isServed(Project project, Path path, URI uri) {
+        return !project.isExcluded(path) || engine.documents().isOpen(uri);
+    }
+
+    /**
      * Get the entry that publishes the diagnostics of a file, or null
      * if no project owns it.
      *
@@ -286,7 +297,7 @@ public final class Workspace implements EngineState {
     FileEntry owner(URI uri) {
         var path = Path.of(uri);
         var routed = projectFor(path);
-        if( routed.isExcluded(path) && !engine.documents().isOpen(uri) )
+        if( !isServed(routed, path, uri) )
             return null;
         var entry = routed.entry(uri);
         if( entry != null )
@@ -733,9 +744,18 @@ public final class Workspace implements EngineState {
      * @param dir
      */
     private void schemaChanged(Path dir) {
+        bumpWhere(entry -> entry.kind == FileKind.SCRIPT && dir.equals(entry.path.getParent()));
+    }
+
+    /**
+     * Bump every entry, in any project, that matches a predicate.
+     *
+     * @param predicate
+     */
+    private void bumpWhere(Predicate<FileEntry> predicate) {
         for( var project : projects() ) {
             for( var entry : project.entries() ) {
-                if( entry.kind == FileKind.SCRIPT && dir.equals(entry.path.getParent()) )
+                if( predicate.test(entry) )
                     project.bump(entry);
             }
         }
@@ -753,12 +773,7 @@ public final class Workspace implements EngineState {
 
         if( !Objects.equals(previous.pluginRegistryUrl(), configuration.pluginRegistryUrl()) ) {
             plugins = new PluginSpecs(engine, configuration.pluginRegistryUrl());
-            for( var project : projects() ) {
-                for( var entry : project.entries() ) {
-                    if( !entry.pluginRefs.isEmpty() || !entry.pluginLookups.isEmpty() )
-                        project.bump(entry);
-                }
-            }
+            bumpWhere(entry -> !entry.pluginRefs.isEmpty() || !entry.pluginLookups.isEmpty());
         }
         var excludesChanged = !Objects.equals(previous.excludePatterns(), configuration.excludePatterns());
         if( excludesChanged ) {
@@ -786,12 +801,7 @@ public final class Workspace implements EngineState {
     private void onPluginFetched(Event.PluginFetched event) {
         if( !plugins.onFetched(event) )
             return;
-        for( var project : projects() ) {
-            for( var entry : project.entries() ) {
-                if( entry.pluginLookups.contains(event.ref()) )
-                    project.bump(entry);
-            }
-        }
+        bumpWhere(entry -> entry.pluginLookups.contains(event.ref()));
         engine.scheduleBackground(Duration.ZERO);
     }
 
@@ -808,19 +818,15 @@ public final class Workspace implements EngineState {
      */
     boolean isIndexing() {
         for( var project : folders ) {
-            if( project.index == Project.IndexStatus.WALKING || project.index == Project.IndexStatus.BUILDING )
+            if( project.isIndexing() )
                 return true;
         }
         return false;
     }
 
-    private static boolean canBuild(Project project) {
-        return project.index == Project.IndexStatus.BUILDING || project.index == Project.IndexStatus.READY;
-    }
-
     private boolean hasBackgroundWork() {
         for( var project : projects() ) {
-            if( canBuild(project) && (project.index == Project.IndexStatus.BUILDING || !project.isFresh()) )
+            if( project.canBuild() && (project.index == Project.IndexStatus.BUILDING || !project.isFresh()) )
                 return true;
         }
         return false;
@@ -912,7 +918,7 @@ public final class Workspace implements EngineState {
         var total = 0;
         if( indexing ) {
             for( var project : folders ) {
-                if( project.index == Project.IndexStatus.BUILDING || project.index == Project.IndexStatus.WALKING ) {
+                if( project.isIndexing() ) {
                     done += project.builtCount();
                     total += project.size();
                 }

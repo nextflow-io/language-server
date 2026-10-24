@@ -144,6 +144,20 @@ final class Project {
     }
 
     /**
+     * Whether the initial index is in progress (walking or building).
+     */
+    boolean isIndexing() {
+        return index == IndexStatus.WALKING || index == IndexStatus.BUILDING;
+    }
+
+    /**
+     * Whether the walk is done, so that entries can be built.
+     */
+    boolean canBuild() {
+        return index == IndexStatus.BUILDING || index == IndexStatus.READY;
+    }
+
+    /**
      * Whether a file belongs to the project: it is under the project
      * root and not under a nested workspace folder (always false for
      * the default project).
