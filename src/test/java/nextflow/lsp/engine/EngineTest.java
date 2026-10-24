@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 import nextflow.lsp.TestWorkspace;
+import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.MessageType;
@@ -368,6 +369,37 @@ class EngineTest {
         assertThat(result).isCompletedWithValue("references");
         assertThat(state.log).containsSubsequence("prepare references", "body references");
         assertThat(h.engine().isIdle()).isTrue();
+    }
+
+    @Test
+    void resumeParkedRequestAfterEventThatDoesNotScheduleBackgroundWork() {
+        var h = start();
+        state.satisfied = false;
+        state.indexed = false;
+        var result = send("references", Need.PROJECT);
+        h.runPending();
+        assertThat(result).isNotDone();
+
+        // the fake state doesn't schedule background work for this event
+        state.satisfied = true;
+        h.engine().submit(new Event.WatchedFiles(new DidChangeWatchedFilesParams(List.of())));
+        h.runPending();
+        assertThat(result).isCompletedWithValue("references");
+    }
+
+    @Test
+    void resumeParkedRequestAfterEventThatThrows() {
+        var h = start();
+        state.satisfied = false;
+        state.indexed = false;
+        var result = send("references", Need.PROJECT);
+        h.runPending();
+
+        state.satisfied = true;
+        state.applyError = new IllegalStateException("bad event");
+        h.engine().submit(new Event.WatchedFiles(new DidChangeWatchedFilesParams(List.of())));
+        h.runPending();
+        assertThat(result).isCompletedWithValue("references");
     }
 
     // -- cancellation

@@ -456,7 +456,8 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                 var result = files.walk(root, excluded, FileKind::isManaged);
                 return new Event.WalkDone(id, generation, result, null);
             }
-            catch( IOException e ) {
+            catch( IOException | RuntimeException e ) {
+                // the folder stays WALKING until it gets an event
                 return new Event.WalkDone(id, generation, null, e);
             }
         });

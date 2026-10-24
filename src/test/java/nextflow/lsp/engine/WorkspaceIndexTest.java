@@ -16,6 +16,7 @@
 package nextflow.lsp.engine;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -426,6 +427,37 @@ class WorkspaceIndexTest {
             assertThat(f.messages("main.nf")).containsExactly(UNUSED);
             assertThat(f.messages("late.nf")).containsExactly(UNUSED);
             assertThat(f.messages("late-request.nf")).containsExactly(UNUSED);
+        }
+    }
+
+    @Test
+    void reportWalkThatThrowsRuntimeExceptionAsFailedWalk() {
+        var env = new TestEnvironment().withFiles(new FileAccess() {
+            @Override
+            public String readText(Path path) throws IOException {
+                return FileAccess.system().readText(path);
+            }
+
+            @Override
+            public boolean exists(Path path) {
+                return FileAccess.system().exists(path);
+            }
+
+            @Override
+            public List<Path> walk(Path root, Predicate<Path> excluded, Predicate<Path> matcher) {
+                throw new UncheckedIOException(new IOException("stale file handle"));
+            }
+        });
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.environment = env;
+            o.settle = false;
+        }) ) {
+            f.write("main.nf", "workflow {}\n");
+            // the project request completes instead of waiting for the walk forever
+            assertThat(f.call(Need.PROJECT, "main.nf", "empty", (context) -> "done")).isEqualTo("done");
+            assertThat(f.workspace().isIndexing()).isFalse();
+            assertThat(f.client().getLogMessages())
+                .anyMatch(m -> m.getMessage().contains("Failed to scan workspace folder"));
         }
     }
 

@@ -216,7 +216,8 @@ public final class Engine {
 
     /**
      * Run blocking work on the IO pool and submit the resulting event,
-     * if any. An exception is logged and produces no event.
+     * if any. An exception is logged and produces no event, so work
+     * that the index waits on must return an event on every path.
      *
      * @param description
      * @param work
@@ -314,6 +315,15 @@ public final class Engine {
 
     // -- events
 
+    /**
+     * Apply an event. Parked requests are resumed only by background
+     * work and the starvation timer, never here, so background work
+     * must be scheduled whenever requests are parked after an event.
+     * The state schedules it for the changes it knows about, and this
+     * method schedules it in any case (e.g. if the state throws).
+     *
+     * @param event
+     */
     private void onEvent(Event event) {
         if( shutdown )
             return;
@@ -332,7 +342,13 @@ public final class Engine {
             if( uri.isEmpty() || !documents.close(uri.get()) )
                 return;
         }
-        state.apply(event);
+        try {
+            state.apply(event);
+        }
+        finally {
+            if( !parked.isEmpty() && background == null )
+                scheduleBackground(Duration.ZERO);
+        }
     }
 
     private void onShutdown() {
