@@ -64,7 +64,7 @@ A single engine thread owns all documents, projects, compilers, ASTs and diagnos
 
 ### Engine thread and FIFO queue
 
-The lsp4j reader thread delivers notifications and requests in order on one thread. Each handler converts the message into an event or a request task and submits it to the engine's single-threaded executor, then returns. The engine therefore sees messages in exactly the order the client sent them, and a request observes every earlier notification and no later one. Every mutable structure has one owner, so there are no locks and no torn reads. The engine never waits on another thread except to join its own parse tasks, so it cannot deadlock.
+The lsp4j reader thread delivers notifications and requests in order on one thread. Each handler converts the message into an event or a request task and submits it to the engine's single-threaded executor, then returns. The engine therefore sees messages in exactly the order the client sent them, and a request observes every earlier notification and no later one. Every mutable structure has one owner, so there are no locks and no torn reads. The engine never waits on another thread except to join its own file reads, so it cannot deadlock.
 
 A request that needs a single file brings that file and its dependencies up to date before it runs. A request that needs the whole project (references, rename, incoming calls, workspace symbol) is parked until the project is indexed, rather than answered with partial results. Cancellation, not a timeout, is the escape hatch. A parked position-based request whose document changed while it waited fails with `ContentModified`.
 
@@ -91,8 +91,8 @@ The script and config services are merged into one `Project` per workspace folde
 ### Work off the engine thread
 
 - **File reads** for a build run on a read pool. Parsing, name resolution and type checking stay on the engine: nf-lang writes to Groovy's shared `ClassHelper` nodes while parsing, and analysis writes across files and shares non-thread-safe caches.
-- **I/O**, such as the directory walk and file reads, runs on an IO pool. Results return as events.
-- **Plugin spec fetches** run on the IO pool. While a spec is pending, the "plugin does not exist" error is suppressed. When the fetch completes, the configs that asked for it and the scripts that depend on them are rebuilt. Failed fetches are retried at most once every 5 minutes.
+- **Directory walks** run on an IO pool. Results return as events.
+- **Plugin spec fetches** run on their own pool. While a spec is pending, the "plugin does not exist" error is suppressed. When the fetch completes, the configs that asked for it and the scripts that depend on them are rebuilt. Failed fetches are retried at most once every 5 minutes.
 
 ## Consequences
 
