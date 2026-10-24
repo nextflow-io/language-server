@@ -29,6 +29,7 @@ import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.WorkspaceSymbol;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -97,7 +98,7 @@ final class ClientUris {
     static WorkspaceEdit edit(WorkspaceEdit edit, UnaryOperator<String> clientUri) {
         if( edit == null || edit.getChanges() == null )
             return edit;
-        var changes = new LinkedHashMap<String, List<org.eclipse.lsp4j.TextEdit>>();
+        var changes = new LinkedHashMap<String, List<TextEdit>>();
         edit.getChanges().forEach((uri, edits) -> changes.put(clientUri.apply(uri), edits));
         edit.setChanges(changes);
         return edit;

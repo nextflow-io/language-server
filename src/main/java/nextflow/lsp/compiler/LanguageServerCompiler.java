@@ -36,8 +36,8 @@ import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.WarningMessage;
 
 /**
- * Compiler that parses source files from the given text or from
- * disk, and defers errors to the language server.
+ * Compiler that parses source files from the given text, and
+ * defers errors to the language server.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

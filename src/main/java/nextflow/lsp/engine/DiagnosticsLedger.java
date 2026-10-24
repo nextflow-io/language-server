@@ -129,7 +129,7 @@ final class DiagnosticsLedger {
      * @param entry
      * @param mode
      */
-    List<Diagnostic> diagnostics(FileEntry entry, ErrorReportingMode mode) {
+    private List<Diagnostic> diagnostics(FileEntry entry, ErrorReportingMode mode) {
         var result = new ArrayList<Diagnostic>();
         if( entry.internalError != null && mode != ErrorReportingMode.OFF ) {
             var range = new Range(new Position(0, 0), new Position(0, 0));

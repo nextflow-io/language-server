@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 
+import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.util.Logger;
 import nextflow.util.PathUtils;
@@ -55,9 +56,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
  * the background in slices: immediately while a project is
  * indexing, and after the debounce delay otherwise.
  *
- * Engine-confined: every method is called on the engine thread,
- * which the entry points assert. {@link Project}, {@link Builder} and
- * {@link FileEntry} are reached only through them.
+ * Engine-confined; every entry point asserts the engine thread.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -721,7 +720,7 @@ public final class Workspace implements EngineState {
     private void libChanged(Project project, boolean jar) {
         // a new classpath needs a new compiler
         if( jar )
-            project.scriptCompiler = nextflow.lsp.compiler.LanguageServerCompiler.forScripts(project.root);
+            project.scriptCompiler = LanguageServerCompiler.forScripts(project.root);
         for( var entry : project.entries() ) {
             if( entry.kind == FileKind.SCRIPT )
                 project.bump(entry);

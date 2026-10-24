@@ -167,14 +167,13 @@ final class Builder {
         final Set<PluginRef> pluginLookups = new LinkedHashSet<>();
         final List<PluginRef> pluginRefs = new ArrayList<>();
         boolean hasPluginInclude;
-        // dependencies of the previous build
-        final Set<URI> previousTargets;
+        final Set<URI> previousDependencies;
 
         Parsed(FileEntry entry, long inputVersion, Integer documentVersion) {
             this.entry = entry;
             this.inputVersion = inputVersion;
             this.documentVersion = documentVersion;
-            this.previousTargets = Set.copyOf(entry.depStamps.keySet());
+            this.previousDependencies = Set.copyOf(entry.depStamps.keySet());
         }
 
         boolean isAnalysable() {
@@ -853,7 +852,7 @@ final class Builder {
         private Set<URI> collectGarbage(List<Parsed> order, Set<URI> removed) {
             var candidates = new TreeSet<URI>();
             for( var parsed : order )
-                candidates.addAll(parsed.previousTargets);
+                candidates.addAll(parsed.previousDependencies);
             var result = new TreeSet<URI>(removed);
             result.addAll(project.collectGarbage(candidates));
             return result;
