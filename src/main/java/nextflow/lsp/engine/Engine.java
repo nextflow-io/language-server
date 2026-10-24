@@ -394,7 +394,7 @@ public final class Engine {
         var r = route.get();
         switch( task.spec.need() ) {
             case FILE, FILE_AND_DEPENDENTS, PROJECT_CONFIGS -> {
-                r.prepare();
+                r.prepare(cancelChecker(task.future));
                 run(task, r);
             }
             case PROJECT, ALL -> {
@@ -466,7 +466,7 @@ public final class Engine {
             var starving = Duration.between(task.arrival, now).compareTo(STARVATION_TIMEOUT) >= 0;
             if( !starving || !r.isIndexed() )
                 return false;
-            r.prepare();
+            r.prepare(cancelChecker(task.future));
         }
         if( task.spec.positionBased() && !Objects.equals(documentVersion(task.spec.uri()), task.versionAtArrival) ) {
             fail(task, ResponseErrorCode.ContentModified, "Content modified");

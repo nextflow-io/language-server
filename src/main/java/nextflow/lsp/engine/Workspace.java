@@ -869,26 +869,30 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
     /**
      * Build the stale closure of the given entries, in slices,
-     * without yielding.
+     * without yielding. Each slice is committed as a whole, so the
+     * build can stop between slices if the request is cancelled.
      */
-    private void buildClosure(Project project, Collection<FileEntry> roots) {
+    private void buildClosure(Project project, Collection<FileEntry> roots, CancelChecker cancelChecker) {
         for( int i = 0; i <= project.size() + 1; i++ ) {
             var live = roots.stream().filter(e -> project.entry(e.uri) == e).toList();
             var stale = project.staleClosure(live);
             if( stale.isEmpty() )
                 return;
+            cancelChecker.checkCanceled();
             build(project, takeSlice(stale));
         }
     }
 
     /**
-     * Build every stale entry of a project, in slices, without yielding.
+     * Build every stale entry of a project, in slices, without
+     * yielding, until done or the request is cancelled.
      */
-    private void buildAll(Project project) {
+    private void buildAll(Project project, CancelChecker cancelChecker) {
         for( int i = 0; i <= project.size() + 1; i++ ) {
             var stale = project.staleEntries(engine.documents().uris());
             if( stale.isEmpty() )
                 break;
+            cancelChecker.checkCanceled();
             build(project, takeSlice(stale));
         }
         markReadyIfDone(project);
@@ -932,17 +936,21 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         }
 
         @Override
-        public void prepare() {
-            switch( need ) {
-                case FILE -> prepareFile(false, false);
-                case FILE_AND_DEPENDENTS -> prepareFile(false, true);
-                case PROJECT_CONFIGS -> prepareFile(true, false);
-                case PROJECT, ALL -> targets.forEach(Workspace.this::buildAll);
+        public void prepare(CancelChecker cancelChecker) {
+            try {
+                switch( need ) {
+                    case FILE -> prepareFile(false, false, cancelChecker);
+                    case FILE_AND_DEPENDENTS -> prepareFile(false, true, cancelChecker);
+                    case PROJECT_CONFIGS -> prepareFile(true, false, cancelChecker);
+                    case PROJECT, ALL -> targets.forEach(p -> buildAll(p, cancelChecker));
+                }
             }
-            updateProgress();
+            finally {
+                updateProgress();
+            }
         }
 
-        private void prepareFile(boolean configs, boolean dependents) {
+        private void prepareFile(boolean configs, boolean dependents, CancelChecker cancelChecker) {
             if( project == null )
                 return;
             var roots = new ArrayList<FileEntry>();
@@ -960,7 +968,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                 if( entry != null && !roots.contains(entry) )
                     roots.add(entry);
             }
-            buildClosure(project, roots);
+            buildClosure(project, roots, cancelChecker);
             if( dependents && uri != null ) {
                 var includers = new ArrayList<FileEntry>();
                 for( var dependent : project.graph.transitiveDependents(List.of(uri)) ) {
@@ -968,7 +976,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                     if( entry != null )
                         includers.add(entry);
                 }
-                buildClosure(project, includers);
+                buildClosure(project, includers, cancelChecker);
             }
             markReadyIfDone(project);
         }

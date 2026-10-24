@@ -15,9 +15,14 @@
  */
 package nextflow.lsp.engine;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import nextflow.lsp.TestWorkspace;
 import org.junit.jupiter.api.Test;
@@ -107,6 +112,62 @@ class WorkspaceBuildCountTest {
             f.settle();
             assertThat(f.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1, "sub.nf", 1, "main.nf", 1));
             assertThat(f.includeTarget("sub.nf")).isEqualTo(URI.create(f.uri("mod_a.nf")));
+        }
+    }
+
+    @Test
+    void stopBuildingBetweenSlicesWhenRequestIsCancelled() {
+        var cancelOnRead = new AtomicReference<CompletableFuture<?>>();
+        var files = new FileAccess() {
+            @Override
+            public String readText(Path path) throws IOException {
+                var request = cancelOnRead.getAndSet(null);
+                if( request != null )
+                    request.cancel(true);
+                return FileAccess.system().readText(path);
+            }
+
+            @Override
+            public boolean exists(Path path) {
+                return FileAccess.system().exists(path);
+            }
+
+            @Override
+            public List<Path> walk(Path root, Predicate<Path> excluded, Predicate<Path> matcher) throws IOException {
+                return FileAccess.system().walk(root, excluded, matcher);
+            }
+        };
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.environment = new TestEnvironment().withFiles(files);
+            o.maxSliceFiles = 1;
+            o.settle = false;
+        }) ) {
+            var main = new StringBuilder();
+            for( int i = 0; i < 5; i++ ) {
+                f.write("mod" + i + ".nf", "workflow M" + i + " {}\n");
+                main.append("include { M" + i + " } from './mod" + i + ".nf'\n");
+            }
+            main.append("workflow { M0() }\n");
+            f.write("main.nf", main.toString());
+            f.settle();
+            var before = f.parses();
+
+            for( int i = 0; i < 5; i++ )
+                f.writeAndNotify("mod" + i + ".nf", "workflow M" + i + " { def x = 1 }\n");
+            var request = f.send(Need.FILE, "main.nf", "empty", (context) -> "done");
+            cancelOnRead.set(request);
+            f.runPending();
+
+            // the slice in progress is committed, and the rest is left stale
+            assertThat(request).isCancelled();
+            assertThat(f.parsesSince(before)).hasSize(1);
+
+            f.settle();
+            assertThat(f.parsesSince(before))
+                .hasSize(6)
+                .allSatisfy((path, count) -> assertThat(count).as(path).isEqualTo(1));
+            assertThat(f.messages("main.nf")).isEmpty();
+            assertThat(f.messages("mod4.nf")).containsExactly(WorkspaceEventsTest.UNUSED);
         }
     }
 

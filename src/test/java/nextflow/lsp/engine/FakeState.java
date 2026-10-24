@@ -109,7 +109,7 @@ final class FakeState implements EngineState {
         }
 
         @Override
-        public void prepare() {
+        public void prepare(CancelChecker cancelChecker) {
             log.add("prepare " + spec.method());
             if( onPrepare != null )
                 onPrepare.run();

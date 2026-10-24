@@ -87,8 +87,15 @@ public interface EngineState {
          * (FILE_AND_DEPENDENTS) or the project configs
          * (PROJECT_CONFIGS), or every stale file of the target
          * projects (PROJECT, ALL; called only when they are indexed).
+         *
+         * The build checks for cancellation between batches, and
+         * throws a CancellationException if the request is cancelled.
+         * The batches built so far are kept, and the rest is left
+         * stale for background work.
+         *
+         * @param cancelChecker
          */
-        void prepare();
+        void prepare(CancelChecker cancelChecker);
 
         /**
          * For PROJECT and ALL: whether every target project is
