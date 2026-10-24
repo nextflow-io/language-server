@@ -36,6 +36,7 @@ import org.eclipse.lsp4j.WatchKind;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import static nextflow.lsp.TestUtils.UNUSED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -46,8 +47,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @ExtendWith(TestWorkspace.class)
 class WorkspaceEventsTest {
-
-    static final String UNUSED = "Variable was declared but not used";
 
     static final String WITH_WARNING = "workflow { def x = 1 }\n";
 
@@ -605,7 +604,7 @@ class WorkspaceEventsTest {
             f.writeAndNotify("foo/main.nf", "workflow BAR {}\n");
             f.settle();
             assertThat(f.messages("main.nf")).anyMatch(m -> m.contains("'FOO' is not defined"));
-            assertThat(WorkspaceBuildTest.nonEmpty(f.client().getAllDiagnostics()))
+            assertThat(f.client().getNonEmptyDiagnostics())
                 .isEqualTo(WorkspaceBuildTest.freshDiagnostics(Map.of()))
                 .isNotEmpty();
         }

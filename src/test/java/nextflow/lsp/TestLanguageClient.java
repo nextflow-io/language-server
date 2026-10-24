@@ -18,6 +18,7 @@ package nextflow.lsp;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -176,6 +177,19 @@ public class TestLanguageClient implements LanguageClient {
      */
     public Map<String,List<Diagnostic>> getAllDiagnostics() {
         return diagnostics;
+    }
+
+    /**
+     * Get a snapshot of the most recently published diagnostics,
+     * omitting the files that have none.
+     */
+    public Map<String,List<Diagnostic>> getNonEmptyDiagnostics() {
+        var result = new HashMap<String,List<Diagnostic>>();
+        diagnostics.forEach((uri, list) -> {
+            if( !list.isEmpty() )
+                result.put(uri, List.copyOf(list));
+        });
+        return result;
     }
 
     /**

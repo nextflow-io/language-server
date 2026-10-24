@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -34,6 +33,7 @@ import org.eclipse.lsp4j.Diagnostic;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import static nextflow.lsp.TestUtils.UNUSED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -44,8 +44,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @ExtendWith(TestWorkspace.class)
 class WorkspaceBuildTest {
-
-    static final String UNUSED = "Variable was declared but not used";
 
     static TestServer start() {
         return TestServer.start((o) -> o.settle = false);
@@ -59,17 +57,8 @@ class WorkspaceBuildTest {
         try( var fresh = TestServer.start((o) -> o.settle = false) ) {
             open.forEach(fresh::open);
             fresh.settle();
-            return nonEmpty(fresh.client().getAllDiagnostics());
+            return fresh.client().getNonEmptyDiagnostics();
         }
-    }
-
-    static Map<String, List<Diagnostic>> nonEmpty(Map<String, List<Diagnostic>> diagnostics) {
-        var result = new HashMap<String, List<Diagnostic>>();
-        diagnostics.forEach((uri, list) -> {
-            if( !list.isEmpty() )
-                result.put(uri, list);
-        });
-        return result;
     }
 
     @Test
@@ -193,7 +182,7 @@ class WorkspaceBuildTest {
             }
 
             var finalMod = mod.replace("hello", "hello 2");
-            assertThat(nonEmpty(f.client().getAllDiagnostics()))
+            assertThat(f.client().getNonEmptyDiagnostics())
                 .isEqualTo(freshDiagnostics(Map.of("mod.nf", finalMod)));
         }
     }
@@ -559,12 +548,7 @@ class WorkspaceBuildTest {
             assertThat(f.client().getPublishLog()).last().satisfies(p -> assertThat(p.getVersion()).isNull());
 
             // the dependents still refer to the indexed module
-            var target = f.call(Need.FILE, "main0.nf", null, (context) -> {
-                var scripts = context.project().scriptView();
-                var include = scripts.getIncludeNodes(URI.create(f.uri("main0.nf"))).get(0);
-                return scripts.getURI(include.entries.get(0).getTarget());
-            });
-            assertThat(target).isEqualTo(URI.create(f.uri("mod.nf")));
+            assertThat(f.includeTarget("main0.nf")).isEqualTo(URI.create(f.uri("mod.nf")));
 
             // a real change still rebuilds the dependents
             f.open("mod.nf", "workflow BAR {}\n");
@@ -602,7 +586,7 @@ class WorkspaceBuildTest {
             f.open("main.nf", main);
             f.settle();
             assertThat(f.messages("main.nf")).isEmpty();
-            assertThat(nonEmpty(f.client().getAllDiagnostics())).isEqualTo(freshDiagnostics(Map.of("main.nf", main)));
+            assertThat(f.client().getNonEmptyDiagnostics()).isEqualTo(freshDiagnostics(Map.of("main.nf", main)));
         }
     }
 
@@ -621,7 +605,7 @@ class WorkspaceBuildTest {
             f.close("main.nf");
             f.settle();
             assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
-            assertThat(nonEmpty(f.client().getAllDiagnostics())).isEqualTo(freshDiagnostics(Map.of()));
+            assertThat(f.client().getNonEmptyDiagnostics()).isEqualTo(freshDiagnostics(Map.of()));
         }
     }
 

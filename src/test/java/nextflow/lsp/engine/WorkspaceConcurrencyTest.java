@@ -30,8 +30,8 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import nextflow.lsp.TestServer;
 import nextflow.lsp.TestLanguageClient;
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.ClientCapabilities;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
@@ -91,15 +91,6 @@ class WorkspaceConcurrencyTest {
         f.write("main.nf", main.toString());
     }
 
-    static Map<String, List<Diagnostic>> nonEmpty(Map<String, List<Diagnostic>> diagnostics) {
-        var result = new HashMap<String, List<Diagnostic>>();
-        diagnostics.forEach((uri, list) -> {
-            if( !list.isEmpty() )
-                result.put(uri, List.copyOf(list));
-        });
-        return result;
-    }
-
     // parsing must stay on the engine thread, because nf-lang writes to
     // shared ClassHelper nodes (Builder.parse asserts the engine thread)
     @Test
@@ -109,7 +100,7 @@ class WorkspaceConcurrencyTest {
         try( var f = TestServer.start((o) -> o.settle = false) ) {
             writeWorkspace(f);
             f.settle();
-            direct = nonEmpty(f.client().getAllDiagnostics());
+            direct = f.client().getNonEmptyDiagnostics();
         }
         var pool = new ForkJoinPool(4);
         try( var f = TestServer.start((o) -> {
@@ -118,7 +109,7 @@ class WorkspaceConcurrencyTest {
             o.settle = false;
         }) ) {
             f.settle();
-            assertThat(nonEmpty(f.client().getAllDiagnostics())).isEqualTo(direct).isNotEmpty();
+            assertThat(f.client().getNonEmptyDiagnostics()).isEqualTo(direct).isNotEmpty();
             assertThat(f.client().getLogMessages()).noneMatch((m) -> m.getMessage().contains("Internal error"));
         }
         finally {
@@ -218,7 +209,7 @@ class WorkspaceConcurrencyTest {
 
             // every project is indexed and fresh when this request runs
             var barrier = engine.request(new RequestSpec("barrier", null, null, Need.ALL, false), null,
-                (context) -> nonEmpty(client.getAllDiagnostics()));
+                (context) -> client.getNonEmptyDiagnostics());
             published = barrier.get(60, TimeUnit.SECONDS);
 
             for( var future : futures ) {
@@ -246,7 +237,7 @@ class WorkspaceConcurrencyTest {
         try( var fresh = TestServer.start((o) -> o.settle = false) ) {
             openDocuments.forEach(fresh::open);
             fresh.settle();
-            assertThat(published).isEqualTo(nonEmpty(fresh.client().getAllDiagnostics()));
+            assertThat(published).isEqualTo(fresh.client().getNonEmptyDiagnostics());
         }
     }
 

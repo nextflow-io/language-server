@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import nextflow.lsp.TestServer;
+import nextflow.lsp.TestUtils;
 import nextflow.lsp.TestWorkspace;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -166,7 +167,7 @@ class WorkspaceBuildCountTest {
                 .hasSize(6)
                 .allSatisfy((path, count) -> assertThat(count).as(path).isEqualTo(1));
             assertThat(f.messages("main.nf")).isEmpty();
-            assertThat(f.messages("mod4.nf")).containsExactly(WorkspaceEventsTest.UNUSED);
+            assertThat(f.messages("mod4.nf")).containsExactly(TestUtils.UNUSED);
         }
     }
 

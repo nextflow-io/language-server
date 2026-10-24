@@ -16,11 +16,9 @@
 package nextflow.lsp;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import nextflow.lsp.engine.QueuedExecutor;
 import nextflow.lsp.engine.TestEnvironment;
-import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
@@ -31,6 +29,7 @@ import org.eclipse.lsp4j.WorkDoneProgressEnd;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import static nextflow.lsp.TestUtils.UNUSED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -41,8 +40,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @ExtendWith(TestWorkspace.class)
 class IssueRegressionTest {
-
-    static final String UNUSED = "Variable was declared but not used";
 
     /**
      * #175: a cross-file request sent right after didOpen, while the
@@ -113,18 +110,14 @@ class IssueRegressionTest {
                 }
                 """);
             server.settle();
-            assertThat(messages(server.diagnostics("main.nf"))).containsExactly(UNUSED);
+            assertThat(server.messages("main.nf")).containsExactly(UNUSED);
 
             for( int i = 0; i < 3; i++ ) {
                 server.change("mod.nf", "workflow FOO {}\n" + "// edit " + i + "\n");
                 server.settle();
-                assertThat(messages(server.diagnostics("main.nf"))).containsExactly(UNUSED);
+                assertThat(server.messages("main.nf")).containsExactly(UNUSED);
             }
         }
-    }
-
-    static List<String> messages(List<Diagnostic> diagnostics) {
-        return diagnostics.stream().map(Diagnostic::getMessage).toList();
     }
 
 }

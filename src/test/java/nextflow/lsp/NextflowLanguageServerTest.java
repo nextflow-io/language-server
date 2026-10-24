@@ -110,7 +110,7 @@ class NextflowLanguageServerTest {
             var hover = server.call((s) -> s.hover(new HoverParams(document, new Position(0, 10))));
             assertThat(hover).isNotNull();
             server.settle();
-            assertThat(server.diagnostics("work/ab/main.nf")).extracting(Diagnostic::getMessage).containsExactly("Variable was declared but not used");
+            assertThat(server.diagnostics("work/ab/main.nf")).extracting(Diagnostic::getMessage).containsExactly(TestUtils.UNUSED);
 
             // once closed, the file is excluded again
             server.close("work/ab/main.nf");

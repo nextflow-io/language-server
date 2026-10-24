@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 
-import nextflow.lsp.TestServer;
 import nextflow.lsp.TestLanguageClient;
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.WorkDoneProgressBegin;
@@ -36,6 +36,7 @@ import org.eclipse.lsp4j.WorkDoneProgressReport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import static nextflow.lsp.TestUtils.UNUSED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -46,8 +47,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @ExtendWith(TestWorkspace.class)
 class WorkspaceIndexTest {
-
-    static final String UNUSED = "Variable was declared but not used";
 
     static List<URI> builtScripts(RequestContext context) {
         return List.copyOf(context.project().scriptView().getUris());

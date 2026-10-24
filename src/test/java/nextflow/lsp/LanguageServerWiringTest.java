@@ -21,20 +21,18 @@ import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpServer;
 import nextflow.lsp.engine.DefaultEngineEnvironment;
 import nextflow.lsp.engine.Engine;
 import nextflow.lsp.engine.FileAccess;
 import nextflow.lsp.engine.Workspace;
-import org.eclipse.lsp4j.DidChangeConfigurationParams;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
@@ -153,19 +151,6 @@ class LanguageServerWiringTest {
         }
     }
 
-    static DidChangeConfigurationParams settings(String key, Object value) {
-        var names = key.split("\\.");
-        var json = new JsonObject();
-        var object = json;
-        for( int i = 0; i < names.length - 1; i++ ) {
-            var child = new JsonObject();
-            object.add(names[i], child);
-            object = child;
-        }
-        object.add(names[names.length - 1], new Gson().toJsonTree(value));
-        return new DidChangeConfigurationParams(json);
-    }
-
     /**
      * The old core blocked the reader thread in the handlers that
      * re-initialize the services (configuration and folder changes),
@@ -213,7 +198,7 @@ class LanguageServerWiringTest {
             remote.initialize(init).get(30, TimeUnit.SECONDS);
             remote.initialized(new InitializedParams());
             var workspace = remote.getWorkspaceService();
-            workspace.didChangeConfiguration(settings("nextflow.pluginRegistryUrl", registry.url()));
+            workspace.didChangeConfiguration(TestServer.configuration(Map.of("nextflow.pluginRegistryUrl", registry.url())));
             var documents = remote.getTextDocumentService();
             var configUri = root.resolve("nextflow.config").toUri().toString();
             documents.didOpen(new DidOpenTextDocumentParams(new TextDocumentItem(configUri, "nextflow-config", 1, config)));
@@ -222,7 +207,7 @@ class LanguageServerWiringTest {
             assertThat(files.entered.await(30, TimeUnit.SECONDS)).isTrue();
 
             // the messages that re-initialized the old services
-            workspace.didChangeConfiguration(settings("nextflow.files.exclude", List.of("tests")));
+            workspace.didChangeConfiguration(TestServer.configuration(Map.of("nextflow.files.exclude", List.of("tests"))));
             var other = new WorkspaceFolder(root.resolve("other").toUri().toString(), "other");
             workspace.didChangeWorkspaceFolders(new DidChangeWorkspaceFoldersParams(new WorkspaceFoldersChangeEvent(List.of(other), List.of())));
 

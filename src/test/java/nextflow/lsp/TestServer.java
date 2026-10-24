@@ -307,6 +307,14 @@ public final class TestServer implements AutoCloseable {
      * e.g. "nextflow.errorReportingMode".
      */
     public void configure(Map<String, Object> settings) {
+        server.didChangeConfiguration(configuration(settings));
+    }
+
+    /**
+     * Build the params of a configuration change. Keys are dotted
+     * setting names.
+     */
+    public static DidChangeConfigurationParams configuration(Map<String, Object> settings) {
         var json = new JsonObject();
         var gson = new Gson();
         for( var setting : settings.entrySet() ) {
@@ -319,7 +327,7 @@ public final class TestServer implements AutoCloseable {
             }
             object.add(names[names.length - 1], gson.toJsonTree(setting.getValue()));
         }
-        server.didChangeConfiguration(new DidChangeConfigurationParams(json));
+        return new DidChangeConfigurationParams(json);
     }
 
     public void addFolder(String path) {

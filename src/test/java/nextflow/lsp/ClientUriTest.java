@@ -15,7 +15,6 @@
  */
 package nextflow.lsp;
 
-import java.util.List;
 
 import org.eclipse.lsp4j.CallHierarchyPrepareParams;
 import org.eclipse.lsp4j.CodeLensParams;

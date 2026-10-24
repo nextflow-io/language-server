@@ -36,6 +36,8 @@ import org.eclipse.lsp4j.TextEdit;
  */
 public class TestUtils {
 
+    public static final String UNUSED = "Variable was declared but not used";
+
     /**
      * Get the URI of the workspace root of the current test.
      */
