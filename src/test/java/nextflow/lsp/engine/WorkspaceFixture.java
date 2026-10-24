@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -237,11 +238,11 @@ final class WorkspaceFixture implements AutoCloseable {
 
     // -- requests
 
-    <T> CompletableFuture<T> send(Need need, String path, T emptyValue, RequestBody<T> body) {
+    <T> CompletableFuture<T> send(Need need, String path, T emptyValue, Function<RequestContext, T> body) {
         return harness.send(new RequestSpec("test/" + need, path != null ? uri(path) : null, null, need, false), emptyValue, body);
     }
 
-    <T> T call(Need need, String path, T emptyValue, RequestBody<T> body) {
+    <T> T call(Need need, String path, T emptyValue, Function<RequestContext, T> body) {
         return harness.call(new RequestSpec("test/" + need, path != null ? uri(path) : null, null, need, false), emptyValue, body);
     }
 

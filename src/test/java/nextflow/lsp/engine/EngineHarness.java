@@ -28,6 +28,7 @@ import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import nextflow.lsp.TestLanguageClient;
 import nextflow.lsp.TestWorkspace;
@@ -192,7 +193,7 @@ public final class EngineHarness implements AutoCloseable {
 
     // -- requests
 
-    public <T> CompletableFuture<T> send(RequestSpec spec, T emptyValue, RequestBody<T> body) {
+    public <T> CompletableFuture<T> send(RequestSpec spec, T emptyValue, Function<RequestContext, T> body) {
         return engine.request(spec, emptyValue, body);
     }
 
@@ -200,7 +201,7 @@ public final class EngineHarness implements AutoCloseable {
      * Send a request, run the engine until it completes, and return
      * its result. Fails if the engine goes idle first.
      */
-    public <T> T call(RequestSpec spec, T emptyValue, RequestBody<T> body) {
+    public <T> T call(RequestSpec spec, T emptyValue, Function<RequestContext, T> body) {
         var future = send(spec, emptyValue, body);
         runUntil(future);
         try {

@@ -18,6 +18,7 @@ package nextflow.lsp.engine;
 import java.time.Clock;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.function.IntConsumer;
 
 /**
  * Runtime services used by the engine, so that tests can replace
@@ -61,7 +62,10 @@ public interface EngineEnvironment {
      */
     PluginRegistryClient registry(String registryUrl);
 
-    Exiter exiter();
+    /**
+     * Terminates the process with the given status (injectable for tests).
+     */
+    IntConsumer exiter();
 
     /**
      * Create the production environment, with daemon threads.

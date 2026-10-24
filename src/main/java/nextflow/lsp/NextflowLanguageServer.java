@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 import nextflow.lsp.engine.DefaultEngineEnvironment;
 import nextflow.lsp.engine.Engine;
@@ -30,7 +31,7 @@ import nextflow.lsp.engine.EngineState;
 import nextflow.lsp.engine.Event;
 import nextflow.lsp.engine.FileKind;
 import nextflow.lsp.engine.Need;
-import nextflow.lsp.engine.RequestBody;
+import nextflow.lsp.engine.RequestContext;
 import nextflow.lsp.engine.RequestSpec;
 import nextflow.lsp.engine.Uris;
 import nextflow.lsp.engine.Workspace;
@@ -256,7 +257,7 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
 
     @Override
     public void exit() {
-        environment.exiter().exit(shutdownReceived ? 0 : 1);
+        environment.exiter().accept(shutdownReceived ? 0 : 1);
     }
 
     @Override
@@ -568,11 +569,11 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             .isPresent();
     }
 
-    private <T> CompletableFuture<T> fileRequest(String method, String uri, T emptyValue, RequestBody<T> body) {
+    private <T> CompletableFuture<T> fileRequest(String method, String uri, T emptyValue, Function<RequestContext, T> body) {
         return request(method, uri, null, Need.FILE, false, emptyValue, body);
     }
 
-    private <T> CompletableFuture<T> request(String method, String uri, String projectName, Need need, boolean positionBased, T emptyValue, RequestBody<T> body) {
+    private <T> CompletableFuture<T> request(String method, String uri, String projectName, Need need, boolean positionBased, T emptyValue, Function<RequestContext, T> body) {
         log.debug(method + " " + (uri != null ? uri : projectName != null ? projectName : ""));
         if( need != Need.ALL && uri == null && projectName == null )
             return CompletableFuture.completedFuture(emptyValue);

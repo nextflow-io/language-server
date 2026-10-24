@@ -62,7 +62,7 @@ final class DocumentStore {
      * @param params
      */
     boolean open(DidOpenTextDocumentParams params) {
-        EngineThread.check(executor);
+        executor.checkThread();
         var item = params.getTextDocument();
         var uri = Uris.canonical(item.getUri());
         if( uri.isEmpty() )
@@ -81,7 +81,7 @@ final class DocumentStore {
      * @param params
      */
     boolean change(DidChangeTextDocumentParams params) {
-        EngineThread.check(executor);
+        executor.checkThread();
         var identifier = params.getTextDocument();
         var uri = Uris.canonical(identifier.getUri());
         if( uri.isEmpty() )
@@ -103,12 +103,12 @@ final class DocumentStore {
      * @param uri canonical URI
      */
     boolean close(URI uri) {
-        EngineThread.check(executor);
+        executor.checkThread();
         return documents.remove(uri) != null;
     }
 
     Optional<OpenDocument> get(URI uri) {
-        EngineThread.check(executor);
+        executor.checkThread();
         return Optional.ofNullable(documents.get(uri));
     }
 
@@ -118,13 +118,13 @@ final class DocumentStore {
      * @param uri canonical URI
      */
     Integer version(URI uri) {
-        EngineThread.check(executor);
+        executor.checkThread();
         var document = documents.get(uri);
         return document != null ? document.version() : null;
     }
 
     boolean isOpen(URI uri) {
-        EngineThread.check(executor);
+        executor.checkThread();
         return documents.containsKey(uri);
     }
 
@@ -132,7 +132,7 @@ final class DocumentStore {
      * Get the canonical URIs of the open documents, in sorted order.
      */
     List<URI> uris() {
-        EngineThread.check(executor);
+        executor.checkThread();
         return documents.keySet().stream().sorted().toList();
     }
 

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
+import java.util.function.IntConsumer;
 
 /**
  * Deterministic engine environment: the engine runs on the test
@@ -129,7 +130,7 @@ public final class TestEnvironment implements EngineEnvironment {
     }
 
     @Override
-    public Exiter exiter() {
+    public IntConsumer exiter() {
         return exits::add;
     }
 

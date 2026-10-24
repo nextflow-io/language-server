@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
@@ -75,7 +76,7 @@ class EngineTest {
         return new RequestSpec(method, harness.uri("main.nf"), null, need, true);
     }
 
-    private <T> RequestBody<T> body(String method, T result) {
+    private <T> Function<RequestContext, T> body(String method, T result) {
         return (ctx) -> {
             state.log.add("body " + method);
             return result;

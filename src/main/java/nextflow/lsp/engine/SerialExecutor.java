@@ -29,6 +29,19 @@ import java.time.Duration;
 public interface SerialExecutor {
 
     /**
+     * Handle to a scheduled task.
+     */
+    @FunctionalInterface
+    interface Cancellable {
+
+        /**
+         * Cancel the task if it has not started yet.
+         */
+        void cancel();
+
+    }
+
+    /**
      * Queue a task. Can be called from any thread.
      *
      * @param task
@@ -47,6 +60,15 @@ public interface SerialExecutor {
      * Whether the calling thread is the thread that runs the tasks.
      */
     boolean inEngineThread();
+
+    /**
+     * Throw an IllegalStateException unless the calling thread is the
+     * thread that runs the tasks.
+     */
+    default void checkThread() {
+        if( !inEngineThread() )
+            throw new IllegalStateException("Engine state was accessed outside the engine thread (from thread " + Thread.currentThread().getName() + ")");
+    }
 
     /**
      * Stop accepting tasks and cancel the timers that are not due

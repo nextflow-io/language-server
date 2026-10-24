@@ -29,6 +29,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
@@ -86,9 +87,9 @@ public final class Engine {
     private final AtomicInteger ioInFlight = new AtomicInteger();
 
     // engine-confined (volatile only so that isIdle() can read them)
-    private volatile Cancellable background;
+    private volatile SerialExecutor.Cancellable background;
 
-    private volatile Cancellable starvationTimer;
+    private volatile SerialExecutor.Cancellable starvationTimer;
 
     private final List<RequestTask<?>> parked = new ArrayList<>();
 
@@ -129,7 +130,7 @@ public final class Engine {
      * @param emptyValue
      * @param body
      */
-    public <T> CompletableFuture<T> request(RequestSpec spec, T emptyValue, RequestBody<T> body) {
+    public <T> CompletableFuture<T> request(RequestSpec spec, T emptyValue, Function<RequestContext, T> body) {
         var task = new RequestTask<>(spec, emptyValue, body);
         task.future.whenComplete((result, error) -> {
             if( task.future.isCancelled() )
@@ -194,7 +195,7 @@ public final class Engine {
      * Throw an IllegalStateException unless called on the engine thread.
      */
     public void checkEngineThread() {
-        EngineThread.check(executor);
+        executor.checkThread();
     }
 
     /**
@@ -313,7 +314,7 @@ public final class Engine {
         }
         catch( Throwable ignored ) {
         }
-        env.exiter().exit(1);
+        env.exiter().accept(1);
     }
 
     void log(MessageType type, String message) {
@@ -591,12 +592,12 @@ public final class Engine {
     private static final class RequestTask<T> {
         final RequestSpec spec;
         final T emptyValue;
-        final RequestBody<T> body;
+        final Function<RequestContext, T> body;
         final CompletableFuture<T> future = new CompletableFuture<>();
         Instant arrival;
         Integer versionAtArrival;
 
-        RequestTask(RequestSpec spec, T emptyValue, RequestBody<T> body) {
+        RequestTask(RequestSpec spec, T emptyValue, Function<RequestContext, T> body) {
             this.spec = spec;
             this.emptyValue = emptyValue;
             this.body = body;

@@ -24,6 +24,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntConsumer;
 
 /**
  * Production environment: a dedicated engine thread, a read pool
@@ -123,7 +124,7 @@ public final class DefaultEngineEnvironment implements EngineEnvironment {
     }
 
     @Override
-    public Exiter exiter() {
+    public IntConsumer exiter() {
         return System::exit;
     }
 

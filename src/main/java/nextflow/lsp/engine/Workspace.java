@@ -33,12 +33,18 @@ import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.util.Logger;
 import nextflow.util.PathUtils;
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
+import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.FileChangeType;
 import org.eclipse.lsp4j.FileEvent;
+import org.eclipse.lsp4j.FileSystemWatcher;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.MessageType;
+import org.eclipse.lsp4j.Registration;
+import org.eclipse.lsp4j.RegistrationParams;
+import org.eclipse.lsp4j.WatchKind;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 /**
  * The language service state driven by the engine: configuration,
@@ -67,6 +73,14 @@ public final class Workspace implements EngineState {
     // extensions of watched files that are not managed, so a watcher
     // event for any other unmanaged path may be for a directory
     private static final Set<String> NOT_DIRECTORIES = Set.of("groovy", "jar", "json");
+
+    private static final List<String> WATCHER_PATTERNS = List.of(
+        "**/*.nf",
+        "**/*.config",
+        "**/nextflow_schema.json",
+        "**/lib/**/*.groovy",
+        "**/lib/*.jar"
+    );
 
     private static final Logger log = Logger.getInstance();
 
@@ -321,9 +335,29 @@ public final class Workspace implements EngineState {
             return;
         initialized = true;
         if( watchersSupported )
-            WatcherRegistration.register(engine);
+            registerWatchers();
         for( var project : folders )
             startWalk(project);
+    }
+
+    /**
+     * Register the file watchers. Deletes are watched for any path,
+     * since clients report only the directory when a directory is
+     * deleted or moved.
+     */
+    private void registerWatchers() {
+        var watchers = new ArrayList<FileSystemWatcher>();
+        for( var pattern : WATCHER_PATTERNS )
+            watchers.add(new FileSystemWatcher(Either.forLeft(pattern)));
+        watchers.add(new FileSystemWatcher(Either.forLeft("**/*"), WatchKind.Delete));
+        var registration = new Registration("nextflow/watchedFiles", "workspace/didChangeWatchedFiles", new DidChangeWatchedFilesRegistrationOptions(watchers));
+        var response = engine.client().registerCapability(new RegistrationParams(List.of(registration)));
+        if( response == null )
+            return;
+        response.whenComplete((result, error) -> {
+            if( error != null )
+                engine.log(MessageType.Warning, "Failed to register file watchers: " + error);
+        });
     }
 
     private Project addFolder(WorkspaceFolder folder) {
