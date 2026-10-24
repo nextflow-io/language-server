@@ -329,7 +329,30 @@ public final class Project {
      * @param entry
      */
     boolean isFresh(FileEntry entry) {
-        return freshness(List.of(entry.uri)).get(entry.uri);
+        return isClosureFresh(List.of(entry.uri));
+    }
+
+    /**
+     * Whether every entry reachable from the given roots is fresh,
+     * which is the case iff all of them pass the local checks.
+     *
+     * @param roots
+     */
+    private boolean isClosureFresh(Collection<URI> roots) {
+        var visited = new HashSet<URI>(roots);
+        var queue = new ArrayDeque<URI>(roots);
+        while( !queue.isEmpty() ) {
+            var entry = files.get(queue.remove());
+            if( entry == null )
+                continue;
+            if( !isLocallyFresh(entry) )
+                return false;
+            for( var dep : entry.depStamps.keySet() ) {
+                if( visited.add(dep) )
+                    queue.add(dep);
+            }
+        }
+        return true;
     }
 
     /**
@@ -416,6 +439,8 @@ public final class Project {
      */
     List<List<FileEntry>> staleClosure(Collection<FileEntry> roots) {
         var rootUris = roots.stream().map(e -> e.uri).sorted().toList();
+        if( isClosureFresh(rootUris) )
+            return List.of();
         return staleComponents(rootUris, freshness(rootUris));
     }
 
