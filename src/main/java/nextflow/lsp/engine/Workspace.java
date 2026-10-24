@@ -273,11 +273,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         return configuration.excludePatterns();
     }
 
-    @Override
-    public void entryCreated(Project project, FileEntry entry) {
-        matchMissing(entry.path);
-    }
-
     // -- Builder.Context
 
     @Override
@@ -509,6 +504,8 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         for( var path : event.files() )
             discovered.add(path.toUri());
         for( var uri : discovered ) {
+            if( project.entry(uri) == null )
+                bumpIncluders(uri);
             var entry = project.getOrCreate(uri, FileEntry.Role.WORKSPACE);
             if( entry != null )
                 entry.role = FileEntry.Role.WORKSPACE;
@@ -550,6 +547,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         if( !FileKind.isManaged(path) )
             return;
         bumpAll(uri);
+        bumpIncluders(uri);
         // an open file is part of the project, even if it is excluded
         projectFor(path).getOrCreate(uri, FileEntry.Role.WORKSPACE).role = FileEntry.Role.WORKSPACE;
         scheduleEdit();
@@ -562,6 +560,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
     private void onClose(URI uri) {
         bumpAll(uri);
+        bumpIncluders(uri);
         var path = Path.of(uri);
         var project = projectFor(path);
         var entry = project.entry(uri);
@@ -595,10 +594,22 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         }
     }
 
-    private void matchMissing(Path path) {
+    /**
+     * Bump the includers of a file that may have been created or
+     * deleted, in the projects that have no entry for it. In the
+     * others, the change of the entry invalidates them.
+     *
+     * @param uri
+     */
+    private void bumpIncluders(URI uri) {
         for( var project : projects() ) {
-            for( var includer : project.includersOfMissing(path) )
-                project.bump(includer);
+            if( project.entry(uri) != null )
+                continue;
+            for( var dependent : project.graph.dependents(uri) ) {
+                var entry = project.entry(dependent);
+                if( entry != null )
+                    project.bump(entry);
+            }
         }
     }
 
@@ -629,6 +640,7 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
             }
             if( !FileKind.isManaged(path) || documents.isOpen(uri) )
                 continue;
+            bumpIncluders(uri);
             if( change.getType() != FileChangeType.Deleted ) {
                 // a changed file may be unknown if its last read failed
                 var project = projectFor(path);
@@ -636,7 +648,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                     project.getOrCreate(uri, FileEntry.Role.WORKSPACE);
                     noteAdded(project, uri);
                 }
-                matchMissing(path);
             }
             else {
                 for( var project : folders )

@@ -29,8 +29,10 @@ import java.util.TreeSet;
 import java.util.function.Function;
 
 /**
- * Dependency edges between the entries of a project, as recorded
- * by their last build, with a reverse index.
+ * The reverse index of the dependency edges between the entries of
+ * a project. The outgoing edges of an entry are the keys of its
+ * {@link FileEntry#depStamps}, as recorded by its last build, and
+ * may point to files that don't exist.
  *
  * Engine-confined.
  *
@@ -38,44 +40,28 @@ import java.util.function.Function;
  */
 final class DependencyGraph {
 
-    private final Map<URI, Set<URI>> forward = new HashMap<>();
-
     private final Map<URI, Set<URI>> reverse = new HashMap<>();
 
     /**
-     * Replace the outgoing edges of a node.
+     * Replace the outgoing edges of a node. The incoming edges of a
+     * node are kept when it is removed, so that its dependents can
+     * still be found.
      *
      * @param from
-     * @param targets
+     * @param previous the current outgoing edges
+     * @param targets the new outgoing edges
      */
-    void setEdges(URI from, Collection<URI> targets) {
-        var previous = forward.remove(from);
-        if( previous != null ) {
-            for( var target : previous ) {
-                var sources = reverse.get(target);
-                if( sources != null ) {
-                    sources.remove(from);
-                    if( sources.isEmpty() )
-                        reverse.remove(target);
-                }
+    void setEdges(URI from, Collection<URI> previous, Collection<URI> targets) {
+        for( var target : previous ) {
+            var sources = reverse.get(target);
+            if( sources != null ) {
+                sources.remove(from);
+                if( sources.isEmpty() )
+                    reverse.remove(target);
             }
         }
-        if( targets.isEmpty() )
-            return;
-        var sorted = new TreeSet<>(targets);
-        forward.put(from, sorted);
-        for( var target : sorted )
+        for( var target : targets )
             reverse.computeIfAbsent(target, (k) -> new TreeSet<>()).add(from);
-    }
-
-    /**
-     * Remove the outgoing edges of a node. Incoming edges are kept,
-     * so that the dependents of a removed node can still be found.
-     *
-     * @param node
-     */
-    void removeNode(URI node) {
-        setEdges(node, List.of());
     }
 
     /**

@@ -573,6 +573,42 @@ class WorkspaceBuildTest {
         }
     }
 
+    @Test
+    void rebuildAFileOpenedWithUnchangedTextWhenAnIncludeTargetAppeared() {
+        try( var f = start() ) {
+            var main = "include { FOO } from './mod.nf'\nworkflow { FOO() }\n";
+            f.write("main.nf", main);
+            f.settle();
+            assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
+
+            // no watcher event
+            f.write("mod.nf", "workflow FOO {}\n");
+            f.open("main.nf", main);
+            f.settle();
+            assertThat(f.messages("main.nf")).isEmpty();
+            assertThat(nonEmpty(f.client().getAllDiagnostics())).isEqualTo(freshDiagnostics(Map.of("main.nf", main)));
+        }
+    }
+
+    @Test
+    void rebuildAFileClosedWithUnchangedTextWhenAnIncludeTargetDisappeared() throws IOException {
+        try( var f = start() ) {
+            var main = "include { FOO } from './mod.nf'\nworkflow { FOO() }\n";
+            f.write("main.nf", main);
+            f.write("mod.nf", "workflow FOO {}\n");
+            f.open("main.nf", main);
+            f.settle();
+            assertThat(f.messages("main.nf")).isEmpty();
+
+            // no watcher event
+            Files.delete(f.path("mod.nf"));
+            f.close("main.nf");
+            f.settle();
+            assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
+            assertThat(nonEmpty(f.client().getAllDiagnostics())).isEqualTo(freshDiagnostics(Map.of()));
+        }
+    }
+
     /**
      * Compile Groovy source into a jar file.
      */

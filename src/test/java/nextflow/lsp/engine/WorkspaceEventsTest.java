@@ -491,6 +491,60 @@ class WorkspaceEventsTest {
     }
 
     @Test
+    void resolveADirectoryIncludeWhenItsMainScriptIsCreated() {
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.watchers = true;
+            o.settle = false;
+        }) ) {
+            f.write("main.nf", "include { FOO } from './modules/foo'\nworkflow { FOO() }\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
+
+            f.writeAndNotify("modules/foo/main.nf", "workflow FOO {}\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).isEmpty();
+            assertThat(f.includeTarget("main.nf")).hasToString(f.uri("modules/foo/main.nf"));
+        }
+    }
+
+    @Test
+    void resolveAnIncludeToADirectoryCreatedNextToTheScript() {
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.watchers = true;
+            o.settle = false;
+        }) ) {
+            f.write("foo.nf", "workflow FOO {}\n");
+            f.write("main.nf", "include { FOO } from './foo'\nworkflow { FOO() }\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).isEmpty();
+
+            // the directory takes precedence over foo.nf
+            f.writeAndNotify("foo/main.nf", "workflow BAR {}\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).anyMatch(m -> m.contains("'FOO' is not defined"));
+            assertThat(WorkspaceBuildTest.nonEmpty(f.client().getAllDiagnostics()))
+                .isEqualTo(WorkspaceBuildTest.freshDiagnostics(Map.of()))
+                .isNotEmpty();
+        }
+    }
+
+    @Test
+    void resolveARemoteModuleWhenItIsInstalled() {
+        try( var f = WorkspaceFixture.start((o) -> {
+            o.watchers = true;
+            o.settle = false;
+        }) ) {
+            f.write("main.nf", "include { FOO } from 'nf-core/foo'\nworkflow { FOO() }\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).isNotEmpty();
+
+            f.writeAndNotify("modules/nf-core/foo/main.nf", "workflow FOO {}\n");
+            f.settle();
+            assertThat(f.messages("main.nf")).isEmpty();
+        }
+    }
+
+    @Test
     void doNotRegisterWatchersWithoutClientSupport() {
         try( var f = WorkspaceFixture.start() ) {
             assertThat(f.client().getRegistrations()).isEmpty();

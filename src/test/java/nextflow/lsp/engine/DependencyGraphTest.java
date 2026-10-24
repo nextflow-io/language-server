@@ -47,7 +47,7 @@ class DependencyGraphTest {
 
     static DependencyGraph graph(Map<String, List<String>> edges) {
         var graph = new DependencyGraph();
-        edges.forEach((from, targets) -> graph.setEdges(uri(from), targets.stream().map(DependencyGraphTest::uri).toList()));
+        edges.forEach((from, targets) -> graph.setEdges(uri(from), List.of(), targets.stream().map(DependencyGraphTest::uri).toList()));
         return graph;
     }
 
@@ -75,11 +75,11 @@ class DependencyGraphTest {
         assertThat(graph.dependents(uri("c"))).containsExactly(uri("b"), uri("d"));
         assertThat(graph.transitiveDependents(Set.of(uri("c")))).containsExactly(uri("a"), uri("b"), uri("d"));
 
-        graph.setEdges(uri("d"), List.of());
+        graph.setEdges(uri("d"), List.of(uri("c")), List.of());
         assertThat(graph.dependents(uri("c"))).containsExactly(uri("b"));
-        graph.removeNode(uri("b"));
+        graph.setEdges(uri("b"), List.of(uri("c")), List.of());
         assertThat(graph.dependents(uri("c"))).isEmpty();
-        // incoming edges of a removed node are kept
+        // incoming edges of a node without outgoing edges are kept
         assertThat(graph.dependents(uri("b"))).containsExactly(uri("a"));
     }
 

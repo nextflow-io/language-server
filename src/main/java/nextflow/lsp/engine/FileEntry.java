@@ -19,7 +19,6 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import nextflow.lsp.spec.PluginRef;
 import org.codehaus.groovy.ast.ASTNode;
@@ -50,6 +49,9 @@ public final class FileEntry {
 
     static final long UNBUILT = -1;
 
+    // the stamp of a dependency that has no entry
+    static final long MISSING = -1;
+
     final URI uri;
 
     final Path path;
@@ -64,11 +66,11 @@ public final class FileEntry {
 
     long stamp;
 
+    // every path that an include of the last build could resolve to,
+    // with the stamp of its entry at the time, or MISSING
     Map<URI, Long> depStamps = Map.of();
 
     Map<ExtKey, Long> extKeys = Map.of();
-
-    Set<Path> missingTargets = Set.of();
 
     // set when an input other than the text changed since the last build
     boolean otherInputChanged;

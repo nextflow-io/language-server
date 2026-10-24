@@ -49,6 +49,7 @@ import nextflow.lsp.services.script.ScriptAstParentVisitor;
 import nextflow.lsp.spec.PluginRef;
 import nextflow.lsp.spec.PluginSpec;
 import nextflow.lsp.util.Includes;
+import nextflow.module.spi.RemoteModuleResolver;
 import nextflow.script.ast.ScriptNode;
 import nextflow.script.control.CallArityVisitor;
 import nextflow.script.control.ModuleResolver;
@@ -148,11 +149,11 @@ final class Builder {
             entry.errors = List.of();
             entry.warnings = List.of();
             entry.internalError = error;
+            project.graph.setEdges(entry.uri, entry.depStamps.keySet(), List.of());
             entry.depStamps = Map.of();
             entry.extKeys = Map.of();
             entry.stamp = context.nextStamp();
             entry.builtInputVersion = entry.inputVersion;
-            project.graph.setEdges(entry.uri, List.of());
             project.built(entry);
         }
         project.markDirty();
@@ -170,9 +171,10 @@ final class Builder {
         boolean missing;
         IOException readError;
         Throwable internalError;
-        // discovered dependencies
+        // every path that an include could resolve to
+        final Set<URI> candidates = new TreeSet<>();
+        // the candidates that exist, which are built first
         final Set<URI> targets = new TreeSet<>();
-        final Set<Path> missingTargets = new TreeSet<>();
         final Map<ExtKey, Long> extKeys = new LinkedHashMap<>();
         final List<PluginRef> pluginRefs = new ArrayList<>();
         boolean hasPluginInclude;
@@ -285,26 +287,47 @@ final class Builder {
             var pool = context.engine().environment().compilePool();
             var files = context.engine().environment().files();
             var candidates = new ArrayList<FileEntry>();
-            var reads = new ArrayList<Future<String>>();
+            var reads = new ArrayList<Future<Read>>();
             for( var entry : initial ) {
                 if( project.entry(entry.uri) != entry || entry.builtInputVersion == entry.inputVersion )
                     continue;
                 if( entry.otherInputChanged || entry.builtText == null || entry.internalError != null )
                     continue;
-                var document = documents.get(entry.uri);
+                // without file watchers, an include target may have been
+                // created or deleted since the last build
+                var closed = new ArrayList<Path>();
+                var present = new ArrayList<Boolean>();
+                var openChanged = false;
+                for( var dep : entry.depStamps.entrySet() ) {
+                    var wasPresent = dep.getValue() != FileEntry.MISSING;
+                    if( documents.isOpen(dep.getKey()) ) {
+                        openChanged |= !wasPresent;
+                    }
+                    else {
+                        closed.add(Path.of(dep.getKey()));
+                        present.add(wasPresent);
+                    }
+                }
+                if( openChanged )
+                    continue;
+                var document = documents.get(entry.uri).map(DocumentStore.OpenDocument::text);
                 var path = entry.path;
                 candidates.add(entry);
-                reads.add(document.isPresent()
-                    ? CompletableFuture.completedFuture(document.get().text())
-                    : submit(pool, () -> files.readText(path)));
+                reads.add(submit(pool, () -> {
+                    for( int i = 0; i < closed.size(); i++ ) {
+                        if( files.exists(closed.get(i)) != present.get(i) )
+                            return new Read(document.orElse(null), false);
+                    }
+                    return new Read(document.isPresent() ? document.get() : files.readText(path), true);
+                }));
             }
             var result = new ArrayList<FileEntry>();
             // dependencies come first, so that their dependents can be kept too
             for( int i = 0; i < candidates.size(); i++ ) {
                 var entry = candidates.get(i);
-                String text;
+                Read read;
                 try {
-                    text = reads.get(i).get();
+                    read = reads.get(i).get();
                 }
                 catch( InterruptedException e ) {
                     Thread.currentThread().interrupt();
@@ -316,8 +339,10 @@ final class Builder {
                     // reported by the build
                     continue;
                 }
-                if( !text.equals(entry.builtText) || !isOtherwiseFresh(entry) ) {
-                    texts.put(entry.uri, text);
+                if( read.text() == null )
+                    continue;
+                if( !read.sameTargets() || !read.text().equals(entry.builtText) || !isOtherwiseFresh(entry) ) {
+                    texts.put(entry.uri, read.text());
                     continue;
                 }
                 entry.builtInputVersion = entry.inputVersion;
@@ -329,13 +354,21 @@ final class Builder {
         }
 
         /**
+         * The current text of a file, and whether each of its include
+         * targets exists if and only if it existed in the last build.
+         */
+        private record Read(String text, boolean sameTargets) {}
+
+        /**
          * Whether every dependency and external input of an entry is
          * unchanged since its last build.
          */
         private boolean isOtherwiseFresh(FileEntry entry) {
             for( var dep : entry.depStamps.entrySet() ) {
+                if( project.stampOf(dep.getKey()) != dep.getValue() )
+                    return false;
                 var target = project.entry(dep.getKey());
-                if( target == null || target.stamp != dep.getValue() || !project.isFresh(target) )
+                if( target != null && !project.isFresh(target) )
                     return false;
             }
             for( var ext : entry.extKeys.entrySet() ) {
@@ -483,6 +516,14 @@ final class Builder {
                     next.add(entry);
                 }
             }
+            // an entry whose file no longer exists is removed by the build
+            for( var candidate : parsed.candidates ) {
+                var entry = project.entry(candidate);
+                if( entry != null && !parsed.targets.contains(candidate) && !batch.containsKey(candidate) ) {
+                    batch.put(candidate, null);
+                    next.add(entry);
+                }
+            }
         }
 
         private FileEntry.Role roleFor(Path path) {
@@ -500,20 +541,51 @@ final class Builder {
                     parsed.hasPluginInclude = true;
                     continue;
                 }
-                URI target;
-                try {
-                    target = ModuleResolver.getIncludeUri(parsed.entry.uri, source, project.root);
-                }
-                catch( Exception e ) {
-                    // reported by include resolution
-                    continue;
-                }
-                addTarget(parsed, target);
+                for( var candidate : includeCandidates(parsed.entry.uri, source) )
+                    addTarget(parsed, candidate);
             }
             if( parsed.hasPluginInclude ) {
                 for( var config : governingConfigs(parsed.entry.path) )
                     addTarget(parsed, config.toUri());
             }
+        }
+
+        /**
+         * Get the paths that an include could resolve to: its current
+         * target, and the main script of the module directory, which
+         * takes precedence once it exists.
+         *
+         * @param uri
+         * @param source
+         */
+        private List<URI> includeCandidates(URI uri, String source) {
+            var result = new ArrayList<URI>(2);
+            try {
+                result.add(ModuleResolver.getIncludeUri(uri, source, project.root));
+            }
+            catch( Exception e ) {
+                // reported by include resolution
+            }
+            var module = moduleDir(uri, source);
+            if( module != null )
+                result.add(module.resolve("main.nf").normalize().toUri());
+            return result;
+        }
+
+        /**
+         * Get the module directory of an include, following
+         * {@link ModuleResolver} and the fallback remote module resolver.
+         */
+        private Path moduleDir(URI uri, String source) {
+            var path = Path.of(uri);
+            if( ModuleResolver.isLocalModule(source) )
+                return path.getParent().resolve(source);
+            var base = RemoteModuleResolver.resolveBaseDir(path, project.root);
+            if( base == null )
+                return null;
+            var modules = base.resolve(RemoteModuleResolver.MODULES_DIR).normalize();
+            var result = modules.resolve(source).normalize();
+            return result.startsWith(modules) ? result : null;
         }
 
         private void discoverConfig(Parsed parsed) {
@@ -547,10 +619,9 @@ final class Builder {
             var path = Path.of(canonical.get());
             if( !FileKind.isManaged(path) )
                 return;
+            parsed.candidates.add(canonical.get());
             if( context.engine().documents().isOpen(canonical.get()) || context.engine().environment().files().exists(path) )
                 parsed.targets.add(canonical.get());
-            else
-                parsed.missingTargets.add(path);
         }
 
         /**
@@ -786,25 +857,18 @@ final class Builder {
             for( var parsed : analysed ) {
                 var entry = parsed.entry;
                 var depStamps = new TreeMap<URI, Long>();
-                var missing = new TreeSet<>(parsed.missingTargets);
-                for( var target : parsed.targets ) {
-                    var dep = project.entry(target);
-                    if( dep != null )
-                        depStamps.put(target, dep.stamp);
-                    else
-                        missing.add(Path.of(target));
-                }
+                for( var candidate : parsed.candidates )
+                    depStamps.put(candidate, project.stampOf(candidate));
                 var extKeys = new LinkedHashMap<ExtKey, Long>();
                 for( var key : parsed.extKeys.keySet() )
                     extKeys.put(key, context.extStamp(project, key));
+                project.graph.setEdges(entry.uri, entry.depStamps.keySet(), depStamps.keySet());
                 entry.depStamps = depStamps;
                 entry.extKeys = extKeys;
                 entry.builtInputVersion = parsed.inputVersion;
                 entry.builtFromVersion = parsed.documentVersion;
                 entry.otherInputChanged = false;
                 entry.pluginRefs = List.copyOf(parsed.pluginRefs);
-                project.graph.setEdges(entry.uri, depStamps.keySet());
-                project.setMissingTargets(entry, missing);
                 project.built(entry);
                 for( var dependent : project.graph.dependents(entry.uri) ) {
                     if( !batch.containsKey(dependent) )

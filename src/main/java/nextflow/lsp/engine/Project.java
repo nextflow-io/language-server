@@ -68,7 +68,6 @@ public final class Project {
         long nextInputVersion();
         long extStamp(Project project, ExtKey key);
         List<String> excludePatterns();
-        void entryCreated(Project project, FileEntry entry);
     }
 
     final String id;
@@ -88,9 +87,6 @@ public final class Project {
     final DependencyGraph graph = new DependencyGraph();
 
     final Map<ASTNode, FileEntry> nodeOwner = new IdentityHashMap<>();
-
-    // includers of each missing include target
-    private final Map<Path, Set<URI>> missingIndex = new HashMap<>();
 
     // entries whose input changed since their last build
     private final Set<URI> inputStale = new HashSet<>();
@@ -249,7 +245,6 @@ public final class Project {
         files.put(uri, entry);
         inputStale.add(uri);
         changed();
-        context.entryCreated(this, entry);
         return entry;
     }
 
@@ -288,8 +283,7 @@ public final class Project {
         compilerFor(entry.kind).getSources().remove(entry.uri);
         unindex(entry);
         entry.unit = null;
-        graph.removeNode(entry.uri);
-        setMissingTargets(entry, Set.of());
+        graph.setEdges(entry.uri, entry.depStamps.keySet(), List.of());
         inputStale.remove(entry.uri);
         if( !graph.dependents(entry.uri).isEmpty() )
             dirty = true;
@@ -359,39 +353,6 @@ public final class Project {
         changed();
     }
 
-    void setMissingTargets(FileEntry entry, Set<Path> targets) {
-        for( var target : entry.missingTargets ) {
-            var includers = missingIndex.get(target);
-            if( includers != null ) {
-                includers.remove(entry.uri);
-                if( includers.isEmpty() )
-                    missingIndex.remove(target);
-            }
-        }
-        entry.missingTargets = Set.copyOf(targets);
-        for( var target : targets )
-            missingIndex.computeIfAbsent(target, (k) -> new TreeSet<>()).add(entry.uri);
-    }
-
-    /**
-     * Get the entries that tried to include the given path when it
-     * did not exist.
-     *
-     * @param path
-     */
-    List<FileEntry> includersOfMissing(Path path) {
-        var includers = missingIndex.get(path);
-        if( includers == null )
-            return List.of();
-        var result = new ArrayList<FileEntry>();
-        for( var uri : includers ) {
-            var entry = files.get(uri);
-            if( entry != null )
-                result.add(entry);
-        }
-        return result;
-    }
-
     void unindex(FileEntry entry) {
         for( var node : entry.nodes ) {
             if( nodeOwner.get(node) == entry )
@@ -455,12 +416,21 @@ public final class Project {
         return freshMemo.get(entry.uri);
     }
 
+    /**
+     * Get the stamp of an entry, or MISSING if there is none.
+     *
+     * @param uri
+     */
+    long stampOf(URI uri) {
+        var entry = files.get(uri);
+        return entry != null ? entry.stamp : FileEntry.MISSING;
+    }
+
     private boolean isLocallyFresh(FileEntry entry) {
         if( entry.builtInputVersion != entry.inputVersion )
             return false;
         for( var dep : entry.depStamps.entrySet() ) {
-            var target = files.get(dep.getKey());
-            if( target == null || target.stamp != dep.getValue() )
+            if( stampOf(dep.getKey()) != dep.getValue() )
                 return false;
         }
         for( var ext : entry.extKeys.entrySet() ) {
