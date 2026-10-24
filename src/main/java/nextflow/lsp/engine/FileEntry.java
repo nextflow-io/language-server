@@ -37,8 +37,7 @@ import org.codehaus.groovy.syntax.SyntaxException;
  * Other inputs (`lib/`, parameter schemas and plugin specs) bump
  * the entries that read them.
  *
- * Engine-confined. Mutated only by {@link Project}, {@link Builder}
- * and {@link Workspace} (which sets the role).
+ * Engine-confined. Mutated only by {@link Project} and {@link Builder}.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

@@ -391,7 +391,7 @@ public final class Workspace implements EngineState {
                 if( other.entry(entry.uri) != entry || entry.role != FileEntry.Role.WORKSPACE || projectFor(entry.path) != project )
                     continue;
                 if( documents.isOpen(entry.uri) )
-                    ledger.publish(release(other, entry));
+                    ledger.publish(other.release(entry));
                 else if( !project.isExcluded(entry.path) )
                     project.getOrCreate(entry.uri, FileEntry.Role.WORKSPACE);
             }
@@ -536,10 +536,7 @@ public final class Workspace implements EngineState {
                 continue;
             if( project.entry(entry.uri) != entry )
                 continue;
-            if( project.isReachableFromOthers(entry) )
-                entry.role = FileEntry.Role.DEPENDENCY;
-            else
-                removed.addAll(project.removeAndCollect(entry));
+            removed.addAll(project.release(entry));
         }
         project.addedDuringWalk.clear();
         ledger.publish(removed);
@@ -574,25 +571,11 @@ public final class Workspace implements EngineState {
         var project = projectFor(path);
         var entry = project.entry(uri);
         if( entry != null && (project.isDefault() || project.isExcluded(path)) ) {
-            var released = new TreeSet<>(release(project, entry));
+            var released = new TreeSet<>(project.release(entry));
             released.add(uri);
             ledger.publish(released);
         }
         scheduleEdit();
-    }
-
-    /**
-     * Drop a file that is not part of the file set of a project,
-     * unless another file of the project depends on it.
-     *
-     * @return the URIs of the removed entries
-     */
-    private Set<URI> release(Project project, FileEntry entry) {
-        if( project.isReachableFromOthers(entry) ) {
-            entry.role = FileEntry.Role.DEPENDENCY;
-            return Set.of();
-        }
-        return project.removeAndCollect(entry);
     }
 
     private void bumpAll(URI uri) {

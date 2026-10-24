@@ -267,13 +267,19 @@ final class Project {
     }
 
     /**
-     * Remove an entry, then remove the dependency-only entries that
-     * are no longer reachable as a result.
+     * Release an entry that is no longer part of the file set. It is
+     * demoted to a dependency if another workspace entry still reaches
+     * it, otherwise it is removed along with the dependency-only
+     * entries that are no longer reachable as a result.
      *
      * @param entry
      * @return the URIs of the removed entries
      */
-    Set<URI> removeAndCollect(FileEntry entry) {
+    Set<URI> release(FileEntry entry) {
+        if( reachableFromWorkspace(entry).contains(entry.uri) ) {
+            entry.role = FileEntry.Role.DEPENDENCY;
+            return Set.of();
+        }
         var candidates = new TreeSet<>(entry.depStamps.keySet());
         remove(entry);
         var result = collectGarbage(candidates);
@@ -290,29 +296,24 @@ final class Project {
      * @return the URIs of the removed entries
      */
     Set<URI> collectGarbage(Collection<URI> candidates) {
-        var reachable = reachableFromWorkspace(null);
+        // computed only if a candidate could be collected
+        Set<URI> reachable = null;
         var result = new TreeSet<URI>();
-        var queue = new ArrayDeque<URI>(new TreeSet<>(candidates));
+        var queue = new ArrayDeque<>(candidates);
         while( !queue.isEmpty() ) {
             var uri = queue.remove();
             var entry = files.get(uri);
-            if( entry == null || entry.role != FileEntry.Role.DEPENDENCY || reachable.contains(uri) )
+            if( entry == null || entry.role != FileEntry.Role.DEPENDENCY )
+                continue;
+            if( reachable == null )
+                reachable = reachableFromWorkspace(null);
+            if( reachable.contains(uri) )
                 continue;
             queue.addAll(entry.depStamps.keySet());
             remove(entry);
             result.add(uri);
         }
         return result;
-    }
-
-    /**
-     * Whether an entry is reachable from a workspace entry other
-     * than itself.
-     *
-     * @param entry
-     */
-    boolean isReachableFromOthers(FileEntry entry) {
-        return reachableFromWorkspace(entry).contains(entry.uri);
     }
 
     private Set<URI> reachableFromWorkspace(FileEntry excluded) {
