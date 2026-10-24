@@ -27,6 +27,10 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
 class DependencyGraphTest {
 
     static URI uri(String name) {
