@@ -420,6 +420,117 @@ class WorkspaceEventsTest {
     }
 
     @Test
+    void dropDependencyCopyOfAnOpenOutsideFileWhenNoLongerIncluded() {
+        var f = TestServer.start((o) -> {
+            o.folders("proj");
+            o.settle = false;
+        });
+        f.write("shared/x.nf", "workflow X { def x = 1 }\n");
+        f.write("proj/main.nf", """
+            include { X } from '../shared/x.nf'
+            workflow {
+                X()
+            }
+            """);
+        f.open("shared/x.nf", "workflow X { def x = 1 }\n");
+        f.settle();
+        assertThat(scriptPaths(f, "proj/main.nf")).containsExactly("proj/main.nf", "shared/x.nf");
+
+        f.writeAndNotify("proj/main.nf", "workflow {}\n");
+        f.settle();
+        f.close("shared/x.nf");
+        f.settle();
+        assertThat(f.messages("shared/x.nf")).isEmpty();
+        assertThat(scriptPaths(f, "proj/main.nf")).containsExactly("proj/main.nf");
+    }
+
+    @Test
+    void dropDependencyCopyOfAnOpenFileInANestedFolderWhenNoLongerIncluded() {
+        var f = TestServer.start((o) -> {
+            o.folders("", "sub");
+            o.settle = false;
+        });
+        f.write("sub/x.nf", "workflow X { def x = 1 }\n");
+        f.write("main.nf", """
+            include { X } from './sub/x.nf'
+            workflow {
+                X()
+            }
+            """);
+        f.open("sub/x.nf", "workflow X { def x = 1 }\n");
+        f.settle();
+        assertThat(scriptPaths(f, "main.nf")).containsExactly("main.nf", "sub/x.nf");
+
+        f.writeAndNotify("main.nf", "workflow {}\n");
+        f.settle();
+        f.close("sub/x.nf");
+        f.settle();
+        assertThat(scriptPaths(f, "main.nf")).containsExactly("main.nf");
+    }
+
+    @Test
+    void dropCyclicOutsideDependenciesWhenNoLongerIncluded() {
+        var f = TestServer.start((o) -> {
+            o.folders("proj");
+            o.settle = false;
+        });
+        writeCycle(f, "shared");
+        f.write("proj/main.nf", """
+            include { A } from '../shared/a.nf'
+            workflow {
+                A()
+            }
+            """);
+        f.settle();
+        assertThat(f.messages("shared/a.nf")).contains(UNUSED);
+        assertThat(scriptPaths(f, "proj/main.nf")).containsExactly("proj/main.nf", "shared/a.nf", "shared/b.nf");
+
+        f.writeAndNotify("proj/main.nf", "workflow {}\n");
+        f.settle();
+        assertThat(f.messages("shared/a.nf")).isEmpty();
+        assertThat(scriptPaths(f, "proj/main.nf")).containsExactly("proj/main.nf");
+    }
+
+    @Test
+    void dropExcludedCyclicDependenciesWhenNoLongerIncluded() {
+        var f = TestServer.start((o) -> o.settle = false);
+        f.configure(Map.of("nextflow.files.exclude", List.of("vendor")));
+        writeCycle(f, "vendor");
+        f.write("main.nf", """
+            include { A } from './vendor/a.nf'
+            workflow {
+                A()
+            }
+            """);
+        f.settle();
+        assertThat(scriptPaths(f, "main.nf")).containsExactly("main.nf", "vendor/a.nf", "vendor/b.nf");
+
+        f.writeAndNotify("main.nf", "workflow {}\n");
+        f.settle();
+        assertThat(scriptPaths(f, "main.nf")).containsExactly("main.nf");
+    }
+
+    private static void writeCycle(TestServer f, String dir) {
+        f.write(dir + "/a.nf", """
+            include { B } from './b.nf'
+            workflow A { def x = 1 }
+            """);
+        f.write(dir + "/b.nf", """
+            include { A } from './a.nf'
+            workflow B {}
+            """);
+    }
+
+    private static List<String> scriptPaths(TestServer f, String path) {
+        var root = f.path("");
+        return f.call(Need.FILE, path, List.<String>of(), (context) ->
+            context.project().scriptView().getUris().stream()
+                .map(uri -> root.relativize(Path.of(uri)).toString())
+                .sorted()
+                .toList());
+    }
+
+    @Test
     void pickUpNewFilesFromWatcherEvents() {
         var f = TestServer.start((o) -> o.watchers = true);
         assertThat(f.client().getRegistrations()).singleElement()

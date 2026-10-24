@@ -835,15 +835,15 @@ final class Builder {
         }
 
         /**
-         * Remove dependency-only entries that no entry depends on any
-         * more, and return the URIs of every removed entry.
+         * Remove dependency-only entries that are no longer reachable,
+         * and return the URIs of every removed entry.
          */
         private Set<URI> collectGarbage(List<Parsed> order, Set<URI> removed) {
             var candidates = new TreeSet<URI>();
             for( var parsed : order )
                 candidates.addAll(parsed.previousTargets);
             var result = new TreeSet<URI>(removed);
-            result.addAll(project.collectGarbage(candidates, workspace.engine().documents()::isOpen));
+            result.addAll(project.collectGarbage(candidates));
             return result;
         }
 

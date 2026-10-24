@@ -530,22 +530,14 @@ public final class Workspace implements EngineState {
                 continue;
             if( project.entry(entry.uri) != entry )
                 continue;
-            if( hasDependents(project, entry) )
+            if( project.isReachableFromOthers(entry) )
                 entry.role = FileEntry.Role.DEPENDENCY;
             else
-                removed.addAll(project.removeAndCollect(entry, documents::isOpen));
+                removed.addAll(project.removeAndCollect(entry));
         }
         project.addedDuringWalk.clear();
         ledger.publish(removed);
         engine.scheduleBackground(Duration.ZERO);
-    }
-
-    private static boolean hasDependents(Project project, FileEntry entry) {
-        for( var dependent : project.graph.dependents(entry.uri) ) {
-            if( project.entry(dependent) != null )
-                return true;
-        }
-        return false;
     }
 
     // -- document events
@@ -587,11 +579,11 @@ public final class Workspace implements EngineState {
      * @return the URIs of the removed entries
      */
     private Set<URI> release(Project project, FileEntry entry) {
-        if( hasDependents(project, entry) ) {
+        if( project.isReachableFromOthers(entry) ) {
             entry.role = FileEntry.Role.DEPENDENCY;
             return Set.of();
         }
-        return project.removeAndCollect(entry, engine.documents()::isOpen);
+        return project.removeAndCollect(entry);
     }
 
     private void bumpAll(URI uri) {

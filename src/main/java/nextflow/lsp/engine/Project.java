@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.function.Predicate;
 
 import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.util.PathUtils;
@@ -259,42 +258,65 @@ final class Project {
 
     /**
      * Remove an entry, then remove the dependency-only entries that
-     * nothing depends on any more as a result.
+     * are no longer reachable as a result.
      *
      * @param entry
-     * @param isOpen
      * @return the URIs of the removed entries
      */
-    Set<URI> removeAndCollect(FileEntry entry, Predicate<URI> isOpen) {
+    Set<URI> removeAndCollect(FileEntry entry) {
         var candidates = new TreeSet<>(entry.depStamps.keySet());
         remove(entry);
-        var result = collectGarbage(candidates, isOpen);
+        var result = collectGarbage(candidates);
         result.add(entry.uri);
         return result;
     }
 
     /**
      * Remove the dependency-only entries among the candidates that
-     * no entry depends on, and then their dependencies, recursively.
-     * Open files are kept.
+     * are not reachable from a workspace entry, and then their
+     * unreachable dependencies, recursively.
      *
      * @param candidates
-     * @param isOpen
      * @return the URIs of the removed entries
      */
-    Set<URI> collectGarbage(Collection<URI> candidates, Predicate<URI> isOpen) {
+    Set<URI> collectGarbage(Collection<URI> candidates) {
+        var reachable = reachableFromWorkspace(null);
         var result = new TreeSet<URI>();
         var queue = new ArrayDeque<URI>(new TreeSet<>(candidates));
         while( !queue.isEmpty() ) {
             var uri = queue.remove();
             var entry = files.get(uri);
-            if( entry == null || entry.role != FileEntry.Role.DEPENDENCY || isOpen.test(uri) )
-                continue;
-            if( !graph.dependents(uri).isEmpty() )
+            if( entry == null || entry.role != FileEntry.Role.DEPENDENCY || reachable.contains(uri) )
                 continue;
             queue.addAll(entry.depStamps.keySet());
             remove(entry);
             result.add(uri);
+        }
+        return result;
+    }
+
+    /**
+     * Whether an entry is reachable from a workspace entry other
+     * than itself.
+     *
+     * @param entry
+     */
+    boolean isReachableFromOthers(FileEntry entry) {
+        return reachableFromWorkspace(entry).contains(entry.uri);
+    }
+
+    private Set<URI> reachableFromWorkspace(FileEntry excluded) {
+        var queue = new ArrayDeque<URI>();
+        for( var entry : files.values() ) {
+            if( entry.role == FileEntry.Role.WORKSPACE && entry != excluded )
+                queue.addAll(entry.depStamps.keySet());
+        }
+        var result = new HashSet<URI>();
+        while( !queue.isEmpty() ) {
+            var uri = queue.remove();
+            var entry = files.get(uri);
+            if( entry != null && result.add(uri) )
+                queue.addAll(entry.depStamps.keySet());
         }
         return result;
     }
