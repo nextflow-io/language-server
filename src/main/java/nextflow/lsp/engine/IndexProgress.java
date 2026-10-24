@@ -51,6 +51,9 @@ final class IndexProgress {
 
     private boolean begun;
 
+    // whether the client refused the token of the current run
+    private boolean refused;
+
     private int lastDone = -1;
 
     private int lastTotal = -1;
@@ -71,7 +74,9 @@ final class IndexProgress {
      * @param total files in the indexing projects
      */
     void update(boolean indexing, int done, int total) {
-        if( indexing && token == null )
+        if( !indexing )
+            refused = false;
+        if( indexing && token == null && !refused )
             start();
         if( token == null )
             return;
@@ -96,6 +101,7 @@ final class IndexProgress {
         if( event.error() != null ) {
             // the client refused the token -- stay silent for this run
             token = null;
+            refused = true;
             return;
         }
         begun = true;

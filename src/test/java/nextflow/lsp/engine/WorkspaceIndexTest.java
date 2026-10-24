@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 import nextflow.lsp.TestLanguageClient;
@@ -212,6 +213,34 @@ class WorkspaceIndexTest {
         f.runPending();
         assertThat(progressKinds(client)).containsExactly("create", "create", "begin");
         f.settle(io);
+    }
+
+    @Test
+    void requestTheTokenOnlyOncePerRunWhenTheClientRefusesIt() {
+        var client = new TestLanguageClient() {
+            @Override
+            public CompletableFuture<Void> createProgress(WorkDoneProgressCreateParams params) {
+                getProgress().add(params);
+                return CompletableFuture.failedFuture(new IllegalStateException("refused"));
+            }
+        };
+        var f = TestServer.start((o) -> {
+            o.client = client;
+            o.progress = true;
+            o.maxSliceFiles = 2;
+            o.initialized = false;
+            o.settle = false;
+        });
+        writeModules(f, 20);
+        f.initialized();
+        f.settle();
+        assertThat(progressKinds(client)).containsExactly("create");
+
+        // a new run requests a new token
+        f.write("other/mod.nf", "workflow OTHER {}\n");
+        f.addFolder("other");
+        f.settle();
+        assertThat(progressKinds(client)).containsExactly("create", "create");
     }
 
     @Test
