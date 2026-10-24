@@ -86,15 +86,6 @@ import org.eclipse.lsp4j.MessageType;
 final class Builder {
 
     /**
-     * Services used by a build.
-     */
-    interface Context {
-        Engine engine();
-        PluginSpecs plugins();
-        long nextStamp();
-    }
-
-    /**
      * The result of a build.
      *
      * @param built the entries that were built, in build order
@@ -111,10 +102,10 @@ final class Builder {
 
     static final String MAIN_CONFIG = "nextflow.config";
 
-    private final Context context;
+    private final Workspace workspace;
 
-    Builder(Context context) {
-        this.context = context;
+    Builder(Workspace workspace) {
+        this.workspace = workspace;
     }
 
     /**
@@ -152,7 +143,7 @@ final class Builder {
             project.graph.setEdges(entry.uri, entry.depStamps.keySet(), List.of());
             entry.depStamps = Map.of();
             entry.pluginLookups = Set.of();
-            entry.stamp = context.nextStamp();
+            entry.stamp = workspace.nextSeq();
             entry.builtInputVersion = entry.inputVersion;
         }
     }
@@ -281,9 +272,9 @@ final class Builder {
          * @return the kept entries
          */
         private List<FileEntry> keepUnchanged(Collection<FileEntry> initial) {
-            var documents = context.engine().documents();
-            var pool = context.engine().environment().readPool();
-            var files = context.engine().environment().files();
+            var documents = workspace.engine().documents();
+            var pool = workspace.engine().environment().readPool();
+            var files = workspace.engine().environment().files();
             var candidates = new ArrayList<FileEntry>();
             var reads = new ArrayList<Future<Read>>();
             for( var entry : initial ) {
@@ -374,8 +365,8 @@ final class Builder {
         // -- parse
 
         private List<Parsed> parseAll(List<FileEntry> entries) {
-            var documents = context.engine().documents();
-            var pool = context.engine().environment().readPool();
+            var documents = workspace.engine().documents();
+            var pool = workspace.engine().environment().readPool();
             var tasks = new ArrayList<Parsed>(entries.size());
             var futures = new ArrayList<Future<?>>(entries.size());
             for( var entry : entries ) {
@@ -409,7 +400,7 @@ final class Builder {
                 if( parsed.internalError != null )
                     logInternalError(parsed, "parsing", parsed.internalError);
                 if( parsed.readError != null )
-                    context.engine().log(MessageType.Warning, "Failed to read " + parsed.entry.path + " -- " + parsed.readError);
+                    workspace.engine().log(MessageType.Warning, "Failed to read " + parsed.entry.path + " -- " + parsed.readError);
             }
             return tasks;
         }
@@ -438,7 +429,7 @@ final class Builder {
             }
             else {
                 try {
-                    text = context.engine().environment().files().readText(entry.path);
+                    text = workspace.engine().environment().files().readText(entry.path);
                 }
                 catch( NoSuchFileException e ) {
                     parsed.missing = true;
@@ -459,7 +450,7 @@ final class Builder {
          * writes to shared Groovy AST nodes while parsing.
          */
         private void parse(Parsed parsed) {
-            context.engine().checkEngineThread();
+            workspace.engine().checkEngineThread();
             var entry = parsed.entry;
             var compiler = project.compilerFor(entry.kind);
             var unit = compiler.createSourceUnit(entry.uri, parsed.text);
@@ -624,7 +615,7 @@ final class Builder {
             if( !FileKind.isManaged(path) )
                 return;
             parsed.candidates.add(canonical.get());
-            if( context.engine().documents().isOpen(canonical.get()) || context.engine().environment().files().exists(path) )
+            if( workspace.engine().documents().isOpen(canonical.get()) || workspace.engine().environment().files().exists(path) )
                 parsed.targets.add(canonical.get());
         }
 
@@ -641,7 +632,7 @@ final class Builder {
                     break;
                 var config = dir.resolve(MAIN_CONFIG);
                 var uri = config.toUri();
-                if( project.root != null || project.entry(uri) != null || context.engine().documents().isOpen(uri) )
+                if( project.root != null || project.entry(uri) != null || workspace.engine().documents().isOpen(uri) )
                     result.add(config);
                 if( dir.equals(project.root) )
                     break;
@@ -675,14 +666,14 @@ final class Builder {
             new ConfigSpecVisitor(unit, new ConfigSpecVisitor.PluginLookup() {
                 @Override
                 public PluginSpec get(PluginRef ref) {
-                    var lookup = context.plugins().lookup(ref);
+                    var lookup = workspace.plugins().lookup(ref);
                     parsed.pluginLookups.add(ref);
                     return lookup.spec().orElse(null);
                 }
 
                 @Override
                 public boolean isPending(PluginRef ref) {
-                    return context.plugins().lookup(ref).pending();
+                    return workspace.plugins().lookup(ref).pending();
                 }
 
                 @Override
@@ -718,7 +709,7 @@ final class Builder {
                     var ref = refs.stream().filter(r -> r.name().equals(name)).findFirst().orElse(null);
                     if( ref == null )
                         return null;
-                    var lookup = context.plugins().lookup(ref);
+                    var lookup = workspace.plugins().lookup(ref);
                     parsed.pluginLookups.add(ref);
                     return lookup;
                 }
@@ -849,7 +840,7 @@ final class Builder {
         private void commit(List<Parsed> analysed, Set<URI> removed) {
             // stamps first, so that dependencies in the batch carry their new stamps
             for( var parsed : analysed )
-                parsed.entry.stamp = context.nextStamp();
+                parsed.entry.stamp = workspace.nextSeq();
             for( var uri : removed ) {
                 var entry = project.entry(uri);
                 if( entry != null )
@@ -879,12 +870,12 @@ final class Builder {
             for( var parsed : order )
                 candidates.addAll(parsed.previousTargets);
             var result = new TreeSet<URI>(removed);
-            result.addAll(project.collectGarbage(candidates, context.engine().documents()::isOpen));
+            result.addAll(project.collectGarbage(candidates, workspace.engine().documents()::isOpen));
             return result;
         }
 
         private void logInternalError(Parsed parsed, String step, Throwable e) {
-            context.engine().logError("Internal error while " + step + " " + parsed.entry.uri.getPath(), e);
+            workspace.engine().logError("Internal error while " + step + " " + parsed.entry.uri.getPath(), e);
         }
     }
 

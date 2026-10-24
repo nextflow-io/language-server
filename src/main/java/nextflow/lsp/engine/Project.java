@@ -60,22 +60,13 @@ public final class Project {
         READY
     }
 
-    /**
-     * Source of the external stamps and input versions, shared by
-     * every project of a workspace.
-     */
-    interface Context {
-        long nextInputVersion();
-        List<String> excludePatterns();
-    }
-
     final String id;
 
     final String name;
 
     final Path root;
 
-    private final Context context;
+    private final Workspace workspace;
 
     LanguageServerCompiler scriptCompiler;
 
@@ -98,11 +89,11 @@ public final class Project {
     // the walk result may not include
     final Set<URI> addedDuringWalk = new HashSet<>();
 
-    Project(String id, String name, Path root, Context context) {
+    Project(String id, String name, Path root, Workspace workspace) {
         this.id = id;
         this.name = name;
         this.root = root;
-        this.context = context;
+        this.workspace = workspace;
         this.scriptCompiler = LanguageServerCompiler.forScripts(root);
         this.configCompiler = LanguageServerCompiler.forConfigs();
         this.index = root != null ? IndexStatus.NOT_STARTED : IndexStatus.READY;
@@ -195,7 +186,7 @@ public final class Project {
      * @param path
      */
     boolean isExcluded(Path path) {
-        var patterns = context.excludePatterns();
+        var patterns = workspace.excludePatterns();
         if( root == null || !path.startsWith(root) )
             return PathUtils.isExcluded(path, patterns);
         for( var current = path; current != null && !current.equals(root); current = current.getParent() ) {
@@ -224,7 +215,7 @@ public final class Project {
         if( kind.isEmpty() )
             return null;
         entry = new FileEntry(uri, path, kind.get(), role);
-        entry.inputVersion = context.nextInputVersion();
+        entry.inputVersion = workspace.nextSeq();
         files.put(uri, entry);
         return entry;
     }
@@ -247,7 +238,7 @@ public final class Project {
      * @param entry
      */
     void bumpText(FileEntry entry) {
-        entry.inputVersion = context.nextInputVersion();
+        entry.inputVersion = workspace.nextSeq();
     }
 
     /**

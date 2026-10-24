@@ -55,32 +55,17 @@ final class DiagnosticsLedger {
 
     static final String INTERNAL_ERROR_MESSAGE = "Internal error while analysing this file; see the language server log";
 
-    /**
-     * Resolves the owner of a file.
-     */
-    interface Owners {
-        /**
-         * Get the entry that publishes the diagnostics of a file, or
-         * null if no project owns it.
-         *
-         * @param uri
-         */
-        FileEntry owner(URI uri);
-
-        ErrorReportingMode errorReportingMode();
-    }
-
     private record Published(List<Diagnostic> diagnostics, Integer version) {}
 
     private final Engine engine;
 
-    private final Owners owners;
+    private final Workspace workspace;
 
     private final Map<URI, Published> published = new HashMap<>();
 
-    DiagnosticsLedger(Engine engine, Owners owners) {
+    DiagnosticsLedger(Engine engine, Workspace workspace) {
         this.engine = engine;
-        this.owners = owners;
+        this.workspace = workspace;
     }
 
     /**
@@ -106,7 +91,7 @@ final class DiagnosticsLedger {
     }
 
     private void publish(URI uri) {
-        var entry = owners.owner(uri);
+        var entry = workspace.owner(uri);
         var last = published.get(uri);
         if( entry == null ) {
             if( last != null && !last.diagnostics().isEmpty() )
@@ -119,7 +104,7 @@ final class DiagnosticsLedger {
             return;
         var documents = engine.documents();
         var version = documents.isOpen(uri) ? entry.builtFromVersion : null;
-        var diagnostics = diagnostics(entry, owners.errorReportingMode());
+        var diagnostics = diagnostics(entry, workspace.configuration().errorReportingMode());
         if( last == null && diagnostics.isEmpty() && version == null )
             return;
         if( last != null && last.diagnostics().equals(diagnostics) && Objects.equals(last.version(), version) )

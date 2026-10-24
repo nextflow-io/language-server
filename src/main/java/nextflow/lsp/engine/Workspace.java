@@ -29,7 +29,6 @@ import java.util.TreeSet;
 import java.util.function.Predicate;
 
 import nextflow.lsp.ast.ProjectView;
-import nextflow.lsp.services.ErrorReportingMode;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.util.Logger;
 import nextflow.util.PathUtils;
@@ -57,7 +56,7 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
-public final class Workspace implements EngineState, Project.Context, Builder.Context, DiagnosticsLedger.Owners {
+public final class Workspace implements EngineState {
 
     static final int DEFAULT_MAX_SLICE_FILES = 64;
 
@@ -90,9 +89,8 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
 
     private final Builder builder;
 
-    private long inputSeq;
-
-    private long stampSeq;
+    // source of input versions and build stamps
+    private long seq;
 
     private int projectCount;
 
@@ -251,39 +249,35 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
         return false;
     }
 
-    // -- Project.Context
+    // -- services for projects and builds
 
-    @Override
-    public long nextInputVersion() {
-        return ++inputSeq;
+    /**
+     * Get the next input version or build stamp, from one sequence
+     * shared by every project.
+     */
+    long nextSeq() {
+        return ++seq;
     }
 
-    @Override
-    public List<String> excludePatterns() {
+    List<String> excludePatterns() {
         return configuration.excludePatterns();
     }
 
-    // -- Builder.Context
-
-    @Override
-    public Engine engine() {
+    Engine engine() {
         return engine;
     }
 
-    @Override
-    public PluginSpecs plugins() {
+    PluginSpecs plugins() {
         return plugins;
     }
 
-    @Override
-    public long nextStamp() {
-        return ++stampSeq;
-    }
-
-    // -- DiagnosticsLedger.Owners
-
-    @Override
-    public FileEntry owner(URI uri) {
+    /**
+     * Get the entry that publishes the diagnostics of a file, or null
+     * if no project owns it.
+     *
+     * @param uri
+     */
+    FileEntry owner(URI uri) {
         var path = Path.of(uri);
         var routed = projectFor(path);
         if( routed.isExcluded(path) && !engine.documents().isOpen(uri) )
@@ -299,11 +293,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                 return entry;
         }
         return null;
-    }
-
-    @Override
-    public ErrorReportingMode errorReportingMode() {
-        return configuration.errorReportingMode();
     }
 
     // -- lifecycle events
