@@ -120,14 +120,9 @@ public final class ManualExecutor implements SerialExecutor {
 
     /**
      * Run tasks until no task is due, without moving the clock.
-     *
-     * @return the number of tasks that were run
      */
-    public int runPending() {
-        var count = 0;
-        while( runNext() )
-            count++;
-        return count;
+    public void runPending() {
+        while( runNext() ) {}
     }
 
     /**

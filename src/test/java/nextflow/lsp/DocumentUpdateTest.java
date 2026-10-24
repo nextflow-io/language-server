@@ -120,7 +120,6 @@ class DocumentUpdateTest {
         server.open("main.nf", "workflow {\n}\n");
         server.settle();
         assertThat(codeLensCount(server, "main.nf")).isEqualTo(1);
-        assertThat(codeLensCount(server, "main.nf")).isEqualTo(1);
     }
 
 }

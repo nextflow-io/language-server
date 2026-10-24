@@ -28,7 +28,8 @@ import java.util.function.IntConsumer;
  * Deterministic engine environment: the engine runs on the test
  * thread through a {@link ManualExecutor} with a {@link FakeClock},
  * and the read pool and IO executor run tasks on the calling
- * thread. The file system is real by default.
+ * thread. The file system is real and the plugin registry is a
+ * {@link FixtureRegistry} by default.
  *
  * Must be created on the test thread.
  *
@@ -44,12 +45,11 @@ public final class TestEnvironment implements EngineEnvironment {
 
     private Executor ioExecutor = new DirectExecutorService();
 
-    // the IO executor if not set
-    private Executor fetchExecutor;
-
     private FileAccess files = FileAccess.system();
 
-    private Function<String, PluginRegistryClient> registry = (url) -> (name, version) -> new PluginRegistryClient.NotFound();
+    private final FixtureRegistry fixtures = new FixtureRegistry();
+
+    private Function<String, PluginRegistryClient> registry = (url) -> fixtures;
 
     private final List<Integer> exits = Collections.synchronizedList(new ArrayList<>());
 
@@ -60,11 +60,6 @@ public final class TestEnvironment implements EngineEnvironment {
 
     public TestEnvironment withIoExecutor(Executor ioExecutor) {
         this.ioExecutor = ioExecutor;
-        return this;
-    }
-
-    public TestEnvironment withFetchExecutor(Executor fetchExecutor) {
-        this.fetchExecutor = fetchExecutor;
         return this;
     }
 
@@ -110,7 +105,7 @@ public final class TestEnvironment implements EngineEnvironment {
 
     @Override
     public Executor fetchExecutor() {
-        return fetchExecutor != null ? fetchExecutor : ioExecutor;
+        return ioExecutor;
     }
 
     @Override

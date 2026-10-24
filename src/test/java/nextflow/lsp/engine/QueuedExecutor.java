@@ -56,17 +56,15 @@ public final class QueuedExecutor implements Executor {
     /**
      * Run the queued tasks, including tasks queued while running.
      */
-    public int runAll() {
-        var count = 0;
+    public void runAll() {
         while( true ) {
             Runnable next;
             synchronized (this) {
                 next = queue.poll();
             }
             if( next == null )
-                return count;
+                return;
             next.run();
-            count++;
         }
     }
 

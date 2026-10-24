@@ -40,6 +40,7 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.InitializedParams;
+import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.TextDocumentContentChangeEvent;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TextDocumentItem;
@@ -123,7 +124,7 @@ class WorkspaceConcurrencyTest {
         var unexpected = Collections.synchronizedList(new ArrayList<String>());
         var client = new TestLanguageClient() {
             @Override
-            public void logMessage(org.eclipse.lsp4j.MessageParams message) {
+            public void logMessage(MessageParams message) {
                 super.logMessage(message);
                 if( message.getMessage().contains("Unexpected") || message.getMessage().contains("Internal error") )
                     unexpected.add(message.getMessage());
@@ -136,7 +137,7 @@ class WorkspaceConcurrencyTest {
         try {
             var params = new InitializeParams();
             params.setCapabilities(new ClientCapabilities());
-            params.setWorkspaceFolders(List.of(new WorkspaceFolder(TestWorkspace.root().toUri().toString(), "root")));
+            params.setWorkspaceFolders(List.of(new WorkspaceFolder(f.uri(""), "root")));
             engine.submit(new Event.Init(params));
             engine.submit(new Event.Initialized(new InitializedParams()));
 
@@ -164,12 +165,12 @@ class WorkspaceConcurrencyTest {
                 // let the engine catch up now and then, so that later
                 // messages interleave with builds instead of coalescing
                 if( step % 20 == 19 ) {
-                    var mainUri = TestWorkspace.root().resolve("main.nf").toUri().toString();
+                    var mainUri = f.uri("main.nf");
                     var paced = engine.request(new RequestSpec("pace", mainUri, null, Need.FILE, false), null, (context) -> null);
                     paced.get(60, TimeUnit.SECONDS);
                 }
                 var module = "modules/mod" + random.nextInt(MODULES) + ".nf";
-                var uri = TestWorkspace.root().resolve(module).toUri().toString();
+                var uri = f.uri(module);
                 var index = Integer.parseInt(module.replaceAll("\\D", ""));
                 var text = VARIANTS.get(random.nextInt(VARIANTS.size())).formatted(index);
                 switch( random.nextInt(6) ) {

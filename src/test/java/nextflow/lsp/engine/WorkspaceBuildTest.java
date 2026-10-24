@@ -30,6 +30,7 @@ import nextflow.lsp.TestWorkspace;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.Phases;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.FileChangeType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -347,7 +348,7 @@ class WorkspaceBuildTest {
                 }
             }
             """);
-        f.notify("lib/tools.jar", org.eclipse.lsp4j.FileChangeType.Created);
+        f.notify("lib/tools.jar", FileChangeType.Created);
         f.settle();
         assertThat(f.parsesSince(before)).isEqualTo(Map.of("main.nf", 1, "other.nf", 1));
         assertThat(f.messages("main.nf")).containsExactly(UNUSED);
@@ -433,7 +434,7 @@ class WorkspaceBuildTest {
         assertThat(f.client().getLogMessages()).anyMatch(m -> m.getMessage().startsWith("Failed to read " + f.path("bad.nf")));
 
         failing[0] = false;
-        f.notify("bad.nf", org.eclipse.lsp4j.FileChangeType.Changed);
+        f.notify("bad.nf", FileChangeType.Changed);
         f.settle();
         assertThat(f.messages("bad.nf")).containsExactly(UNUSED);
         assertThat(f.messages("good.nf")).containsExactly(UNUSED);

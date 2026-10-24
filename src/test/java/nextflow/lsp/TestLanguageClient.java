@@ -37,6 +37,7 @@ import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
 import org.eclipse.lsp4j.services.LanguageClient;
 
 /**
+ * Language client that records what the server sends.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

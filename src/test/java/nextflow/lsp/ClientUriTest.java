@@ -15,6 +15,7 @@
  */
 package nextflow.lsp;
 
+import java.util.stream.Stream;
 
 import org.eclipse.lsp4j.CallHierarchyPrepareParams;
 import org.eclipse.lsp4j.CodeLensParams;
@@ -30,7 +31,8 @@ import org.eclipse.lsp4j.TextDocumentItem;
 import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,6 +60,15 @@ class ClientUriTest {
         """;
 
     /**
+     * Directories with their percent-encoded spelling in the client URI.
+     */
+    static Stream<Arguments> clientDirs() {
+        return Stream.of(
+            Arguments.of("c:", "c%3A"),
+            Arguments.of("my@pipeline (copy)", "my%40pipeline%20%28copy%29"));
+    }
+
+    /**
      * Start a server with main.nf open under the given client URI.
      */
     static TestServer start(String dir, String encodedDir) {
@@ -71,10 +82,7 @@ class ClientUriTest {
     }
 
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {
-        "c:|c%3A",
-        "my@pipeline (copy)|my%40pipeline%20%28copy%29"
-    })
+    @MethodSource("clientDirs")
     void findReferencesOfAnIncludeAlias(String dir, String encodedDir) {
         var server = start(dir, encodedDir);
         var clientUri = server.uri("") + encodedDir + "/main.nf";
@@ -88,10 +96,7 @@ class ClientUriTest {
     }
 
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {
-        "c:|c%3A",
-        "my@pipeline (copy)|my%40pipeline%20%28copy%29"
-    })
+    @MethodSource("clientDirs")
     void referToOpenDocumentsByTheirClientUri(String dir, String encodedDir) {
         var server = start(dir, encodedDir);
         var clientUri = server.uri("") + encodedDir + "/main.nf";

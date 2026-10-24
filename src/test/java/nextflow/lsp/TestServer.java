@@ -33,9 +33,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import nextflow.lsp.engine.Engine;
 import nextflow.lsp.engine.EngineHarness;
-import nextflow.lsp.engine.FixtureRegistry;
 import nextflow.lsp.engine.Need;
-import nextflow.lsp.engine.PluginRegistryClient;
 import nextflow.lsp.engine.QueuedExecutor;
 import nextflow.lsp.engine.RequestContext;
 import nextflow.lsp.engine.RequestSpec;
@@ -88,8 +86,8 @@ public final class TestServer {
         public boolean settle = true;
         /** Settings sent with didChangeConfiguration after initialized, as dotted keys. */
         public Map<String, Object> settings = Map.of();
-        public int maxSliceFiles = 64;
-        public PluginRegistryClient registry = new FixtureRegistry();
+        /** The workspace default if not set. */
+        public Integer maxSliceFiles;
         public TestEnvironment environment;
         public TestLanguageClient client = new TestLanguageClient();
 
@@ -113,11 +111,9 @@ public final class TestServer {
 
     private TestServer(Options options) {
         this.options = options;
-        var registry = options.registry;
-        this.env = options.environment != null
-            ? options.environment
-            : new TestEnvironment().withRegistry((url) -> registry);
-        this.server = new NextflowLanguageServer(env, (engine) -> workspace = (Workspace) Workspace.factory(options.maxSliceFiles).create(engine));
+        this.env = options.environment != null ? options.environment : new TestEnvironment();
+        var factory = options.maxSliceFiles != null ? Workspace.factory(options.maxSliceFiles) : Workspace.factory();
+        this.server = new NextflowLanguageServer(env, (engine) -> workspace = (Workspace) factory.create(engine));
         server.connect(options.client);
         this.harness = EngineHarness.attach(server.engine(), env, options.client);
     }
@@ -420,8 +416,8 @@ public final class TestServer {
     /**
      * Run every task that is due, without moving the clock.
      */
-    public int runPending() {
-        return harness.runPending();
+    public void runPending() {
+        harness.runPending();
     }
 
     /**
@@ -429,10 +425,6 @@ public final class TestServer {
      */
     public void advance(Duration duration) {
         harness.advance(duration);
-    }
-
-    public boolean isIdle() {
-        return server.engine().isIdle();
     }
 
     // -- diagnostics

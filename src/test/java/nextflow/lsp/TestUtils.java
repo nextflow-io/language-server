@@ -53,13 +53,6 @@ public class TestUtils {
     }
 
     /**
-     * Get the URI of the workspace root of the current test.
-     */
-    public static String workspaceRootUri() {
-        return TestWorkspace.root().toUri().toString();
-    }
-
-    /**
      * Write a file into the workspace of the current test.
      *
      * @param path

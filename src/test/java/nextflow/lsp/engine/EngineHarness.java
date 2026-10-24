@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import nextflow.lsp.TestLanguageClient;
@@ -53,21 +52,6 @@ public final class EngineHarness {
      */
     private static final int MAX_STEPS = 100_000;
 
-    public static final class Options {
-        TestEnvironment environment;
-        TestLanguageClient client = new TestLanguageClient();
-
-        public Options environment(TestEnvironment value) {
-            environment = value;
-            return this;
-        }
-
-        public Options client(TestLanguageClient value) {
-            client = value;
-            return this;
-        }
-    }
-
     private final TestEnvironment env;
 
     private final TestLanguageClient client;
@@ -75,12 +59,6 @@ public final class EngineHarness {
     private final Engine engine;
 
     private final Map<String, Integer> versions = new HashMap<>();
-
-    private EngineHarness(Options options, EngineState.Factory stateFactory) {
-        this.env = options.environment != null ? options.environment : new TestEnvironment();
-        this.client = options.client;
-        this.engine = new Engine(env, client, Engine.DEFAULT_DEBOUNCE, stateFactory);
-    }
 
     private EngineHarness(TestEnvironment env, TestLanguageClient client, Engine engine) {
         this.env = env;
@@ -101,13 +79,12 @@ public final class EngineHarness {
     }
 
     public static EngineHarness start(EngineState.Factory stateFactory) {
-        return start(stateFactory, (options) -> {});
+        return start(stateFactory, new TestEnvironment());
     }
 
-    public static EngineHarness start(EngineState.Factory stateFactory, Consumer<Options> configure) {
-        var options = new Options();
-        configure.accept(options);
-        return new EngineHarness(options, stateFactory);
+    public static EngineHarness start(EngineState.Factory stateFactory, TestEnvironment env) {
+        var client = new TestLanguageClient();
+        return new EngineHarness(env, client, new Engine(env, client, Engine.DEFAULT_DEBOUNCE, stateFactory));
     }
 
     public Engine engine() {
@@ -202,7 +179,7 @@ public final class EngineHarness {
      *
      * @param future
      */
-    public void runUntil(CompletableFuture<?> future) {
+    private void runUntil(CompletableFuture<?> future) {
         var executor = env.manualExecutor();
         for( int i = 0; i < MAX_STEPS; i++ ) {
             executor.runPending();
@@ -219,8 +196,8 @@ public final class EngineHarness {
     /**
      * Run every task that is due, without moving the clock.
      */
-    public int runPending() {
-        return env.manualExecutor().runPending();
+    public void runPending() {
+        env.manualExecutor().runPending();
     }
 
     /**

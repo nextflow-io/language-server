@@ -24,6 +24,7 @@ import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.engine.FixtureRegistry;
 import nextflow.lsp.engine.PluginRegistryClient;
+import nextflow.lsp.engine.TestEnvironment;
 import nextflow.lsp.spec.PluginSpec;
 import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.Position;
@@ -87,10 +88,10 @@ class ConfigHoverTest {
             List.of(), List.of(), List.of()
         );
         var registry = new FixtureRegistry();
-        var server = TestServer.start((o) -> o.registry = (name, version) ->
+        var server = TestServer.start((o) -> o.environment = new TestEnvironment().withRegistry((url) -> (name, version) ->
             "nf-prov".equals(name) && "1.6.0".equals(version)
                 ? new PluginRegistryClient.Found(provSpec)
-                : registry.fetch(name, version));
+                : registry.fetch(name, version)));
 
         server.open("nextflow.config", """
             plugins {

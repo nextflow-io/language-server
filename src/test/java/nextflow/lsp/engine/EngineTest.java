@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import nextflow.lsp.TestWorkspace;
@@ -53,11 +52,11 @@ class EngineTest {
     private EngineHarness harness;
 
     private EngineHarness start() {
-        return start((options) -> {});
+        return start(new TestEnvironment());
     }
 
-    private EngineHarness start(Consumer<EngineHarness.Options> configure) {
-        harness = EngineHarness.start((engine) -> state = new FakeState(engine), configure);
+    private EngineHarness start(TestEnvironment env) {
+        harness = EngineHarness.start((engine) -> state = new FakeState(engine), env);
         return harness;
     }
 
@@ -593,7 +592,7 @@ class EngineTest {
     @Test
     void deliverIoResultAsEvent() {
         var io = new ArrayList<Runnable>();
-        var h = start((options) -> options.environment(new TestEnvironment().withIoExecutor(io::add)));
+        var h = start(new TestEnvironment().withIoExecutor(io::add));
         assertThat(h.engine().isIdle()).isTrue();
 
         h.engine().submitIo("walk", () -> new Event.Initialized(new InitializedParams()));
@@ -632,19 +631,6 @@ class EngineTest {
         var h = start();
         assertThat(thrownOnAnotherThread(() -> h.engine().checkEngineThread())).isInstanceOf(IllegalStateException.class);
         h.engine().checkEngineThread();
-    }
-
-    @Test
-    void callRunsEngineUntilRequestCompletes() {
-        var h = start();
-        state.satisfied = false;
-        state.pendingSlices = 2;
-        h.open("main.nf", "a");
-
-        assertThat(h.call(spec("references", Need.PROJECT), "empty", body("references", "refs"))).isEqualTo("refs");
-        assertThatThrownBy(() -> h.call(spec("hover", Need.FILE), null, (ctx) -> {
-            throw new IllegalStateException("boom");
-        })).isInstanceOf(IllegalStateException.class);
     }
 
 }

@@ -16,7 +16,6 @@
 package nextflow.lsp;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
 import java.nio.file.Path;
@@ -24,11 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
-import com.sun.net.httpserver.HttpServer;
 import nextflow.lsp.engine.DefaultEngineEnvironment;
 import nextflow.lsp.engine.ForwardingFileAccess;
 import nextflow.lsp.engine.Workspace;
@@ -99,61 +96,14 @@ class LanguageServerWiringTest {
     }
 
     /**
-     * Plugin registry that holds the body of every response until it
-     * is released. The HTTP client has no timeout for the body.
-     */
-    static final class BlockingRegistry implements AutoCloseable {
-
-        final CountDownLatch entered = new CountDownLatch(1);
-
-        final CountDownLatch released = new CountDownLatch(1);
-
-        private final HttpServer server;
-
-        BlockingRegistry() throws IOException {
-            server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-            server.createContext("/", (exchange) -> {
-                exchange.sendResponseHeaders(200, 0);
-                exchange.getResponseBody().flush();
-                entered.countDown();
-                try {
-                    released.await();
-                }
-                catch( InterruptedException e ) {
-                    Thread.currentThread().interrupt();
-                }
-                exchange.getResponseBody().write("{}".getBytes());
-                exchange.close();
-            });
-            server.setExecutor(Executors.newCachedThreadPool());
-            server.start();
-        }
-
-        String url() {
-            return "http://127.0.0.1:" + server.getAddress().getPort() + "/api/";
-        }
-
-        @Override
-        public void close() {
-            released.countDown();
-            server.stop(0);
-        }
-    }
-
-    /**
-     * The old core blocked the reader thread in the handlers that
-     * re-initialize the services (configuration and folder changes),
-     * whenever an update held the service lock, for example while it
-     * fetched a plugin spec. The reader then couldn't process
-     * `$/cancelRequest` or any later message.
+     * The reader thread should handle configuration and folder changes
+     * and answer `$/cancelRequest` while the engine is blocked.
      */
     @Test
     void answerCancelRequestWhileTheEngineIsBlocked() throws Exception {
         var root = TestWorkspace.root();
         TestUtils.writeWorkspaceFile("slow.nf", "workflow SLOW {}\n");
         TestUtils.writeWorkspaceFile("other/main.nf", "workflow OTHER {}\n");
-        var config = "plugins { id 'nf-blocked@1.0.0' }\n";
-        TestUtils.writeWorkspaceFile("nextflow.config", config);
         var files = new BlockingFileAccess((path) -> path.endsWith("slow.nf"));
         var cancelled = new CompletableFuture<ResponseMessage>();
 
@@ -181,21 +131,18 @@ class LanguageServerWiringTest {
         clientLauncher.startListening();
         var remote = clientLauncher.getRemoteProxy();
 
-        try( var registry = new BlockingRegistry() ) {
+        try {
             var init = new InitializeParams();
             init.setWorkspaceFolders(List.of(new WorkspaceFolder(root.toUri().toString(), "root")));
             remote.initialize(init).get(30, TimeUnit.SECONDS);
             remote.initialized(new InitializedParams());
             var workspace = remote.getWorkspaceService();
-            workspace.didChangeConfiguration(TestServer.configuration(Map.of("nextflow.pluginRegistryUrl", registry.url())));
             var documents = remote.getTextDocumentService();
-            var configUri = root.resolve("nextflow.config").toUri().toString();
-            documents.didOpen(new DidOpenTextDocumentParams(new TextDocumentItem(configUri, "nextflow-config", 1, config)));
 
             // the index build blocks the engine while it reads slow.nf
             assertThat(files.entered.await(30, TimeUnit.SECONDS)).isTrue();
 
-            // the messages that re-initialized the old services
+            // configuration and folder changes are handled without waiting for the engine
             workspace.didChangeConfiguration(TestServer.configuration(Map.of("nextflow.files.exclude", List.of("tests"))));
             var other = new WorkspaceFolder(root.resolve("other").toUri().toString(), "other");
             workspace.didChangeWorkspaceFolders(new DidChangeWorkspaceFoldersParams(new WorkspaceFoldersChangeEvent(List.of(other), List.of())));

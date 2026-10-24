@@ -54,7 +54,7 @@ class PreviewDagTest {
     Stream<DynamicTest> previewDagGoldenFiles() {
         var server = TestServer.start();
         var uri = getUri("main.nf");
-        var rootUri = workspaceRootUri();
+        var rootUri = getUri("");
 
         return Golden.inputs("dag", ".nf").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
             server.openVerbatim("main.nf", Golden.read(input));

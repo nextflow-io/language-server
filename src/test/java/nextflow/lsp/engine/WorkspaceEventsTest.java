@@ -26,6 +26,7 @@ import java.util.Map;
 import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.ast.ProjectView;
+import nextflow.lsp.services.ErrorReportingMode;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.FileChangeType;
 import org.eclipse.lsp4j.InitializedParams;
@@ -348,7 +349,7 @@ class WorkspaceEventsTest {
             "nextflow.dag.direction", "LR"));
         f.settle();
         var configuration = f.workspace().configuration();
-        assertThat(configuration.errorReportingMode()).isEqualTo(nextflow.lsp.services.ErrorReportingMode.WARNINGS);
+        assertThat(configuration.errorReportingMode()).isEqualTo(ErrorReportingMode.WARNINGS);
         assertThat(configuration.maxCompletionItems()).isEqualTo(100);
         assertThat(configuration.dagDirection()).isEqualTo("LR");
         assertThat(f.client().getLogMessages())
