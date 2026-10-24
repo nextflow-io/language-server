@@ -32,6 +32,7 @@ import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.eclipse.lsp4j.RegistrationParams;
 import org.eclipse.lsp4j.ShowMessageRequestParams;
+import org.eclipse.lsp4j.WorkDoneProgressEnd;
 import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
 import org.eclipse.lsp4j.services.LanguageClient;
 
@@ -54,6 +55,8 @@ public class TestLanguageClient implements LanguageClient {
     private final Map<String,CompletableFuture<Void>> heldProgressCreates = Collections.synchronizedMap(new LinkedHashMap<>());
 
     private volatile boolean holdProgressCreate;
+
+    private volatile Runnable onProgressEnd = () -> {};
 
     @Override
     public void telemetryEvent(Object object) {
@@ -141,6 +144,18 @@ public class TestLanguageClient implements LanguageClient {
     @Override
     public void notifyProgress(ProgressParams params) {
         progress.add(params);
+        if( params.getValue().getLeft() instanceof WorkDoneProgressEnd )
+            onProgressEnd.run();
+    }
+
+    /**
+     * Run an action whenever the server ends a progress, after the
+     * end is recorded.
+     *
+     * @param action
+     */
+    public void onProgressEnd(Runnable action) {
+        onProgressEnd = action;
     }
 
     /**

@@ -31,7 +31,7 @@ import java.util.function.Predicate;
 import com.sun.net.httpserver.HttpServer;
 import nextflow.lsp.engine.DefaultEngineEnvironment;
 import nextflow.lsp.engine.Engine;
-import nextflow.lsp.engine.FileAccess;
+import nextflow.lsp.engine.ForwardingFileAccess;
 import nextflow.lsp.engine.Workspace;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams;
@@ -71,7 +71,7 @@ class LanguageServerWiringTest {
     /**
      * File access that blocks reading one file until it is released.
      */
-    static final class BlockingFileAccess implements FileAccess {
+    static final class BlockingFileAccess extends ForwardingFileAccess {
 
         final CountDownLatch entered = new CountDownLatch(1);
 
@@ -95,17 +95,7 @@ class LanguageServerWiringTest {
                     throw new IOException(e);
                 }
             }
-            return FileAccess.system().readText(path);
-        }
-
-        @Override
-        public boolean exists(Path path) {
-            return FileAccess.system().exists(path);
-        }
-
-        @Override
-        public List<Path> walk(Path root, Predicate<Path> excluded, Predicate<Path> matcher) throws IOException {
-            return FileAccess.system().walk(root, excluded, matcher);
+            return super.readText(path);
         }
     }
 

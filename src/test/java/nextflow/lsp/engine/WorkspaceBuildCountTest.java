@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Predicate;
 
 import nextflow.lsp.TestServer;
 import nextflow.lsp.TestUtils;
@@ -118,23 +117,13 @@ class WorkspaceBuildCountTest {
     @Test
     void stopBuildingBetweenSlicesWhenRequestIsCancelled() {
         var cancelOnRead = new AtomicReference<CompletableFuture<?>>();
-        var files = new FileAccess() {
+        var files = new ForwardingFileAccess() {
             @Override
             public String readText(Path path) throws IOException {
                 var request = cancelOnRead.getAndSet(null);
                 if( request != null )
                     request.cancel(true);
-                return FileAccess.system().readText(path);
-            }
-
-            @Override
-            public boolean exists(Path path) {
-                return FileAccess.system().exists(path);
-            }
-
-            @Override
-            public List<Path> walk(Path root, Predicate<Path> excluded, Predicate<Path> matcher) throws IOException {
-                return FileAccess.system().walk(root, excluded, matcher);
+                return super.readText(path);
             }
         };
         try( var f = TestServer.start((o) -> {

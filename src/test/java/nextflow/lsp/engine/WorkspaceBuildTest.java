@@ -633,7 +633,7 @@ class WorkspaceBuildTest {
     /**
      * File access that fails to read some files.
      */
-    static final class FailingFileAccess implements FileAccess {
+    static final class FailingFileAccess extends ForwardingFileAccess {
 
         private final Predicate<Path> failing;
 
@@ -651,17 +651,7 @@ class WorkspaceBuildTest {
                     throw new IllegalStateException("injected failure");
                 throw new IOException("injected failure");
             }
-            return FileAccess.system().readText(path);
-        }
-
-        @Override
-        public boolean exists(Path path) {
-            return FileAccess.system().exists(path);
-        }
-
-        @Override
-        public List<Path> walk(Path root, Predicate<Path> excluded, Predicate<Path> matcher) throws IOException {
-            return FileAccess.system().walk(root, excluded, matcher);
+            return super.readText(path);
         }
     }
 

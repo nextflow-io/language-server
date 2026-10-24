@@ -22,7 +22,6 @@ import nextflow.lsp.engine.TestEnvironment;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.HoverParams;
-import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.ReferenceContext;
 import org.eclipse.lsp4j.ReferenceParams;
@@ -83,7 +82,7 @@ class NextflowLanguageServerTest {
         try( var server = TestServer.start((o) -> o.initialized = false) ) {
             server.write("main.nf", INVALID_SCRIPT);
             server.write("work/ab/cdef/main.nf", INVALID_SCRIPT);
-            server.server().initialized(new InitializedParams());
+            server.initialized();
             server.open("main.nf", INVALID_SCRIPT);
             server.settle();
             assertThat(server.diagnostics("main.nf")).isNotEmpty();
@@ -142,7 +141,7 @@ class NextflowLanguageServerTest {
             o.initialized = false;
         }) ) {
             server.write("main.nf", INVALID_SCRIPT);
-            server.server().initialized(new InitializedParams());
+            server.initialized();
             server.settle();
             assertThat(server.client().getProgress().isEmpty()).isNotEqualTo(supported);
         }

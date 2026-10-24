@@ -82,20 +82,15 @@ class WorkspaceIndexTest {
     @Test
     void endProgressOnlyWhenEveryProjectIsIndexed() {
         var publishedAtEnd = new ArrayList<String>();
-        var client = new TestLanguageClient() {
-            @Override
-            public void notifyProgress(ProgressParams params) {
-                super.notifyProgress(params);
-                if( params.getValue().getLeft() instanceof WorkDoneProgressEnd ) {
-                    synchronized (getPublishLog()) {
-                        for( var publish : getPublishLog() ) {
-                            if( !publish.getDiagnostics().isEmpty() )
-                                publishedAtEnd.add(publish.getUri());
-                        }
-                    }
+        var client = new TestLanguageClient();
+        client.onProgressEnd(() -> {
+            synchronized (client.getPublishLog()) {
+                for( var publish : client.getPublishLog() ) {
+                    if( !publish.getDiagnostics().isEmpty() )
+                        publishedAtEnd.add(publish.getUri());
                 }
             }
-        };
+        });
         try( var f = TestServer.start((o) -> {
             o.client = client;
             o.progress = true;
@@ -350,7 +345,7 @@ class WorkspaceIndexTest {
      * File access whose walk omits some files, as if the listing was
      * taken before they were created.
      */
-    static final class LaggingWalk implements FileAccess {
+    static final class LaggingWalk extends ForwardingFileAccess {
 
         private final Predicate<Path> omitted;
 
@@ -359,18 +354,8 @@ class WorkspaceIndexTest {
         }
 
         @Override
-        public String readText(Path path) throws IOException {
-            return FileAccess.system().readText(path);
-        }
-
-        @Override
-        public boolean exists(Path path) {
-            return FileAccess.system().exists(path);
-        }
-
-        @Override
         public List<Path> walk(Path root, Predicate<Path> excluded, Predicate<Path> matcher) throws IOException {
-            var result = new ArrayList<>(FileAccess.system().walk(root, excluded, matcher));
+            var result = new ArrayList<>(super.walk(root, excluded, matcher));
             result.removeIf(omitted);
             return result;
         }
@@ -402,17 +387,7 @@ class WorkspaceIndexTest {
 
     @Test
     void reportWalkThatThrowsRuntimeExceptionAsFailedWalk() {
-        var env = new TestEnvironment().withFiles(new FileAccess() {
-            @Override
-            public String readText(Path path) throws IOException {
-                return FileAccess.system().readText(path);
-            }
-
-            @Override
-            public boolean exists(Path path) {
-                return FileAccess.system().exists(path);
-            }
-
+        var env = new TestEnvironment().withFiles(new ForwardingFileAccess() {
             @Override
             public List<Path> walk(Path root, Predicate<Path> excluded, Predicate<Path> matcher) {
                 throw new UncheckedIOException(new IOException("stale file handle"));

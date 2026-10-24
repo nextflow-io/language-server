@@ -19,11 +19,9 @@ import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
@@ -37,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import static nextflow.lsp.TestUtils.UNUSED;
+import static nextflow.lsp.TestUtils.thrownOnAnotherThread;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -55,24 +54,12 @@ class WorkspaceEventsTest {
         try( var f = TestServer.start() ) {
             var workspace = f.workspace();
             var spec = new RequestSpec("test", f.uri("main.nf"), null, Need.FILE, false);
-            var errors = new ArrayList<Throwable>();
-            var thread = new Thread(() -> {
-                for( Runnable access : List.<Runnable>of(
-                    () -> workspace.apply(new Event.Initialized(new InitializedParams())),
-                    () -> workspace.route(spec),
-                    () -> workspace.runSlice()
-                ) ) {
-                    try {
-                        access.run();
-                    }
-                    catch( Throwable e ) {
-                        errors.add(e);
-                    }
-                }
-            });
-            thread.start();
-            thread.join();
-            assertThat(errors).hasSize(3).allMatch(e -> e instanceof IllegalStateException);
+            for( Runnable access : List.<Runnable>of(
+                () -> workspace.apply(new Event.Initialized(new InitializedParams())),
+                () -> workspace.route(spec),
+                () -> workspace.runSlice()
+            ) )
+                assertThat(thrownOnAnotherThread(access)).isInstanceOf(IllegalStateException.class);
         }
     }
 
@@ -641,18 +628,7 @@ class WorkspaceEventsTest {
     void rejectProjectAccessOutsideTheEngineThread() throws Exception {
         try( var f = TestServer.start() ) {
             var view = f.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
-            var error = new AtomicReference<Throwable>();
-            var thread = new Thread(() -> {
-                try {
-                    view.name();
-                }
-                catch( Throwable e ) {
-                    error.set(e);
-                }
-            });
-            thread.start();
-            thread.join();
-            assertThat(error.get()).isInstanceOf(IllegalStateException.class);
+            assertThat(thrownOnAnotherThread(view::name)).isInstanceOf(IllegalStateException.class);
         }
     }
 

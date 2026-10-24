@@ -21,7 +21,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
@@ -32,6 +31,7 @@ import org.codehaus.groovy.ast.ASTNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import static nextflow.lsp.TestUtils.thrownOnAnotherThread;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -178,22 +178,8 @@ class ProjectViewTest {
             f.settle();
             var view = f.call(Need.FILE, "main.nf", (ScriptView) null, (context) -> context.project().scriptView());
             var project = f.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
-            var errors = new ArrayList<Throwable>();
-            for( Runnable access : List.<Runnable>of(view::getUris, view::getNodes, () -> view.getURI(null), project::scriptView) ) {
-                var error = new AtomicReference<Throwable>();
-                var thread = new Thread(() -> {
-                    try {
-                        access.run();
-                    }
-                    catch( Throwable e ) {
-                        error.set(e);
-                    }
-                });
-                thread.start();
-                thread.join();
-                errors.add(error.get());
-            }
-            assertThat(errors).allMatch(e -> e instanceof IllegalStateException);
+            for( Runnable access : List.<Runnable>of(view::getUris, view::getNodes, () -> view.getURI(null), project::scriptView) )
+                assertThat(thrownOnAnotherThread(access)).isInstanceOf(IllegalStateException.class);
         }
     }
 

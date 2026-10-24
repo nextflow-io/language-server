@@ -36,6 +36,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import static nextflow.lsp.TestUtils.thrownOnAnotherThread;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -636,13 +637,7 @@ class EngineTest {
     @Test
     void rejectEngineStateAccessFromOtherThreads() throws Exception {
         var h = start();
-        var thread = new Thread(() -> h.engine().checkEngineThread());
-        var errors = new ArrayList<Throwable>();
-        thread.setUncaughtExceptionHandler((t, e) -> errors.add(e));
-        thread.start();
-        thread.join();
-
-        assertThat(errors).singleElement().isInstanceOf(IllegalStateException.class);
+        assertThat(thrownOnAnotherThread(() -> h.engine().checkEngineThread())).isInstanceOf(IllegalStateException.class);
         h.engine().checkEngineThread();
     }
 

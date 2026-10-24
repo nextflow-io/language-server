@@ -16,7 +16,6 @@
 package nextflow.lsp.engine;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
@@ -30,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import static nextflow.lsp.TestUtils.thrownOnAnotherThread;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -248,13 +248,7 @@ class DocumentStoreTest {
 
     @Test
     void rejectAccessFromOtherThreads() throws InterruptedException {
-        var errors = new ArrayList<Throwable>();
-        var thread = new Thread(() -> store.get(CANONICAL));
-        thread.setUncaughtExceptionHandler((t, e) -> errors.add(e));
-        thread.start();
-        thread.join();
-
-        assertThat(errors).singleElement().isInstanceOf(IllegalStateException.class);
+        assertThat(thrownOnAnotherThread(() -> store.get(CANONICAL))).isInstanceOf(IllegalStateException.class);
     }
 
 }

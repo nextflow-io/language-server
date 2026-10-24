@@ -20,6 +20,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import nextflow.script.formatter.FormattingOptions;
 import org.eclipse.lsp4j.DocumentFormattingParams;
@@ -36,6 +37,20 @@ import org.eclipse.lsp4j.TextEdit;
 public class TestUtils {
 
     public static final String UNUSED = "Variable was declared but not used";
+
+    /**
+     * Run an action on a new thread, and get what it threw, if anything.
+     *
+     * @param action
+     */
+    public static Throwable thrownOnAnotherThread(Runnable action) throws InterruptedException {
+        var error = new AtomicReference<Throwable>();
+        var thread = new Thread(action);
+        thread.setUncaughtExceptionHandler((t, e) -> error.set(e));
+        thread.start();
+        thread.join();
+        return error.get();
+    }
 
     /**
      * Get the URI of the workspace root of the current test.

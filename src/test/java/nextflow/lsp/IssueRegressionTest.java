@@ -19,13 +19,10 @@ import java.util.ArrayList;
 
 import nextflow.lsp.engine.QueuedExecutor;
 import nextflow.lsp.engine.TestEnvironment;
-import org.eclipse.lsp4j.InitializedParams;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.ProgressParams;
 import org.eclipse.lsp4j.ReferenceContext;
 import org.eclipse.lsp4j.ReferenceParams;
-import org.eclipse.lsp4j.WorkDoneProgressEnd;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -49,14 +46,8 @@ class IssueRegressionTest {
     void crossFileRequestAfterOpenGetsFullResults() {
         var io = new QueuedExecutor();
         var ended = new ArrayList<Boolean>();
-        var client = new TestLanguageClient() {
-            @Override
-            public void notifyProgress(ProgressParams params) {
-                super.notifyProgress(params);
-                if( params.getValue().getLeft() instanceof WorkDoneProgressEnd )
-                    ended.add(true);
-            }
-        };
+        var client = new TestLanguageClient();
+        client.onProgressEnd(() -> ended.add(true));
         try( var server = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withIoExecutor(io);
             o.client = client;
@@ -72,7 +63,7 @@ class IssueRegressionTest {
                     GREET()
                 }
                 """);
-            server.server().initialized(new InitializedParams());
+            server.initialized();
             server.runPending();
 
             server.open("modules/greet/main.nf", module);
