@@ -268,12 +268,13 @@ class EngineTest {
         h.runPending();
         assertThat(state.slices).isZero();
 
-        h.advance(Duration.ofMillis(300));
+        // each edit restarts the debounce
+        h.advance(Engine.DEFAULT_DEBOUNCE.minusMillis(1));
         h.change("main.nf", "b");
-        h.advance(Duration.ofMillis(300));
+        h.advance(Engine.DEFAULT_DEBOUNCE.minusMillis(1));
         assertThat(state.slices).isZero();
 
-        h.advance(Duration.ofMillis(200));
+        h.advance(Duration.ofMillis(1));
         assertThat(state.slices).isEqualTo(1);
         assertThat(h.engine().isIdle()).isTrue();
     }

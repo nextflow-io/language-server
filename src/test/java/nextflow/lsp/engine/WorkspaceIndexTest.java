@@ -303,9 +303,9 @@ class WorkspaceIndexTest {
 
             f.change("main.nf", "workflow { def x = 1 }\n");
             f.runPending();
-            f.advance(Duration.ofMillis(400));
+            f.advance(Engine.DEFAULT_DEBOUNCE.minusMillis(1));
             assertThat(f.client().getPublishLog()).hasSize(publishes);
-            f.advance(Duration.ofMillis(100));
+            f.advance(Duration.ofMillis(1));
             assertThat(f.messages("main.nf")).containsExactly(UNUSED);
         }
     }

@@ -146,7 +146,7 @@ class WorkspacePluginTest {
             // rebuilding within the retry interval doesn't fetch again
             f.change("nextflow.config", SCHEMA_CONFIG + "// edit 1\n");
             f.settle();
-            f.advance(Duration.ofMinutes(4));
+            f.advance(PluginSpecs.RETRY_INTERVAL.minusMinutes(1));
             f.change("nextflow.config", SCHEMA_CONFIG + "// edit 2\n");
             f.settle();
             assertThat(registry.fetches).hasSize(1);
@@ -170,7 +170,7 @@ class WorkspacePluginTest {
             f.write("main.nf", SCRIPT);
             f.settle();
             registry.overrides.clear();
-            f.advance(Duration.ofMinutes(4));
+            f.advance(PluginSpecs.RETRY_INTERVAL.minusMinutes(1));
             f.call(Need.FILE, "main.nf", null, (context) -> null);
             f.settle();
             assertThat(registry.fetches).hasSize(1);
@@ -194,7 +194,7 @@ class WorkspacePluginTest {
             f.write("main.nf", SCRIPT);
             f.settle();
             registry.overrides.clear();
-            f.advance(Duration.ofMinutes(5));
+            f.advance(PluginSpecs.RETRY_INTERVAL);
             f.open("other.nf", "workflow {}\n");
             f.settle();
             assertThat(registry.fetches).hasSize(2);
