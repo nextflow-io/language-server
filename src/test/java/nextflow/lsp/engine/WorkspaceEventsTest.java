@@ -27,6 +27,7 @@ import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.ast.ProjectView;
 import nextflow.lsp.services.ErrorReportingMode;
+import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.FileChangeType;
 import org.eclipse.lsp4j.InitializedParams;
@@ -575,6 +576,66 @@ class WorkspaceEventsTest {
         assertThat(f.messages("modules/sub/b.nf")).isEmpty();
         assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
         assertThat(f.parses()).containsOnlyKeys("main.nf");
+    }
+
+    private static final Map<String, Object> EXCLUDE_VENDOR = Map.of("nextflow.files.exclude", List.of("vendor"));
+
+    private static final String INCLUDE_VENDOR = """
+        include { V } from './vendor/v.nf'
+        workflow {
+            V()
+        }
+        """;
+
+    private static Map<String, List<Diagnostic>> freshDiagnostics(Map<String, Object> settings) {
+        var fresh = TestServer.start((o) -> {
+            o.settings = settings;
+            o.settle = false;
+        });
+        fresh.settle();
+        return fresh.client().getNonEmptyDiagnostics();
+    }
+
+    @Test
+    void invalidateTheIncludersOfADeletedExcludedDirectory() throws IOException {
+        var f = TestServer.start((o) -> {
+            o.watchers = true;
+            o.settings = EXCLUDE_VENDOR;
+            o.settle = false;
+        });
+        f.write("vendor/v.nf", "workflow V {}\n");
+        f.write("main.nf", INCLUDE_VENDOR);
+        f.settle();
+        assertThat(f.messages("main.nf")).isEmpty();
+
+        // the client reports only the directory
+        Files.delete(f.path("vendor/v.nf"));
+        Files.delete(f.path("vendor"));
+        f.notify("vendor", FileChangeType.Deleted);
+        f.settle();
+        assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
+        assertThat(f.client().getNonEmptyDiagnostics())
+            .isEqualTo(freshDiagnostics(EXCLUDE_VENDOR));
+    }
+
+    @Test
+    void invalidateTheIncludersOfACreatedExcludedDirectory() {
+        var f = TestServer.start((o) -> {
+            o.watchers = true;
+            o.settings = EXCLUDE_VENDOR;
+            o.settle = false;
+        });
+        f.write("main.nf", INCLUDE_VENDOR);
+        f.settle();
+        assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
+
+        // the client reports only the directory
+        f.write("vendor/v.nf", "workflow V {}\n");
+        f.notify("vendor", FileChangeType.Created);
+        f.settle();
+        assertThat(f.messages("main.nf")).isEmpty();
+        assertThat(f.client().getNonEmptyDiagnostics())
+            .isEqualTo(freshDiagnostics(EXCLUDE_VENDOR));
     }
 
     /**

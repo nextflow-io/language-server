@@ -678,13 +678,18 @@ public final class Workspace implements EngineState {
      * new location if the directory was moved. The files under a
      * created directory are discovered with a walk.
      *
+     * An excluded directory is not walked, but the files that include
+     * from it are bumped, since their includes may now resolve
+     * differently.
+     *
      * @param path
      * @param type
      */
     private void directoryChanged(Path path, FileChangeType type) {
         var project = projectFor(path);
-        if( project.isExcluded(path) )
-            return;
+        var excluded = project.isExcluded(path);
+        if( excluded )
+            bumpWhere(entry -> entry.depStamps.keySet().stream().anyMatch(dep -> Path.of(dep).startsWith(path)));
         var documents = engine.documents();
         if( type == FileChangeType.Deleted ) {
             var rewalk = new ArrayList<Project>();
@@ -694,21 +699,21 @@ public final class Workspace implements EngineState {
                         continue;
                     if( !documents.isOpen(entry.uri) )
                         other.bumpText(entry);
-                    if( !other.isDefault() && other.index != Project.IndexStatus.NOT_STARTED && !rewalk.contains(other) )
+                    if( !excluded && !other.isDefault() && other.index != Project.IndexStatus.NOT_STARTED && !rewalk.contains(other) )
                         rewalk.add(other);
                 }
             }
             rewalk.forEach(this::startWalk);
             return;
         }
-        if( type != FileChangeType.Created || project.isDefault() )
+        if( type != FileChangeType.Created || project.isDefault() || excluded )
             return;
-        var excluded = walkExclusions(project);
+        var exclusions = walkExclusions(project);
         var files = engine.environment().files();
         engine.submitIo("walk " + path, () -> {
             List<Path> result;
             try {
-                result = files.walk(path, excluded, FileKind::isManaged);
+                result = files.walk(path, exclusions, FileKind::isManaged);
             }
             catch( IOException e ) {
                 // not a directory, or deleted since
