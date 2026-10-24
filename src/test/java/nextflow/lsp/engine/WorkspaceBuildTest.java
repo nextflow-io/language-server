@@ -388,6 +388,21 @@ class WorkspaceBuildTest {
     }
 
     @Test
+    void rebuildOnlyTheScriptsNextToAChangedParameterSchema() {
+        try( var f = start() ) {
+            f.write("main.nf", "workflow { println(params.foo) }\n");
+            f.write("sub/main.nf", "workflow { println(params.foo) }\n");
+            f.write("sub/nextflow.config", "process.cpus = 2\n");
+            f.settle();
+            var before = f.parses();
+
+            f.writeAndNotify("sub/nextflow_schema.json", "{}\n");
+            f.settle();
+            assertThat(f.parsesSince(before)).isEqualTo(Map.of("sub/main.nf", 1));
+        }
+    }
+
+    @Test
     void containReadFailureToOneFileAndRetryOnNextEvent() {
         var failing = new boolean[] { true };
         var files = new FailingFileAccess((path) -> failing[0] && path.endsWith("bad.nf"), false);

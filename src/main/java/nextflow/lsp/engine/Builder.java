@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,7 +30,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -91,7 +91,6 @@ final class Builder {
         Engine engine();
         PluginSpecs plugins();
         long nextStamp();
-        long extStamp(Project project, ExtKey key);
     }
 
     /**
@@ -151,7 +150,7 @@ final class Builder {
             entry.internalError = error;
             project.graph.setEdges(entry.uri, entry.depStamps.keySet(), List.of());
             entry.depStamps = Map.of();
-            entry.extKeys = Map.of();
+            entry.pluginLookups = Set.of();
             entry.stamp = context.nextStamp();
             entry.builtInputVersion = entry.inputVersion;
             project.built(entry);
@@ -175,7 +174,7 @@ final class Builder {
         final Set<URI> candidates = new TreeSet<>();
         // the candidates that exist, which are built first
         final Set<URI> targets = new TreeSet<>();
-        final Map<ExtKey, Long> extKeys = new LinkedHashMap<>();
+        final Set<PluginRef> pluginLookups = new LinkedHashSet<>();
         final List<PluginRef> pluginRefs = new ArrayList<>();
         boolean hasPluginInclude;
         // dependencies of the previous build
@@ -360,8 +359,8 @@ final class Builder {
         private record Read(String text, boolean sameTargets) {}
 
         /**
-         * Whether every dependency and external input of an entry is
-         * unchanged since its last build.
+         * Whether every dependency of an entry is unchanged since its
+         * last build.
          */
         private boolean isOtherwiseFresh(FileEntry entry) {
             for( var dep : entry.depStamps.entrySet() ) {
@@ -369,10 +368,6 @@ final class Builder {
                     return false;
                 var target = project.entry(dep.getKey());
                 if( target != null && !project.isFresh(target) )
-                    return false;
-            }
-            for( var ext : entry.extKeys.entrySet() ) {
-                if( context.extStamp(project, ext.getKey()) != ext.getValue() )
                     return false;
             }
             return true;
@@ -672,7 +667,7 @@ final class Builder {
                 @Override
                 public PluginSpec get(PluginRef ref) {
                     var lookup = context.plugins().lookup(ref);
-                    parsed.extKeys.put(new ExtKey.Plugin(ref), 0L);
+                    parsed.pluginLookups.add(ref);
                     return lookup.spec().orElse(null);
                 }
 
@@ -715,7 +710,7 @@ final class Builder {
                     if( ref == null )
                         return null;
                     var lookup = context.plugins().lookup(ref);
-                    parsed.extKeys.put(new ExtKey.Plugin(ref), 0L);
+                    parsed.pluginLookups.add(ref);
                     return lookup;
                 }
             }).visit();
@@ -743,8 +738,6 @@ final class Builder {
 
         private void resolveNames(Parsed parsed) {
             var unit = parsed.unit;
-            parsed.extKeys.put(new ExtKey.Lib(project.id), 0L);
-            parsed.extKeys.put(new ExtKey.Schema(parsed.entry.path.getParent()), 0L);
             try {
                 new ScriptResolveVisitor(unit, project.scriptCompiler.compilationUnit(), Types.DEFAULT_SCRIPT_IMPORTS, List.of()).visit();
             }
@@ -859,16 +852,13 @@ final class Builder {
                 var depStamps = new TreeMap<URI, Long>();
                 for( var candidate : parsed.candidates )
                     depStamps.put(candidate, project.stampOf(candidate));
-                var extKeys = new LinkedHashMap<ExtKey, Long>();
-                for( var key : parsed.extKeys.keySet() )
-                    extKeys.put(key, context.extStamp(project, key));
                 project.graph.setEdges(entry.uri, entry.depStamps.keySet(), depStamps.keySet());
                 entry.depStamps = depStamps;
-                entry.extKeys = extKeys;
                 entry.builtInputVersion = parsed.inputVersion;
                 entry.builtFromVersion = parsed.documentVersion;
                 entry.otherInputChanged = false;
                 entry.pluginRefs = List.copyOf(parsed.pluginRefs);
+                entry.pluginLookups = Set.copyOf(parsed.pluginLookups);
                 project.built(entry);
                 for( var dependent : project.graph.dependents(entry.uri) ) {
                     if( !batch.containsKey(dependent) )

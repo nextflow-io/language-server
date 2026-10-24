@@ -19,6 +19,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import nextflow.lsp.spec.PluginRef;
 import org.codehaus.groovy.ast.ASTNode;
@@ -70,8 +71,6 @@ public final class FileEntry {
     // with the stamp of its entry at the time, or MISSING
     Map<URI, Long> depStamps = Map.of();
 
-    Map<ExtKey, Long> extKeys = Map.of();
-
     // set when an input other than the text changed since the last build
     boolean otherInputChanged;
 
@@ -92,7 +91,11 @@ public final class FileEntry {
 
     Throwable internalError;
 
+    // the plugins declared by a config file
     List<PluginRef> pluginRefs = List.of();
+
+    // the plugins whose specs the last build looked up
+    Set<PluginRef> pluginLookups = Set.of();
 
     // the number of times the file was parsed, for tests
     int parses;

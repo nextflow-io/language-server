@@ -21,9 +21,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -89,8 +87,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
     private final IndexProgress progress;
 
     private final Builder builder;
-
-    private final Map<Path, Long> schemaStamps = new HashMap<>();
 
     private long inputSeq;
 
@@ -255,17 +251,6 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
     @Override
     public long nextInputVersion() {
         return ++inputSeq;
-    }
-
-    @Override
-    public long extStamp(Project project, ExtKey key) {
-        if( key instanceof ExtKey.Lib lib )
-            return lib.projectId().equals(project.id) ? project.libStamp : -1;
-        if( key instanceof ExtKey.Schema schema )
-            return schemaStamps.getOrDefault(schema.dir(), 0L);
-        if( key instanceof ExtKey.Plugin plugin )
-            return plugins.generation(plugin.ref());
-        throw new IllegalArgumentException(key.toString());
     }
 
     @Override
@@ -630,10 +615,8 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
                 if( path.startsWith(lib) )
                     libChanged(project, fileName.endsWith(".jar") || path.equals(lib));
             }
-            if( "nextflow_schema.json".equals(fileName) ) {
-                schemaStamps.merge(path.getParent(), 1L, Long::sum);
-                projects().forEach(Project::markDirty);
-            }
+            if( "nextflow_schema.json".equals(fileName) )
+                schemaChanged(path.getParent());
             if( !FileKind.isManaged(path) && !NOT_DIRECTORIES.contains(extension(fileName)) ) {
                 directoryChanged(path, change.getType());
                 continue;
@@ -714,16 +697,27 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
     }
 
     private void libChanged(Project project, boolean jar) {
-        if( jar ) {
-            // a new classpath needs a new compiler, so every script is rebuilt
+        // a new classpath needs a new compiler
+        if( jar )
             project.scriptCompiler = nextflow.lsp.compiler.LanguageServerCompiler.forScripts(project.root);
+        for( var entry : project.entries() ) {
+            if( entry.kind == FileKind.SCRIPT )
+                project.bump(entry);
+        }
+    }
+
+    /**
+     * Bump the scripts that read the parameter schema of a directory.
+     *
+     * @param dir
+     */
+    private void schemaChanged(Path dir) {
+        for( var project : projects() ) {
             for( var entry : project.entries() ) {
-                if( entry.kind == FileKind.SCRIPT )
+                if( entry.kind == FileKind.SCRIPT && dir.equals(entry.path.getParent()) )
                     project.bump(entry);
             }
         }
-        project.libStamp++;
-        project.markDirty();
     }
 
     // -- configuration
@@ -740,10 +734,9 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
             plugins = new PluginSpecs(engine, configuration.pluginRegistryUrl());
             for( var project : projects() ) {
                 for( var entry : project.entries() ) {
-                    if( !entry.pluginRefs.isEmpty() )
+                    if( !entry.pluginRefs.isEmpty() || !entry.pluginLookups.isEmpty() )
                         project.bump(entry);
                 }
-                project.markDirty();
             }
         }
         var excludesChanged = !Objects.equals(previous.excludePatterns(), configuration.excludePatterns());
@@ -772,7 +765,12 @@ public final class Workspace implements EngineState, Project.Context, Builder.Co
     private void onPluginFetched(Event.PluginFetched event) {
         if( !plugins.onFetched(event) )
             return;
-        projects().forEach(Project::markDirty);
+        for( var project : projects() ) {
+            for( var entry : project.entries() ) {
+                if( entry.pluginLookups.contains(event.ref()) )
+                    project.bump(entry);
+            }
+        }
         scheduleBackground(Duration.ZERO);
     }
 

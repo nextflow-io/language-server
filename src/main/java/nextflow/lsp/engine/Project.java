@@ -66,7 +66,6 @@ public final class Project {
      */
     interface Context {
         long nextInputVersion();
-        long extStamp(Project project, ExtKey key);
         List<String> excludePatterns();
     }
 
@@ -112,8 +111,6 @@ public final class Project {
     // files created or loaded since the current walk started, which
     // the walk result may not include
     final Set<URI> addedDuringWalk = new HashSet<>();
-
-    long libStamp;
 
     Project(String id, String name, Path root, Context context) {
         this.id = id;
@@ -431,10 +428,6 @@ public final class Project {
             return false;
         for( var dep : entry.depStamps.entrySet() ) {
             if( stampOf(dep.getKey()) != dep.getValue() )
-                return false;
-        }
-        for( var ext : entry.extKeys.entrySet() ) {
-            if( context.extStamp(this, ext.getKey()) != ext.getValue() )
                 return false;
         }
         return true;

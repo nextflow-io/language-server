@@ -30,10 +30,8 @@ import org.eclipse.lsp4j.MessageType;
  *
  * Specs are fetched asynchronously on the IO pool and cached per
  * release, including releases that don't exist. A failed fetch is
- * retried at most once per {@link #RETRY_INTERVAL}. Each completed
- * fetch bumps the generation of its ref, which is the stamp of
- * {@link ExtKey.Plugin}, so that the files that looked it up are
- * rebuilt.
+ * retried at most once per {@link #RETRY_INTERVAL}. When a fetch
+ * completes, the workspace bumps the files that looked it up.
  *
  * Engine-confined.
  *
@@ -57,7 +55,6 @@ final class PluginSpecs {
     private static final class Entry {
         State state = State.PENDING;
         PluginSpec spec;
-        long generation;
         Instant retryAt;
     }
 
@@ -117,16 +114,6 @@ final class PluginSpecs {
     }
 
     /**
-     * The stamp of a ref, which changes whenever a fetch completes.
-     *
-     * @param ref
-     */
-    long generation(PluginRef ref) {
-        var entry = cache.get(ref);
-        return entry != null ? entry.generation : 0;
-    }
-
-    /**
      * Apply the result of a fetch.
      *
      * @param event
@@ -151,7 +138,6 @@ final class PluginSpecs {
             entry.retryAt = engine.environment().clock().instant().plus(RETRY_INTERVAL);
             engine.log(MessageType.Warning, "Failed to fetch plugin " + refString(event.ref()) + " from registry: " + failed.reason());
         }
-        entry.generation++;
         return true;
     }
 
