@@ -32,10 +32,8 @@ import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.services.LanguageServerConfiguration;
 import nextflow.lsp.util.Logger;
 import nextflow.util.PathUtils;
-import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.FileChangeType;
-import org.eclipse.lsp4j.FileEvent;
 import org.eclipse.lsp4j.FileSystemWatcher;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.MessageType;
@@ -658,8 +656,7 @@ public final class Workspace implements EngineState {
      * clients report only the directory when it is deleted or moved.
      * A deleted directory deletes every file under it, and re-walks
      * the folders that had files under it, which finds them at their
-     * new location if the directory was moved. The files under a
-     * created directory are discovered with a walk.
+     * new location if the directory was moved.
      *
      * An excluded directory is not walked, but the files that include
      * from it are bumped, since their includes may now resolve
@@ -669,46 +666,24 @@ public final class Workspace implements EngineState {
      * @param type
      */
     private void directoryChanged(Path path, FileChangeType type) {
-        var project = projectFor(path);
-        var excluded = project.isExcluded(path);
+        if( type != FileChangeType.Deleted )
+            return;
+        var excluded = projectFor(path).isExcluded(path);
         if( excluded )
             bumpWhere(entry -> entry.depStamps.keySet().stream().anyMatch(dep -> Path.of(dep).startsWith(path)));
         var documents = engine.documents();
-        if( type == FileChangeType.Deleted ) {
-            var rewalk = new ArrayList<Project>();
-            for( var other : projects() ) {
-                for( var entry : other.entries() ) {
-                    if( !entry.path.startsWith(path) )
-                        continue;
-                    if( !documents.isOpen(entry.uri) )
-                        other.bumpText(entry);
-                    if( !excluded && !other.isDefault() && other.index != Project.IndexStatus.NOT_STARTED && !rewalk.contains(other) )
-                        rewalk.add(other);
-                }
+        var rewalk = new ArrayList<Project>();
+        for( var other : projects() ) {
+            for( var entry : other.entries() ) {
+                if( !entry.path.startsWith(path) )
+                    continue;
+                if( !documents.isOpen(entry.uri) )
+                    other.bumpText(entry);
+                if( !excluded && !other.isDefault() && other.index != Project.IndexStatus.NOT_STARTED && !rewalk.contains(other) )
+                    rewalk.add(other);
             }
-            rewalk.forEach(this::startWalk);
-            return;
         }
-        if( type != FileChangeType.Created || project.isDefault() || excluded )
-            return;
-        var exclusions = walkExclusions(project);
-        var files = engine.environment().files();
-        engine.submitIo("walk " + path, () -> {
-            List<Path> result;
-            try {
-                result = files.walk(path, exclusions, FileKind::isManaged);
-            }
-            catch( IOException e ) {
-                // not a directory, or deleted since
-                return null;
-            }
-            if( result.isEmpty() )
-                return null;
-            var created = result.stream()
-                .map(file -> new FileEvent(file.toUri().toString(), FileChangeType.Created))
-                .toList();
-            return new Event.WatchedFiles(new DidChangeWatchedFilesParams(created));
-        });
+        rewalk.forEach(this::startWalk);
     }
 
     static void noteAdded(Project project, URI uri) {

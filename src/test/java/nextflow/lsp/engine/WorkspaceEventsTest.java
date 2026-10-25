@@ -619,7 +619,7 @@ class WorkspaceEventsTest {
     }
 
     @Test
-    void invalidateTheIncludersOfACreatedExcludedDirectory() {
+    void invalidateTheIncludersOfAFileCreatedInAnExcludedDirectory() {
         var f = TestServer.start((o) -> {
             o.watchers = true;
             o.settings = EXCLUDE_VENDOR;
@@ -629,9 +629,9 @@ class WorkspaceEventsTest {
         f.settle();
         assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
 
-        // the client reports only the directory
         f.write("vendor/v.nf", "workflow V {}\n");
-        f.notify("vendor", FileChangeType.Created);
+        notifyIfWatched(f, "vendor", FileChangeType.Created);
+        notifyIfWatched(f, "vendor/v.nf", FileChangeType.Created);
         f.settle();
         assertThat(f.messages("main.nf")).isEmpty();
         assertThat(f.client().getNonEmptyDiagnostics())
@@ -702,11 +702,12 @@ class WorkspaceEventsTest {
         f.settle();
         assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
 
-        // the client reports only the directory
+        // the client reports each file, and not the directory
         f.write("modules/a.nf", "workflow A { def x = 1 }\n");
         f.write("modules/sub/b.nf", WITH_WARNING);
         f.write("modules/work/c.nf", WITH_WARNING);
-        f.notify("modules", FileChangeType.Created);
+        for( var path : List.of("modules", "modules/a.nf", "modules/sub", "modules/sub/b.nf", "modules/work", "modules/work/c.nf") )
+            notifyIfWatched(f, path, FileChangeType.Created);
         f.settle();
         assertThat(f.messages("main.nf")).isEmpty();
         assertThat(f.messages("modules/a.nf")).containsExactly(UNUSED);
