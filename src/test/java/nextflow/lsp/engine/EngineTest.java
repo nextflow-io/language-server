@@ -186,9 +186,9 @@ class EngineTest {
     // -- parking and background
 
     @Test
-    void parkProjectRequestUntilBackgroundWorkSatisfiesIt() {
+    void parkProjectRequestUntilBackgroundWorkIndexesIt() {
         var h = start();
-        state.satisfied = false;
+        state.indexed = false;
         state.pendingSlices = 3;
         var result = send("references", Need.PROJECT);
 
@@ -204,19 +204,20 @@ class EngineTest {
     }
 
     @Test
-    void runSatisfiedProjectRequestImmediately() {
+    void buildAndRunIndexedProjectRequestImmediately() {
         var h = start();
         var result = send("symbol", Need.ALL);
 
         h.runPending();
         assertThat(result).isCompletedWithValue("symbol");
+        assertThat(state.log).containsExactly("route symbol", "prepare symbol", "body symbol");
         assertThat(state.slices).isZero();
     }
 
     @Test
     void resumeParkedRequestsInArrivalOrder() {
         var h = start();
-        state.satisfied = false;
+        state.indexed = false;
         state.pendingSlices = 2;
         var first = send("first", Need.PROJECT);
         var second = send("second", Need.ALL);
@@ -232,7 +233,7 @@ class EngineTest {
         var h = start();
         h.open("main.nf", "x");
         h.runPending();
-        state.satisfied = false;
+        state.indexed = false;
         state.pendingSlices = 4;
         var parked = send("references", Need.PROJECT);
         h.env().manualExecutor().runNext();
@@ -249,7 +250,7 @@ class EngineTest {
             "prepare hover", "body hover",
             "event DidChange",
             "slice", "slice", "slice",
-            "body references");
+            "prepare references", "body references");
         assertThat(hover).isCompletedWithValue("hover");
         assertThat(parked).isCompletedWithValue("references");
     }
@@ -287,7 +288,7 @@ class EngineTest {
     void ignoreDebounceWhileRequestsAreParked() {
         var h = start();
         h.open("main.nf", "a");
-        state.satisfied = false;
+        state.indexed = false;
         state.pendingSlices = 1;
         var result = send("references", Need.PROJECT);
         h.change("main.nf", "b");
@@ -301,7 +302,7 @@ class EngineTest {
         var h = start();
         h.open("main.nf", "a");
         h.runPending();
-        state.satisfied = false;
+        state.indexed = false;
         state.pendingSlices = 2;
         var result = h.send(positionSpec("rename", Need.PROJECT), null, body("rename", "edit"));
         h.env().manualExecutor().runNext();
@@ -318,7 +319,7 @@ class EngineTest {
         var h = start();
         h.open("main.nf", "a");
         h.runPending();
-        state.satisfied = false;
+        state.indexed = false;
         state.pendingSlices = 2;
         var result = send("symbol", Need.ALL);
         h.env().manualExecutor().runNext();
@@ -333,7 +334,7 @@ class EngineTest {
         var h = start();
         h.open("main.nf", "a");
         h.runPending();
-        state.satisfied = false;
+        state.indexed = false;
         state.pendingSlices = 2;
         var result = h.send(positionSpec("references", Need.PROJECT), null, body("references", "refs"));
 
@@ -342,40 +343,15 @@ class EngineTest {
     }
 
     @Test
-    void runLongParkedRequestOnceProjectIsIndexed() {
-        var h = start();
-        state.satisfied = false;
-        state.satisfyWhenDone = false;
-        state.indexed = false;
-        var result = send("references", Need.PROJECT);
-
-        h.runPending();
-        assertThat(result).isNotDone();
-
-        // not indexed yet: keep waiting
-        h.advance(Engine.STARVATION_TIMEOUT);
-        assertThat(result).isNotDone();
-        assertThat(state.log).doesNotContain("prepare references");
-
-        // indexed but still stale: build synchronously and answer
-        state.indexed = true;
-        h.advance(Engine.STARVATION_TIMEOUT);
-        assertThat(result).isCompletedWithValue("references");
-        assertThat(state.log).containsSubsequence("prepare references", "body references");
-        assertThat(h.engine().isIdle()).isTrue();
-    }
-
-    @Test
     void resumeParkedRequestAfterEventThatDoesNotScheduleBackgroundWork() {
         var h = start();
-        state.satisfied = false;
         state.indexed = false;
         var result = send("references", Need.PROJECT);
         h.runPending();
         assertThat(result).isNotDone();
 
         // the fake state doesn't schedule background work for this event
-        state.satisfied = true;
+        state.indexed = true;
         h.engine().submit(new Event.WatchedFiles(new DidChangeWatchedFilesParams(List.of())));
         h.runPending();
         assertThat(result).isCompletedWithValue("references");
@@ -384,12 +360,11 @@ class EngineTest {
     @Test
     void resumeParkedRequestAfterEventThatThrows() {
         var h = start();
-        state.satisfied = false;
         state.indexed = false;
         var result = send("references", Need.PROJECT);
         h.runPending();
 
-        state.satisfied = true;
+        state.indexed = true;
         state.applyError = new IllegalStateException("bad event");
         h.engine().submit(new Event.WatchedFiles(new DidChangeWatchedFilesParams(List.of())));
         h.runPending();
@@ -424,19 +399,16 @@ class EngineTest {
     @Test
     void dropParkedRequestWhenCancelled() {
         var h = start();
-        state.satisfied = false;
         state.indexed = false;
         var result = send("references", Need.PROJECT);
         h.runPending();
         assertThat(state.log).contains("route references").doesNotContain("body references");
-        assertThat(h.engine().isIdle()).isFalse();
 
         result.cancel(true);
         h.runPending();
-        assertThat(h.engine().isIdle()).isTrue();
 
         // the body never runs, even once the project is ready
-        state.satisfied = true;
+        state.indexed = true;
         h.open("main.nf", "a");
         h.settle();
         assertThat(state.log).doesNotContain("body references");
@@ -535,7 +507,6 @@ class EngineTest {
     @Test
     void releaseParkedRequestsWhenBackgroundWorkKeepsFailing() {
         var h = start();
-        state.satisfied = false;
         state.indexed = false;
         state.sliceError = new IllegalStateException("slice failed");
         var parked = send("references", Need.PROJECT);
@@ -568,7 +539,6 @@ class EngineTest {
     @Test
     void failParkedAndLaterRequestsAfterShutdown() {
         var h = start();
-        state.satisfied = false;
         state.indexed = false;
         var parked = send("references", Need.PROJECT);
         h.runPending();

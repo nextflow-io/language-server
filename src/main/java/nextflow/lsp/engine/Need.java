@@ -25,8 +25,8 @@ public enum Need {
     FILE,
     /** Like FILE, plus every config file of the project. */
     PROJECT_CONFIGS,
-    /** Parked until the project is indexed and fresh. */
+    /** Parked until the project is indexed, then every stale file of it is built. */
     PROJECT,
-    /** Parked until every project is indexed and fresh. */
+    /** Parked until every project is indexed, then every stale file is built. */
     ALL
 }

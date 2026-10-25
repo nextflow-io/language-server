@@ -97,12 +97,6 @@ public interface EngineState {
         void prepare(CancelChecker cancelChecker);
 
         /**
-         * For PROJECT and ALL: whether every target project is
-         * indexed and fresh.
-         */
-        boolean isSatisfied();
-
-        /**
          * For PROJECT and ALL: whether every target project has
          * finished its initial index, even if it is stale.
          */

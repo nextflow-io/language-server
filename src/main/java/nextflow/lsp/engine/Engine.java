@@ -18,7 +18,6 @@ package nextflow.lsp.engine;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -46,7 +45,7 @@ import org.eclipse.lsp4j.services.LanguageClient;
  * executor), in the order they are submitted. A request runs at its
  * position in that order, after building what it needs, so it
  * observes every earlier event and no later one. Requests that need
- * a whole project are parked until the project is indexed and fresh.
+ * a whole project are parked until the project is indexed.
  * Background work runs in short slices between mailbox tasks.
  *
  * Every task contains its own errors: an exception is logged and
@@ -62,12 +61,6 @@ import org.eclipse.lsp4j.services.LanguageClient;
 public final class Engine {
 
     public static final Duration DEFAULT_DEBOUNCE = Duration.ofMillis(500);
-
-    /**
-     * Age after which a parked request is answered as soon as its
-     * projects are indexed, even if background work keeps them stale.
-     */
-    static final Duration STARVATION_TIMEOUT = Duration.ofSeconds(2);
 
     private final EngineEnvironment env;
 
@@ -88,8 +81,6 @@ public final class Engine {
 
     // engine-confined (volatile only so that isIdle() can read them)
     private volatile SerialExecutor.Cancellable background;
-
-    private volatile SerialExecutor.Cancellable starvationTimer;
 
     private final List<RequestTask<?>> parked = new ArrayList<>();
 
@@ -163,13 +154,12 @@ public final class Engine {
 
     /**
      * Whether the engine has nothing to do: no queued tasks, no
-     * background work or timers, and no IO in flight.
+     * background work, and no IO in flight.
      */
     public boolean isIdle() {
         return queuedTasks.get() == 0
             && ioInFlight.get() == 0
-            && background == null
-            && starvationTimer == null;
+            && background == null;
     }
 
     // -- API for the engine state (engine thread)
@@ -332,8 +322,8 @@ public final class Engine {
 
     /**
      * Apply an event. Parked requests are resumed only by background
-     * work and the starvation timer, never here, so background work
-     * must be scheduled whenever requests are parked after an event.
+     * work, never here, so background work must be scheduled whenever
+     * requests are parked after an event.
      * The state schedules it for the changes it knows about, and this
      * method schedules it in any case (e.g. if the state throws).
      *
@@ -393,55 +383,19 @@ public final class Engine {
             fail(task, ResponseErrorCode.InvalidRequest, "Server is shutting down");
             return;
         }
-        task.arrival = env.clock().instant();
         task.versionAtArrival = documentVersion(task.spec.uri());
-        guarded(task, () -> dispatch(task));
-    }
-
-    private void dispatch(RequestTask<?> task) {
-        var route = state.route(task.spec);
-        if( route.isEmpty() ) {
-            task.completeEmpty();
-            return;
-        }
-        var r = route.get();
-        switch( task.spec.need() ) {
-            case FILE, PROJECT_CONFIGS -> {
-                r.prepare(cancelChecker(task.future));
-                run(task, r);
-            }
-            case PROJECT, ALL -> {
-                if( r.isSatisfied() )
-                    run(task, r);
-                else
-                    park(task);
-            }
-        }
+        guarded(task, () -> {
+            if( !tryRun(task) )
+                park(task);
+        });
     }
 
     private void park(RequestTask<?> task) {
         parked.add(task);
         scheduleBackground(Duration.ZERO);
-        if( starvationTimer == null )
-            starvationTimer = executor.schedule(STARVATION_TIMEOUT, contained("parked requests", this::onStarvationTimer));
-    }
-
-    private void onStarvationTimer() {
-        starvationTimer = null;
-        resumeParked();
-        if( !parked.isEmpty() && !shutdown )
-            starvationTimer = executor.schedule(STARVATION_TIMEOUT, contained("parked requests", this::onStarvationTimer));
-    }
-
-    private void cancelStarvationTimer() {
-        if( starvationTimer != null ) {
-            starvationTimer.cancel();
-            starvationTimer = null;
-        }
     }
 
     private void failParked(ResponseErrorCode code, String message) {
-        cancelStarvationTimer();
         var pending = new ArrayList<>(parked);
         parked.clear();
         for( var task : pending )
@@ -450,49 +404,48 @@ public final class Engine {
 
     private void dropParked(RequestTask<?> task) {
         parked.remove(task);
-        if( parked.isEmpty() )
-            cancelStarvationTimer();
     }
 
     /**
-     * Resume every parked request that is now satisfied, in FIFO order.
+     * Resume every parked request that can now run, in FIFO order.
      */
     private void resumeParked() {
         if( parked.isEmpty() )
             return;
-        var now = env.clock().instant();
         var pending = new ArrayList<>(parked);
         parked.clear();
         for( var task : pending ) {
             if( task.future.isDone() )
                 continue;
             guarded(task, () -> {
-                if( !tryResume(task, now) )
+                if( !tryRun(task) )
                     parked.add(task);
             });
         }
-        if( parked.isEmpty() )
-            cancelStarvationTimer();
     }
 
-    private boolean tryResume(RequestTask<?> task, Instant now) {
+    /**
+     * Build what the request needs and run it, unless it needs a
+     * project that is not indexed yet.
+     *
+     * @return false if the request must be parked
+     */
+    private boolean tryRun(RequestTask<?> task) {
         var route = state.route(task.spec);
         if( route.isEmpty() ) {
             task.completeEmpty();
             return true;
         }
         var r = route.get();
-        var satisfied = r.isSatisfied();
-        if( !satisfied ) {
-            var starving = Duration.between(task.arrival, now).compareTo(STARVATION_TIMEOUT) >= 0;
-            if( !starving || !r.isIndexed() )
-                return false;
-            r.prepare(cancelChecker(task.future));
-        }
+        var need = task.spec.need();
+        if( (need == Need.PROJECT || need == Need.ALL) && !r.isIndexed() )
+            return false;
+        // only differs if the request was parked
         if( task.spec.positionBased() && !Objects.equals(documentVersion(task.spec.uri()), task.versionAtArrival) ) {
             fail(task, ResponseErrorCode.ContentModified, "Content modified");
             return true;
         }
+        r.prepare(cancelChecker(task.future));
         run(task, r);
         return true;
     }
@@ -579,7 +532,6 @@ public final class Engine {
         final T emptyValue;
         final Function<RequestContext, T> body;
         final CompletableFuture<T> future = new CompletableFuture<>();
-        Instant arrival;
         Integer versionAtArrival;
 
         RequestTask(RequestSpec spec, T emptyValue, Function<RequestContext, T> body) {

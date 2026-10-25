@@ -106,11 +106,6 @@ final class WorkspaceRoute implements EngineState.Route {
     }
 
     @Override
-    public boolean isSatisfied() {
-        return targets.stream().allMatch(p -> p.isIndexed() && p.isFresh());
-    }
-
-    @Override
     public boolean isIndexed() {
         return targets.stream().allMatch(Project::isIndexed);
     }

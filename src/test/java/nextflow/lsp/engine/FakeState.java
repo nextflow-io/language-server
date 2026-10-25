@@ -29,8 +29,7 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
  * Scriptable engine state that records what the engine asks of it.
  *
  * Background work is modelled as a number of pending slices. When
- * the last one runs, PROJECT/ALL requests become satisfied (unless
- * {@link #satisfyWhenDone} is false).
+ * the last one runs, the PROJECT/ALL targets become indexed.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -40,13 +39,9 @@ final class FakeState implements EngineState {
 
     final List<String> log = new ArrayList<>();
 
-    boolean satisfied = true;
-
     boolean indexed = true;
 
     int pendingSlices;
-
-    boolean satisfyWhenDone = true;
 
     final Set<String> unroutable = new HashSet<>();
 
@@ -93,8 +88,8 @@ final class FakeState implements EngineState {
             throw sliceError;
         if( pendingSlices > 0 ) {
             pendingSlices--;
-            if( pendingSlices == 0 && satisfyWhenDone )
-                satisfied = true;
+            if( pendingSlices == 0 )
+                indexed = true;
         }
         return pendingSlices > 0;
     }
@@ -114,11 +109,6 @@ final class FakeState implements EngineState {
                 onPrepare.run();
             if( prepareError != null )
                 throw prepareError;
-        }
-
-        @Override
-        public boolean isSatisfied() {
-            return satisfied;
         }
 
         @Override

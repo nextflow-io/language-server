@@ -66,7 +66,7 @@ A single engine thread owns all documents, projects, compilers, ASTs and diagnos
 
 The lsp4j reader thread delivers notifications and requests in order on one thread. Each handler converts the message into an event or a request task and submits it to the engine's single-threaded executor, then returns. The engine therefore sees messages in exactly the order the client sent them, and a request observes every earlier notification and no later one. Every mutable structure has one owner, so there are no locks and no torn reads. The engine never waits on another thread except to join its own file reads, so it cannot deadlock.
 
-A request that needs a single file brings that file and its dependencies up to date before it runs. A request that needs the whole project (references, rename, incoming calls, workspace symbol) is parked until the project is indexed, rather than answered with partial results. Cancellation, not a timeout, is the escape hatch. A parked position-based request whose document changed while it waited fails with `ContentModified`.
+A request that needs a single file brings that file and its dependencies up to date before it runs. A request that needs the whole project (references, rename, incoming calls, workspace symbol) is parked until the project is indexed, rather than answered with partial results. Once indexed, it builds whatever is stale synchronously and runs, so it never waits for background work to catch up with edits. Cancellation, not a timeout, is the escape hatch. A parked position-based request whose document changed while it waited fails with `ContentModified`.
 
 ### Re-parse instead of patching ASTs
 
