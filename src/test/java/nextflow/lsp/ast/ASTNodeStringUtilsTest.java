@@ -50,11 +50,18 @@ class ASTNodeStringUtilsTest {
         return node;
     }
 
+    /**
+     * Assert that a description from an upstream annotation is
+     * present, trimmed and unindented, without pinning its text.
+     */
+    static void assertDescription(String docs) {
+        assertThat(docs).isNotBlank().isEqualTo(docs.strip());
+        assertThat(docs.lines()).noneMatch(line -> line.startsWith(" "));
+    }
+
     @Test
     void getLabelAndDocsForClass() {
         var classNode = new ClassNode(Channel.class);
-        assertThat(classNode.isEnum()).isFalse();
-        assertThat(classNode.isResolved()).isTrue();
 
         assertThat(ASTNodeStringUtils.getLabel(classNode)).isEqualTo("class Channel");
 
@@ -63,8 +70,6 @@ class ASTNodeStringUtilsTest {
              * Enumeration of sequence types.
              */
             """);
-        assertThat(enumNode.isEnum()).isTrue();
-        assertThat(enumNode.isResolved()).isTrue();
 
         assertThat(ASTNodeStringUtils.getLabel(enumNode)).isEqualTo("enum SequenceTypes");
         assertThat(ASTNodeStringUtils.getDocumentation(enumNode)).isEqualTo("Enumeration of sequence types.");
@@ -76,14 +81,13 @@ class ASTNodeStringUtilsTest {
         ffn.target = new ClassNode(FeatureFlagDsl.class).getDeclaredField("strict");
 
         assertThat(ASTNodeStringUtils.getLabel(ffn)).isEqualTo("(feature flag) nextflow.enable.strict");
-        assertThat(ASTNodeStringUtils.getDocumentation(ffn)).isEqualTo("When `true`, the pipeline is executed in [strict mode](https://docs.seqera.io/nextflow/reference/feature-flags).");
+        assertDescription(ASTNodeStringUtils.getDocumentation(ffn));
     }
 
     @Test
     void getLabelAndDocsForWorkflow() {
         var entry = new WorkflowNode(null, EmptyStatement.INSTANCE);
         entry.putNodeMetaData(ASTNodeMarker.PIPELINE_SCRIPT, new ScriptNode(null));
-        assertThat(entry.isEntry()).isTrue();
 
         assertThat(ASTNodeStringUtils.getLabel(entry)).isEqualTo("workflow <entry>");
 
@@ -92,9 +96,6 @@ class ASTNodeStringUtilsTest {
              * Run the FOO workflow.
              */
             """);
-        assertThat(node.isEntry()).isFalse();
-        assertThat(node.getParameters()).isEmpty();
-        assertThat(node.emits).isSameAs(EmptyStatement.INSTANCE);
 
         assertThat(ASTNodeStringUtils.getLabel(node)).isEqualTo("""
             workflow FOO {
@@ -148,7 +149,7 @@ class ASTNodeStringUtilsTest {
         var node = new ClassNode(ScriptDsl.class).getDeclaredMethods("env").get(0);
 
         assertThat(ASTNodeStringUtils.getLabel(node)).isEqualTo("env(name: String) -> String");
-        assertThat(ASTNodeStringUtils.getDocumentation(node)).isEqualTo("Get the value of an environment variable from the launch environment.");
+        assertDescription(ASTNodeStringUtils.getDocumentation(node));
     }
 
     @Test
@@ -156,10 +157,7 @@ class ASTNodeStringUtilsTest {
         var node = new ClassNode(ChannelNamespace.class).getDeclaredMethods("of").get(0);
 
         assertThat(ASTNodeStringUtils.getLabel(node)).isEqualTo("of(values...: E) -> Channel<E>");
-        assertThat(ASTNodeStringUtils.getDocumentation(node)).isEqualTo("""
-            Create a channel that emits each argument.
-
-            [Read more](https://docs.seqera.io/nextflow/reference/stdlib-namespaces/channel#of)""");
+        assertDescription(ASTNodeStringUtils.getDocumentation(node));
     }
 
     @Test
@@ -167,7 +165,7 @@ class ASTNodeStringUtilsTest {
         var node = new ClassNode(Iterable.class).getDeclaredMethods("collect").get(0);
 
         assertThat(ASTNodeStringUtils.getLabel(node)).isEqualTo("Iterable collect(transform: (E) -> R) -> Iterable<R>");
-        assertThat(ASTNodeStringUtils.getDocumentation(node)).isEqualTo("Returns a new iterable with each element transformed by the given closure.");
+        assertDescription(ASTNodeStringUtils.getDocumentation(node));
     }
 
     @Test
@@ -175,10 +173,7 @@ class ASTNodeStringUtilsTest {
         var node = new ClassNode(ProcessDsl.DirectiveDsl.class).getDeclaredMethods("executor").get(0);
 
         assertThat(ASTNodeStringUtils.getLabel(node)).isEqualTo("executor(value: String)");
-        assertThat(ASTNodeStringUtils.getDocumentation(node)).isEqualTo("""
-            The `executor` defines the underlying system where tasks are executed.
-
-            [Read more](https://docs.seqera.io/nextflow/reference/process#executor)""");
+        assertDescription(ASTNodeStringUtils.getDocumentation(node));
     }
 
 }

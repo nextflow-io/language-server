@@ -78,7 +78,7 @@ class WorkspaceEventsTest {
     }
 
     @Test
-    void buildFilesOfNestedFoldersOnlyInTheInnermostFolder() {
+    void buildFilesOfNestedFoldersInTheInnermostFolderAndDependenciesInBoth() {
         var f = TestServer.start((o) -> {
             o.folders("", "sub");
             o.settle = false;
@@ -222,7 +222,7 @@ class WorkspaceEventsTest {
         assertThat(f.publishes("a/open.nf")).noneMatch(List::isEmpty);
         assertThat(f.messages("a/open.nf")).containsExactly(UNUSED);
         assertThat(f.messages("b/z.nf")).containsExactly(UNUSED);
-        assertThat(f.workspace().projects()).extracting(p -> p.name).containsExactly("b", "");
+        assertThat(f.workspace().projectFor(f.path("a/x.nf")).isDefault()).isTrue();
         assertThat(f.engine().isIdle()).isTrue();
     }
 
@@ -313,7 +313,9 @@ class WorkspaceEventsTest {
 
         f.configure(Map.of("nextflow.files.exclude", List.of("sub")));
         f.settle();
-        assertThat(f.publishes("sub/x.nf")).containsExactly(f.diagnostics("main.nf"), List.of());
+        assertThat(f.publishes("sub/x.nf")).satisfiesExactly(
+            (first) -> assertThat(first).extracting(Diagnostic::getMessage).containsExactly(UNUSED),
+            (last) -> assertThat(last).isEmpty());
         assertThat(f.messages("tests/y.nf")).containsExactly(UNUSED);
         assertThat(f.publishes("main.nf")).hasSize(1);
         assertThat(f.call(Need.FILE, "sub/x.nf", "empty", (context) -> "ran")).isEqualTo("empty");

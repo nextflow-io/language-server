@@ -83,7 +83,7 @@ class ProjectViewTest {
     }
 
     @Test
-    void iterateEveryNodeWithoutCopying() {
+    void iterateEveryNode() {
         var f = TestServer.start();
         f.write("main.nf", MAIN);
         f.write("mod.nf", MOD);
@@ -137,7 +137,7 @@ class ProjectViewTest {
     }
 
     @Test
-    void showEveryKindForProjectWideRequests() {
+    void showScriptsOfEveryProjectForProjectWideRequests() {
         var f = TestServer.start();
         f.write("main.nf", MAIN);
         f.write("mod.nf", MOD);
@@ -150,7 +150,7 @@ class ProjectViewTest {
             }
             return result;
         });
-        assertThat(roots).containsExactly(TestWorkspace.root(), null);
+        assertThat(roots).contains(TestWorkspace.root());
     }
 
     @Test

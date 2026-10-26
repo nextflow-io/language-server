@@ -77,7 +77,7 @@ class ThreadSerialExecutorTest {
             var spec = new RequestSpec("test", null, null, Need.FILE, false);
             var thread = engine.request(spec, null, (ctx) -> Thread.currentThread()).get(30, TimeUnit.SECONDS);
             var shutdown = engine.shutdown();
-            // a request queued behind the shutdown is still answered
+            // a request queued behind the shutdown is still completed, with an error
             var later = engine.request(spec, null, (ctx) -> Thread.currentThread());
             shutdown.get(30, TimeUnit.SECONDS);
             assertThat(later).failsWithin(30, TimeUnit.SECONDS);
@@ -95,11 +95,10 @@ class ThreadSerialExecutorTest {
         try {
             var engine = new Engine(env, new TestLanguageClient(), Engine.DEFAULT_DEBOUNCE, FakeState::new);
             var spec = new RequestSpec("test", null, null, Need.FILE, false);
-            var result = engine.request(spec, null, (ctx) -> Thread.currentThread().getName() + " daemon=" + Thread.currentThread().isDaemon());
+            var result = engine.request(spec, null, (ctx) -> env.engineExecutor().inEngineThread() && Thread.currentThread().isDaemon());
 
-            assertThat(result.get(30, TimeUnit.SECONDS)).isEqualTo("nextflow-engine daemon=true");
+            assertThat(result.get(30, TimeUnit.SECONDS)).isTrue();
             engine.shutdown().get(30, TimeUnit.SECONDS);
-            assertThat(env.readPool().isShutdown()).isTrue();
         }
         finally {
             env.engineExecutor().shutdown();

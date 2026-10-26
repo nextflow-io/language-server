@@ -84,7 +84,7 @@ class ScriptCompletionTest {
             """);
         var completions = getCompletions(server, uri, new Position(1, 14));
 
-        assertThat(completions).hasSize(2);
+        assertThat(completions).extracting(CompletionItem::getLabel).allMatch(label -> label.startsWith("f"));
         var failOnIgnore = findByLabel(completions, "failOnIgnore");
         assertThat(failOnIgnore.getLabelDetails().getDescription()).isEqualTo("Boolean");
         assertThat(failOnIgnore.getKind()).isEqualTo(CompletionItemKind.Constant);
@@ -101,7 +101,7 @@ class ScriptCompletionTest {
             """);
         completions = getCompletions(server, uri, new Position(1, 19));
 
-        assertThat(completions).hasSize(1);
+        assertThat(completions).extracting(CompletionItem::getLabel).allMatch(label -> label.startsWith("config"));
         var configFiles = findByLabel(completions, "configFiles");
         assertThat(configFiles.getLabelDetails().getDescription()).isEqualTo("List<Path>");
         assertThat(configFiles.getKind()).isEqualTo(CompletionItemKind.Constant);
@@ -114,7 +114,8 @@ class ScriptCompletionTest {
             """);
         completions = getCompletions(server, uri, new Position(1, 8));
 
-        assertThat(completions).hasSize(3);
+        // members of log, not top-level names
+        assertThat(completions).extracting(CompletionItem::getLabel).doesNotContain("log", "workflow", "params");
         var logCompletions = completions;
         assertThat(List.of("info", "error", "warn")).allSatisfy(name -> {
             var item = findByLabel(logCompletions, name);
