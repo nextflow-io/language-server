@@ -769,7 +769,7 @@ final class Builder {
 
         private void index(Parsed parsed) {
             var entry = parsed.entry;
-            entry.parses++;
+            workspace.parses.merge(entry.uri, 1, Integer::sum);
             project.unindex(entry);
             entry.unit = parsed.unit;
             entry.builtText = parsed.unit != null ? parsed.text : null;

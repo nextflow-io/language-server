@@ -99,9 +99,6 @@ final class FileEntry {
     // the plugins whose specs the last build looked up
     Set<PluginRef> pluginLookups = Set.of();
 
-    // the number of times the file was parsed, for tests
-    int parses;
-
     FileEntry(URI uri, Path path, FileKind kind, Role role) {
         this.uri = uri;
         this.path = path;

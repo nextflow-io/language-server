@@ -401,6 +401,13 @@ public final class TestServer {
     }
 
     /**
+     * Get the number of projects that hold an entry for each file.
+     */
+    public Map<String, Integer> entries() {
+        return EngineHarness.entries(workspace);
+    }
+
+    /**
      * Get the number of parses of each file since the given counts,
      * omitting the files that were not parsed.
      *

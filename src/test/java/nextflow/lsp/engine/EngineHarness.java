@@ -15,6 +15,7 @@
  */
 package nextflow.lsp.engine;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
@@ -239,20 +240,33 @@ public final class EngineHarness {
 
     /**
      * Get the number of parses of each file so far, summed over the
-     * projects that contain it.
+     * projects that parsed it, including entries that were since
+     * removed.
      *
      * @param workspace
      */
     public static Map<String, Integer> parses(Workspace workspace) {
-        var root = TestWorkspace.root();
+        var result = new TreeMap<String, Integer>();
+        workspace.parses.forEach((uri, count) -> result.put(relativize(uri), count));
+        return result;
+    }
+
+    /**
+     * Get the number of projects that hold an entry for each file.
+     *
+     * @param workspace
+     */
+    public static Map<String, Integer> entries(Workspace workspace) {
         var result = new TreeMap<String, Integer>();
         for( var project : workspace.projects() ) {
-            for( var entry : project.entries() ) {
-                var path = root.relativize(Path.of(entry.uri)).toString().replace('\\', '/');
-                result.merge(path, entry.parses, Integer::sum);
-            }
+            for( var entry : project.entries() )
+                result.merge(relativize(entry.uri), 1, Integer::sum);
         }
         return result;
+    }
+
+    private static String relativize(URI uri) {
+        return TestWorkspace.root().relativize(Path.of(uri)).toString().replace('\\', '/');
     }
 
     /**

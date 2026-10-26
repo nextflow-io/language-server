@@ -107,16 +107,21 @@ class WorkspaceEventsTest {
         f.settle();
         assertThat(f.parses()).isEqualTo(Map.of("sub/a.nf", 1, "sub/b.nf", 1));
 
-        // each file is held by one folder at a time
+        // each file is held by one folder at a time, and is built once
+        // by the folder it moves to
+        var before = f.parses();
         f.addFolder("sub");
         f.settle();
-        assertThat(f.parses()).isEqualTo(Map.of("sub/a.nf", 1, "sub/b.nf", 1));
+        assertThat(f.entries()).isEqualTo(Map.of("sub/a.nf", 1, "sub/b.nf", 1));
+        assertThat(f.parsesSince(before)).isEqualTo(Map.of("sub/a.nf", 1, "sub/b.nf", 1));
         assertThat(f.messages("sub/a.nf")).containsExactly(UNUSED);
         assertThat(f.messages("sub/b.nf")).containsExactly(UNUSED);
 
+        before = f.parses();
         f.removeFolder("sub");
         f.settle();
-        assertThat(f.parses()).isEqualTo(Map.of("sub/a.nf", 1, "sub/b.nf", 1));
+        assertThat(f.entries()).isEqualTo(Map.of("sub/a.nf", 1, "sub/b.nf", 1));
+        assertThat(f.parsesSince(before)).isEqualTo(Map.of("sub/a.nf", 1, "sub/b.nf", 1));
         assertThat(f.messages("sub/a.nf")).containsExactly(UNUSED);
         assertThat(f.messages("sub/b.nf")).containsExactly(UNUSED);
         assertThat(f.publishes("sub/a.nf")).noneMatch(List::isEmpty);
@@ -135,11 +140,13 @@ class WorkspaceEventsTest {
         assertThat(f.messages("a/main.nf")).containsExactly(UNUSED);
 
         f.write("a/main.nf", WITH_WARNING);
+        var before = f.parses();
         f.addFolder("a");
         f.settle();
         var path = f.path("a/main.nf");
         assertThat(f.workspace().projectFor(path).name).isEqualTo("a");
-        assertThat(f.parses()).isEqualTo(Map.of("a/main.nf", 1));
+        assertThat(f.entries()).isEqualTo(Map.of("a/main.nf", 1));
+        assertThat(f.parsesSince(before)).isEqualTo(Map.of("a/main.nf", 1));
         assertThat(f.publishes("a/main.nf")).noneMatch(List::isEmpty);
         assertThat(f.messages("a/main.nf")).containsExactly(UNUSED);
     }
@@ -151,9 +158,11 @@ class WorkspaceEventsTest {
         f.settle();
         assertThat(f.messages("a/work/x.nf")).containsExactly(UNUSED);
 
+        var before = f.parses();
         f.addFolder("a");
         f.settle();
-        assertThat(f.parses()).isEqualTo(Map.of("a/work/x.nf", 1));
+        assertThat(f.entries()).isEqualTo(Map.of("a/work/x.nf", 1));
+        assertThat(f.parsesSince(before)).isEqualTo(Map.of("a/work/x.nf", 1));
         f.change("a/work/x.nf", "workflow {\n");
         f.settle();
         assertThat(f.messages("a/work/x.nf")).hasSize(1).doesNotContain(UNUSED);
@@ -395,7 +404,7 @@ class WorkspaceEventsTest {
         f.close("outside/main.nf");
         f.settle();
         assertThat(f.messages("outside/main.nf")).isEmpty();
-        assertThat(f.parses()).isEmpty();
+        assertThat(f.entries()).isEmpty();
     }
 
     @Test
@@ -419,7 +428,7 @@ class WorkspaceEventsTest {
         f.close("outside/main.nf");
         f.settle();
         assertThat(f.messages("outside/mod.nf")).isEmpty();
-        assertThat(f.parses()).isEmpty();
+        assertThat(f.entries()).isEmpty();
     }
 
     /**
@@ -504,7 +513,7 @@ class WorkspaceEventsTest {
         f.delete("new.nf");
         f.settle();
         assertThat(f.messages("new.nf")).isEmpty();
-        assertThat(f.parses()).isEmpty();
+        assertThat(f.entries()).isEmpty();
     }
 
     @Test
@@ -534,7 +543,7 @@ class WorkspaceEventsTest {
         assertThat(f.messages("modules/a.nf")).isEmpty();
         assertThat(f.messages("modules/sub/b.nf")).isEmpty();
         assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
-        assertThat(f.parses()).containsOnlyKeys("main.nf");
+        assertThat(f.entries()).containsOnlyKeys("main.nf");
     }
 
     private static final Map<String, Object> EXCLUDE_VENDOR = Map.of("nextflow.files.exclude", List.of("vendor"));

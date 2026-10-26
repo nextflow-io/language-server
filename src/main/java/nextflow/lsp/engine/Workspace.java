@@ -21,7 +21,9 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -108,6 +110,9 @@ public final class Workspace implements EngineState {
 
     // estimated build time per file, for sizing slices
     private double millisPerFile;
+
+    // the number of times each file was parsed in any project, for tests
+    final Map<URI, Integer> parses = new HashMap<>();
 
     private Workspace(Engine engine, int maxSliceFiles) {
         this.engine = engine;
