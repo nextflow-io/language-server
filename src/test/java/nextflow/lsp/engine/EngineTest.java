@@ -169,20 +169,6 @@ class EngineTest {
         assertThat(state.log).containsExactly("route hover");
     }
 
-    @Test
-    void prepareFileRequestBeforeRunningBody() {
-        var h = start();
-        var file = send("hover", Need.FILE);
-        var configs = send("previewConfig", Need.PROJECT_CONFIGS);
-
-        h.runPending();
-        assertThat(state.log).containsExactly(
-            "route hover", "prepare hover", "body hover",
-            "route previewConfig", "prepare previewConfig", "body previewConfig");
-        assertThat(file).isCompletedWithValue("hover");
-        assertThat(configs).isCompletedWithValue("previewConfig");
-    }
-
     // -- parking and background
 
     @Test

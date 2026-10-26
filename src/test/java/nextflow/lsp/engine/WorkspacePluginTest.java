@@ -51,10 +51,12 @@ class WorkspacePluginTest {
         return "Plugin '" + plugin + "' does not exist or is not specified in the configuration file";
     }
 
-    static TestServer start(FixtureRegistry registry) {
+    static TestServer start(FixtureRegistry registry, String... folders) {
         return TestServer.start((o) -> {
             o.environment = new TestEnvironment().withRegistry((url) -> registry);
             o.settle = false;
+            if( folders.length > 0 )
+                o.folders(folders);
         });
     }
 
@@ -157,41 +159,31 @@ class WorkspacePluginTest {
     }
 
     @Test
-    void retryFailedFetchOnTheNextRequestAfterTheInterval() {
+    void retryFailedFetchAfterTheIntervalWithoutAConfigEdit() {
         var registry = new FixtureRegistry();
         registry.overrides.put("nf-schema@2.7.3", new PluginRegistryClient.Failed("connection refused"));
         var f = start(registry);
         f.write("nextflow.config", SCHEMA_CONFIG);
         f.write("main.nf", SCRIPT);
         f.settle();
-        registry.overrides.clear();
         f.advance(PluginSpecs.RETRY_INTERVAL.minusMinutes(1));
         f.call(Need.FILE, "main.nf", null, (context) -> null);
         f.settle();
         assertThat(registry.fetches).hasSize(1);
-        assertThat(f.messages("main.nf")).isEmpty();
 
-        // no config edit is needed
+        // the next background build retries
         f.advance(Duration.ofMinutes(1));
-        f.call(Need.FILE, "main.nf", null, (context) -> null);
-        f.settle();
-        assertThat(registry.fetches).hasSize(2);
-        assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
-    }
-
-    @Test
-    void retryFailedFetchOnTheNextBackgroundBuildAfterTheInterval() {
-        var registry = new FixtureRegistry();
-        registry.overrides.put("nf-schema@2.7.3", new PluginRegistryClient.Failed("connection refused"));
-        var f = start(registry);
-        f.write("nextflow.config", SCHEMA_CONFIG);
-        f.write("main.nf", SCRIPT);
-        f.settle();
-        registry.overrides.clear();
-        f.advance(PluginSpecs.RETRY_INTERVAL);
         f.open("other.nf", "workflow {}\n");
         f.settle();
         assertThat(registry.fetches).hasSize(2);
+        assertThat(f.messages("main.nf")).isEmpty();
+
+        // the next request retries
+        registry.overrides.clear();
+        f.advance(PluginSpecs.RETRY_INTERVAL);
+        f.call(Need.FILE, "main.nf", null, (context) -> null);
+        f.settle();
+        assertThat(registry.fetches).hasSize(3);
         assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
     }
 
@@ -244,6 +236,27 @@ class WorkspacePluginTest {
         f.settle();
         assertThat(f.messages("a/main.nf")).containsExactly(NOT_DEFINED);
         assertThat(f.messages("b/main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
+    }
+
+    @Test
+    void onlyMainConfigFilesDeclarePluginsForScripts() {
+        var registry = new FixtureRegistry();
+        var f = start(registry);
+        f.write("other.config", SCHEMA_CONFIG);
+        f.write("main.nf", SCRIPT);
+        f.settle();
+        assertThat(f.messages("main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
+        assertThat(registry.fetches).containsExactly("nf-schema@2.7.3");
+    }
+
+    @Test
+    void ignoreConfigFilesOutsideTheProject() {
+        var registry = new FixtureRegistry();
+        var f = start(registry, "project");
+        f.write("nextflow.config", SCHEMA_CONFIG);
+        f.write("project/main.nf", SCRIPT);
+        f.settle();
+        assertThat(f.messages("project/main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
     }
 
     @Test

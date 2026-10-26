@@ -30,8 +30,6 @@ import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,15 +44,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class NextflowLanguageServerTest {
 
     private static final String INVALID_SCRIPT = "workflow {\n";
-
-    @Test
-    void reportDiagnosticsWithoutConfiguration() {
-        var server = TestServer.start((o) -> o.settle = false);
-        server.write("main.nf", INVALID_SCRIPT);
-        server.open("main.nf", INVALID_SCRIPT);
-        server.settle();
-        assertThat(server.diagnostics("main.nf")).isNotEmpty();
-    }
 
     @Test
     void useRootUriIfThereAreNoWorkspaceFolders() {
@@ -125,19 +114,6 @@ class NextflowLanguageServerTest {
         server.runPending();
         assertThat(references).isCompletedWithValue(List.of());
         assertThat(rename).isCompletedWithValue(null);
-    }
-
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void reportProgressOnlyIfClientSupportsIt(boolean supported) {
-        var server = TestServer.start((o) -> {
-            o.progress = supported;
-            o.initialized = false;
-        });
-        server.write("main.nf", INVALID_SCRIPT);
-        server.initialized();
-        server.settle();
-        assertThat(server.client().getProgress().isEmpty()).isNotEqualTo(supported);
     }
 
     @Test

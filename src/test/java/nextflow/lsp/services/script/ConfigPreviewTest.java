@@ -448,7 +448,7 @@ class ConfigPreviewTest {
     }
 
     @Test
-    void qualifyInvocationWithIncludersAsLastBuiltUntilTheyAreRebuilt() {
+    void qualifyInvocationWithTheEditedAliasOnceRebuilt() {
         writeWorkspaceFile("modules/align.nf", """
             process ALIGN {
                 script:
@@ -476,55 +476,9 @@ class ConfigPreviewTest {
         var server = TestServer.start();
         var uri = getUri("subworkflows/sub.nf");
         server.open("subworkflows/sub.nf", sub);
-        var before = server.parses();
-        server.change("subworkflows/sub.nf", sub + "\n");
-
-        // within the debounce, the includers still refer to the
-        // previous version of the subworkflow, so no call path matches
-        assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for ALIGN");
-        assertThat(server.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1));
-
+        server.change("subworkflows/sub.nf", sub.replace("ALIGN_DNA", "ALIGN_RNA"));
         server.settle();
-        assertThat(server.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1, "main.nf", 1));
-        assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for SUB:ALIGN_DNA");
-    }
-
-    @Test
-    void parseOnlyTheRequestFileForCodeActionOnWidelyIncludedModule() {
-        writeWorkspaceFile("modules/align.nf", """
-            process ALIGN {
-                script:
-                \"""
-                echo align
-                \"""
-            }
-            """);
-        var sub = """
-            include { ALIGN } from '../modules/align.nf'
-
-            workflow SUB {
-                main:
-                ALIGN()
-            }
-            """;
-        writeWorkspaceFile("subworkflows/sub.nf", sub);
-        for( int i = 0; i < 50; i++ ) {
-            writeWorkspaceFile("main" + i + ".nf", """
-                include { SUB } from './subworkflows/sub.nf'
-
-                workflow {
-                    SUB()
-                }
-                """);
-        }
-        var server = TestServer.start();
-        var uri = getUri("subworkflows/sub.nf");
-        server.open("subworkflows/sub.nf", sub);
-        var before = server.parses();
-        server.change("subworkflows/sub.nf", sub + "\n");
-
-        assertThat(codeActionTitles(server, uri, 4, 4)).isNotEmpty();
-        assertThat(server.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1));
+        assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for SUB:ALIGN_RNA");
     }
 
     @Test

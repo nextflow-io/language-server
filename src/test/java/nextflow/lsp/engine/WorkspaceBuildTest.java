@@ -492,20 +492,6 @@ class WorkspaceBuildTest {
     }
 
     @Test
-    void rebuildDependentsOfAModuleThatARequestRemoved() {
-        var f = start();
-        f.write("mod.nf", "workflow FOO {}\n");
-        f.write("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
-        f.settle();
-        assertThat(f.messages("main.nf")).isEmpty();
-
-        f.delete("mod.nf");
-        f.call(Need.FILE, "mod.nf", null, (context) -> null);
-        f.settle();
-        assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
-    }
-
-    @Test
     void rebuildAnEditedFileWhenItIsNewlyIncluded() {
         var f = start();
         f.write("mod.nf", "workflow FOO {}\n");

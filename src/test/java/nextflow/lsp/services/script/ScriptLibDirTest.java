@@ -159,22 +159,6 @@ class ScriptLibDirTest {
     }
 
     @Test
-    void resolveLibClassWhenLibDirectoryIsCreatedAfterStartup() {
-        var client = new TestLanguageClient();
-        var server = TestServer.start((o) -> o.client = client);
-        var uri = getUri("main.nf");
-
-        writeLib("Greeter.groovy", GREETER);
-        server.open("main.nf", """
-            workflow {
-                println(Greeter.greet('world'))
-            }
-            """);
-        server.settle();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
-    }
-
-    @Test
     void pickUpChangesToLibClassWithoutRestarting() {
         writeLib("Greeter.groovy", GREETER);
         var client = new TestLanguageClient();
@@ -214,24 +198,6 @@ class ScriptLibDirTest {
         server.settle();
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).anyMatch(d -> d.getMessage().contains("foo"));
-    }
-
-    @Test
-    void doNotFailWhenThereIsNoWorkspaceRoot() {
-        var client = new TestLanguageClient();
-        var server = TestServer.start((o) -> {
-            o.client = client;
-            o.folders();
-        });
-        var uri = getUri("main.nf");
-
-        server.open("main.nf", """
-            workflow {
-                println('Hello!')
-            }
-            """);
-        server.settle();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
 }

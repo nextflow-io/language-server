@@ -23,9 +23,15 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
+import nextflow.lsp.NextflowLanguageServer;
 import nextflow.lsp.TestServer;
 import nextflow.lsp.TestUtils;
 import nextflow.lsp.TestWorkspace;
+import org.eclipse.lsp4j.CodeActionContext;
+import org.eclipse.lsp4j.CodeActionParams;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -109,6 +115,33 @@ class WorkspaceBuildCountTest {
         f.settle();
         assertThat(f.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1, "sub.nf", 1, "main.nf", 1));
         assertThat(f.includeTarget("sub.nf")).isEqualTo(URI.create(f.uri("mod_a.nf")));
+    }
+
+    @Test
+    void parseOnlyTheRequestFileForCodeActionOnWidelyIncludedModule() {
+        var f = TestServer.start((o) -> o.settle = false);
+        f.write("modules/align.nf", "process ALIGN {\n    script:\n    'echo align'\n}\n");
+        var sub = """
+            include { ALIGN } from '../modules/align.nf'
+
+            workflow SUB {
+                main:
+                ALIGN()
+            }
+            """;
+        f.write("subworkflows/sub.nf", sub);
+        for( int i = 0; i < 50; i++ )
+            f.write("main" + i + ".nf", "include { SUB } from './subworkflows/sub.nf'\nworkflow { SUB() }\n");
+        f.settle();
+        f.open("subworkflows/sub.nf", sub);
+        var before = f.parses();
+        f.change("subworkflows/sub.nf", sub + "\n");
+
+        var position = new Position(4, 4);
+        var params = new CodeActionParams(new TextDocumentIdentifier(f.uri("subworkflows/sub.nf")), new Range(position, position), new CodeActionContext(List.of()));
+        var actions = f.call((NextflowLanguageServer s) -> s.codeAction(params));
+        assertThat(actions).isNotEmpty();
+        assertThat(f.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1));
     }
 
     @Test

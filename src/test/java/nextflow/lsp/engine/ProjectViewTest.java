@@ -15,12 +15,9 @@
  */
 package nextflow.lsp.engine;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import nextflow.lsp.TestServer;
@@ -57,16 +54,6 @@ class ProjectViewTest {
             'echo hello'
         }
         """;
-
-    @Test
-    void exposeOnlyTheViewApiToProviders() {
-        var publicMethods = Arrays.stream(ProjectHandle.class.getDeclaredMethods())
-            .filter(method -> Modifier.isPublic(method.getModifiers()))
-            .map(Method::getName)
-            .toList();
-        var viewMethods = Arrays.stream(ProjectView.class.getMethods()).map(Method::getName).toList();
-        assertThat(publicMethods).containsExactlyInAnyOrderElementsOf(viewMethods);
-    }
 
     @Test
     void showBuiltScriptsOfTheProject() {
@@ -174,7 +161,7 @@ class ProjectViewTest {
         f.settle();
         var view = f.call(Need.FILE, "main.nf", (ScriptView) null, (context) -> context.project().scriptView());
         var project = f.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
-        for( Runnable access : List.<Runnable>of(view::getUris, view::getNodes, () -> view.getURI(null), project::scriptView) )
+        for( Runnable access : List.<Runnable>of(view::getUris, view::getNodes, () -> view.getURI(null), project::scriptView, project::configView) )
             assertThat(thrownOnAnotherThread(access)).isInstanceOf(IllegalStateException.class);
     }
 

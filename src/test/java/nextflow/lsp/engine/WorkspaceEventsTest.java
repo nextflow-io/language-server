@@ -25,7 +25,6 @@ import java.util.Map;
 
 import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
-import nextflow.lsp.ast.ProjectView;
 import nextflow.lsp.services.ErrorReportingMode;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
@@ -35,6 +34,8 @@ import org.eclipse.lsp4j.MessageType;
 import org.eclipse.lsp4j.WatchKind;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static nextflow.lsp.TestUtils.UNUSED;
 import static nextflow.lsp.TestUtils.thrownOnAnotherThread;
@@ -421,106 +422,64 @@ class WorkspaceEventsTest {
         assertThat(f.parses()).isEmpty();
     }
 
-    @Test
-    void dropDependencyCopyOfAnOpenOutsideFileWhenNoLongerIncluded() {
+    /**
+     * A dependency that the project doesn't own is dropped once nothing
+     * includes it, whether it is outside the folder, in a nested
+     * folder or excluded, cyclic or not, and open or not.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+        proj   | proj/main.nf | ../shared/a.nf | false | true  | true
+        ',sub' | main.nf      | ./sub/a.nf     | false | true  | false
+        proj   | proj/main.nf | ../shared/a.nf | true  | false | true
+        ''     | main.nf      | ./vendor/a.nf  | true  | false | false
+        """)
+    void dropDependenciesWhenNoLongerIncluded(String folders, String main, String include, boolean cyclic, boolean open, boolean outside) {
         var f = TestServer.start((o) -> {
-            o.folders("proj");
+            o.folders(folders.split(",", -1));
             o.settle = false;
         });
-        f.write("shared/x.nf", "workflow X { def x = 1 }\n");
-        f.write("proj/main.nf", """
-            include { X } from '../shared/x.nf'
-            workflow {
-                X()
-            }
-            """);
-        f.open("shared/x.nf", "workflow X { def x = 1 }\n");
-        f.settle();
-        assertThat(scriptPaths(f, "proj/main.nf")).containsExactly("proj/main.nf", "shared/x.nf");
-
-        f.writeAndNotify("proj/main.nf", "workflow {}\n");
-        f.settle();
-        f.close("shared/x.nf");
-        f.settle();
-        assertThat(f.messages("shared/x.nf")).isEmpty();
-        assertThat(scriptPaths(f, "proj/main.nf")).containsExactly("proj/main.nf");
-    }
-
-    @Test
-    void dropDependencyCopyOfAnOpenFileInANestedFolderWhenNoLongerIncluded() {
-        var f = TestServer.start((o) -> {
-            o.folders("", "sub");
-            o.settle = false;
-        });
-        f.write("sub/x.nf", "workflow X { def x = 1 }\n");
-        f.write("main.nf", """
-            include { X } from './sub/x.nf'
-            workflow {
-                X()
-            }
-            """);
-        f.open("sub/x.nf", "workflow X { def x = 1 }\n");
-        f.settle();
-        assertThat(scriptPaths(f, "main.nf")).containsExactly("main.nf", "sub/x.nf");
-
-        f.writeAndNotify("main.nf", "workflow {}\n");
-        f.settle();
-        f.close("sub/x.nf");
-        f.settle();
-        assertThat(scriptPaths(f, "main.nf")).containsExactly("main.nf");
-    }
-
-    @Test
-    void dropCyclicOutsideDependenciesWhenNoLongerIncluded() {
-        var f = TestServer.start((o) -> {
-            o.folders("proj");
-            o.settle = false;
-        });
-        writeCycle(f, "shared");
-        f.write("proj/main.nf", """
-            include { A } from '../shared/a.nf'
+        var dep = Path.of(main).resolveSibling(include).normalize().toString();
+        var dir = Path.of(dep).getParent().toString();
+        // the last case's dependencies are excluded from its folder
+        if( dir.equals("vendor") )
+            f.configure(Map.of("nextflow.files.exclude", List.of("vendor")));
+        if( cyclic ) {
+            f.write(dep, """
+                include { B } from './b.nf'
+                workflow A { def x = 1 }
+                """);
+            f.write(dir + "/b.nf", """
+                include { A } from './a.nf'
+                workflow B {}
+                """);
+        }
+        else {
+            f.write(dep, "workflow A { def x = 1 }\n");
+        }
+        f.write(main, """
+            include { A } from '%s'
             workflow {
                 A()
             }
-            """);
+            """.formatted(include));
+        if( open )
+            f.open(dep, "workflow A { def x = 1 }\n");
         f.settle();
-        assertThat(f.messages("shared/a.nf")).contains(UNUSED);
-        assertThat(scriptPaths(f, "proj/main.nf")).containsExactly("proj/main.nf", "shared/a.nf", "shared/b.nf");
+        var deps = cyclic ? List.of(main, dep, dir + "/b.nf") : List.of(main, dep);
+        assertThat(scriptPaths(f, main)).containsExactlyInAnyOrderElementsOf(deps);
+        if( outside )
+            assertThat(f.messages(dep)).contains(UNUSED);
 
-        f.writeAndNotify("proj/main.nf", "workflow {}\n");
+        f.writeAndNotify(main, "workflow {}\n");
         f.settle();
-        assertThat(f.messages("shared/a.nf")).isEmpty();
-        assertThat(scriptPaths(f, "proj/main.nf")).containsExactly("proj/main.nf");
-    }
-
-    @Test
-    void dropExcludedCyclicDependenciesWhenNoLongerIncluded() {
-        var f = TestServer.start((o) -> o.settle = false);
-        f.configure(Map.of("nextflow.files.exclude", List.of("vendor")));
-        writeCycle(f, "vendor");
-        f.write("main.nf", """
-            include { A } from './vendor/a.nf'
-            workflow {
-                A()
-            }
-            """);
-        f.settle();
-        assertThat(scriptPaths(f, "main.nf")).containsExactly("main.nf", "vendor/a.nf", "vendor/b.nf");
-
-        f.writeAndNotify("main.nf", "workflow {}\n");
-        f.settle();
-        assertThat(scriptPaths(f, "main.nf")).containsExactly("main.nf");
-    }
-
-    private static void writeCycle(TestServer f, String dir) {
-        f.write(dir + "/a.nf", """
-            include { B } from './b.nf'
-            workflow A { def x = 1 }
-            """);
-        f.write(dir + "/b.nf", """
-            include { A } from './a.nf'
-            workflow B {}
-            """);
+        if( open ) {
+            f.close(dep);
+            f.settle();
+        }
+        assertThat(scriptPaths(f, main)).containsExactly(main);
+        if( outside )
+            assertThat(f.messages(dep)).isEmpty();
     }
 
     private static List<String> scriptPaths(TestServer f, String path) {
@@ -770,13 +729,6 @@ class WorkspaceEventsTest {
     void doNotRegisterWatchersWithoutClientSupport() {
         var f = TestServer.start();
         assertThat(f.client().getRegistrations()).isEmpty();
-    }
-
-    @Test
-    void rejectProjectAccessOutsideTheEngineThread() throws Exception {
-        var f = TestServer.start();
-        var view = f.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
-        assertThat(thrownOnAnotherThread(view::configView)).isInstanceOf(IllegalStateException.class);
     }
 
 }

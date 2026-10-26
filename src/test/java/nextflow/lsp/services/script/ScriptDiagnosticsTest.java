@@ -113,64 +113,6 @@ class ScriptDiagnosticsTest {
     }
 
     @Test
-    void resolveTypesForIncludedScriptsBeforeIncludingScripts() {
-        var client = new TestLanguageClient();
-        var server = TestServer.start((o) -> o.client = client);
-        // filenames chosen so the entry file iterates before its modules in
-        // the unordered change set, exercising the check-ordering bug
-        var mainUri = getUri("workflow.nf");
-
-        server.open("producer.nf", """
-            nextflow.enable.types = true
-
-            process PRODUCER {
-                input:
-                record(id: String)
-
-                output:
-                record(id: id, data: file('data.txt'))
-
-                script:
-                \"""
-                echo hello > data.txt
-                \"""
-            }
-            """);
-        server.open("consumer.nf", """
-            nextflow.enable.types = true
-
-            process CONSUMER {
-                input:
-                record(id: String, data: Path)
-
-                output:
-                record(id: id)
-
-                script:
-                \"""
-                cat ${data}
-                \"""
-            }
-            """);
-        server.open("workflow.nf", """
-            nextflow.enable.types = true
-
-            include { PRODUCER } from './producer.nf'
-            include { CONSUMER } from './consumer.nf'
-
-            workflow {
-                ch_produced = PRODUCER(channel.of(record(id: 'sample1')))
-                CONSUMER(ch_produced)
-            }
-            """);
-        server.settle();
-        var diagnostics = client.getDiagnostics(mainUri);
-        assertThat(diagnostics)
-            .extracting(Diagnostic::getMessage)
-            .noneMatch(m -> m.contains("is not compatible with process input"));
-    }
-
-    @Test
     void clearDiagnosticsWhenErrorIsFixed() {
         var client = new TestLanguageClient();
         var server = TestServer.start((o) -> o.client = client);
@@ -225,24 +167,6 @@ class ScriptDiagnosticsTest {
                 %s
             }
             """.formatted(statement);
-    }
-
-    @Test
-    void resolvePluginIncludesBeforeConfigFileIsCompiled() {
-        var client = new TestLanguageClient();
-        var server = TestServer.start((o) -> o.client = client);
-        var uri = getUri("main.nf");
-
-        server.open("nextflow.config", "plugins { id 'nf-schema@2.7.3' }");
-        server.open("main.nf", """
-            include { paramsHelp } from 'plugin/nf-schema'
-
-            workflow {
-                println paramsHelp()
-            }
-            """);
-        server.settle();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
     @Test

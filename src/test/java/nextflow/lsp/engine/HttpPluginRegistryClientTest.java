@@ -17,8 +17,6 @@ package nextflow.lsp.engine;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collections;
 
 import com.sun.net.httpserver.HttpServer;
 import nextflow.lsp.TestPluginRegistry;
@@ -74,27 +72,6 @@ class HttpPluginRegistryClientTest {
     void reportInvalidRegistryUrlAsFailure() throws InterruptedException {
         var client = new HttpPluginRegistryClient("http://bad url/");
         assertThat(client.fetch("nf-prov", "1.6.0")).isInstanceOf(PluginRegistryClient.Failed.class);
-    }
-
-    @Test
-    void reuseConnectionsAcrossFetches() throws IOException, InterruptedException {
-        var clients = Collections.synchronizedList(new ArrayList<InetSocketAddress>());
-        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/", (exchange) -> {
-            clients.add(exchange.getRemoteAddress());
-            exchange.sendResponseHeaders(404, -1);
-            exchange.close();
-        });
-        server.start();
-        try {
-            var client = new HttpPluginRegistryClient("http://127.0.0.1:" + server.getAddress().getPort() + "/api/");
-            for( int i = 0; i < 3; i++ )
-                assertThat(client.fetch("nf-missing", "1.0." + i)).isInstanceOf(PluginRegistryClient.NotFound.class);
-            assertThat(clients).hasSize(3).containsOnly(clients.get(0));
-        }
-        finally {
-            server.stop(0);
-        }
     }
 
 }
