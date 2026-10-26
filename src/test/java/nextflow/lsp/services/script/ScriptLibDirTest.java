@@ -66,7 +66,7 @@ class ScriptLibDirTest {
             }
             """);
         server.settle();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
+        assertThat(client.getPublishedDiagnostics(uri)).isEmpty();
     }
 
     @Test
@@ -82,7 +82,7 @@ class ScriptLibDirTest {
             }
             """);
         server.settle();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
+        assertThat(client.getPublishedDiagnostics(uri)).isEmpty();
     }
 
     @Test
@@ -120,7 +120,7 @@ class ScriptLibDirTest {
             }
             """);
         server.settle();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
+        assertThat(client.getPublishedDiagnostics(uri)).isEmpty();
     }
 
     @Test
@@ -172,7 +172,7 @@ class ScriptLibDirTest {
 
         server.open("main.nf", contents);
         server.settle();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
+        assertThat(client.getPublishedDiagnostics(uri)).isEmpty();
 
         // the lib change arrives as a watcher event, without reopening the script
         server.writeAndNotify("lib/Greeter.groovy", GREETER.replace("class Greeter", "class Salutation"));

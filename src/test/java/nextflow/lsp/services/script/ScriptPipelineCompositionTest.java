@@ -100,7 +100,7 @@ class ScriptPipelineCompositionTest {
             """);
         server.settle();
 
-        assertThat(client.getDiagnostics(uri)).isEmpty();
+        assertThat(client.getPublishedDiagnostics(uri)).isEmpty();
     }
 
     @Test

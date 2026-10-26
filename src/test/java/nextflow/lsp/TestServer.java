@@ -451,6 +451,22 @@ public final class TestServer {
     }
 
     /**
+     * Get the most recently published diagnostics of a file, failing
+     * if none were published.
+     */
+    public List<Diagnostic> publishedDiagnostics(String path) {
+        return client().getPublishedDiagnostics(uri(path));
+    }
+
+    /**
+     * Get the messages of the most recently published diagnostics of
+     * a file, failing if none were published.
+     */
+    public List<String> publishedMessages(String path) {
+        return publishedDiagnostics(path).stream().map(Diagnostic::getMessage).toList();
+    }
+
+    /**
      * Get the messages of the most recently published diagnostics of
      * a file.
      */

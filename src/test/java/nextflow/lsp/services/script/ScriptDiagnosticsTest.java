@@ -53,7 +53,7 @@ class ScriptDiagnosticsTest {
             }
             """);
         server.settle();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
+        assertThat(client.getPublishedDiagnostics(uri)).isEmpty();
     }
 
     @Test
@@ -74,7 +74,7 @@ class ScriptDiagnosticsTest {
             }
             """);
         server.settle();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
+        assertThat(client.getPublishedDiagnostics(uri)).isEmpty();
     }
 
     @Test
@@ -146,7 +146,7 @@ class ScriptDiagnosticsTest {
         var uri = getUri("main.nf");
         server.open("main.nf", script);
         server.settle();
-        var diagnostics = client.getDiagnostics(uri);
+        var diagnostics = client.getPublishedDiagnostics(uri);
         // otherwise type checking is skipped and the test passes vacuously
         assertThat(diagnostics)
             .extracting(Diagnostic::getMessage)

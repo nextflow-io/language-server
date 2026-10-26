@@ -189,6 +189,20 @@ public class TestLanguageClient implements LanguageClient {
     }
 
     /**
+     * Get the most recently published diagnostics for a given file,
+     * failing if none were published, so that an empty result means
+     * that the file was published clean.
+     *
+     * @param uri
+     */
+    public List<Diagnostic> getPublishedDiagnostics(String uri) {
+        var result = diagnostics.get(uri);
+        if( result == null )
+            throw new AssertionError("No diagnostics were published for " + uri);
+        return result;
+    }
+
+    /**
      * Get the most recently published diagnostics for all files.
      */
     public Map<String,List<Diagnostic>> getAllDiagnostics() {
