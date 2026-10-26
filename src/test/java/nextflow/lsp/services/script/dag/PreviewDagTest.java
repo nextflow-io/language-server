@@ -58,21 +58,25 @@ class PreviewDagTest {
 
         return Golden.inputs("dag", ".nf").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
             server.openVerbatim("main.nf", Golden.read(input));
-            var lenses = server.call(s -> s.codeLens(new CodeLensParams(new TextDocumentIdentifier(uri)))).stream()
-                .filter(lens -> "nextflow.previewDag".equals(lens.getCommand().getCommand()))
-                .toList();
-            assertThat(lenses).isNotEmpty();
+            try {
+                var lenses = server.call(s -> s.codeLens(new CodeLensParams(new TextDocumentIdentifier(uri)))).stream()
+                    .filter(lens -> "nextflow.previewDag".equals(lens.getCommand().getCommand()))
+                    .toList();
+                assertThat(lenses).isNotEmpty();
 
-            var mmd = lenses.stream()
-                .map((lens) -> {
-                    var response = (Map<?,?>) executeCommand(server, "nextflow.server.previewDag", lens.getCommand().getArguments());
-                    assertThat(response).isNotNull();
-                    var result = (String) response.get("result");
-                    assertThat(result).as("DAG preview error: %s", response.get("error")).isNotNull();
-                    return result.replace(rootUri, "");
-                })
-                .collect(Collectors.joining("\n"));
-            Golden.check(Golden.sibling(input, ".mmd"), mmd);
+                var mmd = lenses.stream()
+                    .map((lens) -> {
+                        var response = (Map<?,?>) executeCommand(server, "nextflow.server.previewDag", lens.getCommand().getArguments());
+                        assertThat(response).isNotNull();
+                        var result = (String) response.get("result");
+                        assertThat(result).as("DAG preview error: %s", response.get("error")).isNotNull();
+                        return result.replace(rootUri, "");
+                    })
+                    .collect(Collectors.joining("\n"));
+                Golden.check(Golden.sibling(input, ".mmd"), mmd);
+            } finally {
+                server.close("main.nf");
+            }
         }));
     }
 

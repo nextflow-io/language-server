@@ -126,7 +126,7 @@ class ScriptDiagnosticsTest {
         assertThat(client.getDiagnostics(uri)).isNotEmpty();
 
         // the error is fixed
-        server.open("main.nf", """
+        server.change("main.nf", """
             workflow {
                 println('Hello!')
             }

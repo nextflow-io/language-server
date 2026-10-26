@@ -270,7 +270,14 @@ public final class TestServer {
      * Replace the whole text of an open document.
      */
     public void change(String path, String text) {
-        sendChange(path, new TextDocumentContentChangeEvent(text.stripIndent()));
+        changeVerbatim(path, text.stripIndent());
+    }
+
+    /**
+     * Replace the whole text of an open document with exactly the given text.
+     */
+    public void changeVerbatim(String path, String text) {
+        sendChange(path, new TextDocumentContentChangeEvent(text));
     }
 
     public void change(String path, Range range, String text) {

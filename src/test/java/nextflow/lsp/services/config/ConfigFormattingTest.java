@@ -58,15 +58,19 @@ class ConfigFormattingTest {
 
         return Golden.inputs("format/config", ".config").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
             server.openVerbatim("nextflow.config", Golden.read(input));
-            var textEdits = formatting(server, uri, options);
-            assertThat(textEdits).isNotEmpty();
-            var formatted = textEdits.get(0).getNewText();
-            Golden.check(Golden.sibling(input, ".formatted"), formatted);
+            try {
+                var textEdits = formatting(server, uri, options);
+                assertThat(textEdits).isNotEmpty();
+                var formatted = textEdits.get(0).getNewText();
+                Golden.check(Golden.sibling(input, ".formatted"), formatted);
 
-            server.openVerbatim("nextflow.config", formatted);
-            var reformatted = formatting(server, uri, options);
-            if( !reformatted.isEmpty() )
-                assertThat(reformatted.get(0).getNewText()).isEqualTo(formatted);
+                server.changeVerbatim("nextflow.config", formatted);
+                var reformatted = formatting(server, uri, options);
+                if( !reformatted.isEmpty() )
+                    assertThat(reformatted.get(0).getNewText()).isEqualTo(formatted);
+            } finally {
+                server.close("nextflow.config");
+            }
         }));
     }
 

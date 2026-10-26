@@ -94,7 +94,7 @@ class ScriptCompletionTest {
         assertThat(fusion.getKind()).isEqualTo(CompletionItemKind.Module);
         assertThat(fusion.getDetail()).isEqualTo("(namespace) fusion");
 
-        server.open("main.nf", """
+        server.change("main.nf", """
             workflow {
                 workflow.config
             }
@@ -107,7 +107,7 @@ class ScriptCompletionTest {
         assertThat(configFiles.getKind()).isEqualTo(CompletionItemKind.Constant);
         assertThat(configFiles.getDetail()).isEqualTo("configFiles: List<Path>");
 
-        server.open("main.nf", """
+        server.change("main.nf", """
             workflow {
                 log.
             }
@@ -171,7 +171,7 @@ class ScriptCompletionTest {
         assertThat(greet.getAdditionalTextEdits()).isNull();
 
         // non-extended completion does not suggest definitions that are not included
-        server.open("main.nf", """
+        server.change("main.nf", """
             include { sayHello as greet } from './module.nf'
 
             workflow {
@@ -211,7 +211,7 @@ class ScriptCompletionTest {
         });
 
         // definitions that are already included don't add an include
-        server.open("main.nf", """
+        server.change("main.nf", """
             include { sayHello } from './module.nf'
 
             workflow {
@@ -249,7 +249,7 @@ class ScriptCompletionTest {
                 assertThat(edit.getNewText()).isEqualTo("include { sayHello } from './module.nf'\n");
             });
 
-        server.open("main.nf", """
+        server.change("main.nf", """
             process FOO {
                 exec:
                 HEL
@@ -293,7 +293,7 @@ class ScriptCompletionTest {
 
         assertThat(completions).isEmpty();
 
-        server.open("main.nf", """
+        server.change("main.nf", """
             // foo.
             workflow {
             }

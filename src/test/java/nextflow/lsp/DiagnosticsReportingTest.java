@@ -70,7 +70,7 @@ class DiagnosticsReportingTest {
         assertThat(client.getDiagnostics(uri)).anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Error);
 
         // an unrecognized-option warning
-        server.open("nextflow.config", WARNING_SOURCE);
+        server.change("nextflow.config", WARNING_SOURCE);
         server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
@@ -87,7 +87,7 @@ class DiagnosticsReportingTest {
         assertThat(client.getDiagnostics(uri)).anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Warning);
 
         // a syntax error
-        server.open("nextflow.config", ERROR_SOURCE);
+        server.change("nextflow.config", ERROR_SOURCE);
         server.settle();
         assertThat(client.getDiagnostics(uri)).anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Error);
     }

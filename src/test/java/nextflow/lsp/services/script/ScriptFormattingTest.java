@@ -75,15 +75,19 @@ class ScriptFormattingTest {
 
         return Golden.inputs("format/script", ".nf").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
             server.openVerbatim("main.nf", Golden.read(input));
-            var textEdits = formatting(server, uri, options);
-            assertThat(textEdits).isNotEmpty();
-            var formatted = textEdits.get(0).getNewText();
-            Golden.check(Golden.sibling(input, ".formatted"), formatted);
+            try {
+                var textEdits = formatting(server, uri, options);
+                assertThat(textEdits).isNotEmpty();
+                var formatted = textEdits.get(0).getNewText();
+                Golden.check(Golden.sibling(input, ".formatted"), formatted);
 
-            server.openVerbatim("main.nf", formatted);
-            var reformatted = formatting(server, uri, options);
-            if( !reformatted.isEmpty() )
-                assertThat(reformatted.get(0).getNewText()).isEqualTo(formatted);
+                server.changeVerbatim("main.nf", formatted);
+                var reformatted = formatting(server, uri, options);
+                if( !reformatted.isEmpty() )
+                    assertThat(reformatted.get(0).getNewText()).isEqualTo(formatted);
+            } finally {
+                server.close("main.nf");
+            }
         }));
     }
 

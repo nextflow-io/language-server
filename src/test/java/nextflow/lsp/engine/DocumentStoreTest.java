@@ -214,6 +214,9 @@ class DocumentStoreTest {
         assertThat(text()).isEqualTo("z");
     }
 
+    /**
+     * Reopening without a close is a client bug, tolerated by taking the new text.
+     */
     @Test
     void replaceDocumentWhenReopened() {
         open(URI_STRING, 1, "first");

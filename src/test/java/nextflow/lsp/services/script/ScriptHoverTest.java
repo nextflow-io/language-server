@@ -147,7 +147,7 @@ class ScriptHoverTest {
             ```""");
 
         // named record type input
-        server.open("main.nf", """
+        server.change("main.nf", """
             nextflow.enable.types = true
 
             record SamtoolsIndexInput {
