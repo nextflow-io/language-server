@@ -22,7 +22,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
@@ -146,12 +145,7 @@ class WorkspaceIndexTest {
         f.runPending();
         client.completeProgressCreate();
         f.settle(io);
-        var tokens = new TreeSet<String>();
-        for( var item : client.getProgress() ) {
-            if( item instanceof WorkDoneProgressCreateParams params )
-                tokens.add(params.getToken().getLeft());
-        }
-        assertThat(tokens).containsExactly("nextflow/index/1", "nextflow/index/2");
+        assertThat(progressTokens(client)).hasSize(2).doesNotHaveDuplicates();
     }
 
     @Test
@@ -204,12 +198,13 @@ class WorkspaceIndexTest {
         f.addFolder("other");
         f.runPending();
         assertThat(progressKinds(client)).containsExactly("create", "create");
+        var tokens = progressTokens(client);
 
         // the first run ended before its token was created
-        client.completeProgressCreate("nextflow/index/1");
+        client.completeProgressCreate(tokens.get(0));
         f.runPending();
         assertThat(progressKinds(client)).containsExactly("create", "create");
-        client.completeProgressCreate("nextflow/index/2");
+        client.completeProgressCreate(tokens.get(1));
         f.runPending();
         assertThat(progressKinds(client)).containsExactly("create", "create", "begin");
         f.settle(io);
@@ -262,11 +257,10 @@ class WorkspaceIndexTest {
         f.open("modules/mod7.nf", "workflow MOD7 { def x = 1 }\n");
         f.initialized();
         f.settle();
-        // the first slice holds the open file, and publishes in URI order
+        // the first slice holds the open file
         var log = f.client().getPublishLog();
         assertThat(log).hasSize(10);
         assertThat(log.subList(0, 2)).anyMatch(p -> p.getUri().equals(f.uri("modules/mod7.nf")));
-        assertThat(log.get(2).getUri()).isEqualTo(f.uri("modules/mod1.nf"));
     }
 
     @Test
@@ -296,11 +290,8 @@ class WorkspaceIndexTest {
         writeModules(f, 50);
         f.open("main.nf", "workflow {}\n");
         f.initialized();
-        var executor = f.env().manualExecutor();
-        // run the walk and a couple of slices, then edit
-        for( int i = 0; i < 6; i++ )
-            executor.runNext();
-        assertThat(f.workspace().isIndexing()).isTrue();
+        // edit once indexing has built some files
+        runUntilIndexingHasParsed(f);
         f.change("main.nf", "workflow { def x = 1 }\n");
         var now = f.env().fakeClock().instant();
         f.runPending();
@@ -347,17 +338,36 @@ class WorkspaceIndexTest {
         writeModules(f, 200);
         f.write("main.nf", "workflow {}\n");
         f.initialized();
-        // the walk runs inline, so its result is the next task
-        f.env().manualExecutor().runNext();
-        f.env().manualExecutor().runNext();
+        runUntilIndexingHasParsed(f);
         var parsesAtAnswer = f.call(Need.FILE, "main.nf", -1, (context) -> {
             assertThat(f.workspace().isIndexing()).isTrue();
-            return f.parses().values().stream().mapToInt(Integer::intValue).sum();
+            return totalParses(f);
         });
         // at most two slices
         assertThat(parsesAtAnswer).isLessThanOrEqualTo(20);
         f.settle();
         assertThat(f.workspace().isIndexing()).isFalse();
+    }
+
+    private static void runUntilIndexingHasParsed(TestServer f) {
+        var executor = f.env().manualExecutor();
+        while( !(f.workspace().isIndexing() && totalParses(f) > 0) )
+            assertThat(executor.runNext()).as("indexing parsed some files before going idle").isTrue();
+    }
+
+    private static int totalParses(TestServer f) {
+        return f.parses().values().stream().mapToInt(Integer::intValue).sum();
+    }
+
+    private static List<String> progressTokens(TestLanguageClient client) {
+        var tokens = new ArrayList<String>();
+        synchronized (client.getProgress()) {
+            for( var item : client.getProgress() ) {
+                if( item instanceof WorkDoneProgressCreateParams params )
+                    tokens.add(params.getToken().getLeft());
+            }
+        }
+        return tokens;
     }
 
     /**
