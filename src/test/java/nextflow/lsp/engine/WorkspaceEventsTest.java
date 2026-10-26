@@ -27,6 +27,7 @@ import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.services.ErrorReportingMode;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.FileChangeType;
 import org.eclipse.lsp4j.InitializedParams;
@@ -258,16 +259,26 @@ class WorkspaceEventsTest {
         f.write("bad.nf", "workflow {\n");
         f.settle();
         var before = f.parses();
-        assertThat(f.messages("main.nf")).containsExactly(UNUSED);
+        assertThat(f.diagnostics("main.nf")).singleElement()
+            .satisfies(d -> assertThat(d.getMessage()).isEqualTo(UNUSED))
+            .satisfies(d -> assertThat(d.getSeverity()).isEqualTo(DiagnosticSeverity.Warning));
+        assertThat(f.diagnostics("bad.nf")).isNotEmpty()
+            .allMatch(d -> d.getSeverity() == DiagnosticSeverity.Error);
 
         f.configure(Map.of("nextflow.errorReportingMode", "errors"));
         f.settle();
         assertThat(f.messages("main.nf")).isEmpty();
         assertThat(f.messages("bad.nf")).isNotEmpty();
 
+        f.configure(Map.of("nextflow.errorReportingMode", "off"));
+        f.settle();
+        assertThat(f.messages("main.nf")).isEmpty();
+        assertThat(f.messages("bad.nf")).isEmpty();
+
         f.configure(Map.of("nextflow.errorReportingMode", "warnings"));
         f.settle();
         assertThat(f.messages("main.nf")).containsExactly(UNUSED);
+        assertThat(f.messages("bad.nf")).isNotEmpty();
         assertThat(f.parsesSince(before)).isEmpty();
     }
 
