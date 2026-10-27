@@ -68,7 +68,7 @@ configurations.matching { it.name in ['compileClasspath', 'runtimeClasspath', 't
 dependencies {
   groovyCompiler 'org.apache.groovy:groovy:4.0.33'
 
-  implementation 'io.nextflow:nf-lang:26.10.3'
+  implementation 'io.nextflow:nf-lang:26.10.4'
   implementation 'org.apache.groovy:groovy:4.0.33'
   implementation 'org.apache.groovy:groovy-json:4.0.33'
   // Jackson is only used internally (by YamlConverter) when YAML is actually parsed or built,
@@ -85,8 +85,8 @@ dependencies {
   runtimeOnly 'org.yaml:snakeyaml:2.4'
 
   // include Nextflow runtime at build-time to extract language definitions
-  nextflowRuntime 'io.nextflow:nextflow:26.10.3'
-  nextflowRuntime 'io.nextflow:nf-lineage:26.10.3'
+  nextflowRuntime 'io.nextflow:nextflow:26.10.4'
+  nextflowRuntime 'io.nextflow:nf-lineage:26.10.4'
   nextflowRuntime 'io.nextflow:nf-amazon:3.12.1'
   nextflowRuntime 'io.nextflow:nf-azure:1.24.2'
   nextflowRuntime 'io.nextflow:nf-google:1.29.1'
