@@ -31,6 +31,7 @@ import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.ast.expr.CastExpression;
 import org.codehaus.groovy.ast.expr.ClassExpression;
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
 import org.codehaus.groovy.ast.expr.MapEntryExpression;
@@ -74,6 +75,9 @@ public class LanguageServerASTUtils {
         }
 
         if( node instanceof ClassExpression ce )
+            return ce.getType().redirect();
+
+        if( node instanceof CastExpression ce )
             return ce.getType().redirect();
 
         if( node instanceof ConstructorCallExpression cce )

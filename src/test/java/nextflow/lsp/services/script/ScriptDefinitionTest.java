@@ -95,4 +95,33 @@ class ScriptDefinitionTest {
         assertThat(location.getRange().getEnd()).isEqualTo(new Position(6, 1));
     }
 
+    @Test
+    void getDefinitionOfRecordTypeInCast() {
+        var server = TestServer.start();
+        var mainUri = getUri("main.nf");
+        var moduleUri = getUri("Problem.nf");
+
+        server.open("Problem.nf", """
+            record Problem {
+                id: String
+            }
+            """);
+        server.open("main.nf", """
+            include { Problem } from './Problem.nf'
+
+            nextflow.enable.types = true
+
+            workflow {
+                problem = record(id: 'example') as Problem
+                println problem.id
+            }
+            """);
+        var location = getDefinition(server, mainUri, new Position(5, 40));
+
+        assertThat(location).isNotNull();
+        assertThat(location.getUri()).isEqualTo(moduleUri);
+        assertThat(location.getRange().getStart()).isEqualTo(new Position(0, 0));
+        assertThat(location.getRange().getEnd()).isEqualTo(new Position(2, 1));
+    }
+
 }
