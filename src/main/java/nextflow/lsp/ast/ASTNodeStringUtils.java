@@ -16,7 +16,9 @@
 package nextflow.lsp.ast;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -453,7 +455,7 @@ public class ASTNodeStringUtils {
         return findAnnotation(parameter, NamedParams.class).isPresent();
     }
 
-    private static String parameterToLabel(Variable parameter) {
+    public static String parameterToLabel(Variable parameter) {
         var builder = new StringBuilder();
         builder.append(parameter.getName());
         var type = parameter.getType();
@@ -531,7 +533,13 @@ public class ASTNodeStringUtils {
             .orElse(null);
     }
 
-    private static String namedParams(Parameter[] parameters) {
+    /**
+     * Get the named params of a method as a Markdown list, or null
+     * if the method has no named params.
+     *
+     * @param parameters
+     */
+    public static String namedParams(Parameter[] parameters) {
         if( parameters.length == 0 )
             return null;
         var namedParams = asNamedParams(parameters[0]);
@@ -550,6 +558,49 @@ public class ASTNodeStringUtils {
             builder.append("`\n");
         });
         return builder.toString();
+    }
+
+    /**
+     * Get the description of each parameter of a method from the
+     * `@param` tags of its Groovydoc comment.
+     *
+     * @param node
+     */
+    public static Map<String,String> getParameterDocumentation(AnnotatedNode node) {
+        var result = new HashMap<String,String>();
+        var groovydoc = node.getGroovydoc();
+        if( groovydoc == null || !groovydoc.isPresent() )
+            return result;
+        String name = null;
+        StringBuilder builder = null;
+        for( var line : groovydoc.getContent().split("\n") ) {
+            line = line.trim();
+            if( line.startsWith("/**") )
+                line = line.substring(3);
+            if( line.endsWith("*/") )
+                line = line.substring(0, line.length() - 2);
+            if( line.startsWith("*") )
+                line = line.substring(1);
+            line = line.trim();
+            if( line.startsWith("@") ) {
+                if( name != null )
+                    result.put(name, builder.toString());
+                name = null;
+                var tokens = line.split("\\s+", 3);
+                if( "@param".equals(tokens[0]) && tokens.length > 1 ) {
+                    name = tokens[1];
+                    builder = new StringBuilder(tokens.length > 2 ? tokens[2] : "");
+                }
+            }
+            else if( name != null && !line.isEmpty() ) {
+                if( builder.length() > 0 )
+                    builder.append(' ');
+                builder.append(line);
+            }
+        }
+        if( name != null )
+            result.put(name, builder.toString());
+        return result;
     }
 
     private static String groovydocToMarkdown(Groovydoc groovydoc) {
