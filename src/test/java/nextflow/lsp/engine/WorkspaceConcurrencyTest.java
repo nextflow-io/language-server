@@ -78,18 +78,18 @@ class WorkspaceConcurrencyTest {
         // no longer exports the name that main.nf includes
         "workflow RENAMED%d {}\n");
 
-    static void writeWorkspace(TestServer f) {
-        f.write("modules/helper.nf", "workflow HELPER { def unused = 1 }\n");
+    static void writeWorkspace(TestServer server) {
+        server.write("modules/helper.nf", "workflow HELPER { def unused = 1 }\n");
         var main = new StringBuilder();
         for( int i = 0; i < MODULES; i++ ) {
-            f.write("modules/mod" + i + ".nf", VARIANTS.get(i % VARIANTS.size()).formatted(i));
+            server.write("modules/mod" + i + ".nf", VARIANTS.get(i % VARIANTS.size()).formatted(i));
             main.append("include { MOD" + i + " } from './modules/mod" + i + ".nf'\n");
         }
         main.append("workflow {\n");
         for( int i = 0; i < MODULES; i++ )
             main.append("    MOD" + i + "()\n");
         main.append("}\n");
-        f.write("main.nf", main.toString());
+        server.write("main.nf", main.toString());
     }
 
     // parsing must stay on the engine thread, because nf-lang writes to
@@ -102,14 +102,14 @@ class WorkspaceConcurrencyTest {
         direct.settle();
         var pool = new ForkJoinPool(4);
         try {
-            var f = TestServer.start((o) -> {
+            var server = TestServer.start((o) -> {
                 o.environment = new TestEnvironment().withReadPool(pool);
                 o.maxSliceFiles = 16;
                 o.settle = false;
             });
-            f.settle();
-            assertThat(f.client().getNonEmptyDiagnostics()).isEqualTo(direct.client().getNonEmptyDiagnostics()).isNotEmpty();
-            assertThat(f.client().getLogMessages()).noneMatch((m) -> m.getMessage().contains("Internal error"));
+            server.settle();
+            assertThat(server.client().getNonEmptyDiagnostics()).isEqualTo(direct.client().getNonEmptyDiagnostics()).isNotEmpty();
+            assertThat(server.client().getLogMessages()).noneMatch((m) -> m.getMessage().contains("Internal error"));
         }
         finally {
             pool.shutdownNow();
@@ -118,7 +118,7 @@ class WorkspaceConcurrencyTest {
 
     @Test
     @Timeout(120)
-    void stressTheProductionEngine() throws Exception {
+    void publishFreshDiagnosticsAfterConcurrentEditsRequestsAndCancellations() throws Exception {
         Map<String, String> openDocuments;
         Map<String, List<Diagnostic>> published;
         var unexpected = Collections.synchronizedList(new ArrayList<String>());
@@ -130,14 +130,14 @@ class WorkspaceConcurrencyTest {
                     unexpected.add(message.getMessage());
             }
         };
-        var f = TestServer.start((o) -> o.settle = false);
-        writeWorkspace(f);
+        var server = TestServer.start((o) -> o.settle = false);
+        writeWorkspace(server);
         var env = new DefaultEngineEnvironment();
         var engine = new Engine(env, client, Duration.ofMillis(5), Workspace.factory(8));
         try {
             var params = new InitializeParams();
             params.setCapabilities(new ClientCapabilities());
-            params.setWorkspaceFolders(List.of(new WorkspaceFolder(f.uri(""), "root")));
+            params.setWorkspaceFolders(List.of(new WorkspaceFolder(server.uri(""), "root")));
             engine.submit(new Event.Init(params));
             engine.submit(new Event.Initialized(new InitializedParams()));
 
@@ -165,12 +165,12 @@ class WorkspaceConcurrencyTest {
                 // let the engine catch up now and then, so that later
                 // messages interleave with builds instead of coalescing
                 if( step % 20 == 19 ) {
-                    var mainUri = f.uri("main.nf");
+                    var mainUri = server.uri("main.nf");
                     var paced = engine.request(new RequestSpec("pace", mainUri, null, Need.FILE, false), null, (context) -> null);
                     paced.get(60, TimeUnit.SECONDS);
                 }
                 var module = "modules/mod" + random.nextInt(MODULES) + ".nf";
-                var uri = f.uri(module);
+                var uri = server.uri(module);
                 var index = Integer.parseInt(module.replaceAll("\\D", ""));
                 var text = VARIANTS.get(random.nextInt(VARIANTS.size())).formatted(index);
                 switch( random.nextInt(6) ) {

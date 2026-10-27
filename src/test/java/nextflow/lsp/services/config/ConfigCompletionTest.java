@@ -37,6 +37,7 @@ import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies code completion in config files.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -134,8 +135,8 @@ class ConfigCompletionTest {
         server.open("nextflow.config", "process.\n");
         var result = either(server, uri, new Position(0, 8), 1);
 
-        assertThat(result.isRight()).isTrue();
-        assertThat(result.getRight().isIncomplete()).isTrue();
+        assertThat(result).matches(Either::isRight, "is a completion list");
+        assertThat(result.getRight()).matches(CompletionList::isIncomplete, "is incomplete");
         assertThat(result.getRight().getItems()).hasSize(1);
     }
 

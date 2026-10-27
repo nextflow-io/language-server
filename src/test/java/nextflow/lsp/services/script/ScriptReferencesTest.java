@@ -36,6 +36,7 @@ import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies find references in scripts.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

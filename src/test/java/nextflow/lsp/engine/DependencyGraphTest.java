@@ -28,6 +28,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies the include graph: dependency-first ordering of components
+ * and tracking of dependents.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -74,7 +76,7 @@ class DependencyGraphTest {
     }
 
     @Test
-    void trackDependents() {
+    void updateDirectAndTransitiveDependentsWhenEdgesChange() {
         var graph = graph(Map.of("a", List.of("b"), "b", List.of("c"), "d", List.of("c")));
         assertThat(graph.dependents(uri("c"))).containsExactly(uri("b"), uri("d"));
         assertThat(graph.transitiveDependents(Set.of(uri("c")))).containsExactly(uri("a"), uri("b"), uri("d"));
@@ -88,7 +90,7 @@ class DependencyGraphTest {
     }
 
     @Test
-    void handleLongChainsWithoutRecursion() {
+    void orderLongChainsWithoutRecursion() {
         var count = 20_000;
         var edges = new HashMap<String, List<String>>();
         IntStream.range(0, count - 1).forEach(i -> edges.put("n" + i, List.of("n" + (i + 1))));

@@ -28,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
+ * Specifies the system file access: walking, reading and existence
+ * checks.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -79,8 +81,8 @@ class FileAccessTest {
         var file = write("main.nf", "println 'héllo'");
 
         assertThat(files.readText(file)).isEqualTo("println 'héllo'");
-        assertThat(files.exists(file)).isTrue();
-        assertThat(files.exists(file.resolveSibling("missing.nf"))).isFalse();
+        assertThat(files.exists(file)).as("%s exists", file).isTrue();
+        assertThat(files.exists(file.resolveSibling("missing.nf"))).as("missing.nf exists").isFalse();
         assertThatThrownBy(() -> files.readText(file.resolveSibling("missing.nf"))).isInstanceOf(NoSuchFileException.class);
     }
 

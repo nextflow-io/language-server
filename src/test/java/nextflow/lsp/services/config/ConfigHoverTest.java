@@ -28,6 +28,7 @@ import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies hover hints in config files.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

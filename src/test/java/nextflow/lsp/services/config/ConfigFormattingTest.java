@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 /**
+ * Specifies formatting of config files.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

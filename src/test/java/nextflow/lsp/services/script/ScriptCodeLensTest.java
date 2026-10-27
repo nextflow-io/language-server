@@ -31,6 +31,8 @@ import static nextflow.lsp.util.JsonUtils.asJson;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies the DAG preview code lenses of scripts and the commands
+ * behind them.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

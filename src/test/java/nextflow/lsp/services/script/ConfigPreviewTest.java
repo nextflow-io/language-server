@@ -27,6 +27,7 @@ import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -39,6 +40,8 @@ import static nextflow.lsp.util.JsonUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies the resolved process config preview and the code actions
+ * that open it.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -181,402 +184,438 @@ class ConfigPreviewTest {
             .toList();
     }
 
-    @Test
-    void orderLayersThatApplyToProcessByPrecedence() {
-        var response = previewConfig(List.of());
+    /**
+     * The preview lists the layers that set each directive, in order of
+     * precedence.
+     */
+    @Nested
+    class Layers {
 
-        assertThat(result(response).get("process")).isEqualTo("ALIGN");
-        assertThat(result(response).get("labels")).isEqualTo(List.of("big"));
-        // a selector overrides the process body, which overrides the process scope
-        assertThat(layers(response, "cpus")).containsExactly(
-            new Layer("withLabel:big", "8", true),
-            new Layer("process body", "2", false),
-            new Layer("process config", "1", false)
-        );
-    }
+        @Test
+        void orderLayersThatApplyToProcessByPrecedence() {
+            var response = previewConfig(List.of());
 
-    @Test
-    void collectSettingsFromIncludedConfigFile() {
-        var response = previewConfig(List.of());
+            assertThat(result(response).get("process")).isEqualTo("ALIGN");
+            assertThat(result(response).get("labels")).isEqualTo(List.of("big"));
+            // a selector overrides the process body, which overrides the process scope
+            assertThat(layers(response, "cpus")).containsExactly(
+                new Layer("withLabel:big", "8", true),
+                new Layer("process body", "2", false),
+                new Layer("process config", "1", false)
+            );
+        }
 
-        assertThat(layers(response, "memory")).containsExactly(
-            new Layer("withName:ALIGN", "'16.GB'", true)
-        );
-        assertThat(rawLayers(response, "memory").get(0).get("file")).isEqualTo("conf/extra.config");
-    }
+        @Test
+        void collectSettingsFromIncludedConfigFile() {
+            var response = previewConfig(List.of());
 
-    @Test
-    void applyProfileOnlyWhenItIsActive() {
-        var response = previewConfig(List.of());
+            assertThat(layers(response, "memory")).containsExactly(
+                new Layer("withName:ALIGN", "'16.GB'", true)
+            );
+            assertThat(rawLayers(response, "memory").get(0).get("file")).isEqualTo("conf/extra.config");
+        }
 
-        assertThat(result(response).get("profiles")).isEqualTo(List.of("hpc"));
-        assertThat(result(response).get("activeProfiles")).isEqualTo(List.of());
-        assertThat(layers(response, "cpus").get(0)).isEqualTo(new Layer("withLabel:big", "8", true));
+        @Test
+        void applyProfileOnlyWhenItIsActive() {
+            var response = previewConfig(List.of());
 
-        response = previewConfig(List.of("hpc"));
+            assertThat(result(response).get("profiles")).isEqualTo(List.of("hpc"));
+            assertThat(result(response).get("activeProfiles")).isEqualTo(List.of());
+            assertThat(layers(response, "cpus").get(0)).isEqualTo(new Layer("withLabel:big", "8", true));
 
-        assertThat(result(response).get("activeProfiles")).isEqualTo(List.of("hpc"));
-        assertThat(layers(response, "cpus")).containsExactly(
-            new Layer("withName:ALIGN", "64", true),
-            new Layer("withLabel:big", "8", false),
-            new Layer("process body", "2", false),
-            new Layer("process config", "1", false)
-        );
-        // the profile layer records where it came from
-        assertThat(rawLayers(response, "cpus").get(0).get("profile")).isEqualTo("hpc");
-    }
+            response = previewConfig(List.of("hpc"));
 
-    @Test
-    void doNotApplySelectorThatDoesNotMatchProcess() {
-        var response = preview("""
-            process {
-                withName: OTHER {
-                    cpus = 16
+            assertThat(result(response).get("activeProfiles")).isEqualTo(List.of("hpc"));
+            assertThat(layers(response, "cpus")).containsExactly(
+                new Layer("withName:ALIGN", "64", true),
+                new Layer("withLabel:big", "8", false),
+                new Layer("process body", "2", false),
+                new Layer("process config", "1", false)
+            );
+            // the profile layer records where it came from
+            assertThat(rawLayers(response, "cpus").get(0).get("profile")).isEqualTo("hpc");
+        }
+
+        @Test
+        void doNotPromoteSelectorThatProfileOverridesInPlace() {
+            var response = preview("""
+                process {
+                    withName: 'ALIGN' {
+                        cpus = 1
+                    }
+                    withName: 'A.*' {
+                        cpus = 9
+                    }
                 }
-                withLabel: '!big' {
-                    cpus = 32
-                }
-            }
-            """);
 
-        assertThat(layers(response, "cpus")).containsExactly(
-            new Layer("process body", "2", true)
-        );
-    }
-
-    @ParameterizedTest
-    @CsvSource(delimiter = '|', quoteCharacter = '"', textBlock = """
-        .*   | withLabel:.*   | 32 | true
-        !.*  | process body   | 2  | true
-        big  | process body   | 2  | true
-        !big | withLabel:!big | 32 | true
-        """)
-    void matchLabelSelectorAgainstEmptyLabel(String selector, String source, String value, boolean active) {
-        var config = """
-            process {
-                withLabel: '%s' {
-                    cpus = 32
-                }
-            }
-            """.formatted(selector);
-        var response = preview(config, UNLABELED, "ALIGN", List.of(), null);
-
-        assertThat(layers(response, "cpus").get(0)).isEqualTo(new Layer(source, value, active));
-    }
-
-    @Test
-    void doNotPromoteSelectorThatProfileOverridesInPlace() {
-        var response = preview("""
-            process {
-                withName: 'ALIGN' {
-                    cpus = 1
-                }
-                withName: 'A.*' {
-                    cpus = 9
-                }
-            }
-
-            profiles {
-                docker {
-                    process {
-                        withName: 'ALIGN' {
-                            cpus = 4
+                profiles {
+                    docker {
+                        process {
+                            withName: 'ALIGN' {
+                                cpus = 4
+                            }
                         }
                     }
                 }
-            }
-            """, SCRIPT, "ALIGN", List.of("docker"), null);
+                """, SCRIPT, "ALIGN", List.of("docker"), null);
 
-        // a profile overrides `withName: ALIGN` where it is declared, so
-        // `withName: A.*` is still applied after it
-        assertThat(layers(response, "cpus").get(0)).isEqualTo(new Layer("withName:A.*", "9", true));
-    }
+            // a profile overrides `withName: ALIGN` where it is declared, so
+            // `withName: A.*` is still applied after it
+            assertThat(layers(response, "cpus").get(0)).isEqualTo(new Layer("withName:A.*", "9", true));
+        }
 
-    @Test
-    void treatMissingProfileArgumentAsNoProfiles() {
-        var response = preview("""
-            process {
-                cpus = 1
-                memory = '4.GB'
-            }
-            """, SCRIPT, "ALIGN", null, null);
-
-        assertThat(layers(response, "memory")).containsExactly(
-            new Layer("process config", "'4.GB'", true)
-        );
-    }
-
-    @Test
-    void reportErrorWhenProcessDoesNotExist() {
-        var response = preview("""
-            process.cpus = 1
-            """, SCRIPT, "NOPE", List.of(), null);
-
-        assertThat(response.get("error")).isEqualTo("Process 'NOPE' was not found.");
-    }
-
-    @Test
-    void handleQuotedProfileName() {
-        var response = preview("""
-            profiles {
-                'all-reads' {
-                    process.cpus = 99
-                }
-            }
-            """, SCRIPT, "ALIGN", List.of("all-reads"), null);
-
-        assertThat(result(response).get("profiles")).isEqualTo(List.of("all-reads"));
-        assertThat(layers(response, "cpus")).containsExactly(
-            new Layer("process body", "2", true),
-            new Layer("process config", "99", false)
-        );
-    }
-
-    @Test
-    void showDynamicValueAsSourceText() {
-        var response = preview("""
-            process.memory = '2.GB'
-            """, """
-            process ALIGN {
-                memory { 4.GB * task.attempt }
-
-                script:
-                \"""
-                echo align
-                \"""
-            }
-            """, "ALIGN", List.of(), null);
-
-        // a closure is shown as written, since the language server cannot evaluate it
-        assertThat(layers(response, "memory")).containsExactly(
-            new Layer("process body", "{ 4.GB * task.attempt }", true),
-            new Layer("process config", "'2.GB'", false)
-        );
-    }
-
-    static Stream<Arguments> configsWithErrors() {
-        return Stream.of(
-            Arguments.of("nextflow.config", """
-                includeConfig 'conf/missing.config'
-
-                process.cpus = 4
-                """),
-            Arguments.of("nextflow.config", """
+        @Test
+        void treatMissingProfileArgumentAsNoProfiles() {
+            var response = preview("""
                 process {
-                    cpus =
-                """)
-        );
+                    cpus = 1
+                    memory = '4.GB'
+                }
+                """, SCRIPT, "ALIGN", null, null);
+
+            assertThat(layers(response, "memory")).containsExactly(
+                new Layer("process config", "'4.GB'", true)
+            );
+        }
+
+        @Test
+        void recognizeQuotedProfileName() {
+            var response = preview("""
+                profiles {
+                    'all-reads' {
+                        process.cpus = 99
+                    }
+                }
+                """, SCRIPT, "ALIGN", List.of("all-reads"), null);
+
+            assertThat(result(response).get("profiles")).isEqualTo(List.of("all-reads"));
+            assertThat(layers(response, "cpus")).containsExactly(
+                new Layer("process body", "2", true),
+                new Layer("process config", "99", false)
+            );
+        }
+
+        @Test
+        void showDynamicValueAsSourceText() {
+            var response = preview("""
+                process.memory = '2.GB'
+                """, """
+                process ALIGN {
+                    memory { 4.GB * task.attempt }
+
+                    script:
+                    \"""
+                    echo align
+                    \"""
+                }
+                """, "ALIGN", List.of(), null);
+
+            // a closure is shown as written, since the language server cannot evaluate it
+            assertThat(layers(response, "memory")).containsExactly(
+                new Layer("process body", "{ 4.GB * task.attempt }", true),
+                new Layer("process config", "'2.GB'", false)
+            );
+        }
+
+        @Test
+        void doNotPickWinnerForRepeatableDirective() {
+            var response = preview("""
+                process {
+                    withLabel: big {
+                        label = 'retry_high'
+                    }
+                }
+                """);
+
+            // Nextflow appends labels rather than overriding them, so every layer applies
+            assertThat(layers(response, "label")).containsExactly(
+                new Layer("withLabel:big", "'retry_high'", true),
+                new Layer("process body", "'big'", true)
+            );
+            // a directive that overrides still has a single winner
+            assertThat(layers(response, "cpus")).containsExactly(
+                new Layer("process body", "2", true)
+            );
+        }
+
     }
 
-    @ParameterizedTest
-    @MethodSource("configsWithErrors")
-    void blockPreviewWhenConfigFileHasErrors(String file, String config) {
-        var response = preview(config);
+    /**
+     * Process selectors apply when they match the process name, alias,
+     * qualified name or labels.
+     */
+    @Nested
+    class Selectors {
 
-        assertThat(response.get("error")).isEqualTo("Config preview cannot be shown because " + file + " has errors.");
+        @Test
+        void doNotApplySelectorThatDoesNotMatchProcess() {
+            var response = preview("""
+                process {
+                    withName: OTHER {
+                        cpus = 16
+                    }
+                    withLabel: '!big' {
+                        cpus = 32
+                    }
+                }
+                """);
+
+            assertThat(layers(response, "cpus")).containsExactly(
+                new Layer("process body", "2", true)
+            );
+        }
+
+        @ParameterizedTest
+        @CsvSource(delimiter = '|', quoteCharacter = '"', textBlock = """
+            .*   | withLabel:.*   | 32 | true
+            !.*  | process body   | 2  | true
+            big  | process body   | 2  | true
+            !big | withLabel:!big | 32 | true
+            """)
+        void matchLabelSelectorAgainstEmptyLabel(String selector, String source, String value, boolean active) {
+            var config = """
+                process {
+                    withLabel: '%s' {
+                        cpus = 32
+                    }
+                }
+                """.formatted(selector);
+            var response = preview(config, UNLABELED, "ALIGN", List.of(), null);
+
+            assertThat(layers(response, "cpus").get(0)).isEqualTo(new Layer(source, value, active));
+        }
+
+        @Test
+        void matchSelectorAgainstQualifiedNameAndAlias() {
+            var response = preview("""
+                process {
+                    withName: 'SUB:ALIGN_DNA' {
+                        cpus = 16
+                    }
+                    withName: ALIGN_DNA {
+                        cpus = 8
+                    }
+                    withName: ALIGN {
+                        cpus = 4
+                    }
+                    withName: OTHER {
+                        cpus = 32
+                    }
+                }
+                """, SCRIPT, "ALIGN", List.of(), "SUB:ALIGN_DNA");
+
+            assertThat(result(response).get("process")).isEqualTo("SUB:ALIGN_DNA");
+            // the qualified name outranks the alias, which outranks the process name
+            assertThat(layers(response, "cpus")).extracting(Layer::source).containsExactly(
+                "withName:SUB:ALIGN_DNA",
+                "withName:ALIGN_DNA",
+                "withName:ALIGN",
+                "process body"
+            );
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @CsvSource(delimiter = '|', quoteCharacter = '"', textBlock = """
+            a wildcard over the process name             | ALIGN.*          | true
+            a prefix of the process name                 | ALI              | false
+            a wildcard over the enclosing scope          | .*:SUB:ALIGN_DNA | true
+            an exact selector for a nested invocation    | SUB:ALIGN_DNA    | false
+            a negated selector matching another name     | !ALIGN_DNA       | true
+            a pattern that differs only in case          | !align.*         | true
+            an alternation                               | "ALIGN|REPORT"   | true
+            """)
+        void matchNameSelectorAsRegularExpression(String description, String pattern, boolean applies) {
+            var config = """
+                process {
+                    withName: '%s' {
+                        queue = 'long'
+                    }
+                }
+                """.formatted(pattern);
+            var response = preview(config, SCRIPT, "ALIGN", List.of(), "SUB2:SUB:ALIGN_DNA");
+
+            assertThat(layers(response, "queue")).as("layers of queue")
+                .matches(layers -> (layers != null) == applies, applies ? "is not null" : "is null");
+        }
+
+        @Test
+        void rankNameSelectorByTheNameThatItMatched() {
+            var response = preview("""
+                process {
+                    withName: 'SUB:ALIGN_DNA' {
+                        cpus = 128
+                    }
+                    withName: ALIGN {
+                        cpus = 16
+                    }
+                    withName: 'ALIGN.*' {
+                        memory = '64.GB'
+                    }
+                    withName: ALIGN {
+                        memory = '8.GB'
+                    }
+                }
+                """, SCRIPT, "ALIGN", List.of(), "SUB:ALIGN_DNA");
+
+            // the qualified selector wins even though the weaker one is declared later
+            assertThat(layers(response, "cpus").get(0)).isEqualTo(new Layer("withName:SUB:ALIGN_DNA", "128", true));
+            // a selector that matches several names is ranked by the strongest one
+            assertThat(layers(response, "memory").get(0)).isEqualTo(new Layer("withName:ALIGN.*", "'64.GB'", true));
+        }
+
     }
 
-    static Stream<Arguments> invocations() {
-        return Stream.of(
-            Arguments.of("a process invocation", 8, 4, List.of("Preview config for SUB:ALIGN", "Preview config for SUB2:SUB:ALIGN")),
-            Arguments.of("a workflow invocation", 12, 4, List.of()),
-            Arguments.of("the definition", 0, 8, List.of())
-        );
+    /**
+     * The preview is replaced by an error when it cannot be shown.
+     */
+    @Nested
+    class Errors {
+
+        @Test
+        void reportErrorWhenProcessDoesNotExist() {
+            var response = preview("""
+                process.cpus = 1
+                """, SCRIPT, "NOPE", List.of(), null);
+
+            assertThat(response.get("error")).isEqualTo("Process 'NOPE' was not found.");
+        }
+
+        static Stream<Arguments> configsWithErrors() {
+            return Stream.of(
+                Arguments.of("nextflow.config", """
+                    includeConfig 'conf/missing.config'
+
+                    process.cpus = 4
+                    """),
+                Arguments.of("nextflow.config", """
+                    process {
+                        cpus =
+                    """)
+            );
+        }
+
+        @ParameterizedTest
+        @MethodSource("configsWithErrors")
+        void blockPreviewWhenConfigFileHasErrors(String file, String config) {
+            var response = preview(config);
+
+            assertThat(response.get("error")).isEqualTo("Config preview cannot be shown because " + file + " has errors.");
+        }
+
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("invocations")
-    void offerCodeActionForEachQualifiedNameOfInvocation(String location, int line, int character, List<String> expected) {
-        var server = TestServer.start();
-        var uri = getUri("main.nf");
-        server.open("main.nf", """
-            process ALIGN {
-                script:
-                \"""
-                echo align
-                \"""
-            }
+    /**
+     * A code action on a process invocation opens the preview for each
+     * qualified name of the process.
+     */
+    @Nested
+    class CodeActions {
 
-            workflow SUB {
-                ALIGN()
-            }
+        static Stream<Arguments> invocations() {
+            return Stream.of(
+                Arguments.of("a process invocation", 8, 4, List.of("Preview config for SUB:ALIGN", "Preview config for SUB2:SUB:ALIGN")),
+                Arguments.of("a workflow invocation", 12, 4, List.of()),
+                Arguments.of("the definition", 0, 8, List.of())
+            );
+        }
 
-            workflow SUB2 {
-                SUB()
-            }
-
-            workflow {
-                SUB()
-                SUB2()
-            }
-            """);
-
-        assertThat(codeActionTitles(server, uri, line, character)).isEqualTo(expected);
-    }
-
-    @Test
-    void qualifyInvocationWithIncludeAlias() {
-        writeWorkspaceFile("modules/align.nf", """
-            process ALIGN {
-                script:
-                \"""
-                echo align
-                \"""
-            }
-            """);
-        writeWorkspaceFile("subworkflows/sub.nf", """
-            include { ALIGN as ALIGN_DNA } from '../modules/align.nf'
-
-            workflow SUB {
-                main:
-                ALIGN_DNA()
-            }
-            """);
-        var main = """
-            include { SUB } from './subworkflows/sub.nf'
-
-            workflow {
-                SUB()
-            }
-            """;
-        writeWorkspaceFile("main.nf", main);
-        var server = TestServer.start();
-
-        // the qualified name uses the alias at the call site, not the process name
-        assertThat(codeActionTitles(server, getUri("subworkflows/sub.nf"), 4, 4))
-            .containsExactly("Preview config for SUB:ALIGN_DNA");
-    }
-
-    @Test
-    void qualifyInvocationWithTheEditedAliasOnceRebuilt() {
-        writeWorkspaceFile("modules/align.nf", """
-            process ALIGN {
-                script:
-                \"""
-                echo align
-                \"""
-            }
-            """);
-        var sub = """
-            include { ALIGN as ALIGN_DNA } from '../modules/align.nf'
-
-            workflow SUB {
-                main:
-                ALIGN_DNA()
-            }
-            """;
-        writeWorkspaceFile("subworkflows/sub.nf", sub);
-        writeWorkspaceFile("main.nf", """
-            include { SUB } from './subworkflows/sub.nf'
-
-            workflow {
-                SUB()
-            }
-            """);
-        var server = TestServer.start();
-        var uri = getUri("subworkflows/sub.nf");
-        server.open("subworkflows/sub.nf", sub);
-        server.change("subworkflows/sub.nf", sub.replace("ALIGN_DNA", "ALIGN_RNA"));
-        server.settle();
-        assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for SUB:ALIGN_RNA");
-    }
-
-    @Test
-    void matchSelectorAgainstQualifiedNameAndAlias() {
-        var response = preview("""
-            process {
-                withName: 'SUB:ALIGN_DNA' {
-                    cpus = 16
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("invocations")
+        void offerCodeActionForEachQualifiedNameOfInvocation(String location, int line, int character, List<String> expected) {
+            var server = TestServer.start();
+            var uri = getUri("main.nf");
+            server.open("main.nf", """
+                process ALIGN {
+                    script:
+                    \"""
+                    echo align
+                    \"""
                 }
-                withName: ALIGN_DNA {
-                    cpus = 8
-                }
-                withName: ALIGN {
-                    cpus = 4
-                }
-                withName: OTHER {
-                    cpus = 32
-                }
-            }
-            """, SCRIPT, "ALIGN", List.of(), "SUB:ALIGN_DNA");
 
-        assertThat(result(response).get("process")).isEqualTo("SUB:ALIGN_DNA");
-        // the qualified name outranks the alias, which outranks the process name
-        assertThat(layers(response, "cpus")).extracting(Layer::source).containsExactly(
-            "withName:SUB:ALIGN_DNA",
-            "withName:ALIGN_DNA",
-            "withName:ALIGN",
-            "process body"
-        );
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @CsvSource(delimiter = '|', quoteCharacter = '"', textBlock = """
-        a wildcard over the process name             | ALIGN.*          | true
-        a prefix of the process name                 | ALI              | false
-        a wildcard over the enclosing scope          | .*:SUB:ALIGN_DNA | true
-        an exact selector for a nested invocation    | SUB:ALIGN_DNA    | false
-        a negated selector matching another name     | !ALIGN_DNA       | true
-        a pattern that differs only in case          | !align.*         | true
-        an alternation                               | "ALIGN|REPORT"   | true
-        """)
-    void matchNameSelectorAsRegularExpression(String description, String pattern, boolean applies) {
-        var config = """
-            process {
-                withName: '%s' {
-                    queue = 'long'
+                workflow SUB {
+                    ALIGN()
                 }
-            }
-            """.formatted(pattern);
-        var response = preview(config, SCRIPT, "ALIGN", List.of(), "SUB2:SUB:ALIGN_DNA");
 
-        assertThat(layers(response, "queue") != null).isEqualTo(applies);
-    }
+                workflow SUB2 {
+                    SUB()
+                }
 
-    @Test
-    void rankNameSelectorByTheNameThatItMatched() {
-        var response = preview("""
-            process {
-                withName: 'SUB:ALIGN_DNA' {
-                    cpus = 128
+                workflow {
+                    SUB()
+                    SUB2()
                 }
-                withName: ALIGN {
-                    cpus = 16
-                }
-                withName: 'ALIGN.*' {
-                    memory = '64.GB'
-                }
-                withName: ALIGN {
-                    memory = '8.GB'
-                }
-            }
-            """, SCRIPT, "ALIGN", List.of(), "SUB:ALIGN_DNA");
+                """);
 
-        // the qualified selector wins even though the weaker one is declared later
-        assertThat(layers(response, "cpus").get(0)).isEqualTo(new Layer("withName:SUB:ALIGN_DNA", "128", true));
-        // a selector that matches several names is ranked by the strongest one
-        assertThat(layers(response, "memory").get(0)).isEqualTo(new Layer("withName:ALIGN.*", "'64.GB'", true));
-    }
+            assertThat(codeActionTitles(server, uri, line, character)).isEqualTo(expected);
+        }
 
-    @Test
-    void doNotPickWinnerForRepeatableDirective() {
-        var response = preview("""
-            process {
-                withLabel: big {
-                    label = 'retry_high'
+        @Test
+        void qualifyInvocationWithIncludeAlias() {
+            writeWorkspaceFile("modules/align.nf", """
+                process ALIGN {
+                    script:
+                    \"""
+                    echo align
+                    \"""
                 }
-            }
-            """);
+                """);
+            writeWorkspaceFile("subworkflows/sub.nf", """
+                include { ALIGN as ALIGN_DNA } from '../modules/align.nf'
 
-        // Nextflow appends labels rather than overriding them, so every layer applies
-        assertThat(layers(response, "label")).containsExactly(
-            new Layer("withLabel:big", "'retry_high'", true),
-            new Layer("process body", "'big'", true)
-        );
-        // a directive that overrides still has a single winner
-        assertThat(layers(response, "cpus")).containsExactly(
-            new Layer("process body", "2", true)
-        );
+                workflow SUB {
+                    main:
+                    ALIGN_DNA()
+                }
+                """);
+            var main = """
+                include { SUB } from './subworkflows/sub.nf'
+
+                workflow {
+                    SUB()
+                }
+                """;
+            writeWorkspaceFile("main.nf", main);
+            var server = TestServer.start();
+
+            // the qualified name uses the alias at the call site, not the process name
+            assertThat(codeActionTitles(server, getUri("subworkflows/sub.nf"), 4, 4))
+                .containsExactly("Preview config for SUB:ALIGN_DNA");
+        }
+
+        @Test
+        void qualifyInvocationWithTheEditedAliasOnceRebuilt() {
+            writeWorkspaceFile("modules/align.nf", """
+                process ALIGN {
+                    script:
+                    \"""
+                    echo align
+                    \"""
+                }
+                """);
+            var sub = """
+                include { ALIGN as ALIGN_DNA } from '../modules/align.nf'
+
+                workflow SUB {
+                    main:
+                    ALIGN_DNA()
+                }
+                """;
+            writeWorkspaceFile("subworkflows/sub.nf", sub);
+            writeWorkspaceFile("main.nf", """
+                include { SUB } from './subworkflows/sub.nf'
+
+                workflow {
+                    SUB()
+                }
+                """);
+            var server = TestServer.start();
+            var uri = getUri("subworkflows/sub.nf");
+            server.open("subworkflows/sub.nf", sub);
+            server.change("subworkflows/sub.nf", sub.replace("ALIGN_DNA", "ALIGN_RNA"));
+            server.settle();
+            assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for SUB:ALIGN_RNA");
+        }
+
     }
 
 }

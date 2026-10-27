@@ -28,6 +28,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies that source units are created from the given text rather
+ * than the file on disk.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

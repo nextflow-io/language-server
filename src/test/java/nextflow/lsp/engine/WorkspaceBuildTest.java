@@ -38,8 +38,9 @@ import static nextflow.lsp.TestUtils.UNUSED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for the build pipeline: invalidation, re-parse on rebuild,
- * external inputs and failure containment.
+ * Specifies the build pipeline: invalidation, rebuilds, external
+ * inputs (lib directory and parameter schema) and failure containment.
+ * Include resolution is specified by WorkspaceBuildIncludesTest.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -63,23 +64,23 @@ class WorkspaceBuildTest {
 
     @Test
     void publishDiagnosticsForEveryFileInTheWorkspace() {
-        var f = start();
-        f.write("mod.nf", """
+        var server = start();
+        server.write("mod.nf", """
             workflow FOO {
                 def y = 2
             }
             """);
-        f.write("main.nf", """
+        server.write("main.nf", """
             include { FOO } from './mod.nf'
             workflow {
                 FOO()
             }
             """);
-        f.write("nextflow.config", "foo.bar = 1\n");
-        f.settle();
-        assertThat(f.messages("mod.nf")).containsExactly(UNUSED);
-        assertThat(f.messages("main.nf")).isEmpty();
-        assertThat(f.messages("nextflow.config")).containsExactly("Unrecognized config option 'foo.bar'");
+        server.write("nextflow.config", "foo.bar = 1\n");
+        server.settle();
+        assertThat(server.messages("mod.nf")).containsExactly(UNUSED);
+        assertThat(server.messages("main.nf")).isEmpty();
+        assertThat(server.messages("nextflow.config")).containsExactly("Unrecognized config option 'foo.bar'");
     }
 
     @Test
@@ -100,9 +101,9 @@ class WorkspaceBuildTest {
                 \"""
             }
             """;
-        var f = start();
-        f.write("c.nf", producer);
-        f.write("b.nf", """
+        var server = start();
+        server.write("c.nf", producer);
+        server.write("b.nf", """
             nextflow.enable.types = true
 
             include { PRODUCER } from './c.nf'
@@ -118,7 +119,7 @@ class WorkspaceBuildTest {
                 ch_out
             }
             """);
-        f.write("a.nf", """
+        server.write("a.nf", """
             nextflow.enable.types = true
 
             include { WF } from './b.nf'
@@ -140,17 +141,17 @@ class WorkspaceBuildTest {
                 CONSUMER(WF(channel.of(record(id: 'sample1'))))
             }
             """);
-        f.settle();
-        assertThat(f.messages("a.nf")).isEmpty();
+        server.settle();
+        assertThat(server.messages("a.nf")).isEmpty();
 
         // a.nf only depends on c.nf through b.nf
-        f.open("c.nf", producer.replace("record(id: id, data: file('data.txt'))", "record(id: id)"));
-        f.settle();
-        assertThat(f.messages("a.nf")).singleElement().asString().contains("is not compatible with process input");
+        server.open("c.nf", producer.replace("record(id: id, data: file('data.txt'))", "record(id: id)"));
+        server.settle();
+        assertThat(server.messages("a.nf")).singleElement().asString().contains("is not compatible with process input");
 
-        f.change("c.nf", producer);
-        f.settle();
-        assertThat(f.messages("a.nf")).isEmpty();
+        server.change("c.nf", producer);
+        server.settle();
+        assertThat(server.messages("a.nf")).isEmpty();
     }
 
     /**
@@ -159,8 +160,8 @@ class WorkspaceBuildTest {
      */
     @Test
     void doNotDuplicateWarningsInDependentsWhenEditingAnIncludedModule() {
-        var f = start();
-        f.write("main.nf", """
+        var server = start();
+        server.write("main.nf", """
             include { FOO } from './mod.nf'
             workflow {
                 def x = 1
@@ -172,27 +173,27 @@ class WorkspaceBuildTest {
                 println 'hello'
             }
             """;
-        f.write("mod.nf", mod);
-        f.open("mod.nf", mod);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(UNUSED);
+        server.write("mod.nf", mod);
+        server.open("mod.nf", mod);
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(UNUSED);
 
         for( int i = 0; i < 3; i++ ) {
-            f.change("mod.nf", mod.replace("hello", "hello " + i));
-            f.settle();
-            assertThat(f.messages("main.nf")).containsExactly(UNUSED);
+            server.change("mod.nf", mod.replace("hello", "hello " + i));
+            server.settle();
+            assertThat(server.messages("main.nf")).containsExactly(UNUSED);
         }
 
         var finalMod = mod.replace("hello", "hello 2");
-        assertThat(f.client().getNonEmptyDiagnostics())
+        assertThat(server.client().getNonEmptyDiagnostics())
             .isEqualTo(freshDiagnostics(Map.of("mod.nf", finalMod)));
     }
 
     @Test
     void reportPluginErrorInFileWithLocalInclude() {
-        var f = start();
-        f.write("mod.nf", "workflow FOO {}\n");
-        f.write("main.nf", """
+        var server = start();
+        server.write("mod.nf", "workflow FOO {}\n");
+        server.write("main.nf", """
             include { FOO } from './mod.nf'
             include { bar } from 'plugin/nf-missing'
 
@@ -200,180 +201,64 @@ class WorkspaceBuildTest {
                 FOO()
             }
             """);
-        f.settle();
-        assertThat(f.messages("main.nf"))
+        server.settle();
+        assertThat(server.messages("main.nf"))
             .containsExactly("Plugin 'nf-missing' does not exist or is not specified in the configuration file");
 
         // rebuilding the file must not drop or duplicate the error
-        f.open("mod.nf", "workflow FOO { println 'hi' }\n");
-        f.settle();
-        assertThat(f.messages("main.nf"))
+        server.open("mod.nf", "workflow FOO { println 'hi' }\n");
+        server.settle();
+        assertThat(server.messages("main.nf"))
             .containsExactly("Plugin 'nf-missing' does not exist or is not specified in the configuration file");
-    }
-
-    @Test
-    void reportMissingIncludeUntilTheTargetIsCreated() {
-        var f = start();
-        f.write("main.nf", """
-            include { FOO } from './mod.nf'
-            workflow {
-                FOO()
-            }
-            """);
-        f.settle();
-        assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
-
-        f.writeAndNotify("mod.nf", "workflow FOO {}\n");
-        f.settle();
-        assertThat(f.messages("main.nf")).isEmpty();
-
-        f.delete("mod.nf");
-        f.settle();
-        assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
-    }
-
-    @Test
-    void includeOfAnOpenFileThatIsNotOnDisk() {
-        var f = start();
-        f.write("main.nf", """
-            include { FOO } from './mod.nf'
-            workflow {
-                FOO()
-            }
-            """);
-        f.open("mod.nf", "workflow FOO {}\n");
-        f.settle();
-        assertThat(f.messages("main.nf")).isEmpty();
-
-        // closing the unsaved file removes it
-        f.close("mod.nf");
-        f.settle();
-        assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
-    }
-
-    @Test
-    void handleIncludeCycles() {
-        var f = start();
-        f.write("a.nf", """
-            include { B } from './b.nf'
-            workflow A {
-                def x = 1
-            }
-            """);
-        f.write("b.nf", """
-            include { A } from './a.nf'
-            workflow B {
-                A()
-            }
-            """);
-        f.settle();
-        assertThat(f.messages("a.nf")).containsExactly(UNUSED);
-
-        f.open("b.nf", """
-            include { A } from './a.nf'
-            workflow B {
-                A()
-                def y = 2
-            }
-            """);
-        f.settle();
-        assertThat(f.messages("a.nf")).containsExactly(UNUSED);
-        assertThat(f.messages("b.nf")).containsExactly(UNUSED);
-    }
-
-    @Test
-    void checkConfigIncludesAgainWhenTheTargetIsCreated() {
-        var f = start();
-        f.write("nextflow.config", "includeConfig 'conf/base.config'\n");
-        f.settle();
-        assertThat(f.messages("nextflow.config")).singleElement().asString().startsWith("Invalid include source");
-
-        f.writeAndNotify("conf/base.config", "process.cpus = 2\n");
-        f.settle();
-        assertThat(f.messages("nextflow.config")).isEmpty();
-    }
-
-    @Test
-    void clearConfigIncludeErrorWhenAnOpenTargetIsSaved() {
-        var f = start();
-        f.write("nextflow.config", "includeConfig 'conf/base.config'\n");
-        f.settle();
-        assertThat(f.messages("nextflow.config")).singleElement().asString().startsWith("Invalid include source");
-
-        f.open("conf/base.config", "process.cpus = 2\n");
-        f.settle();
-
-        // the watcher event is ignored because the document is open
-        f.writeAndNotify("conf/base.config", "process.cpus = 2\n");
-        f.settle();
-        assertThat(f.messages("nextflow.config")).isEmpty();
-        assertThat(f.client().getNonEmptyDiagnostics())
-            .isEqualTo(freshDiagnostics(Map.of("conf/base.config", "process.cpus = 2\n")));
-    }
-
-    @Test
-    void keepConfigIncludeValidWhenAnOpenTargetIsDeleted() {
-        var f = start();
-        f.write("nextflow.config", "includeConfig 'conf/base.config'\n");
-        f.write("conf/base.config", "process.cpus = 2\n");
-        f.open("conf/base.config", "process.cpus = 2\n");
-        f.settle();
-        assertThat(f.messages("nextflow.config")).isEmpty();
-
-        f.delete("conf/base.config");
-        f.settle();
-        assertThat(f.messages("nextflow.config")).isEmpty();
-        assertThat(f.client().getNonEmptyDiagnostics())
-            .isEqualTo(freshDiagnostics(Map.of("conf/base.config", "process.cpus = 2\n")));
     }
 
     @Test
     void rebuildEveryScriptWhenALibJarChanges() throws IOException {
-        var f = start();
-        f.write("main.nf", """
+        var server = start();
+        server.write("main.nf", """
             workflow {
                 def x = Greeter.greet('world')
             }
             """);
-        f.write("other.nf", "workflow OTHER {}\n");
-        f.write("nextflow.config", "process.cpus = 2\n");
-        f.settle();
-        assertThat(f.messages("main.nf")).anyMatch(m -> m.contains("Greeter"));
-        var before = f.parses();
+        server.write("other.nf", "workflow OTHER {}\n");
+        server.write("nextflow.config", "process.cpus = 2\n");
+        server.settle();
+        assertThat(server.messages("main.nf")).anyMatch(m -> m.contains("Greeter"));
+        var before = server.parses();
 
-        writeJar(f.path("lib/tools.jar"), """
+        writeJar(server.path("lib/tools.jar"), """
             class Greeter {
                 static String greet(String name) {
                     return "Hello, ${name}!"
                 }
             }
             """);
-        f.notify("lib/tools.jar", FileChangeType.Created);
-        f.settle();
-        assertThat(f.parsesSince(before)).isEqualTo(Map.of("main.nf", 1, "other.nf", 1));
-        assertThat(f.messages("main.nf")).containsExactly(UNUSED);
+        server.notify("lib/tools.jar", FileChangeType.Created);
+        server.settle();
+        assertThat(server.parsesSince(before)).isEqualTo(Map.of("main.nf", 1, "other.nf", 1));
+        assertThat(server.messages("main.nf")).containsExactly(UNUSED);
     }
 
     @Test
     void rebuildScriptWhenLibClassIsAdded() {
-        var f = start();
-        f.write("main.nf", """
+        var server = start();
+        server.write("main.nf", """
             workflow {
                 println(Greeter.greet('world'))
             }
             """);
-        f.settle();
-        assertThat(f.messages("main.nf")).singleElement().asString().contains("Greeter");
+        server.settle();
+        assertThat(server.messages("main.nf")).singleElement().asString().contains("Greeter");
 
-        f.writeAndNotify("lib/Greeter.groovy", """
+        server.writeAndNotify("lib/Greeter.groovy", """
             class Greeter {
                 static String greet(String name) {
                     return "Hello, ${name}!"
                 }
             }
             """);
-        f.settle();
-        assertThat(f.messages("main.nf")).isEmpty();
+        server.settle();
+        assertThat(server.messages("main.nf")).isEmpty();
     }
 
     @Test
@@ -389,224 +274,164 @@ class WorkspaceBuildTest {
                 }
             }
             """;
-        var f = start();
-        f.write("nextflow_schema.json", schema.formatted("\"bar\": { \"type\": \"string\" }"));
-        f.write("main.nf", """
+        var server = start();
+        server.write("nextflow_schema.json", schema.formatted("\"bar\": { \"type\": \"string\" }"));
+        server.write("main.nf", """
             workflow {
                 println(params.foo)
             }
             """);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly("Unrecognized parameter `foo`");
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly("Unrecognized parameter `foo`");
 
-        f.writeAndNotify("nextflow_schema.json", schema.formatted("\"foo\": { \"type\": \"string\" }"));
-        f.settle();
-        assertThat(f.messages("main.nf")).isEmpty();
+        server.writeAndNotify("nextflow_schema.json", schema.formatted("\"foo\": { \"type\": \"string\" }"));
+        server.settle();
+        assertThat(server.messages("main.nf")).isEmpty();
     }
 
     @Test
     void rebuildOnlyTheScriptsNextToAChangedParameterSchema() {
-        var f = start();
-        f.write("main.nf", "workflow { println(params.foo) }\n");
-        f.write("sub/main.nf", "workflow { println(params.foo) }\n");
-        f.write("sub/nextflow.config", "process.cpus = 2\n");
-        f.settle();
-        var before = f.parses();
+        var server = start();
+        server.write("main.nf", "workflow { println(params.foo) }\n");
+        server.write("sub/main.nf", "workflow { println(params.foo) }\n");
+        server.write("sub/nextflow.config", "process.cpus = 2\n");
+        server.settle();
+        var before = server.parses();
 
-        f.writeAndNotify("sub/nextflow_schema.json", "{}\n");
-        f.settle();
-        assertThat(f.parsesSince(before)).isEqualTo(Map.of("sub/main.nf", 1));
+        server.writeAndNotify("sub/nextflow_schema.json", "{}\n");
+        server.settle();
+        assertThat(server.parsesSince(before)).isEqualTo(Map.of("sub/main.nf", 1));
     }
 
     @Test
     void containReadFailureToOneFileAndRetryOnNextEvent() {
         var failing = new boolean[] { true };
         var files = new FailingFileAccess((path) -> failing[0] && path.endsWith("bad.nf"), false);
-        var f = TestServer.start((o) -> {
+        var server = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withFiles(files);
             o.settle = false;
         });
-        f.write("bad.nf", "workflow BAD { def x = 1 }\n");
-        f.write("good.nf", "workflow GOOD { def y = 1 }\n");
-        f.settle();
-        assertThat(f.messages("good.nf")).containsExactly(UNUSED);
-        assertThat(f.messages("bad.nf")).isEmpty();
-        assertThat(f.client().getLogMessages()).anyMatch(m -> m.getMessage().startsWith("Failed to read " + f.path("bad.nf")));
+        server.write("bad.nf", "workflow BAD { def x = 1 }\n");
+        server.write("good.nf", "workflow GOOD { def y = 1 }\n");
+        server.settle();
+        assertThat(server.messages("good.nf")).containsExactly(UNUSED);
+        assertThat(server.messages("bad.nf")).isEmpty();
+        assertThat(server.client().getLogMessages()).anyMatch(m -> m.getMessage().startsWith("Failed to read " + server.path("bad.nf")));
 
         failing[0] = false;
-        f.notify("bad.nf", FileChangeType.Changed);
-        f.settle();
-        assertThat(f.messages("bad.nf")).containsExactly(UNUSED);
-        assertThat(f.messages("good.nf")).containsExactly(UNUSED);
+        server.notify("bad.nf", FileChangeType.Changed);
+        server.settle();
+        assertThat(server.messages("bad.nf")).containsExactly(UNUSED);
+        assertThat(server.messages("good.nf")).containsExactly(UNUSED);
     }
 
     @Test
     void containInternalErrorToOneFile() {
         var files = new FailingFileAccess((path) -> path.endsWith("bad.nf"), true);
-        var f = TestServer.start((o) -> {
+        var server = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withFiles(files);
             o.settle = false;
         });
-        f.write("bad.nf", "workflow BAD {}\n");
-        f.write("good.nf", """
+        server.write("bad.nf", "workflow BAD {}\n");
+        server.write("good.nf", """
             include { BAD } from './bad.nf'
             workflow {
                 def y = 1
                 BAD()
             }
             """);
-        f.settle();
-        assertThat(f.messages("bad.nf")).containsExactly(DiagnosticsLedger.INTERNAL_ERROR_MESSAGE);
-        assertThat(f.messages("good.nf")).contains(UNUSED);
-        assertThat(f.client().getLogMessages()).anyMatch(m -> m.getMessage().contains("Internal error while parsing"));
+        server.settle();
+        assertThat(server.messages("bad.nf")).containsExactly(DiagnosticsLedger.INTERNAL_ERROR_MESSAGE);
+        assertThat(server.messages("good.nf")).contains(UNUSED);
+        assertThat(server.client().getLogMessages()).anyMatch(m -> m.getMessage().contains("Internal error while parsing"));
     }
 
     @Test
     void containUnresolvableRemoteModule() {
-        var f = start();
-        f.write("main.nf", """
+        var server = start();
+        server.write("main.nf", """
             include { X } from 'nf-core/missing'
             workflow {
                 def y = 1
             }
             """);
-        f.write("other.nf", "workflow OTHER { def z = 1 }\n");
-        f.settle();
-        assertThat(f.diagnostics("main.nf")).isNotEmpty();
-        assertThat(f.messages("other.nf")).containsExactly(UNUSED);
+        server.write("other.nf", "workflow OTHER { def z = 1 }\n");
+        server.settle();
+        assertThat(server.diagnostics("main.nf")).isNotEmpty();
+        assertThat(server.messages("other.nf")).containsExactly(UNUSED);
     }
 
     @Test
     void rebuildDependentsOfAModuleThatARequestBuilt() {
-        var f = start();
-        f.write("mod.nf", "workflow FOO {}\n");
-        f.write("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
-        f.settle();
-        assertThat(f.messages("main.nf")).isEmpty();
+        var server = start();
+        server.write("mod.nf", "workflow FOO {}\n");
+        server.write("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
+        server.settle();
+        assertThat(server.messages("main.nf")).isEmpty();
 
-        f.open("mod.nf", "workflow BAR {}\n");
+        server.open("mod.nf", "workflow BAR {}\n");
         // builds only the module, so the dependent is stale only by stamp
-        f.call(Need.FILE, "mod.nf", null, (context) -> null);
-        f.settle();
-        assertThat(f.messages("main.nf")).isNotEmpty();
+        server.call(Need.FILE, "mod.nf", null, (context) -> null);
+        server.settle();
+        assertThat(server.messages("main.nf")).isNotEmpty();
     }
 
     @Test
     void rebuildAnEditedFileWhenItIsNewlyIncluded() {
-        var f = start();
-        f.write("mod.nf", "workflow FOO {}\n");
-        f.write("main.nf", "workflow {}\n");
-        f.settle();
+        var server = start();
+        server.write("mod.nf", "workflow FOO {}\n");
+        server.write("main.nf", "workflow {}\n");
+        server.settle();
 
-        f.open("mod.nf", "workflow BAR {}\n");
-        f.open("main.nf", "include { BAR } from './mod.nf'\nworkflow { BAR() }\n");
-        var before = f.parses();
-        var errors = f.call(Need.FILE, "main.nf", List.<String>of(), (context) ->
-            context.project().scriptView().getErrors(URI.create(f.uri("main.nf"))).stream().map(e -> e.getOriginalMessage()).toList());
+        server.open("mod.nf", "workflow BAR {}\n");
+        server.open("main.nf", "include { BAR } from './mod.nf'\nworkflow { BAR() }\n");
+        var before = server.parses();
+        var errors = server.call(Need.FILE, "main.nf", List.<String>of(), (context) ->
+            context.project().scriptView().getErrors(URI.create(server.uri("main.nf"))).stream().map(e -> e.getOriginalMessage()).toList());
         assertThat(errors).isEmpty();
         // main.nf is never analysed against the previous build of mod.nf
-        assertThat(f.parsesSince(before)).isEqualTo(Map.of("main.nf", 1, "mod.nf", 1));
-        assertThat(f.publishes("main.nf")).allMatch(List::isEmpty);
-    }
-
-    @Test
-    void resolveMissingIncludeWhenTheTargetIsOpened() {
-        var f = start();
-        f.write("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
-        f.settle();
-        assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
-
-        // not on disk, and no watcher event
-        f.open("mod.nf", "workflow FOO {}\n");
-        f.settle();
-        assertThat(f.messages("main.nf")).isEmpty();
+        assertThat(server.parsesSince(before)).isEqualTo(Map.of("main.nf", 1, "mod.nf", 1));
+        assertThat(server.publishes("main.nf")).allMatch(List::isEmpty);
     }
 
     @Test
     void publishTheDocumentVersionOfTheBuild() {
-        var f = start();
-        f.open("main.nf", "workflow { def x = 1 }\n");
-        f.change("main.nf", "workflow { def y = 1 }\n");
-        f.settle();
-        var uri = f.uri("main.nf");
-        assertThat(f.client().getPublishLog()).filteredOn(p -> p.getUri().equals(uri)).last()
+        var server = start();
+        server.open("main.nf", "workflow { def x = 1 }\n");
+        server.change("main.nf", "workflow { def y = 1 }\n");
+        server.settle();
+        var uri = server.uri("main.nf");
+        assertThat(server.client().getPublishLog()).filteredOn(p -> p.getUri().equals(uri)).last()
             .satisfies(p -> assertThat(p.getVersion()).isEqualTo(2));
     }
 
     @Test
     void keepTheBuildOfAModuleOpenedOrClosedWithUnchangedText() {
-        var f = start();
+        var server = start();
         var module = "workflow FOO { def x = 1 }\n";
-        f.write("mod.nf", module);
+        server.write("mod.nf", module);
         for( int i = 0; i < 5; i++ )
-            f.write("main" + i + ".nf", "include { FOO } from './mod.nf'\nworkflow W" + i + " { FOO() }\n");
-        f.settle();
-        var before = f.parses();
+            server.write("main" + i + ".nf", "include { FOO } from './mod.nf'\nworkflow W" + i + " { FOO() }\n");
+        server.settle();
+        var before = server.parses();
 
-        f.open("mod.nf", module);
-        f.settle();
-        f.close("mod.nf");
-        f.settle();
-        assertThat(f.parsesSince(before)).isEmpty();
-        assertThat(f.messages("mod.nf")).containsExactly(UNUSED);
-        assertThat(f.client().getPublishLog()).last().satisfies(p -> assertThat(p.getVersion()).isNull());
+        server.open("mod.nf", module);
+        server.settle();
+        server.close("mod.nf");
+        server.settle();
+        assertThat(server.parsesSince(before)).isEmpty();
+        assertThat(server.messages("mod.nf")).containsExactly(UNUSED);
+        assertThat(server.client().getPublishLog()).last().satisfies(p -> assertThat(p.getVersion()).isNull());
 
         // the dependents still refer to the indexed module
-        assertThat(f.includeTarget("main0.nf")).isEqualTo(URI.create(f.uri("mod.nf")));
+        assertThat(server.includeTarget("main0.nf")).isEqualTo(URI.create(server.uri("mod.nf")));
 
         // a real change still rebuilds the dependents
-        f.open("mod.nf", "workflow BAR {}\n");
-        f.settle();
-        assertThat(f.parsesSince(before)).isEqualTo(Map.of(
+        server.open("mod.nf", "workflow BAR {}\n");
+        server.settle();
+        assertThat(server.parsesSince(before)).isEqualTo(Map.of(
             "mod.nf", 1, "main0.nf", 1, "main1.nf", 1, "main2.nf", 1, "main3.nf", 1, "main4.nf", 1));
-        assertThat(f.messages("main0.nf")).isNotEmpty();
-    }
-
-    @Test
-    void rebuildAFileWithUnchangedTextWhenAnotherInputChanged() {
-        var f = start();
-        f.write("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
-        f.settle();
-        assertThat(f.messages("main.nf")).isNotEmpty();
-        f.open("main.nf", "include { FOO } from './mod.nf'\nworkflow { FOO() }\n");
-        // the missing target is created while main.nf is stale
-        f.writeAndNotify("mod.nf", "workflow FOO {}\n");
-        f.settle();
-        assertThat(f.messages("main.nf")).isEmpty();
-    }
-
-    @Test
-    void rebuildAFileOpenedWithUnchangedTextWhenAnIncludeTargetAppeared() {
-        var f = start();
-        var main = "include { FOO } from './mod.nf'\nworkflow { FOO() }\n";
-        f.write("main.nf", main);
-        f.settle();
-        assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
-
-        // no watcher event
-        f.write("mod.nf", "workflow FOO {}\n");
-        f.open("main.nf", main);
-        f.settle();
-        assertThat(f.messages("main.nf")).isEmpty();
-        assertThat(f.client().getNonEmptyDiagnostics()).isEqualTo(freshDiagnostics(Map.of("main.nf", main)));
-    }
-
-    @Test
-    void rebuildAFileClosedWithUnchangedTextWhenAnIncludeTargetDisappeared() throws IOException {
-        var f = start();
-        var main = "include { FOO } from './mod.nf'\nworkflow { FOO() }\n";
-        f.write("main.nf", main);
-        f.write("mod.nf", "workflow FOO {}\n");
-        f.open("main.nf", main);
-        f.settle();
-        assertThat(f.messages("main.nf")).isEmpty();
-
-        // no watcher event
-        Files.delete(f.path("mod.nf"));
-        f.close("main.nf");
-        f.settle();
-        assertThat(f.messages("main.nf")).anyMatch(m -> m.startsWith("Invalid include source"));
-        assertThat(f.client().getNonEmptyDiagnostics()).isEqualTo(freshDiagnostics(Map.of()));
+        assertThat(server.messages("main0.nf")).isNotEmpty();
     }
 
     /**

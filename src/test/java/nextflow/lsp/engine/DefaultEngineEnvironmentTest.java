@@ -21,14 +21,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.parallel.Isolated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for the production environment.
+ * Specifies the executors of the production environment.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
+@Isolated // real threads, so other tests would slow it down
+@Timeout(60) // hang guard
 class DefaultEngineEnvironmentTest {
 
     @Test
@@ -49,7 +53,7 @@ class DefaultEngineEnvironmentTest {
             }
             var walk = new CompletableFuture<Boolean>();
             env.ioExecutor().execute(() -> walk.complete(true));
-            assertThat(walk.get(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(walk.get(10, TimeUnit.SECONDS)).as("walk ran").isTrue();
         }
         finally {
             release.countDown();

@@ -33,8 +33,8 @@ import static nextflow.lsp.TestUtils.thrownOnAnotherThread;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Text sync (F1): edits, line endings, clamping, versions and
- * canonical URIs.
+ * Specifies the text sync of open documents: edits, line endings,
+ * clamping, versions and canonical URIs.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -67,7 +67,7 @@ class DocumentStoreTest {
     }
 
     @Test
-    void openAndReplaceDocument() {
+    void replaceTheTextOnFullContentChange() {
         open(URI_STRING, 1, "hello world");
         assertThat(text()).isEqualTo("hello world");
 
@@ -177,18 +177,18 @@ class DocumentStoreTest {
     void ignoreChangeOfUnknownDocument() {
         var result = store.change(change(URI_STRING, 2, edit(0, 0, 0, 0, "x")));
 
-        assertThat(result).isFalse();
+        assertThat(result).as("applied").isFalse();
         assertThat(store.get(CANONICAL)).isEmpty();
         assertThat(store.uris()).isEmpty();
     }
 
     @Test
-    void closingUnknownDocumentIsNoOp() {
-        assertThat(store.close(CANONICAL)).isFalse();
+    void ignoreCloseOfUnknownDocument() {
+        assertThat(store.close(CANONICAL)).as("closed").isFalse();
 
         open(URI_STRING, 1, "x");
-        assertThat(store.close(CANONICAL)).isTrue();
-        assertThat(store.isOpen(CANONICAL)).isFalse();
+        assertThat(store.close(CANONICAL)).as("closed").isTrue();
+        assertThat(store.isOpen(CANONICAL)).as("open").isFalse();
         assertThat(store.version(CANONICAL)).isNull();
     }
 
@@ -201,7 +201,7 @@ class DocumentStoreTest {
     }
 
     @Test
-    void recordVersions() {
+    void recordTheVersionOfEachChangeAndKeepItWhenMissing() {
         open(URI_STRING, 3, "x");
         assertThat(store.version(CANONICAL)).isEqualTo(3);
 

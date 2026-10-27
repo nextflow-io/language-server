@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies the canonical form of document URIs.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

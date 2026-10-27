@@ -140,7 +140,7 @@ class LanguageServerWiringTest {
             var documents = remote.getTextDocumentService();
 
             // the index build blocks the engine while it reads slow.nf
-            assertThat(files.entered.await(30, TimeUnit.SECONDS)).isTrue();
+            assertThat(files.entered.await(30, TimeUnit.SECONDS)).as("read of slow.nf started").isTrue();
 
             // configuration and folder changes are handled without waiting for the engine
             workspace.didChangeConfiguration(TestServer.configuration(Map.of("nextflow.files.exclude", List.of("tests"))));

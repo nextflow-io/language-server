@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies the labels and documentation of AST nodes.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

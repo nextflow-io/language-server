@@ -62,7 +62,7 @@ class ThreadSerialExecutorTest {
 
             assertThat(order).hasSize(100).isSorted();
             assertThat(threads).containsOnly(true);
-            assertThat(executor.inEngineThread()).isFalse();
+            assertThat(executor.inEngineThread()).as("in engine thread").isFalse();
         }
         finally {
             executor.shutdown();
@@ -82,7 +82,7 @@ class ThreadSerialExecutorTest {
             shutdown.get(30, TimeUnit.SECONDS);
             assertThat(later).failsWithin(30, TimeUnit.SECONDS);
             thread.join(30_000);
-            assertThat(thread.isAlive()).isFalse();
+            assertThat(thread.isAlive()).as("engine thread is alive").isFalse();
         }
         finally {
             env.engineExecutor().shutdown();
@@ -97,7 +97,7 @@ class ThreadSerialExecutorTest {
             var spec = new RequestSpec("test", null, null, Need.FILE, false);
             var result = engine.request(spec, null, (ctx) -> env.engineExecutor().inEngineThread() && Thread.currentThread().isDaemon());
 
-            assertThat(result.get(30, TimeUnit.SECONDS)).isTrue();
+            assertThat(result.get(30, TimeUnit.SECONDS)).as("ran on a daemon engine thread").isTrue();
             engine.shutdown().get(30, TimeUnit.SECONDS);
         }
         finally {

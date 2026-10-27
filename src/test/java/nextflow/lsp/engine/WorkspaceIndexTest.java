@@ -35,6 +35,7 @@ import org.eclipse.lsp4j.WorkDoneProgressBegin;
 import org.eclipse.lsp4j.WorkDoneProgressCreateParams;
 import org.eclipse.lsp4j.WorkDoneProgressEnd;
 import org.eclipse.lsp4j.WorkDoneProgressReport;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -42,7 +43,7 @@ import static nextflow.lsp.TestUtils.UNUSED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for the workspace scan, indexing progress and background
+ * Specifies the workspace scan, indexing progress and background
  * scheduling.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
@@ -54,9 +55,9 @@ class WorkspaceIndexTest {
         return List.copyOf(context.project().scriptView().getUris());
     }
 
-    static void writeModules(TestServer f, int count) {
+    static void writeModules(TestServer server, int count) {
         for( int i = 0; i < count; i++ )
-            f.write("modules/mod" + i + ".nf", "workflow MOD" + i + " { def x = 1 }\n");
+            server.write("modules/mod" + i + ".nf", "workflow MOD" + i + " { def x = 1 }\n");
     }
 
     /**
@@ -80,283 +81,14 @@ class WorkspaceIndexTest {
         return result;
     }
 
-    @Test
-    void endProgressOnlyWhenEveryProjectIsIndexed() {
-        var publishedAtEnd = new ArrayList<String>();
-        var client = new TestLanguageClient();
-        client.onProgressEnd(() -> {
-            synchronized (client.getPublishLog()) {
-                for( var publish : client.getPublishLog() ) {
-                    if( !publish.getDiagnostics().isEmpty() )
-                        publishedAtEnd.add(publish.getUri());
-                }
-            }
-        });
-        var f = TestServer.start((o) -> {
-            o.client = client;
-            o.progress = true;
-            o.maxSliceFiles = 3;
-            o.folders("a", "b");
-            o.initialized = false;
-            o.settle = false;
-        });
-        var files = new ArrayList<String>();
-        for( int i = 0; i < 10; i++ ) {
-            f.write("a/mod" + i + ".nf", "workflow A" + i + " { def x = 1 }\n");
-            f.write("b/mod" + i + ".nf", "workflow B" + i + " { def x = 1 }\n");
-            files.add(f.uri("a/mod" + i + ".nf"));
-            files.add(f.uri("b/mod" + i + ".nf"));
-        }
-        f.initialized();
-        f.settle();
-        assertThat(progressKinds(client)).first().isEqualTo("create");
-        assertThat(progressKinds(client)).element(1).isEqualTo("begin");
-        assertThat(progressKinds(client)).contains("report");
-        assertThat(progressKinds(client)).last().isEqualTo("end");
-        assertThat(progressKinds(client)).filteredOn("end"::equals).hasSize(1);
-        assertThat(publishedAtEnd).containsExactlyInAnyOrderElementsOf(files);
-    }
-
-    @Test
-    void beginProgressOnlyAfterTheTokenIsCreated() {
-        var client = new TestLanguageClient();
-        client.setHoldProgressCreate(true);
-        var io = new QueuedExecutor();
-        var f = TestServer.start((o) -> {
-            o.client = client;
-            o.environment = new TestEnvironment().withIoExecutor(io);
-            o.progress = true;
-            o.initialized = false;
-            o.settle = false;
-        });
-        writeModules(f, 3);
-        f.initialized();
-        f.runPending();
-        assertThat(progressKinds(client)).containsExactly("create");
-        client.completeProgressCreate();
-        f.runPending();
-        assertThat(progressKinds(client)).containsExactly("create", "begin");
-        f.settle(io);
-        assertThat(progressKinds(client)).startsWith("create", "begin").endsWith("end");
-
-        // a new run gets a new token
-        f.write("other/mod.nf", "workflow OTHER {}\n");
-        f.addFolder("other");
-        f.runPending();
-        client.completeProgressCreate();
-        f.settle(io);
-        assertThat(progressTokens(client)).hasSize(2).doesNotHaveDuplicates();
-    }
-
-    @Test
-    void reportTheNumberOfFilesOnlyOnceItIsKnown() {
-        var client = new TestLanguageClient();
-        var io = new QueuedExecutor();
-        var f = TestServer.start((o) -> {
-            o.client = client;
-            o.environment = new TestEnvironment().withIoExecutor(io);
-            o.progress = true;
-            o.settle = false;
-        });
-        writeModules(f, 3);
-        f.runPending();
-        f.settle(io);
-        var messages = new ArrayList<String>();
-        synchronized (client.getProgress()) {
-            for( var item : client.getProgress() ) {
-                if( item instanceof ProgressParams params ) {
-                    var value = params.getValue().getLeft();
-                    if( value instanceof WorkDoneProgressBegin begin )
-                        messages.add("begin " + begin.getMessage());
-                    else if( value instanceof WorkDoneProgressReport report )
-                        messages.add("report " + report.getMessage());
-                    else
-                        messages.add("end");
-                }
-            }
-        }
-        assertThat(messages).first().isEqualTo("begin null");
-        assertThat(messages).endsWith("report 3 / 3 files", "end");
-        assertThat(messages).noneMatch(m -> m.contains("/ 0"));
-    }
-
-    @Test
-    void ignoreTheTokenOfAPreviousRun() {
-        var client = new TestLanguageClient();
-        client.setHoldProgressCreate(true);
-        var io = new QueuedExecutor();
-        var f = TestServer.start((o) -> {
-            o.client = client;
-            o.environment = new TestEnvironment().withIoExecutor(io);
-            o.progress = true;
-            o.initialized = false;
-            o.settle = false;
-        });
-        writeModules(f, 1);
-        f.initialized();
-        f.settle(io);
-        f.addFolder("other");
-        f.runPending();
-        assertThat(progressKinds(client)).containsExactly("create", "create");
-        var tokens = progressTokens(client);
-
-        // the first run ended before its token was created
-        client.completeProgressCreate(tokens.get(0));
-        f.runPending();
-        assertThat(progressKinds(client)).containsExactly("create", "create");
-        client.completeProgressCreate(tokens.get(1));
-        f.runPending();
-        assertThat(progressKinds(client)).containsExactly("create", "create", "begin");
-        f.settle(io);
-    }
-
-    @Test
-    void requestTheTokenOnlyOncePerRunWhenTheClientRefusesIt() {
-        var client = new TestLanguageClient() {
-            @Override
-            public CompletableFuture<Void> createProgress(WorkDoneProgressCreateParams params) {
-                getProgress().add(params);
-                return CompletableFuture.failedFuture(new IllegalStateException("refused"));
-            }
-        };
-        var f = TestServer.start((o) -> {
-            o.client = client;
-            o.progress = true;
-            o.maxSliceFiles = 2;
-            o.initialized = false;
-            o.settle = false;
-        });
-        writeModules(f, 20);
-        f.initialized();
-        f.settle();
-        assertThat(progressKinds(client)).containsExactly("create");
-
-        // a new run requests a new token
-        f.write("other/mod.nf", "workflow OTHER {}\n");
-        f.addFolder("other");
-        f.settle();
-        assertThat(progressKinds(client)).containsExactly("create", "create");
-    }
-
-    @Test
-    void doNotReportProgressWithoutClientSupport() {
-        var f = TestServer.start((o) -> o.settle = false);
-        writeModules(f, 3);
-        f.settle();
-        assertThat(f.client().getProgress()).isEmpty();
-    }
-
-    @Test
-    void buildOpenFilesFirst() {
-        var f = TestServer.start((o) -> {
-            o.maxSliceFiles = 2;
-            o.initialized = false;
-            o.settle = false;
-        });
-        writeModules(f, 10);
-        f.open("modules/mod7.nf", "workflow MOD7 { def x = 1 }\n");
-        f.initialized();
-        f.settle();
-        // the first slice holds the open file
-        var log = f.client().getPublishLog();
-        assertThat(log).hasSize(10);
-        assertThat(log.subList(0, 2)).anyMatch(p -> p.getUri().equals(f.uri("modules/mod7.nf")));
-    }
-
-    @Test
-    void keepOpenFilesThatAreNotOnDisk() {
-        var f = TestServer.start((o) -> {
-            o.initialized = false;
-            o.settle = false;
-        });
-        f.write("main.nf", "workflow {}\n");
-        f.open("new.nf", "workflow NEW { def x = 1 }\n");
-        f.initialized();
-        f.settle();
-        assertThat(f.messages("new.nf")).containsExactly(UNUSED);
-        var scripts = f.call(Need.PROJECT, "main.nf", List.<URI>of(), WorkspaceIndexTest::builtScripts);
-        assertThat(scripts).contains(URI.create(f.uri("new.nf")));
-        var symbols = f.call((s) -> s.documentSymbol(new DocumentSymbolParams(f.document("new.nf"))));
-        assertThat(symbols).extracting((symbol) -> symbol.getRight().getName()).containsExactly("workflow NEW");
-    }
-
-    @Test
-    void doNotPauseIndexingForTheDebounce() {
-        var f = TestServer.start((o) -> {
-            o.maxSliceFiles = 5;
-            o.initialized = false;
-            o.settle = false;
-        });
-        writeModules(f, 50);
-        f.open("main.nf", "workflow {}\n");
-        f.initialized();
-        // edit once indexing has built some files
-        runUntilIndexingHasParsed(f);
-        f.change("main.nf", "workflow { def x = 1 }\n");
-        var now = f.env().fakeClock().instant();
-        f.runPending();
-        assertThat(f.env().fakeClock().instant()).isEqualTo(now);
-        assertThat(f.workspace().isIndexing()).isFalse();
-        assertThat(f.engine().isIdle()).isTrue();
-        assertThat(f.messages("modules/mod49.nf")).containsExactly(UNUSED);
-        assertThat(f.messages("main.nf")).containsExactly(UNUSED);
-    }
-
-    @Test
-    void debounceBackgroundBuildsAfterIndexing() {
-        var f = TestServer.start();
-        f.open("main.nf", "workflow {}\n");
-        f.settle();
-        var publishes = f.client().getPublishLog().size();
-
-        f.change("main.nf", "workflow { def x = 1 }\n");
-        f.runPending();
-        f.advance(Engine.DEFAULT_DEBOUNCE.minusMillis(1));
-        assertThat(f.client().getPublishLog()).hasSize(publishes);
-        f.advance(Duration.ofMillis(1));
-        assertThat(f.messages("main.nf")).containsExactly(UNUSED);
-    }
-
-    @Test
-    void requestBuildsWithoutWaitingForTheDebounce() {
-        var f = TestServer.start();
-        f.open("main.nf", "workflow {}\n");
-        f.settle();
-        f.change("main.nf", "workflow { def x = 1 }\n");
-        var warnings = f.call(Need.FILE, "main.nf", 0, (context) -> context.project().scriptView().getWarnings(URI.create(f.uri("main.nf"))).size());
-        assertThat(warnings).isEqualTo(1);
-        assertThat(f.messages("main.nf")).containsExactly(UNUSED);
-    }
-
-    @Test
-    void yieldToRequestsBetweenSlices() {
-        var f = TestServer.start((o) -> {
-            o.maxSliceFiles = 10;
-            o.initialized = false;
-            o.settle = false;
-        });
-        writeModules(f, 200);
-        f.write("main.nf", "workflow {}\n");
-        f.initialized();
-        runUntilIndexingHasParsed(f);
-        var parsesAtAnswer = f.call(Need.FILE, "main.nf", -1, (context) -> {
-            assertThat(f.workspace().isIndexing()).isTrue();
-            return totalParses(f);
-        });
-        // at most two slices
-        assertThat(parsesAtAnswer).isLessThanOrEqualTo(20);
-        f.settle();
-        assertThat(f.workspace().isIndexing()).isFalse();
-    }
-
-    private static void runUntilIndexingHasParsed(TestServer f) {
-        var executor = f.env().manualExecutor();
-        while( !(f.workspace().isIndexing() && totalParses(f) > 0) )
+    private static void runUntilIndexingHasParsed(TestServer server) {
+        var executor = server.env().manualExecutor();
+        while( !(server.workspace().isIndexing() && totalParses(server) > 0) )
             assertThat(executor.runNext()).as("indexing parsed some files before going idle").isTrue();
     }
 
-    private static int totalParses(TestServer f) {
-        return f.parses().values().stream().mapToInt(Integer::intValue).sum();
+    private static int totalParses(TestServer server) {
+        return server.parses().values().stream().mapToInt(Integer::intValue).sum();
     }
 
     private static List<String> progressTokens(TestLanguageClient client) {
@@ -390,118 +122,412 @@ class WorkspaceIndexTest {
         }
     }
 
-    @Test
-    void keepFilesCreatedDuringTheWalk() {
-        var io = new QueuedExecutor();
-        var f = TestServer.start((o) -> {
-            o.environment = new TestEnvironment()
-                .withIoExecutor(io)
-                .withFiles(new LaggingWalk((path) -> path.getFileName().toString().startsWith("late")));
-            o.watchers = true;
-            o.settle = false;
-        });
-        f.write("main.nf", "workflow { def x = 1 }\n");
-        f.runPending();
-        // created while the walk is in flight
-        f.writeAndNotify("late.nf", "workflow LATE { def y = 1 }\n");
-        // loaded on demand while the walk is in flight
-        f.write("late-request.nf", "workflow LATE_REQUEST { def z = 1 }\n");
-        f.call(Need.FILE, "late-request.nf", null, (context) -> null);
-        f.settle(io);
-        assertThat(f.messages("main.nf")).containsExactly(UNUSED);
-        assertThat(f.messages("late.nf")).containsExactly(UNUSED);
-        assertThat(f.messages("late-request.nf")).containsExactly(UNUSED);
-    }
+    /**
+     * Indexing progress is reported to clients that support it.
+     */
+    @Nested
+    class Progress {
 
-    @Test
-    void keepFilesOpenedAndClosedDuringTheWalk() {
-        var io = new QueuedExecutor();
-        var f = TestServer.start((o) -> {
-            o.environment = new TestEnvironment()
-                .withIoExecutor(io)
-                .withFiles(new LaggingWalk((path) -> path.getFileName().toString().startsWith("late")));
-            o.watchers = true;
-            o.settle = false;
-        });
-        f.write("main.nf", "workflow { def x = 1 }\n");
-        f.runPending();
-        // created and opened while the walk is in flight, with the
-        // watcher event arriving after the open
-        f.write("late.nf", "workflow LATE { def y = 1 }\n");
-        f.open("late.nf", "workflow LATE { def y = 1 }\n");
-        f.notify("late.nf", FileChangeType.Created);
-        f.close("late.nf");
-        f.settle(io);
-        assertThat(f.messages("late.nf")).containsExactly(UNUSED);
-    }
-
-    @Test
-    void reportWalkThatThrowsRuntimeExceptionAsFailedWalk() {
-        var env = new TestEnvironment().withFiles(new ForwardingFileAccess() {
-            @Override
-            public List<Path> walk(Path root, Predicate<Path> excluded, Predicate<Path> matcher) {
-                throw new UncheckedIOException(new IOException("stale file handle"));
+        @Test
+        void endProgressOnlyWhenEveryProjectIsIndexed() {
+            var publishedAtEnd = new ArrayList<String>();
+            var client = new TestLanguageClient();
+            client.onProgressEnd(() -> {
+                synchronized (client.getPublishLog()) {
+                    for( var publish : client.getPublishLog() ) {
+                        if( !publish.getDiagnostics().isEmpty() )
+                            publishedAtEnd.add(publish.getUri());
+                    }
+                }
+            });
+            var server = TestServer.start((o) -> {
+                o.client = client;
+                o.progress = true;
+                o.maxSliceFiles = 3;
+                o.folders("a", "b");
+                o.initialized = false;
+                o.settle = false;
+            });
+            var files = new ArrayList<String>();
+            for( int i = 0; i < 10; i++ ) {
+                server.write("a/mod" + i + ".nf", "workflow A" + i + " { def x = 1 }\n");
+                server.write("b/mod" + i + ".nf", "workflow B" + i + " { def x = 1 }\n");
+                files.add(server.uri("a/mod" + i + ".nf"));
+                files.add(server.uri("b/mod" + i + ".nf"));
             }
-        });
-        var f = TestServer.start((o) -> {
-            o.environment = env;
-            o.settle = false;
-        });
-        f.write("main.nf", "workflow {}\n");
-        // the project request completes instead of waiting for the walk forever
-        assertThat(f.call(Need.PROJECT, "main.nf", "empty", (context) -> "done")).isEqualTo("done");
-        assertThat(f.workspace().isIndexing()).isFalse();
-        assertThat(f.client().getLogMessages())
-            .anyMatch(m -> m.getMessage().contains("Failed to scan workspace folder"));
-    }
+            server.initialized();
+            server.settle();
+            assertThat(progressKinds(client)).first().isEqualTo("create");
+            assertThat(progressKinds(client)).element(1).isEqualTo("begin");
+            assertThat(progressKinds(client)).contains("report");
+            assertThat(progressKinds(client)).last().isEqualTo("end");
+            assertThat(progressKinds(client)).filteredOn("end"::equals).hasSize(1);
+            assertThat(publishedAtEnd).containsExactlyInAnyOrderElementsOf(files);
+        }
 
-    @Test
-    void loadFileOnDemandBeforeTheScan() {
-        var f = TestServer.start((o) -> {
-            o.initialized = false;
-        });
-        f.write("main.nf", """
-            include { FOO } from './mod.nf'
-            workflow {
-                FOO()
+        @Test
+        void beginProgressOnlyAfterTheTokenIsCreated() {
+            var client = new TestLanguageClient();
+            client.setHoldProgressCreate(true);
+            var io = new QueuedExecutor();
+            var server = TestServer.start((o) -> {
+                o.client = client;
+                o.environment = new TestEnvironment().withIoExecutor(io);
+                o.progress = true;
+                o.initialized = false;
+                o.settle = false;
+            });
+            writeModules(server, 3);
+            server.initialized();
+            server.runPending();
+            assertThat(progressKinds(client)).containsExactly("create");
+            client.completeProgressCreate();
+            server.runPending();
+            assertThat(progressKinds(client)).containsExactly("create", "begin");
+            server.settle(io);
+            assertThat(progressKinds(client)).startsWith("create", "begin").endsWith("end");
+
+            // a new run gets a new token
+            server.write("other/mod.nf", "workflow OTHER {}\n");
+            server.addFolder("other");
+            server.runPending();
+            client.completeProgressCreate();
+            server.settle(io);
+            assertThat(progressTokens(client)).hasSize(2).doesNotHaveDuplicates();
+        }
+
+        @Test
+        void reportTheNumberOfFilesOnlyOnceItIsKnown() {
+            var client = new TestLanguageClient();
+            var io = new QueuedExecutor();
+            var server = TestServer.start((o) -> {
+                o.client = client;
+                o.environment = new TestEnvironment().withIoExecutor(io);
+                o.progress = true;
+                o.settle = false;
+            });
+            writeModules(server, 3);
+            server.runPending();
+            server.settle(io);
+            var messages = new ArrayList<String>();
+            synchronized (client.getProgress()) {
+                for( var item : client.getProgress() ) {
+                    if( item instanceof ProgressParams params ) {
+                        var value = params.getValue().getLeft();
+                        if( value instanceof WorkDoneProgressBegin begin )
+                            messages.add("begin " + begin.getMessage());
+                        else if( value instanceof WorkDoneProgressReport report )
+                            messages.add("report " + report.getMessage());
+                        else
+                            messages.add("end");
+                    }
+                }
             }
-            """);
-        f.write("mod.nf", "workflow FOO {}\n");
-        var scripts = f.call(Need.FILE, "main.nf", List.<URI>of(), WorkspaceIndexTest::builtScripts);
-        assertThat(scripts).containsExactly(URI.create(f.uri("main.nf")), URI.create(f.uri("mod.nf")));
+            assertThat(messages).first().isEqualTo("begin null");
+            assertThat(messages).endsWith("report 3 / 3 files", "end");
+            assertThat(messages).noneMatch(m -> m.contains("/ 0"));
+        }
+
+        @Test
+        void ignoreTheTokenOfAPreviousRun() {
+            var client = new TestLanguageClient();
+            client.setHoldProgressCreate(true);
+            var io = new QueuedExecutor();
+            var server = TestServer.start((o) -> {
+                o.client = client;
+                o.environment = new TestEnvironment().withIoExecutor(io);
+                o.progress = true;
+                o.initialized = false;
+                o.settle = false;
+            });
+            writeModules(server, 1);
+            server.initialized();
+            server.settle(io);
+            server.addFolder("other");
+            server.runPending();
+            assertThat(progressKinds(client)).containsExactly("create", "create");
+            var tokens = progressTokens(client);
+
+            // the first run ended before its token was created
+            client.completeProgressCreate(tokens.get(0));
+            server.runPending();
+            assertThat(progressKinds(client)).containsExactly("create", "create");
+            client.completeProgressCreate(tokens.get(1));
+            server.runPending();
+            assertThat(progressKinds(client)).containsExactly("create", "create", "begin");
+            server.settle(io);
+        }
+
+        @Test
+        void requestTheTokenOnlyOncePerRunWhenTheClientRefusesIt() {
+            var client = new TestLanguageClient() {
+                @Override
+                public CompletableFuture<Void> createProgress(WorkDoneProgressCreateParams params) {
+                    getProgress().add(params);
+                    return CompletableFuture.failedFuture(new IllegalStateException("refused"));
+                }
+            };
+            var server = TestServer.start((o) -> {
+                o.client = client;
+                o.progress = true;
+                o.maxSliceFiles = 2;
+                o.initialized = false;
+                o.settle = false;
+            });
+            writeModules(server, 20);
+            server.initialized();
+            server.settle();
+            assertThat(progressKinds(client)).containsExactly("create");
+
+            // a new run requests a new token
+            server.write("other/mod.nf", "workflow OTHER {}\n");
+            server.addFolder("other");
+            server.settle();
+            assertThat(progressKinds(client)).containsExactly("create", "create");
+        }
+
+        @Test
+        void doNotReportProgressWithoutClientSupport() {
+            var server = TestServer.start((o) -> o.settle = false);
+            writeModules(server, 3);
+            server.settle();
+            assertThat(server.client().getProgress()).isEmpty();
+        }
+
     }
 
-    @Test
-    void buildEveryConfigForProjectConfigRequests() {
-        var f = TestServer.start((o) -> o.initialized = false);
-        f.write("nextflow.config", "includeConfig 'conf/base.config'\n");
-        f.write("conf/base.config", "process.cpus = 2\n");
-        f.write("conf/other.config", "process.memory = '1 GB'\n");
-        f.write("main.nf", "workflow {}\n");
-        f.open("main.nf", "workflow {}\n");
-        // before the scan, the main config and its includes are loaded on demand
-        var configs = f.call(Need.PROJECT_CONFIGS, "main.nf", List.<URI>of(), (context) ->
-            List.copyOf(context.project().configView().getUris()));
-        assertThat(configs).containsExactly(URI.create(f.uri("conf/base.config")), URI.create(f.uri("nextflow.config")));
+    /**
+     * The workspace scan finds the files of each folder, and files are
+     * loaded on demand before it completes.
+     */
+    @Nested
+    class Scan {
 
-        // other configs are known once the scan has found them
-        f.initialized();
-        f.runPending();
-        configs = f.call(Need.PROJECT_CONFIGS, "main.nf", List.<URI>of(), (context) ->
-            List.copyOf(context.project().configView().getUris()));
-        assertThat(configs).hasSize(3);
+        @Test
+        void keepOpenFilesThatAreNotOnDisk() {
+            var server = TestServer.start((o) -> {
+                o.initialized = false;
+                o.settle = false;
+            });
+            server.write("main.nf", "workflow {}\n");
+            server.open("new.nf", "workflow NEW { def x = 1 }\n");
+            server.initialized();
+            server.settle();
+            assertThat(server.messages("new.nf")).containsExactly(UNUSED);
+            var scripts = server.call(Need.PROJECT, "main.nf", List.<URI>of(), WorkspaceIndexTest::builtScripts);
+            assertThat(scripts).contains(URI.create(server.uri("new.nf")));
+            var symbols = server.call((s) -> s.documentSymbol(new DocumentSymbolParams(server.document("new.nf"))));
+            assertThat(symbols).extracting((symbol) -> symbol.getRight().getName()).containsExactly("workflow NEW");
+        }
+
+        @Test
+        void keepFilesCreatedDuringTheWalk() {
+            var io = new QueuedExecutor();
+            var server = TestServer.start((o) -> {
+                o.environment = new TestEnvironment()
+                    .withIoExecutor(io)
+                    .withFiles(new LaggingWalk((path) -> path.getFileName().toString().startsWith("late")));
+                o.watchers = true;
+                o.settle = false;
+            });
+            server.write("main.nf", "workflow { def x = 1 }\n");
+            server.runPending();
+            // created while the walk is in flight
+            server.writeAndNotify("late.nf", "workflow LATE { def y = 1 }\n");
+            // loaded on demand while the walk is in flight
+            server.write("late-request.nf", "workflow LATE_REQUEST { def z = 1 }\n");
+            server.call(Need.FILE, "late-request.nf", null, (context) -> null);
+            server.settle(io);
+            assertThat(server.messages("main.nf")).containsExactly(UNUSED);
+            assertThat(server.messages("late.nf")).containsExactly(UNUSED);
+            assertThat(server.messages("late-request.nf")).containsExactly(UNUSED);
+        }
+
+        @Test
+        void keepFilesOpenedAndClosedDuringTheWalk() {
+            var io = new QueuedExecutor();
+            var server = TestServer.start((o) -> {
+                o.environment = new TestEnvironment()
+                    .withIoExecutor(io)
+                    .withFiles(new LaggingWalk((path) -> path.getFileName().toString().startsWith("late")));
+                o.watchers = true;
+                o.settle = false;
+            });
+            server.write("main.nf", "workflow { def x = 1 }\n");
+            server.runPending();
+            // created and opened while the walk is in flight, with the
+            // watcher event arriving after the open
+            server.write("late.nf", "workflow LATE { def y = 1 }\n");
+            server.open("late.nf", "workflow LATE { def y = 1 }\n");
+            server.notify("late.nf", FileChangeType.Created);
+            server.close("late.nf");
+            server.settle(io);
+            assertThat(server.messages("late.nf")).containsExactly(UNUSED);
+        }
+
+        @Test
+        void reportWalkThatThrowsRuntimeExceptionAsFailedWalk() {
+            var env = new TestEnvironment().withFiles(new ForwardingFileAccess() {
+                @Override
+                public List<Path> walk(Path root, Predicate<Path> excluded, Predicate<Path> matcher) {
+                    throw new UncheckedIOException(new IOException("stale file handle"));
+                }
+            });
+            var server = TestServer.start((o) -> {
+                o.environment = env;
+                o.settle = false;
+            });
+            server.write("main.nf", "workflow {}\n");
+            // the project request completes instead of waiting for the walk forever
+            assertThat(server.call(Need.PROJECT, "main.nf", "empty", (context) -> "done")).isEqualTo("done");
+            assertThat(server.workspace().isIndexing()).as("indexing").isFalse();
+            assertThat(server.client().getLogMessages())
+                .anyMatch(m -> m.getMessage().contains("Failed to scan workspace folder"));
+        }
+
+        @Test
+        void loadFileOnDemandBeforeTheScan() {
+            var server = TestServer.start((o) -> {
+                o.initialized = false;
+            });
+            server.write("main.nf", """
+                include { FOO } from './mod.nf'
+                workflow {
+                    FOO()
+                }
+                """);
+            server.write("mod.nf", "workflow FOO {}\n");
+            var scripts = server.call(Need.FILE, "main.nf", List.<URI>of(), WorkspaceIndexTest::builtScripts);
+            assertThat(scripts).containsExactly(URI.create(server.uri("main.nf")), URI.create(server.uri("mod.nf")));
+        }
+
+        @Test
+        void buildEveryConfigForProjectConfigRequests() {
+            var server = TestServer.start((o) -> o.initialized = false);
+            server.write("nextflow.config", "includeConfig 'conf/base.config'\n");
+            server.write("conf/base.config", "process.cpus = 2\n");
+            server.write("conf/other.config", "process.memory = '1 GB'\n");
+            server.write("main.nf", "workflow {}\n");
+            server.open("main.nf", "workflow {}\n");
+            // before the scan, the main config and its includes are loaded on demand
+            var configs = server.call(Need.PROJECT_CONFIGS, "main.nf", List.<URI>of(), (context) ->
+                List.copyOf(context.project().configView().getUris()));
+            assertThat(configs).containsExactly(URI.create(server.uri("conf/base.config")), URI.create(server.uri("nextflow.config")));
+
+            // other configs are known once the scan has found them
+            server.initialized();
+            server.runPending();
+            configs = server.call(Need.PROJECT_CONFIGS, "main.nf", List.<URI>of(), (context) ->
+                List.copyOf(context.project().configView().getUris()));
+            assertThat(configs).hasSize(3);
+        }
+
+        @Test
+        void returnEmptyValueForUnmanagedFiles() {
+            var server = TestServer.start();
+            server.write("work/ab/main.nf", "workflow {}\n");
+            server.write("notes.txt", "hello\n");
+            assertThat(server.call(Need.FILE, "work/ab/main.nf", "empty", (context) -> "ran")).isEqualTo("empty");
+            assertThat(server.call(Need.FILE, "notes.txt", "empty", (context) -> "ran")).isEqualTo("empty");
+            var spec = new RequestSpec("test", "untitled:Untitled-1", null, Need.FILE, false);
+            assertThat(server.harness().call(spec, "empty", (context) -> "ran")).isEqualTo("empty");
+            assertThat(server.client().getAllDiagnostics()).isEmpty();
+        }
+
     }
 
-    @Test
-    void returnEmptyValueForUnmanagedFiles() {
-        var f = TestServer.start();
-        f.write("work/ab/main.nf", "workflow {}\n");
-        f.write("notes.txt", "hello\n");
-        assertThat(f.call(Need.FILE, "work/ab/main.nf", "empty", (context) -> "ran")).isEqualTo("empty");
-        assertThat(f.call(Need.FILE, "notes.txt", "empty", (context) -> "ran")).isEqualTo("empty");
-        var spec = new RequestSpec("test", "untitled:Untitled-1", null, Need.FILE, false);
-        assertThat(f.harness().call(spec, "empty", (context) -> "ran")).isEqualTo("empty");
-        assertThat(f.client().getAllDiagnostics()).isEmpty();
+    /**
+     * Indexing and background builds run in slices that yield to requests.
+     */
+    @Nested
+    class Scheduling {
+
+        @Test
+        void buildOpenFilesFirst() {
+            var server = TestServer.start((o) -> {
+                o.maxSliceFiles = 2;
+                o.initialized = false;
+                o.settle = false;
+            });
+            writeModules(server, 10);
+            server.open("modules/mod7.nf", "workflow MOD7 { def x = 1 }\n");
+            server.initialized();
+            server.settle();
+            // the first slice holds the open file
+            var log = server.client().getPublishLog();
+            assertThat(log).hasSize(10);
+            assertThat(log.subList(0, 2)).anyMatch(p -> p.getUri().equals(server.uri("modules/mod7.nf")));
+        }
+
+        @Test
+        void doNotPauseIndexingForTheDebounce() {
+            var server = TestServer.start((o) -> {
+                o.maxSliceFiles = 5;
+                o.initialized = false;
+                o.settle = false;
+            });
+            writeModules(server, 50);
+            server.open("main.nf", "workflow {}\n");
+            server.initialized();
+            // edit once indexing has built some files
+            runUntilIndexingHasParsed(server);
+            server.change("main.nf", "workflow { def x = 1 }\n");
+            var now = server.env().fakeClock().instant();
+            server.runPending();
+            assertThat(server.env().fakeClock().instant()).isEqualTo(now);
+            assertThat(server.workspace().isIndexing()).as("indexing").isFalse();
+            assertThat(server.engine().isIdle()).as("idle").isTrue();
+            assertThat(server.messages("modules/mod49.nf")).containsExactly(UNUSED);
+            assertThat(server.messages("main.nf")).containsExactly(UNUSED);
+        }
+
+        @Test
+        void debounceBackgroundBuildsAfterIndexing() {
+            var server = TestServer.start();
+            server.open("main.nf", "workflow {}\n");
+            server.settle();
+            var publishes = server.client().getPublishLog().size();
+
+            server.change("main.nf", "workflow { def x = 1 }\n");
+            server.runPending();
+            server.advance(Engine.DEFAULT_DEBOUNCE.minusMillis(1));
+            assertThat(server.client().getPublishLog()).hasSize(publishes);
+            server.advance(Duration.ofMillis(1));
+            assertThat(server.messages("main.nf")).containsExactly(UNUSED);
+        }
+
+        @Test
+        void requestBuildsWithoutWaitingForTheDebounce() {
+            var server = TestServer.start();
+            server.open("main.nf", "workflow {}\n");
+            server.settle();
+            server.change("main.nf", "workflow { def x = 1 }\n");
+            var warnings = server.call(Need.FILE, "main.nf", 0, (context) -> context.project().scriptView().getWarnings(URI.create(server.uri("main.nf"))).size());
+            assertThat(warnings).isEqualTo(1);
+            assertThat(server.messages("main.nf")).containsExactly(UNUSED);
+        }
+
+        @Test
+        void yieldToRequestsBetweenSlices() {
+            var server = TestServer.start((o) -> {
+                o.maxSliceFiles = 10;
+                o.initialized = false;
+                o.settle = false;
+            });
+            writeModules(server, 200);
+            server.write("main.nf", "workflow {}\n");
+            server.initialized();
+            runUntilIndexingHasParsed(server);
+            var parsesAtAnswer = server.call(Need.FILE, "main.nf", -1, (context) -> {
+                assertThat(server.workspace().isIndexing()).as("indexing").isTrue();
+                return totalParses(server);
+            });
+            // at most two slices
+            assertThat(parsesAtAnswer).isLessThanOrEqualTo(20);
+            server.settle();
+            assertThat(server.workspace().isIndexing()).as("indexing").isFalse();
+        }
+
     }
 
 }

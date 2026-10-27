@@ -35,6 +35,7 @@ import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies renaming symbols in scripts.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -55,7 +56,7 @@ class ScriptRenameTest {
     }
 
     @Test
-    void renameWorkflow() {
+    void renameWorkflowDefinitionAndInvocation() {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
@@ -80,7 +81,7 @@ class ScriptRenameTest {
     }
 
     @Test
-    void renameWorkflowInput() {
+    void renameWorkflowInputDeclarationAndReference() {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
@@ -106,7 +107,7 @@ class ScriptRenameTest {
     }
 
     @Test
-    void renameProcess() {
+    void renameProcessDefinitionAndInvocation() {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
@@ -133,7 +134,7 @@ class ScriptRenameTest {
     }
 
     @Test
-    void renameProcessInput() {
+    void renameProcessInputDeclarationAndReference() {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
@@ -159,7 +160,7 @@ class ScriptRenameTest {
     }
 
     @Test
-    void renameLocalVariable() {
+    void renameLocalVariableDeclarationAndReference() {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
@@ -180,7 +181,7 @@ class ScriptRenameTest {
     }
 
     @Test
-    void renameFunction() {
+    void renameFunctionDefinitionAndCall() {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 
@@ -205,7 +206,7 @@ class ScriptRenameTest {
     }
 
     @Test
-    void renameFunctionParameter() {
+    void renameFunctionParameterDeclarationAndReference() {
         var server = TestServer.start();
         var uri = getUri("main.nf");
 

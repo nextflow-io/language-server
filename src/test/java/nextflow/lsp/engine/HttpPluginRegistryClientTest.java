@@ -27,6 +27,7 @@ import org.junit.jupiter.api.parallel.Isolated;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies fetching plugin specs from a plugin registry over HTTP.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -35,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class HttpPluginRegistryClientTest {
 
     @Test
-    void fetchPluginSpec() throws InterruptedException {
+    void reportPublishedPluginAsFoundWithItsSpec() throws InterruptedException {
         var client = new HttpPluginRegistryClient(TestPluginRegistry.url());
 
         var result = client.fetch("nf-prov", "1.6.0");

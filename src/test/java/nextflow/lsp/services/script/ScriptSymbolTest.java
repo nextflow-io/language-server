@@ -34,6 +34,7 @@ import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies document symbols and workspace symbols in scripts.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

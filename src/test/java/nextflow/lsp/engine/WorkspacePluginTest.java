@@ -17,6 +17,7 @@ package nextflow.lsp.engine;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import nextflow.lsp.TestServer;
@@ -63,68 +64,68 @@ class WorkspacePluginTest {
     @Test
     void resolvePluginIncludesAgainstTheGoverningConfig() {
         var registry = new FixtureRegistry();
-        var f = start(registry);
-        f.write("nextflow.config", SCHEMA_CONFIG);
-        f.write("main.nf", SCRIPT);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        var server = start(registry);
+        server.write("nextflow.config", SCHEMA_CONFIG);
+        server.write("main.nf", SCRIPT);
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(NOT_DEFINED);
         assertThat(registry.fetches).containsExactly("nf-schema@2.7.3");
     }
 
     @Test
     void resolvePluginIncludesWhenConfigAndScriptAreOpenedTogether() {
         var registry = new FixtureRegistry();
-        var f = start(registry);
-        f.open("nextflow.config", SCHEMA_CONFIG);
-        f.open("main.nf", SCRIPT);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        var server = start(registry);
+        server.open("nextflow.config", SCHEMA_CONFIG);
+        server.open("main.nf", SCRIPT);
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(NOT_DEFINED);
     }
 
     @Test
     void suppressMissingPluginErrorWhileTheSpecIsPending() {
         var registry = new FixtureRegistry();
         var io = new QueuedExecutor();
-        var f = TestServer.start((o) -> {
+        var server = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withRegistry((url) -> registry).withIoExecutor(io);
             o.settle = false;
         });
-        f.open("nextflow.config", SCHEMA_CONFIG);
-        f.open("main.nf", SCRIPT);
+        server.open("nextflow.config", SCHEMA_CONFIG);
+        server.open("main.nf", SCRIPT);
         // build the open files while the fetch is held
-        var built = f.call(Need.FILE, "main.nf", false, (context) -> context.project().scriptView().getUris().contains(URI.create(f.uri("main.nf"))));
-        assertThat(built).isTrue();
+        var built = server.call(Need.FILE, "main.nf", List.<URI>of(), (context) -> List.copyOf(context.project().scriptView().getUris()));
+        assertThat(built).contains(URI.create(server.uri("main.nf")));
         assertThat(registry.fetches).isEmpty();
-        f.advance(Duration.ofSeconds(1));
-        assertThat(f.messages("main.nf")).isEmpty();
+        server.advance(Duration.ofSeconds(1));
+        assertThat(server.messages("main.nf")).isEmpty();
 
-        f.settle(io);
+        server.settle(io);
         assertThat(registry.fetches).containsExactly("nf-schema@2.7.3");
-        assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        assertThat(server.messages("main.nf")).containsExactly(NOT_DEFINED);
     }
 
     @Test
     void suppressUnknownScopeWarningsWhileTheSpecIsPending() {
         var registry = new FixtureRegistry();
         var io = new QueuedExecutor();
-        var f = TestServer.start((o) -> {
+        var server = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withRegistry((url) -> registry).withIoExecutor(io);
             o.settle = false;
         });
-        f.open("nextflow.config", """
+        server.open("nextflow.config", """
             plugins { id 'nf-schema@2.7.3' }
             validation { parametersSchema = 'schema.json' }
             validation.bogus = true
             manifest.bogus = true
             """);
-        f.call(Need.FILE, "nextflow.config", null, (context) -> null);
-        f.advance(Duration.ofSeconds(1));
+        server.call(Need.FILE, "nextflow.config", null, (context) -> null);
+        server.advance(Duration.ofSeconds(1));
         assertThat(registry.fetches).isEmpty();
-        assertThat(f.messages("nextflow.config")).containsExactly("Unrecognized config option 'manifest.bogus'");
+        assertThat(server.messages("nextflow.config")).containsExactly("Unrecognized config option 'manifest.bogus'");
 
         // check again once the spec is known
-        f.settle(io);
-        assertThat(f.messages("nextflow.config")).containsExactly(
+        server.settle(io);
+        assertThat(server.messages("nextflow.config")).containsExactly(
             "Unrecognized config option 'validation.bogus'",
             "Unrecognized config option 'manifest.bogus'");
     }
@@ -133,143 +134,143 @@ class WorkspacePluginTest {
     void retryFailedFetchAtMostOncePerInterval() {
         var registry = new FixtureRegistry();
         registry.overrides.put("nf-schema@2.7.3", new PluginRegistryClient.Failed("connection refused"));
-        var f = start(registry);
-        f.open("nextflow.config", SCHEMA_CONFIG);
-        f.open("main.nf", SCRIPT);
-        f.settle();
+        var server = start(registry);
+        server.open("nextflow.config", SCHEMA_CONFIG);
+        server.open("main.nf", SCRIPT);
+        server.settle();
         assertThat(registry.fetches).hasSize(1);
         // a failed fetch doesn't mean that the plugin doesn't exist
-        assertThat(f.messages("main.nf")).isEmpty();
+        assertThat(server.messages("main.nf")).isEmpty();
 
         // rebuilding within the retry interval doesn't fetch again
-        f.change("nextflow.config", SCHEMA_CONFIG + "// edit 1\n");
-        f.settle();
-        f.advance(PluginSpecs.RETRY_INTERVAL.minusMinutes(1));
-        f.change("nextflow.config", SCHEMA_CONFIG + "// edit 2\n");
-        f.settle();
+        server.change("nextflow.config", SCHEMA_CONFIG + "// edit 1\n");
+        server.settle();
+        server.advance(PluginSpecs.RETRY_INTERVAL.minusMinutes(1));
+        server.change("nextflow.config", SCHEMA_CONFIG + "// edit 2\n");
+        server.settle();
         assertThat(registry.fetches).hasSize(1);
 
         // after the interval, the next rebuild retries
         registry.overrides.clear();
-        f.advance(Duration.ofMinutes(1));
-        f.change("nextflow.config", SCHEMA_CONFIG + "// edit 3\n");
-        f.settle();
+        server.advance(Duration.ofMinutes(1));
+        server.change("nextflow.config", SCHEMA_CONFIG + "// edit 3\n");
+        server.settle();
         assertThat(registry.fetches).hasSize(2);
-        assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        assertThat(server.messages("main.nf")).containsExactly(NOT_DEFINED);
     }
 
     @Test
     void retryFailedFetchAfterTheIntervalWithoutAConfigEdit() {
         var registry = new FixtureRegistry();
         registry.overrides.put("nf-schema@2.7.3", new PluginRegistryClient.Failed("connection refused"));
-        var f = start(registry);
-        f.write("nextflow.config", SCHEMA_CONFIG);
-        f.write("main.nf", SCRIPT);
-        f.settle();
-        f.advance(PluginSpecs.RETRY_INTERVAL.minusMinutes(1));
-        f.call(Need.FILE, "main.nf", null, (context) -> null);
-        f.settle();
+        var server = start(registry);
+        server.write("nextflow.config", SCHEMA_CONFIG);
+        server.write("main.nf", SCRIPT);
+        server.settle();
+        server.advance(PluginSpecs.RETRY_INTERVAL.minusMinutes(1));
+        server.call(Need.FILE, "main.nf", null, (context) -> null);
+        server.settle();
         assertThat(registry.fetches).hasSize(1);
 
         // the next background build retries
-        f.advance(Duration.ofMinutes(1));
-        f.open("other.nf", "workflow {}\n");
-        f.settle();
+        server.advance(Duration.ofMinutes(1));
+        server.open("other.nf", "workflow {}\n");
+        server.settle();
         assertThat(registry.fetches).hasSize(2);
-        assertThat(f.messages("main.nf")).isEmpty();
+        assertThat(server.messages("main.nf")).isEmpty();
 
         // the next request retries
         registry.overrides.clear();
-        f.advance(PluginSpecs.RETRY_INTERVAL);
-        f.call(Need.FILE, "main.nf", null, (context) -> null);
-        f.settle();
+        server.advance(PluginSpecs.RETRY_INTERVAL);
+        server.call(Need.FILE, "main.nf", null, (context) -> null);
+        server.settle();
         assertThat(registry.fetches).hasSize(3);
-        assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        assertThat(server.messages("main.nf")).containsExactly(NOT_DEFINED);
     }
 
     @Test
-    void cacheMissingPlugins() {
+    void doNotRefetchMissingPluginWhenConfigIsEdited() {
         var registry = new FixtureRegistry();
-        var f = start(registry);
-        f.open("nextflow.config", "plugins { id 'nf-missing@1.0.0' }\n");
-        f.open("main.nf", """
+        var server = start(registry);
+        server.open("nextflow.config", "plugins { id 'nf-missing@1.0.0' }\n");
+        server.open("main.nf", """
             include { foo } from 'plugin/nf-missing'
             workflow {
             }
             """);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(doesNotExist("nf-missing"));
-        f.change("nextflow.config", "plugins { id 'nf-missing@1.0.0' }\n// edit\n");
-        f.settle();
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(doesNotExist("nf-missing"));
+        server.change("nextflow.config", "plugins { id 'nf-missing@1.0.0' }\n// edit\n");
+        server.settle();
         assertThat(registry.fetches).containsExactly("nf-missing@1.0.0");
     }
 
     @Test
     void updateScriptWhenConfigPluginsChange() {
         var registry = new FixtureRegistry();
-        var f = start(registry);
-        f.write("nextflow.config", SCHEMA_CONFIG);
-        f.write("main.nf", SCRIPT);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        var server = start(registry);
+        server.write("nextflow.config", SCHEMA_CONFIG);
+        server.write("main.nf", SCRIPT);
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(NOT_DEFINED);
 
-        f.open("nextflow.config", "plugins { id 'nf-prov@1.6.0' }\n");
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
+        server.open("nextflow.config", "plugins { id 'nf-prov@1.6.0' }\n");
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
 
-        f.change("nextflow.config", SCHEMA_CONFIG);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        server.change("nextflow.config", SCHEMA_CONFIG);
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(NOT_DEFINED);
     }
 
     @Test
     void useNearestConfigThatDeclaresPlugins() {
         var registry = new FixtureRegistry();
-        var f = start(registry);
-        f.write("nextflow.config", SCHEMA_CONFIG);
+        var server = start(registry);
+        server.write("nextflow.config", SCHEMA_CONFIG);
         // declares no plugins, so the root config applies
-        f.write("a/nextflow.config", "params.foo = 1\n");
-        f.write("a/main.nf", SCRIPT);
+        server.write("a/nextflow.config", "params.foo = 1\n");
+        server.write("a/main.nf", SCRIPT);
         // declares other plugins, so nf-schema is not specified
-        f.write("b/nextflow.config", "plugins { id 'nf-prov@1.6.0' }\n");
-        f.write("b/main.nf", SCRIPT);
-        f.settle();
-        assertThat(f.messages("a/main.nf")).containsExactly(NOT_DEFINED);
-        assertThat(f.messages("b/main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
+        server.write("b/nextflow.config", "plugins { id 'nf-prov@1.6.0' }\n");
+        server.write("b/main.nf", SCRIPT);
+        server.settle();
+        assertThat(server.messages("a/main.nf")).containsExactly(NOT_DEFINED);
+        assertThat(server.messages("b/main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
     }
 
     @Test
     void onlyMainConfigFilesDeclarePluginsForScripts() {
         var registry = new FixtureRegistry();
-        var f = start(registry);
-        f.write("other.config", SCHEMA_CONFIG);
-        f.write("main.nf", SCRIPT);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
+        var server = start(registry);
+        server.write("other.config", SCHEMA_CONFIG);
+        server.write("main.nf", SCRIPT);
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
         assertThat(registry.fetches).containsExactly("nf-schema@2.7.3");
     }
 
     @Test
     void ignoreConfigFilesOutsideTheProject() {
         var registry = new FixtureRegistry();
-        var f = start(registry, "project");
-        f.write("nextflow.config", SCHEMA_CONFIG);
-        f.write("project/main.nf", SCRIPT);
-        f.settle();
-        assertThat(f.messages("project/main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
+        var server = start(registry, "project");
+        server.write("nextflow.config", SCHEMA_CONFIG);
+        server.write("project/main.nf", SCRIPT);
+        server.settle();
+        assertThat(server.messages("project/main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
     }
 
     @Test
     void createGoverningConfigLater() {
         var registry = new FixtureRegistry();
-        var f = start(registry);
-        f.write("main.nf", SCRIPT);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
+        var server = start(registry);
+        server.write("main.nf", SCRIPT);
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
 
-        f.writeAndNotify("nextflow.config", SCHEMA_CONFIG);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        server.writeAndNotify("nextflow.config", SCHEMA_CONFIG);
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(NOT_DEFINED);
     }
 
     @Test
@@ -277,19 +278,19 @@ class WorkspacePluginTest {
         var first = new FixtureRegistry();
         first.overrides.put("nf-schema@2.7.3", new PluginRegistryClient.NotFound());
         var second = new FixtureRegistry();
-        var f = TestServer.start((o) -> {
+        var server = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withRegistry((url) -> url.contains("second") ? second : first);
             o.settle = false;
         });
-        f.write("nextflow.config", SCHEMA_CONFIG);
-        f.write("main.nf", SCRIPT);
-        f.settle();
-        assertThat(f.messages("main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
+        server.write("nextflow.config", SCHEMA_CONFIG);
+        server.write("main.nf", SCRIPT);
+        server.settle();
+        assertThat(server.messages("main.nf")).containsExactly(doesNotExist("nf-schema"), doesNotExist("nf-schema"));
 
-        f.configure(Map.of("nextflow.pluginRegistryUrl", "https://second.example.com/api/"));
-        f.settle();
+        server.configure(Map.of("nextflow.pluginRegistryUrl", "https://second.example.com/api/"));
+        server.settle();
         assertThat(second.fetches).containsExactly("nf-schema@2.7.3");
-        assertThat(f.messages("main.nf")).containsExactly(NOT_DEFINED);
+        assertThat(server.messages("main.nf")).containsExactly(NOT_DEFINED);
     }
 
 }

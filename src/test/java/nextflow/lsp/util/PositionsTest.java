@@ -24,6 +24,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies the ordering of positions and the conversion between
+ * positions and offsets.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

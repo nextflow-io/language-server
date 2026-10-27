@@ -29,6 +29,7 @@ import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies go to definition in scripts.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

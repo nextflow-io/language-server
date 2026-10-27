@@ -33,6 +33,7 @@ import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies the call hierarchy of scripts.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

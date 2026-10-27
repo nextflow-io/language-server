@@ -56,71 +56,71 @@ class WorkspaceBuildCountTest {
     static final List<String> FILES = List.of("mod_a.nf", "mod_b.nf", "sub.nf", "main.nf", "nextflow.config");
 
     static TestServer start() {
-        var f = TestServer.start((o) -> o.settle = false);
-        f.write("mod_a.nf", MOD_A);
-        f.write("mod_b.nf", MOD_B);
-        f.write("sub.nf", """
+        var server = TestServer.start((o) -> o.settle = false);
+        server.write("mod_a.nf", MOD_A);
+        server.write("mod_b.nf", MOD_B);
+        server.write("sub.nf", """
             include { A } from './mod_a.nf'
             include { B } from './mod_b.nf'
             workflow SUB { A() ; B() }
             """);
-        f.write("main.nf", """
+        server.write("main.nf", """
             include { SUB } from './sub.nf'
             workflow { SUB() }
             """);
-        f.write("nextflow.config", "process.cpus = 2\n");
-        f.settle();
-        return f;
+        server.write("nextflow.config", "process.cpus = 2\n");
+        server.settle();
+        return server;
     }
 
-    static void requestEverything(TestServer f, String path) {
+    static void requestEverything(TestServer server, String path) {
         for( var need : List.of(Need.FILE, Need.PROJECT_CONFIGS, Need.PROJECT) )
-            f.call(need, path, null, (context) -> null);
-        f.call(Need.ALL, null, null, (context) -> null);
+            server.call(need, path, null, (context) -> null);
+        server.call(Need.ALL, null, null, (context) -> null);
     }
 
     @Test
     void parseEveryFileOnceWhileIndexing() {
-        var f = start();
-        assertThat(f.parses()).containsOnlyKeys(FILES).allSatisfy((path, count) -> assertThat(count).as(path).isEqualTo(1));
+        var server = start();
+        assertThat(server.parses()).containsOnlyKeys(FILES).allSatisfy((path, count) -> assertThat(count).as(path).isEqualTo(1));
     }
 
     @Test
     void parseNothingForRequestsOnAFreshProject() {
-        var f = start();
-        var before = f.parses();
+        var server = start();
+        var before = server.parses();
         for( int i = 0; i < 3; i++ ) {
             for( var path : FILES )
-                requestEverything(f, path);
+                requestEverything(server, path);
         }
-        f.settle();
-        assertThat(f.parsesSince(before)).isEmpty();
+        server.settle();
+        assertThat(server.parsesSince(before)).isEmpty();
     }
 
     @Test
     void parseAnEditedModuleOnceAndItsDependentsOnceForProjectRequests() {
-        var f = start();
-        var before = f.parses();
-        f.open("mod_a.nf", MOD_A);
-        f.call(Need.FILE, "mod_a.nf", null, (context) -> null);
-        assertThat(f.parsesSince(before)).isEmpty();
+        var server = start();
+        var before = server.parses();
+        server.open("mod_a.nf", MOD_A);
+        server.call(Need.FILE, "mod_a.nf", null, (context) -> null);
+        assertThat(server.parsesSince(before)).isEmpty();
 
-        f.change("mod_a.nf", "workflow A { def y = 1 }\n");
+        server.change("mod_a.nf", "workflow A { def y = 1 }\n");
         for( int i = 0; i < 3; i++ )
-            f.call(Need.FILE, "mod_a.nf", null, (context) -> null);
-        assertThat(f.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1));
+            server.call(Need.FILE, "mod_a.nf", null, (context) -> null);
+        assertThat(server.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1));
 
         for( int i = 0; i < 3; i++ )
-            f.call(Need.PROJECT, "mod_a.nf", null, (context) -> null);
-        f.settle();
-        assertThat(f.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1, "sub.nf", 1, "main.nf", 1));
-        assertThat(f.includeTarget("sub.nf")).isEqualTo(URI.create(f.uri("mod_a.nf")));
+            server.call(Need.PROJECT, "mod_a.nf", null, (context) -> null);
+        server.settle();
+        assertThat(server.parsesSince(before)).isEqualTo(Map.of("mod_a.nf", 1, "sub.nf", 1, "main.nf", 1));
+        assertThat(server.includeTarget("sub.nf")).isEqualTo(URI.create(server.uri("mod_a.nf")));
     }
 
     @Test
     void parseOnlyTheRequestFileForCodeActionOnWidelyIncludedModule() {
-        var f = TestServer.start((o) -> o.settle = false);
-        f.write("modules/align.nf", "process ALIGN {\n    script:\n    'echo align'\n}\n");
+        var server = TestServer.start((o) -> o.settle = false);
+        server.write("modules/align.nf", "process ALIGN {\n    script:\n    'echo align'\n}\n");
         var sub = """
             include { ALIGN } from '../modules/align.nf'
 
@@ -129,19 +129,19 @@ class WorkspaceBuildCountTest {
                 ALIGN()
             }
             """;
-        f.write("subworkflows/sub.nf", sub);
+        server.write("subworkflows/sub.nf", sub);
         for( int i = 0; i < 50; i++ )
-            f.write("main" + i + ".nf", "include { SUB } from './subworkflows/sub.nf'\nworkflow { SUB() }\n");
-        f.settle();
-        f.open("subworkflows/sub.nf", sub);
-        var before = f.parses();
-        f.change("subworkflows/sub.nf", sub + "\n");
+            server.write("main" + i + ".nf", "include { SUB } from './subworkflows/sub.nf'\nworkflow { SUB() }\n");
+        server.settle();
+        server.open("subworkflows/sub.nf", sub);
+        var before = server.parses();
+        server.change("subworkflows/sub.nf", sub + "\n");
 
         var position = new Position(4, 4);
-        var params = new CodeActionParams(new TextDocumentIdentifier(f.uri("subworkflows/sub.nf")), new Range(position, position), new CodeActionContext(List.of()));
-        var actions = f.call((NextflowLanguageServer s) -> s.codeAction(params));
+        var params = new CodeActionParams(new TextDocumentIdentifier(server.uri("subworkflows/sub.nf")), new Range(position, position), new CodeActionContext(List.of()));
+        var actions = server.call((NextflowLanguageServer s) -> s.codeAction(params));
         assertThat(actions).isNotEmpty();
-        assertThat(f.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1));
+        assertThat(server.parsesSince(before)).isEqualTo(Map.of("subworkflows/sub.nf", 1));
     }
 
     @Test
@@ -156,37 +156,37 @@ class WorkspaceBuildCountTest {
                 return super.readText(path);
             }
         };
-        var f = TestServer.start((o) -> {
+        var server = TestServer.start((o) -> {
             o.environment = new TestEnvironment().withFiles(files);
             o.maxSliceFiles = 1;
             o.settle = false;
         });
         var main = new StringBuilder();
         for( int i = 0; i < 5; i++ ) {
-            f.write("mod" + i + ".nf", "workflow M" + i + " {}\n");
+            server.write("mod" + i + ".nf", "workflow M" + i + " {}\n");
             main.append("include { M" + i + " } from './mod" + i + ".nf'\n");
         }
         main.append("workflow { M0() }\n");
-        f.write("main.nf", main.toString());
-        f.settle();
-        var before = f.parses();
+        server.write("main.nf", main.toString());
+        server.settle();
+        var before = server.parses();
 
         for( int i = 0; i < 5; i++ )
-            f.writeAndNotify("mod" + i + ".nf", "workflow M" + i + " { def x = 1 }\n");
-        var request = f.send(Need.FILE, "main.nf", "empty", (context) -> "done");
+            server.writeAndNotify("mod" + i + ".nf", "workflow M" + i + " { def x = 1 }\n");
+        var request = server.send(Need.FILE, "main.nf", "empty", (context) -> "done");
         cancelOnRead.set(request);
-        f.runPending();
+        server.runPending();
 
         // the slice in progress is committed, and the rest is left stale
         assertThat(request).isCancelled();
-        assertThat(f.parsesSince(before)).hasSize(1);
+        assertThat(server.parsesSince(before)).hasSize(1);
 
-        f.settle();
-        assertThat(f.parsesSince(before))
+        server.settle();
+        assertThat(server.parsesSince(before))
             .hasSize(6)
             .allSatisfy((path, count) -> assertThat(count).as(path).isEqualTo(1));
-        assertThat(f.messages("main.nf")).isEmpty();
-        assertThat(f.messages("mod4.nf")).containsExactly(TestUtils.UNUSED);
+        assertThat(server.messages("main.nf")).isEmpty();
+        assertThat(server.messages("mod4.nf")).containsExactly(TestUtils.UNUSED);
     }
 
 }

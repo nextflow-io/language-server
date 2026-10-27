@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 /**
+ * Specifies the diagnostics of scripts.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

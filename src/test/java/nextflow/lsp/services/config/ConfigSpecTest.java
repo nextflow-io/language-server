@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies the validation of config settings against the config spec.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -96,7 +97,7 @@ class ConfigSpecTest {
     };
 
     @Test
-    void checkEnvSettings() {
+    void reportErrorForInvalidEnvironmentVariableName() {
         var errors = getErrors("""
             env {
                 foo.bar = 'HELLO'
@@ -116,7 +117,7 @@ class ConfigSpecTest {
     }
 
     @Test
-    void doNotCheckParams() {
+    void doNotReportParamsAsUnrecognized() {
         var warnings = getWarnings("""
             params {
                 publish_mode = 'copy'
@@ -171,7 +172,7 @@ class ConfigSpecTest {
     }
 
     @Test
-    void reportErrorForUnrecognizedConfigSettings() {
+    void reportWarningForUnrecognizedConfigSettings() {
         var warnings = getWarnings("""
             wokDir = 'work'
             workDir = 'work'
@@ -212,7 +213,7 @@ class ConfigSpecTest {
     }
 
     @Test
-    void ignoreProcessSelectors() {
+    void doNotReportProcessSelectorsAsUnrecognized() {
         var warnings = getWarnings("""
             process {
                 withLabel:'foobar' {
@@ -230,7 +231,7 @@ class ConfigSpecTest {
     }
 
     @Test
-    void reportErrorForInvalidType() {
+    void reportWarningForInvalidType() {
         var warnings = getWarnings("""
             process.cpus = '2'
             """);

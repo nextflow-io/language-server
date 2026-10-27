@@ -57,38 +57,38 @@ class ProjectViewTest {
 
     @Test
     void showBuiltScriptsOfTheProject() {
-        var f = TestServer.start();
-        f.write("main.nf", MAIN);
-        f.write("mod.nf", MOD);
-        f.writeAndNotify("nextflow.config", "process.cpus = 1\n");
-        f.settle();
-        var mainUri = f.path("main.nf").toUri();
-        var modUri = f.path("mod.nf").toUri();
-        f.call(Need.FILE, "main.nf", null, (context) -> {
+        var server = TestServer.start();
+        server.write("main.nf", MAIN);
+        server.write("mod.nf", MOD);
+        server.writeAndNotify("nextflow.config", "process.cpus = 1\n");
+        server.settle();
+        var mainUri = server.path("main.nf").toUri();
+        var modUri = server.path("mod.nf").toUri();
+        server.call(Need.FILE, "main.nf", null, (context) -> {
             var project = context.project();
             var scripts = project.scripts().orElseThrow();
             assertThat(scripts.getUris()).containsExactly(mainUri, modUri);
             assertThat(scripts.getProjectDir()).isEqualTo(TestWorkspace.root());
-            assertThat(scripts.hasAST(mainUri)).isTrue();
-            assertThat(scripts.getScriptNode(f.path("unknown.nf").toUri())).isNull();
-            assertThat(scripts.getIncludeNodes(f.path("unknown.nf").toUri())).isEmpty();
+            assertThat(scripts.hasAST(mainUri)).as("has AST of %s", mainUri).isTrue();
+            assertThat(scripts.getScriptNode(server.path("unknown.nf").toUri())).isNull();
+            assertThat(scripts.getIncludeNodes(server.path("unknown.nf").toUri())).isEmpty();
             var process = scripts.getProcessNodes(modUri).get(0);
             assertThat(scripts.getURI(process)).isEqualTo(modUri);
             assertThat(scripts.getDefinitions()).hasAtLeastOneElementOfType(ProcessNode.class);
             // the config view doesn't own script nodes
             assertThat(project.configView().getURI(process)).isNull();
-            assertThat(project.configView().getUris()).containsExactly(f.path("nextflow.config").toUri());
+            assertThat(project.configView().getUris()).containsExactly(server.path("nextflow.config").toUri());
             return null;
         });
     }
 
     @Test
     void iterateEveryNode() {
-        var f = TestServer.start();
-        f.write("main.nf", MAIN);
-        f.write("mod.nf", MOD);
-        f.settle();
-        f.call(Need.FILE, "main.nf", null, (context) -> {
+        var server = TestServer.start();
+        server.write("main.nf", MAIN);
+        server.write("mod.nf", MOD);
+        server.settle();
+        server.call(Need.FILE, "main.nf", null, (context) -> {
             var scripts = context.project().scriptView();
             var nodes = scripts.getNodes();
             var expected = 0;
@@ -105,14 +105,14 @@ class ProjectViewTest {
 
     @Test
     void canonicaliseRequestUris() {
-        var f = TestServer.start();
-        f.write("main.nf", MAIN);
-        f.write("mod.nf", MOD);
-        f.settle();
+        var server = TestServer.start();
+        server.write("main.nf", MAIN);
+        server.write("mod.nf", MOD);
+        server.settle();
         var raw = URI.create(TestWorkspace.root().toUri() + "sub/../mod.nf");
-        f.call(Need.FILE, "main.nf", null, (context) -> {
+        server.call(Need.FILE, "main.nf", null, (context) -> {
             var scripts = context.project().scriptView();
-            assertThat(scripts.hasAST(raw)).isTrue();
+            assertThat(scripts.hasAST(raw)).as("has AST of %s", raw).isTrue();
             assertThat(scripts.getProcessNodes(raw)).hasSize(1);
             return null;
         });
@@ -120,29 +120,29 @@ class ProjectViewTest {
 
     @Test
     void showConfigFilesForConfigRequests() {
-        var f = TestServer.start();
-        f.write("nextflow.config", "includeConfig 'missing.config'\n");
-        f.settle();
-        var uri = f.path("nextflow.config").toUri();
-        f.call(Need.FILE, "nextflow.config", null, (context) -> {
+        var server = TestServer.start();
+        server.write("nextflow.config", "includeConfig 'missing.config'\n");
+        server.settle();
+        var uri = server.path("nextflow.config").toUri();
+        server.call(Need.FILE, "nextflow.config", null, (context) -> {
             var project = context.project();
             assertThat(project.scripts()).isEmpty();
             var configs = project.configView();
             assertThat(configs.getConfigNode(uri)).isNotNull();
-            assertThat(configs.hasIncludeErrors(uri)).isTrue();
-            assertThat(configs.hasErrors(uri)).isTrue();
-            assertThat(configs.hasSyntaxErrors(uri)).isFalse();
+            assertThat(configs.hasIncludeErrors(uri)).as("has include errors").isTrue();
+            assertThat(configs.hasErrors(uri)).as("has errors").isTrue();
+            assertThat(configs.hasSyntaxErrors(uri)).as("has syntax errors").isFalse();
             return null;
         });
     }
 
     @Test
     void showScriptsOfEveryProjectForProjectWideRequests() {
-        var f = TestServer.start();
-        f.write("main.nf", MAIN);
-        f.write("mod.nf", MOD);
-        f.settle();
-        var roots = f.call(Need.ALL, null, List.<Path>of(), (context) -> {
+        var server = TestServer.start();
+        server.write("main.nf", MAIN);
+        server.write("mod.nf", MOD);
+        server.settle();
+        var roots = server.call(Need.ALL, null, List.<Path>of(), (context) -> {
             var result = new ArrayList<Path>();
             for( var project : context.allProjects() ) {
                 assertThat(project.scripts()).isPresent();
@@ -155,12 +155,12 @@ class ProjectViewTest {
 
     @Test
     void rejectViewAccessOutsideTheEngineThread() throws Exception {
-        var f = TestServer.start();
-        f.write("main.nf", MAIN);
-        f.write("mod.nf", MOD);
-        f.settle();
-        var view = f.call(Need.FILE, "main.nf", (ScriptView) null, (context) -> context.project().scriptView());
-        var project = f.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
+        var server = TestServer.start();
+        server.write("main.nf", MAIN);
+        server.write("mod.nf", MOD);
+        server.settle();
+        var view = server.call(Need.FILE, "main.nf", (ScriptView) null, (context) -> context.project().scriptView());
+        var project = server.call(Need.FILE, "main.nf", (ProjectView) null, RequestContext::project);
         for( Runnable access : List.<Runnable>of(view::getUris, view::getNodes, () -> view.getURI(null), project::scriptView, project::configView) )
             assertThat(thrownOnAnotherThread(access)).isInstanceOf(IllegalStateException.class);
     }

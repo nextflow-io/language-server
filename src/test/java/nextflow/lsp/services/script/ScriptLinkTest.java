@@ -30,6 +30,7 @@ import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies document links for script includes.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

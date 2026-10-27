@@ -32,9 +32,11 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  * on first use and deleted after the test.
  *
  * Register it with `@ExtendWith(TestWorkspace.class)` on test classes
- * that use the workspace helpers in TestUtils. The workspace is bound to the thread that runs the test, so TestUtils
- * must be called from the test thread (e.g. not from a dynamic test
- * that runs concurrently with its factory).
+ * that use TestServer, EngineHarness, or the workspace helpers in
+ * TestUtils, all of which resolve paths against it. The workspace is
+ * bound to the thread that runs the test, so they must be used from
+ * the test thread (e.g. not from a dynamic test that runs concurrently
+ * with its factory).
  */
 public class TestWorkspace implements BeforeEachCallback, AfterEachCallback {
 
@@ -63,7 +65,11 @@ public class TestWorkspace implements BeforeEachCallback, AfterEachCallback {
     @Override
     public void beforeEach(ExtensionContext context) {
         var workspace = new TestWorkspace();
-        workspace.prefix = context.getRequiredTestClass().getSimpleName() + "-";
+        // name it after the top-level class, also for @Nested classes
+        var testClass = context.getRequiredTestClass();
+        while( testClass.getEnclosingClass() != null )
+            testClass = testClass.getEnclosingClass();
+        workspace.prefix = testClass.getSimpleName() + "-";
         // restored after the test, in case the thread was running another test
         var store = context.getStore(NAMESPACE);
         store.put("previous", current.get());

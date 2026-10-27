@@ -31,6 +31,7 @@ import static nextflow.lsp.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * Specifies semantic tokens in config files.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */

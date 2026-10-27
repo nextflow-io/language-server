@@ -29,8 +29,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * End-to-end regression tests for issues of the old language
- * service core.
+ * Specifies whole-session regressions of GitHub issues that belong to
+ * no single unit, one method per issue.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
