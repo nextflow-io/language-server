@@ -66,11 +66,11 @@ A single engine thread owns all documents, projects, compilers, ASTs and diagnos
 
 The lsp4j reader thread delivers notifications and requests in order on one thread. Each handler converts the message into an event or a request task and submits it to the engine's single-threaded executor, then returns. The engine therefore sees messages in exactly the order the client sent them, and a request observes every earlier notification and no later one. Every mutable structure has one owner, so there are no locks and no torn reads. The engine never waits on another thread except to join its own file reads, so it cannot deadlock.
 
-A request that needs a single file brings that file and its dependencies up to date before it runs. A request that needs the whole project (references, rename, incoming calls, workspace symbol) is parked until the project is indexed, rather than answered with partial results. Once indexed, it builds whatever is stale synchronously and runs, so it never waits for background work to catch up with edits. Cancellation, not a timeout, is the escape hatch. A parked position-based request whose document changed while it waited fails with `ContentModified`.
+A request that needs a single file brings that file and its dependencies up to date before it runs, but not its dependents. A request that needs the whole project (e.g. references and rename) is parked until the project is indexed, rather than answered with partial results. Once indexed, it builds whatever is stale synchronously and runs, so it never waits for background work to catch up with edits. Cancellation, not a timeout, is the escape hatch. A parked position-based request whose document changed while it waited fails with `ContentModified`, and a background build that keeps failing fails the parked requests instead of leaving them waiting.
 
 ### Re-parse instead of patching ASTs
 
-nf-lang analysis phases are not idempotent on an analysed AST, and nf-lang has no AST copy API. Any file that must be rebuilt is re-parsed from its current text and analysed from scratch, so every AST in the cache reflects one complete build. This removes the whole class of duplicated and lost diagnostics, along with `LanguageServerErrorCollector.updatePhase` and `CachingResolveIncludeVisitor`. The cost is a parse per rebuilt file, and dependency tracking limits rebuilds to the files that need them.
+nf-lang analysis phases are not idempotent on an analysed AST, and nf-lang has no AST copy API. Any file that must be rebuilt is re-parsed from its current text and analysed from scratch, so every AST in the cache reflects one complete build. This removes the whole class of duplicated and lost diagnostics, along with `LanguageServerErrorCollector.updatePhase` and `CachingResolveIncludeVisitor`. The cost is a parse per rebuilt file, and dependency tracking limits rebuilds to the files that need them. A file whose inputs are unchanged since its last build keeps that build, so opening or closing a file without edits does not invalidate its dependents.
 
 ### Dependency build stamps
 
@@ -78,7 +78,7 @@ Each file entry records the version of its input, a build stamp, and the stamps 
 
 ### Workspace scan
 
-The directory walk starts on `initialized` and runs on the IO pool. Its result enters the engine as an ordinary event that adds every discovered file as unbuilt. Building is ordinary background work, done in slices of about 100 ms or 64 files so that queued messages are handled in between, with open files and their dependencies first. There is no separate scan phase that can be deferred. Work-done progress ends only when every project is fully indexed, so a client can rely on it to mean that cross-file requests are complete. File watchers registered in `initialized` keep the file set current across git checkouts and external edits (#27).
+The directory walk starts on `initialized` and runs on the IO pool. Its result enters the engine as an ordinary event that adds every discovered file as unbuilt. Building is ordinary background work, done in small time-bounded slices so that queued messages are handled in between, with open files and their dependencies first. There is no separate scan phase that can be deferred. Work-done progress ends only when every project is fully indexed, so a client can rely on it to mean that cross-file requests are complete. File watchers registered in `initialized` keep the file set current across git checkouts and external edits (#27).
 
 ### Debouncing
 
@@ -92,12 +92,13 @@ The script and config services are merged into one `Project` per workspace folde
 
 - **File reads** for a build run on a read pool. Parsing, name resolution and type checking stay on the engine: nf-lang writes to Groovy's shared `ClassHelper` nodes while parsing, and analysis writes across files and shares non-thread-safe caches.
 - **Directory walks** run on an IO pool. Results return as events.
-- **Plugin spec fetches** run on their own pool. While a spec is pending, the "plugin does not exist" error is suppressed. When the fetch completes, the configs that asked for it and the scripts that depend on them are rebuilt. Failed fetches are retried at most once every 5 minutes.
+- **Plugin spec fetches** run on their own pool. While a spec is pending, errors that depend on it (such as "plugin does not exist") are suppressed. When the fetch completes, the configs that asked for it and the scripts that depend on them are rebuilt. Failed fetches are retried at most once every few minutes.
 
 ## Consequences
 
 - Requests are serialized. A long request (references over a large workspace, workspace preview) delays the requests behind it, and long providers check for cancellation inside their loops to limit this.
 - A cross-file request issued during indexing waits for indexing instead of returning partial results.
+- A single-file request does not rebuild the dependents of its file, so data read from them can lag behind edits until the debounced background build runs.
 - Rebuilding a widely included module re-parses all of its dependents. The cost is bounded by the dependency graph and spread over background slices.
 - Providers receive a read-only view that is valid only during the request and only on the engine thread. Using it elsewhere throws.
 - `LanguageService`, `ScriptService`, `ConfigService`, the AST caches, `FileCache`, `DebouncingExecutor` and `PluginSpecCache` are replaced.

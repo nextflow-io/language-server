@@ -27,22 +27,11 @@ The language server communicates over standard input/output. See [Editor support
 
 ## Configuration
 
-The language server exposes a set of configuration settings that can be controlled through the `workspace/didChangeConfiguration` event. See the [Nextflow VS Code extension](https://github.com/nextflow-io/vscode-language-nextflow/blob/master/package.json) for an example of how to set up these configuration settings with sensible defaults.
+The language server reads its settings from the `workspace/didChangeConfiguration` notification. See [Configuration](docs/configuration.md) for the available settings and their defaults, and the [Nextflow VS Code extension](https://github.com/nextflow-io/vscode-language-nextflow/blob/master/package.json) for an example client.
 
 ## Development
 
-```sh
-# clone Nextflow next to the language server (for the nf-lang module)
-git clone https://github.com/nextflow-io/nextflow ../nextflow
-
-make                            # build the language server jar
-make test                       # run unit tests
-make bench                      # run the performance benchmark
-make bundle                     # build the standalone bundle for the current platform
-VERSION=<version> make install  # install a local build for the VS Code extension
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more details on building, testing and releasing the language server.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for building, testing, and releasing the language server, and the [docs](docs/README.md) for its internals.
 
 ## Troubleshooting
 

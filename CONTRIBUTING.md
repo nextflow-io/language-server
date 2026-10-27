@@ -15,7 +15,7 @@ The jar is compiled for Java 17, since it is also released for platforms without
 java -jar build/libs/language-server-all.jar
 ```
 
-Design decisions are recorded in [`adr/`](adr).
+Design decisions are recorded in [`docs/adr/`](docs/adr).
 
 ### Standalone bundle
 
@@ -40,30 +40,7 @@ This builds the bundle for the current platform and extracts it into `~/.nextflo
 
 ## Testing
 
-```sh
-make test                     # all unit tests
-make test class=<test class>  # a single test class
-```
-
-Tests resolve plugins from a local registry that serves the fixtures in `src/test/resources/registry/`. To test against a new plugin release, add the registry response for it (`GET https://registry.nextflow.io/api/v1/plugins/<name>/<version>`) as `registry/v1/plugins/<name>/<version>.json`.
-
-### Benchmark
-
-```sh
-make bench
-```
-
-The benchmark clones [nf-core/rnaseq](https://github.com/nf-core/rnaseq) into `build/bench/rnaseq` and drives the language server through a scripted LSP session, reporting the latency of each operation and the peak memory of the server. Every response is validated, so the benchmark also serves as an integration test. See `scripts/bench.py --help`.
-
-To compare the current checkout against another version:
-
-```sh
-make bench-compare                                   # against main
-scripts/bench-compare.sh --base v26.04.5 --rounds 5
-scripts/bench-compare.sh --base-cmd "java -jar old.jar" --head-cmd ./nextflow-lsp
-```
-
-See `scripts/bench-compare.sh --help` for all options.
+See [Testing](docs/testing.md) for running and writing tests, and for the benchmark.
 
 ## Releasing
 

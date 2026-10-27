@@ -33,7 +33,7 @@ The language server communicates over standard input/output.
 
 **Syntax highlighting:** The language server provides semantic tokens, but your editor still needs a Nextflow grammar for basic syntax highlighting. See the editor sections below.
 
-**Settings:** The language server reads settings from `workspace/didChangeConfiguration`, under the `nextflow` key. All settings are optional. See the [VS Code extension](https://github.com/nextflow-io/vscode-language-nextflow/blob/master/package.json) for the available settings and their defaults. Some of them (e.g. `nextflow.languageVersion`, `nextflow.java.home`) are used only by the extension, and are ignored by the language server.
+**Settings:** The language server reads optional settings from `workspace/didChangeConfiguration`, under the `nextflow` key. See [Configuration](configuration.md).
 
 > [!NOTE]
 > Older versions of the language server require the editor to send a value for `nextflow.files.exclude` and to open a workspace folder, otherwise the language server does nothing.
