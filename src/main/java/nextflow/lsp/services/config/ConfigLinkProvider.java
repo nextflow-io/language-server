@@ -23,7 +23,9 @@ import java.util.List;
 import nextflow.config.ast.ConfigIncludeNode;
 import nextflow.config.ast.ConfigNode;
 import nextflow.config.ast.ConfigVisitorSupport;
+import nextflow.lsp.ast.ConfigView;
 import nextflow.lsp.services.LinkProvider;
+import nextflow.lsp.util.Includes;
 import nextflow.lsp.util.Logger;
 import nextflow.lsp.util.LanguageServerUtils;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
@@ -40,9 +42,9 @@ public class ConfigLinkProvider implements LinkProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ConfigAstCache ast;
+    private ConfigView ast;
 
-    public ConfigLinkProvider(ConfigAstCache ast) {
+    public ConfigLinkProvider(ConfigView ast) {
         this.ast = ast;
     }
 
@@ -96,7 +98,7 @@ class ConfigLinkVisitor extends ConfigVisitorSupport {
             return;
         var source = ce.getText();
         var range = LanguageServerUtils.astNodeToRange(node.source);
-        var target = ConfigAstCache.resolveIncludeUri(uri, source);
+        var target = Includes.configIncludeUri(uri, source);
         if( target != null )
             links.add(new DocumentLink(range, target.toString()));
     }

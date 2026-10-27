@@ -19,14 +19,15 @@ package nextflow.lsp.services.script;
 import java.util.List;
 import java.util.Map;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
-import nextflow.lsp.services.LanguageServerConfiguration;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import static nextflow.lsp.TestUtils.*;
+import static nextflow.lsp.util.JsonUtils.asJson;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -38,10 +39,10 @@ class ScriptCodeLensTest {
 
     @Test
     void providePreviewDagCodeLensForEachWorkflow() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow HELLO {
             }
 
@@ -49,8 +50,7 @@ class ScriptCodeLensTest {
                 HELLO()
             }
             """);
-        service.updateNow();
-        var lenses = service.codeLens(new CodeLensParams(new TextDocumentIdentifier(uri)));
+        var lenses = server.call(s -> s.codeLens(new CodeLensParams(new TextDocumentIdentifier(uri))));
 
         // one lens per workflow (named + entry)
         assertThat(lenses).hasSize(2);
@@ -61,11 +61,10 @@ class ScriptCodeLensTest {
     @Test
     @SuppressWarnings("unchecked")
     void previewWorkspaceViaExecuteCommand() {
-        var service = getScriptService();
-        var uri = getUri("main.nf");
+        var server = TestServer.start();
 
-        // open without a manual update; executeCommand drives the compile
-        open(service, uri, """
+        // the request builds the workspace
+        server.open("main.nf", """
             process FOO {
                 script:
                 "echo foo"
@@ -75,7 +74,7 @@ class ScriptCodeLensTest {
                 FOO()
             }
             """);
-        var result = (Map<String,Object>) service.executeCommand("nextflow.server.previewWorkspace", List.of(), LanguageServerConfiguration.defaults());
+        var result = (Map<String,Object>) executeCommand(server, "nextflow.server.previewWorkspace", List.of(asJson("root")));
         var definitions = (List<Map<String,Object>>) result.get("result");
 
         assertThat(definitions).anyMatch(d -> "process".equals(d.get("type")) && "FOO".equals(d.get("name")));
@@ -89,9 +88,9 @@ class ScriptCodeLensTest {
 
     @Test
     void returnNullForUnknownCommand() {
-        var service = getScriptService();
+        var server = TestServer.start();
 
-        assertThat(service.executeCommand("nextflow.server.bogus", List.of(), LanguageServerConfiguration.defaults())).isNull();
+        assertThat(executeCommand(server, "nextflow.server.bogus", List.of())).isNull();
     }
 
 }

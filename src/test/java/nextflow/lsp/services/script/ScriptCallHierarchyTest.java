@@ -18,8 +18,11 @@ package nextflow.lsp.services.script;
 
 import java.util.List;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
+import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams;
 import org.eclipse.lsp4j.CallHierarchyItem;
+import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams;
 import org.eclipse.lsp4j.CallHierarchyPrepareParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -45,19 +48,18 @@ class ScriptCallHierarchyTest {
         }
         """;
 
-    static List<CallHierarchyItem> prepare(ScriptService service, String uri, Position position) {
-        return service.prepareCallHierarchy(new CallHierarchyPrepareParams(new TextDocumentIdentifier(uri), position));
+    static List<CallHierarchyItem> prepare(TestServer server, String uri, Position position) {
+        return server.call(s -> s.prepareCallHierarchy(new CallHierarchyPrepareParams(new TextDocumentIdentifier(uri), position)));
     }
 
     @Test
     void prepareCallHierarchyItemForDefinitionAndCall() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, CONTENTS);
-        service.updateNow();
-        var atDef = prepare(service, uri, new Position(0, 9));
-        var atCall = prepare(service, uri, new Position(4, 4));
+        server.open("main.nf", CONTENTS);
+        var atDef = prepare(server, uri, new Position(0, 9));
+        var atCall = prepare(server, uri, new Position(4, 4));
 
         assertThat(atDef).hasSize(1);
         assertThat(atDef.get(0).getName()).isEqualTo("HELLO");
@@ -70,13 +72,12 @@ class ScriptCallHierarchyTest {
 
     @Test
     void resolveIncomingCallsToWorkflow() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, CONTENTS);
-        service.updateNow();
-        var item = prepare(service, uri, new Position(0, 9)).get(0);
-        var incoming = service.callHierarchyIncomingCalls(item);
+        server.open("main.nf", CONTENTS);
+        var item = prepare(server, uri, new Position(0, 9)).get(0);
+        var incoming = server.call(s -> s.callHierarchyIncomingCalls(new CallHierarchyIncomingCallsParams(item)));
 
         // the entry workflow calls HELLO at line 4
         assertThat(incoming).hasSize(1);
@@ -86,13 +87,12 @@ class ScriptCallHierarchyTest {
 
     @Test
     void resolveOutgoingCallsFromEntryWorkflow() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, CONTENTS);
-        service.updateNow();
-        var item = prepare(service, uri, new Position(3, 0)).get(0);
-        var outgoing = service.callHierarchyOutgoingCalls(item);
+        server.open("main.nf", CONTENTS);
+        var item = prepare(server, uri, new Position(3, 0)).get(0);
+        var outgoing = server.call(s -> s.callHierarchyOutgoingCalls(new CallHierarchyOutgoingCallsParams(item)));
 
         // the entry workflow calls HELLO
         assertThat(outgoing).hasSize(1);
@@ -102,14 +102,13 @@ class ScriptCallHierarchyTest {
 
     @Test
     void noCallHierarchyItemForNonCallablePosition() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, CONTENTS);
-        service.updateNow();
+        server.open("main.nf", CONTENTS);
 
         // the blank line between the two workflows is not a method or call
-        assertThat(prepare(service, uri, new Position(2, 0))).isEmpty();
+        assertThat(prepare(server, uri, new Position(2, 0))).isEmpty();
     }
 
 }

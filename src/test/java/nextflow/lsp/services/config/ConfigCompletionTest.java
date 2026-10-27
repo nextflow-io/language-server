@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
@@ -42,15 +43,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TestWorkspace.class)
 class ConfigCompletionTest {
 
-    // NOTE: completion() runs its own update internally, so (unlike hover or
-    // definition) the file must NOT be flushed with updateNow() beforehand.
-
-    static Either<List<CompletionItem>, CompletionList> either(ConfigService service, String uri, Position position, int maxItems) {
-        return service.completion(new CompletionParams(new TextDocumentIdentifier(uri), position), maxItems, false);
+    static Either<List<CompletionItem>, CompletionList> either(TestServer server, String uri, Position position, int maxItems) {
+        server.configure(Map.of("nextflow.completion.maxItems", maxItems));
+        return server.call(s -> s.completion(new CompletionParams(new TextDocumentIdentifier(uri), position)));
     }
 
-    static List<CompletionItem> getCompletions(ConfigService service, String uri, Position position) {
-        var result = either(service, uri, position, 100);
+    static List<CompletionItem> getCompletions(TestServer server, String uri, Position position) {
+        var result = either(server, uri, position, 100);
         return result.isLeft() ? result.getLeft() : result.getRight().getItems();
     }
 
@@ -67,11 +66,11 @@ class ConfigCompletionTest {
 
     @Test
     void provideTopLevelCompletionsForPartialScopeName() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, "wor\n");
-        var completions = getCompletions(service, uri, new Position(0, 3));
+        server.open("nextflow.config", "wor\n");
+        var completions = getCompletions(server, uri, new Position(0, 3));
         var byLabel = byLabel(completions);
 
         // a scope is offered both as a bare name and as a block snippet
@@ -83,11 +82,11 @@ class ConfigCompletionTest {
 
     @Test
     void provideOptionCompletionsForConfigScope() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, "process.\n");
-        var completions = getCompletions(service, uri, new Position(0, 8));
+        server.open("nextflow.config", "process.\n");
+        var completions = getCompletions(server, uri, new Position(0, 8));
         var cpus = findByLabel(completions, "cpus");
 
         assertThat(cpus).isNotNull();
@@ -97,11 +96,11 @@ class ConfigCompletionTest {
 
     @Test
     void showEveryAcceptedTypeForOptionWithMultipleTypes() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, "process.\n");
-        var completions = getCompletions(service, uri, new Position(0, 8));
+        server.open("nextflow.config", "process.\n");
+        var completions = getCompletions(server, uri, new Position(0, 8));
         var byLabel = byLabel(completions);
 
         // the types are shown in sorted order, since `types()` is not ordered
@@ -111,17 +110,17 @@ class ConfigCompletionTest {
 
     @Test
     void provideOptionCompletionsInsideProfileIgnoringProfileScope() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, """
+        server.open("nextflow.config", """
             profiles {
                 standard {
                     process.
                 }
             }
             """);
-        var completions = getCompletions(service, uri, new Position(2, 16));
+        var completions = getCompletions(server, uri, new Position(2, 16));
 
         // the "profiles.<name>" prefix is stripped, so process options are offered
         assertThat(findByLabel(completions, "cpus")).extracting(CompletionItem::getDetail).isEqualTo("cpus: Integer");
@@ -129,11 +128,11 @@ class ConfigCompletionTest {
 
     @Test
     void markCompletionListIncompleteWhenItemsExceedMaxItems() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, "process.\n");
-        var result = either(service, uri, new Position(0, 8), 1);
+        server.open("nextflow.config", "process.\n");
+        var result = either(server, uri, new Position(0, 8), 1);
 
         assertThat(result.isRight()).isTrue();
         assertThat(result.getRight().isIncomplete()).isTrue();
@@ -142,9 +141,9 @@ class ConfigCompletionTest {
 
     @Test
     void noCompletionsForFileThatIsNotOpen() {
-        var service = getConfigService();
+        var server = TestServer.start();
 
-        assertThat(getCompletions(service, getUri("other.config"), new Position(0, 0))).isEmpty();
+        assertThat(getCompletions(server, getUri("other.config"), new Position(0, 0))).isEmpty();
     }
 
 }

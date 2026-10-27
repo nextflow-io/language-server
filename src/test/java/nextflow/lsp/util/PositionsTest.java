@@ -53,7 +53,6 @@ class PositionsTest {
         assertThat(Positions.getOffset(SCRIPT, new Position(0, 0))).isEqualTo(0);
         assertThat(Positions.getOffset(SCRIPT, new Position(1, 0))).isEqualTo(11);
         assertThat(Positions.getOffset(SCRIPT, new Position(2, 0))).isEqualTo(38);
-        assertThat(Positions.getOffset(SCRIPT, new Position(3, 0))).isEqualTo(-1);
     }
 
     @Test

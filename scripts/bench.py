@@ -10,8 +10,8 @@ end-to-end integration test (non-zero exit on failure).
 The session covers startup and workspace indexing, opening and editing a file,
 and common requests (hover, completion, definition, references, rename, etc).
 didOpen/didChange are measured up to the corresponding diagnostics, so they
-include the server's 1 second update debounce. The peak RSS of the server is
-also reported.
+include the server's 500 ms debounce of background builds. The peak RSS of the
+server is also reported.
 
 Usage:
   scripts/bench.py --workspace build/bench/rnaseq [--iterations 10] [--json out.json]
@@ -273,9 +273,9 @@ def timed(fn):
 def start_server(cmd, workspace, timeout):
     """Launch the server and wait for the workspace to be indexed.
 
-    The `nextflow.server.previewWorkspace` command calls ScriptService.updateNow(),
-    which scans and compiles the entire workspace (config files first) before
-    returning, so its response is a deterministic "indexing done" signal.
+    The `nextflow.server.previewWorkspace` command is a project-wide request,
+    which the server answers only once the workspace is indexed and every file
+    is built, so its response is a deterministic "indexing done" signal.
     """
     root_uri = workspace.as_uri()
     start = time.perf_counter()
@@ -451,7 +451,7 @@ def print_table(results, peak_rss):
         print()
         print('peak RSS: %.0f MB' % (peak_rss / 1024))
     print()
-    print('note: didOpen/didChange latencies include the server\'s 1s update debounce')
+    print('note: didOpen/didChange latencies include the server\'s 500 ms debounce of background builds')
 
 
 def main():

@@ -34,40 +34,47 @@ public class Positions {
      * Map a two-dimensional position (line and character) to a
      * one-dimensional index in a string buffer.
      *
+     * The character is counted in UTF-16 code units, and lines are
+     * terminated by "\n", "\r\n" or "\r". Out-of-range positions are
+     * clamped: a character past the end of its line maps to the line
+     * end, and a line past the last line maps to the end of the text.
+     *
      * @param string
      * @param position
      */
     public static int getOffset(String string, Position position) {
-        int line = position.getLine();
-        int character = position.getCharacter();
-        int currentIndex = 0;
-        if( line > 0 ) {
-            var reader = new BufferedReader(new StringReader(string));
-            try {
-                int readLines = 0;
-                while( true ) {
-                    var b = reader.read();
-                    if( b == -1 )
-                        return -1;
-                    currentIndex++;
-                    if( (char) b == '\n' ) {
-                        readLines++;
-                        if( readLines == line )
-                            break;
-                    }
-                }
-            }
-            catch( IOException e ) {
-                return -1;
-            }
+        var length = string.length();
+        var line = Math.max(0, position.getLine());
+        var character = Math.max(0, position.getCharacter());
 
-            try {
-                reader.close();
-            }
-            catch( IOException e ) {
-            }
+        // find the start of the line
+        int lineStart = 0;
+        for( int i = 0; i < line; i++ ) {
+            var next = nextLineStart(string, lineStart);
+            if( next == -1 )
+                return length;
+            lineStart = next;
         }
-        return currentIndex + character;
+
+        // clamp the character to the end of the line
+        var lineEnd = lineStart;
+        while( lineEnd < length && string.charAt(lineEnd) != '\n' && string.charAt(lineEnd) != '\r' )
+            lineEnd++;
+        return character < lineEnd - lineStart
+            ? lineStart + character
+            : lineEnd;
+    }
+
+    private static int nextLineStart(String string, int from) {
+        var length = string.length();
+        for( int i = from; i < length; i++ ) {
+            var c = string.charAt(i);
+            if( c == '\n' )
+                return i + 1;
+            if( c == '\r' )
+                return i + 1 < length && string.charAt(i + 1) == '\n' ? i + 2 : i + 1;
+        }
+        return -1;
     }
 
     /**

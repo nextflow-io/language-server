@@ -16,16 +16,8 @@
 
 package nextflow.lsp.services.config;
 
-import java.util.List;
-import java.util.Map;
-
-import nextflow.config.spec.SpecNode;
-import nextflow.lsp.TestLanguageClient;
-import nextflow.lsp.TestPluginRegistry;
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
-import nextflow.lsp.services.LanguageServerConfiguration;
-import nextflow.lsp.spec.PluginSpec;
-import nextflow.lsp.spec.PluginSpecCache;
 import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -42,8 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TestWorkspace.class)
 class ConfigHoverTest {
 
-    static String getHoverHint(ConfigService service, String uri, Position position) {
-        var hover = service.hover(new HoverParams(new TextDocumentIdentifier(uri), position));
+    static String getHoverHint(TestServer server, String uri, Position position) {
+        var hover = server.call(s -> s.hover(new HoverParams(new TextDocumentIdentifier(uri), position)));
         return hover != null
             ? hover.getContents().getRight().getValue()
             : null;
@@ -51,58 +43,40 @@ class ConfigHoverTest {
 
     @Test
     void getHoverHintForConfigScope() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, """
+        server.open("nextflow.config", """
             executor {
             }
             """);
-        service.updateNow();
-        var value = getHoverHint(service, uri, new Position(1, 0));
+        var value = getHoverHint(server, uri, new Position(1, 0));
 
-        assertThat(value).isEqualTo("The `executor` scope controls various executor behaviors.\n");
+        // the description comes from nf-lang, so only check that it is shown
+        assertThat(value).isNotBlank().doesNotStartWith(" ").endsWith("\n");
     }
 
     @Test
     void getHoverHintForConfigOptionWithMultipleTypes() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
 
-        open(service, uri, """
+        server.open("nextflow.config", """
             process {
                 arch = 'linux/x86_64'
             }
             """);
-        service.updateNow();
-        var value = getHoverHint(service, uri, new Position(1, 4));
+        var value = getHoverHint(server, uri, new Position(1, 4));
 
         assertThat(value).startsWith("`process.arch (Map | String)`");
     }
 
     @Test
     void getHoverHintForPluginConfigScope() {
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
-        var service = new ConfigService(workspaceRootUri());
-        var configuration = LanguageServerConfiguration.defaults();
-        var provSpec = new PluginSpec(
-            Map.of(
-                "prov", new SpecNode.Scope("The `prov` scope allows you to configure the `nf-prov` plugin.", Map.of())
-            ),
-            List.of(), List.of(), List.of()
-        );
-        var pluginSpecCache = new PluginSpecCache(TestPluginRegistry.url()) {
-            @Override
-            public PluginSpec get(String name, String version) {
-                return "nf-prov".equals(name) && "1.6.0".equals(version)
-                    ? provSpec
-                    : super.get(name, version);
-            }
-        };
-        service.connect(new TestLanguageClient());
-        service.initialize(configuration, pluginSpecCache);
 
-        open(service, uri, """
+        server.open("nextflow.config", """
             plugins {
                 id 'nf-prov@1.6.0'
             }
@@ -110,8 +84,9 @@ class ConfigHoverTest {
             prov {
             }
             """);
-        service.updateNow();
-        var value = getHoverHint(service, uri, new Position(4, 0));
+        // the plugin spec is fetched in the background
+        server.settle();
+        var value = getHoverHint(server, uri, new Position(4, 0));
 
         assertThat(value).isEqualTo("The `prov` scope allows you to configure the `nf-prov` plugin.\n");
     }

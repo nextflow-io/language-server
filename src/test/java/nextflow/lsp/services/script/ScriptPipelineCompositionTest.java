@@ -17,6 +17,7 @@
 package nextflow.lsp.services.script;
 
 import nextflow.lsp.TestLanguageClient;
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.Position;
@@ -57,23 +58,23 @@ class ScriptPipelineCompositionTest {
         }
         """;
 
-    static ScriptService pipelineService() {
+    static TestServer pipelineService() {
         return pipelineService(new TestLanguageClient());
     }
 
-    static ScriptService pipelineService(TestLanguageClient client) {
-        var service = getScriptService(client);
-        open(service, getUri("rnaseq.nf"), PIPELINE);
-        return service;
+    static TestServer pipelineService(TestLanguageClient client) {
+        var server = TestServer.start((o) -> o.client = client);
+        server.open("rnaseq.nf", PIPELINE);
+        return server;
     }
 
     @Test
     void noDiagnosticsForPipelineInclude() {
         var client = new TestLanguageClient();
-        var service = pipelineService(client);
+        var server = pipelineService(client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             nextflow.enable.types = true
 
             include {
@@ -97,17 +98,17 @@ class ScriptPipelineCompositionTest {
                 bams: Channel<Path> { path 'bams' }
             }
             """);
-        service.updateNow();
+        server.settle();
 
-        assertThat(client.getDiagnostics(uri)).isEmpty();
+        assertThat(client.getPublishedDiagnostics(uri)).isEmpty();
     }
 
     @Test
     void getHoverOfIncludedPipeline() {
-        var service = pipelineService();
+        var server = pipelineService();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             nextflow.enable.types = true
 
             include { workflow as RNASEQ } from './rnaseq.nf'
@@ -117,8 +118,7 @@ class ScriptPipelineCompositionTest {
                 RNASEQ( record(input: file('sample.fq')) )
             }
             """);
-        service.updateNow();
-        var hover = service.hover(new HoverParams(new TextDocumentIdentifier(uri), new Position(6, 4)));
+        var hover = server.call(s -> s.hover(new HoverParams(new TextDocumentIdentifier(uri), new Position(6, 4))));
 
         var value = hover.getContents().getRight().getValue();
         assertThat(value).contains("workflow RNASEQ {");

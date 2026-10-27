@@ -19,6 +19,7 @@ package nextflow.lsp.services.script;
 import java.util.ArrayList;
 import java.util.List;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.services.SemanticTokensVisitor;
 import org.eclipse.lsp4j.SemanticTokensParams;
@@ -61,54 +62,52 @@ class ScriptSemanticTokensTest {
         return result;
     }
 
-    static List<Token> getTokens(ScriptService service, String uri) {
-        var st = service.semanticTokensFull(new SemanticTokensParams(new TextDocumentIdentifier(uri)));
+    static List<Token> getTokens(TestServer server, String uri) {
+        var st = server.call(s -> s.semanticTokensFull(new SemanticTokensParams(new TextDocumentIdentifier(uri))));
         return st != null ? decode(st.getData()) : null;
     }
 
     @Test
     void emitFunctionTokenForIncludedName() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             include { HELLO } from './module.nf'
 
             workflow {
                 HELLO()
             }
             """);
-        service.updateNow();
-        var tokens = getTokens(service, uri);
+        var tokens = getTokens(server, uri);
 
         // the imported name "HELLO" is highlighted as a function at column 10
         assertThat(tokens).contains(new Token(0, 10, 5, "function"));
         // the token stream is well-formed (groups of 5 ints)
-        assertThat(service.semanticTokensFull(new SemanticTokensParams(new TextDocumentIdentifier(uri))).getData().size() % 5).isEqualTo(0);
+        assertThat(server.call(s -> s.semanticTokensFull(new SemanticTokensParams(new TextDocumentIdentifier(uri)))).getData().size() % 5).isEqualTo(0);
     }
 
     @Test
     void noNegativeValuesForGStringWithInterpolatedValues() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 def x = 1
                 println "${x}${x}"
             }
             """);
-        service.updateNow();
-        var data = service.semanticTokensFull(new SemanticTokensParams(new TextDocumentIdentifier(uri))).getData();
+        var data = server.call(s -> s.semanticTokensFull(new SemanticTokensParams(new TextDocumentIdentifier(uri)))).getData();
 
         assertThat(data).allMatch(it -> it >= 0);
     }
 
     @Test
     void returnNullForFileThatHasNoAst() {
-        var service = getScriptService();
+        var server = TestServer.start();
 
-        assertThat(getTokens(service, getUri("not-open.nf"))).isNull();
+        assertThat(getTokens(server, getUri("not-open.nf"))).isNull();
     }
 
 }

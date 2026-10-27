@@ -441,16 +441,22 @@ if( hostSupported ) {
             if( !new File(home, 'lib/nextflow-lsp.aot').exists() )
                 throw new GradleException('AOT cache was not created')
             // fails if the cache is rejected
-            final exit = '{"jsonrpc":"2.0","method":"exit"}'
+            final messages = [
+                '{"jsonrpc":"2.0","id":1,"method":"shutdown"}',
+                '{"jsonrpc":"2.0","method":"exit"}'
+            ]
+            final stdin = messages.collect { "Content-Length: ${it.length()}\r\n\r\n${it}" }.join('')
             final stdout = new ByteArrayOutputStream()
             services.exec.exec {
                 environment 'NXF_LSP_JAVA_OPTS', '-XX:AOTMode=on'
                 commandLine launcher
-                standardInput = new ByteArrayInputStream("Content-Length: ${exit.length()}\r\n\r\n${exit}".getBytes('UTF-8'))
+                standardInput = new ByteArrayInputStream(stdin.getBytes('UTF-8'))
                 standardOutput = stdout
             }
-            if( stdout.size() > 0 )
-                throw new GradleException("Server wrote to stdout without a client: ${stdout}")
+            // stdout is reserved for JSON-RPC, so the shutdown response must be all there is
+            final frame = stdout.toString('UTF-8') =~ /^Content-Length: (\d+)\r\n\r\n/
+            if( !frame.find() || stdout.size() != frame.end() + (frame.group(1) as int) )
+                throw new GradleException("Server wrote to stdout outside of JSON-RPC: ${stdout}")
             stamp.get().asFile.text = ''
         }
     }

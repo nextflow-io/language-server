@@ -17,12 +17,12 @@
 
 package nextflow.lsp.services.config;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.stream.Stream;
 
 import nextflow.lsp.Golden;
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.script.formatter.FormattingOptions;
 import org.junit.jupiter.api.DynamicTest;
@@ -50,23 +50,27 @@ class ConfigFormattingTest {
      * must be stable when formatted again.
      */
     @TestFactory
-    @Execution(ExecutionMode.SAME_THREAD) // the dynamic tests share one service
+    @Execution(ExecutionMode.SAME_THREAD) // the dynamic tests share one server
     Stream<DynamicTest> formatGoldenFiles() {
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
         var options = new FormattingOptions(4, true);
 
         return Golden.inputs("format/config", ".config").stream().map(input -> dynamicTest(input.getFileName().toString(), input.toUri(), () -> {
-            openVerbatim(service, uri, Golden.read(input));
-            var textEdits = service.formatting(URI.create(uri), options);
-            assertThat(textEdits).isNotEmpty();
-            var formatted = textEdits.get(0).getNewText();
-            Golden.check(Golden.sibling(input, ".formatted"), formatted);
+            server.openVerbatim("nextflow.config", Golden.read(input));
+            try {
+                var textEdits = formatting(server, uri, options);
+                assertThat(textEdits).isNotEmpty();
+                var formatted = textEdits.get(0).getNewText();
+                Golden.check(Golden.sibling(input, ".formatted"), formatted);
 
-            openVerbatim(service, uri, formatted);
-            var reformatted = service.formatting(URI.create(uri), options);
-            if( !reformatted.isEmpty() )
-                assertThat(reformatted.get(0).getNewText()).isEqualTo(formatted);
+                server.changeVerbatim("nextflow.config", formatted);
+                var reformatted = formatting(server, uri, options);
+                if( !reformatted.isEmpty() )
+                    assertThat(reformatted.get(0).getNewText()).isEqualTo(formatted);
+            } finally {
+                server.close("nextflow.config");
+            }
         }));
     }
 
@@ -76,7 +80,7 @@ class ConfigFormattingTest {
         // re-derives the comment metadata on the same cached AST -- the
         // output must not change; the input is deliberately non-canonical
         // so that every request returns an edit
-        var service = getConfigService();
+        var server = TestServer.start();
         var uri = getUri("nextflow.config");
         var contents = """
             // top comment
@@ -87,10 +91,10 @@ class ConfigFormattingTest {
             """;
         var expected = contents.replace("cpus=2", "cpus = 2");
 
-        openOnDisk(service, uri, contents);
+        server.open("nextflow.config", contents);
         var texts = new ArrayList<String>();
         for( int i = 0; i < 3; i++ ) {
-            var edits = service.formatting(URI.create(uri), new FormattingOptions(4, true));
+            var edits = formatting(server, uri, new FormattingOptions(4, true));
             texts.add(edits != null && !edits.isEmpty() ? edits.get(0).getNewText() : contents);
         }
 

@@ -16,6 +16,7 @@
 
 package nextflow.lsp.services.script;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.Position;
@@ -33,8 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TestWorkspace.class)
 class ScriptHoverTest {
 
-    static String getHoverHint(ScriptService service, String uri, Position position) {
-        var hover = service.hover(new HoverParams(new TextDocumentIdentifier(uri), position));
+    static String getHoverHint(TestServer server, String uri, Position position) {
+        var hover = server.call(s -> s.hover(new HoverParams(new TextDocumentIdentifier(uri), position)));
         return hover != null
             ? hover.getContents().getRight().getValue()
             : null;
@@ -42,10 +43,10 @@ class ScriptHoverTest {
 
     @Test
     void showSignatureAndDocumentationWhenHoveringOverFunctionCall() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             /**
              * Greet someone.
              */
@@ -57,18 +58,17 @@ class ScriptHoverTest {
                 greet('World')
             }
             """);
-        service.updateNow();
-        var value = getHoverHint(service, uri, new Position(8, 5));
+        var value = getHoverHint(server, uri, new Position(8, 5));
 
         assertThat(value).isEqualTo("```nextflow\ndef greet(name)\n```\n\n---\n\nGreet someone.");
     }
 
     @Test
     void showInferredReturnTypeWhenHoveringOverUntypedFunctionCall() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             nextflow.enable.types = true
 
             def make() {
@@ -79,18 +79,17 @@ class ScriptHoverTest {
                 make()
             }
             """);
-        service.updateNow();
-        var value = getHoverHint(service, uri, new Position(7, 5));
+        var value = getHoverHint(server, uri, new Position(7, 5));
 
         assertThat(value).isEqualTo("```nextflow\ndef make() -> Channel<Integer>\n```");
     }
 
     @Test
     void showLabelWhenHoveringOverWorkflowInvocation() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow HELLO {
             }
 
@@ -98,19 +97,18 @@ class ScriptHoverTest {
                 HELLO()
             }
             """);
-        service.updateNow();
-        var value = getHoverHint(service, uri, new Position(4, 4));
+        var value = getHoverHint(server, uri, new Position(4, 4));
 
         assertThat(value).startsWith("```nextflow\nworkflow HELLO {");
     }
 
     @Test
     void showLabelWhenHoveringOverProcess() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
         // destructured record inputs/outputs
-        open(service, uri, """
+        server.open("main.nf", """
             nextflow.enable.types = true
 
             process SAMTOOLS_INDEX {
@@ -128,8 +126,7 @@ class ScriptHoverTest {
                 SAMTOOLS_INDEX( channel.empty() )
             }
             """);
-        service.updateNow();
-        var value = getHoverHint(service, uri, new Position(14, 4));
+        var value = getHoverHint(server, uri, new Position(14, 4));
 
         // render as Record { ... } with body
         assertThat(value).isEqualTo("""
@@ -150,7 +147,7 @@ class ScriptHoverTest {
             ```""");
 
         // named record type input
-        open(service, uri, """
+        server.change("main.nf", """
             nextflow.enable.types = true
 
             record SamtoolsIndexInput {
@@ -170,8 +167,7 @@ class ScriptHoverTest {
                 SAMTOOLS_INDEX( channel.empty() )
             }
             """);
-        service.updateNow();
-        value = getHoverHint(service, uri, new Position(16, 4));
+        value = getHoverHint(server, uri, new Position(16, 4));
 
         // expand named record body
         assertThat(value).isEqualTo("""
@@ -191,17 +187,16 @@ class ScriptHoverTest {
 
     @Test
     void returnNullWhenHoveringOverWhitespace() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 println('Hello!')
             }
             """);
-        service.updateNow();
 
-        assertThat(getHoverHint(service, uri, new Position(3, 0))).isNull();
+        assertThat(getHoverHint(server, uri, new Position(3, 0))).isNull();
     }
 
 }

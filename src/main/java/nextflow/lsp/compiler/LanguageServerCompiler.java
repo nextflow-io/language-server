@@ -15,23 +15,29 @@
  */
 package nextflow.lsp.compiler;
 
-import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import groovy.lang.GroovyClassLoader;
 import nextflow.config.control.StringReaderSourceWithURI;
-import nextflow.lsp.file.FileCache;
+import nextflow.config.parser.ConfigAstBuilder;
+import nextflow.config.parser.ConfigParserPluginFactory;
 import nextflow.script.control.Compiler;
-import org.codehaus.groovy.GroovyBugError;
+import nextflow.script.control.LazyErrorCollector;
+import nextflow.script.parser.ScriptAstBuilder;
+import nextflow.script.parser.ScriptParserPluginFactory;
+import org.antlr.v4.runtime.RecognitionException;
+import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.WarningMessage;
 
 /**
- * Compiler that can load source files from the file cache
- * and defers errors to the language server.
+ * Compiler that parses source files from the given text, and
+ * defers errors to the language server.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
@@ -42,51 +48,105 @@ public class LanguageServerCompiler extends Compiler {
     }
 
     /**
-     * Prepare a source file from the open cache, or the filesystem
-     * if it is not open.
+     * Create a compiler for Nextflow scripts. If a project directory
+     * is given, its `lib` directory is added to the classpath.
      *
-     * If the file is not open and doesn't exist in the filesystem,
-     * it has been renamed. Return null so that the file is removed
-     * from any downstream caches.
+     * @param projectDir
+     */
+    public static LanguageServerCompiler forScripts(Path projectDir) {
+        var config = new CompilerConfiguration();
+        config.setPluginFactory(new ScriptParserPluginFactory());
+        config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
+
+        var optimizationOptions = config.getOptimizationOptions();
+        optimizationOptions.put(CompilerConfiguration.GROOVYDOC, true);
+        optimizationOptions.put(ScriptAstBuilder.COMMENTS_OPTION, true);
+
+        var classLoader = new GroovyClassLoader();
+        if( projectDir != null )
+            addLibToClasspath(classLoader, projectDir.resolve("lib"));
+        return new LanguageServerCompiler(config, classLoader);
+    }
+
+    /**
+     * Create a compiler for Nextflow config files.
+     */
+    public static LanguageServerCompiler forConfigs() {
+        var config = new CompilerConfiguration();
+        config.setPluginFactory(new ConfigParserPluginFactory());
+        config.setWarningLevel(WarningMessage.POSSIBLE_ERRORS);
+        config.getOptimizationOptions().put(ConfigAstBuilder.COMMENTS_OPTION, true);
+        return new LanguageServerCompiler(config, new GroovyClassLoader());
+    }
+
+    /**
+     * Add the `lib` directory and any JARs within it to the classpath,
+     * the same way that Nextflow does. Groovy source files are compiled
+     * on demand when a script refers to them.
+     *
+     * Source files are resolved against the lib directory on every lookup
+     * rather than through the classpath, so that files (or the lib directory
+     * itself) can be added while the language server is running. New JARs
+     * require a new compiler.
+     *
+     * @param classLoader
+     * @param libDir
+     */
+    private static void addLibToClasspath(GroovyClassLoader classLoader, Path libDir) {
+        classLoader.setResourceLoader((name) -> {
+            var source = libDir.resolve(name.replace('.', '/') + ".groovy");
+            return Files.exists(source) ? source.toUri().toURL() : null;
+        });
+        if( !Files.isDirectory(libDir) )
+            return;
+        try( var files = Files.list(libDir) ) {
+            files
+                .filter(path -> path.toString().endsWith(".jar"))
+                .sorted()
+                .forEach(path -> classLoader.addClasspath(path.toString()));
+        }
+        catch( IOException e ) {
+            System.err.println(String.format("Failed to read JAR files in lib directory: %s -- %s", libDir, e));
+        }
+    }
+
+    /**
+     * Prepare a source file from the given text.
      *
      * @param uri
+     * @param text
      */
-    public SourceUnit createSourceUnit(URI uri, FileCache fileCache) {
-        if( fileCache.isOpen(uri) ) {
-            var contents = fileCache.getContents(uri);
-            return new SourceUnit(
-                    uri.toString(),
-                    new StringReaderSourceWithURI(contents, uri, configuration()),
-                    configuration(),
-                    classLoader(),
-                    createErrorCollector());
-        }
-        if( Files.exists(Path.of(uri)) ) {
-            return super.createSourceUnit(new File(uri));
-        }
-        return null;
+    public SourceUnit createSourceUnit(URI uri, String text) {
+        return new SourceUnit(
+                uri.toString(),
+                new StringReaderSourceWithURI(text, uri, configuration()),
+                configuration(),
+                classLoader(),
+                createErrorCollector());
     }
 
     @Override
     protected ErrorCollector createErrorCollector() {
-        return new LanguageServerErrorCollector(configuration());
+        return new LazyErrorCollector(configuration());
     }
 
     /**
-     * Compile a source file enough to build the AST, and defer
-     * any errors to be handled later.
+     * Parse a source file and build the AST. Syntax errors are added
+     * to the error collector, while any other exception propagates.
+     *
+     * Not thread-safe, even for different source units: nf-lang
+     * writes positions and metadata to the shared ClassHelper node
+     * of a fully qualified name such as java.lang.String.
      *
      * @param sourceUnit
      */
-    @Override
-    public void compile(SourceUnit sourceUnit) {
+    public void parse(SourceUnit sourceUnit) {
         try {
-            super.compile(sourceUnit);
+            sourceUnit.parse();
+            sourceUnit.buildAST();
         }
-        catch( GroovyBugError | Exception e ) {
-            var uri = sourceUnit.getSource().getURI();
-            System.err.println("Unexpected exception while compiling " + uri.getPath() + ": " + e.toString());
-            e.printStackTrace();
+        catch( RecognitionException | CompilationFailedException e ) {
+            // syntax errors are in the error collector
         }
     }
 

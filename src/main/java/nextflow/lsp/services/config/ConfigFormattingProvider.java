@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 
 import nextflow.config.formatter.ConfigFormattingVisitor;
+import nextflow.lsp.ast.ConfigView;
 import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.services.FormattingUtils;
 import nextflow.lsp.util.Logger;
@@ -40,9 +41,9 @@ public class ConfigFormattingProvider implements FormattingProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ConfigAstCache ast;
+    private ConfigView ast;
 
-    public ConfigFormattingProvider(ConfigAstCache ast) {
+    public ConfigFormattingProvider(ConfigView ast) {
         this.ast = ast;
     }
 

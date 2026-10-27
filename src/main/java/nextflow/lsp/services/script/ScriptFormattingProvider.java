@@ -20,6 +20,7 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
+import nextflow.lsp.ast.ScriptView;
 import nextflow.lsp.services.FormattingProvider;
 import nextflow.lsp.services.FormattingUtils;
 import nextflow.lsp.util.Logger;
@@ -40,9 +41,9 @@ public class ScriptFormattingProvider implements FormattingProvider {
 
     private static Logger log = Logger.getInstance();
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
-    public ScriptFormattingProvider(ScriptAstCache ast) {
+    public ScriptFormattingProvider(ScriptView ast) {
         this.ast = ast;
     }
 

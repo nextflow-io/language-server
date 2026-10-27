@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import nextflow.lsp.util.Positions;
 import org.eclipse.lsp4j.Position;
@@ -40,8 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TestWorkspace.class)
 class ScriptRenameTest {
 
-    static Map<String,List<TextEdit>> rename(ScriptService service, String uri, Position position, String newName) {
-        var workspaceEdit = service.rename(new RenameParams(new TextDocumentIdentifier(uri), position, newName));
+    static Map<String,List<TextEdit>> rename(TestServer server, String uri, Position position, String newName) {
+        var workspaceEdit = server.call(s -> s.rename(new RenameParams(new TextDocumentIdentifier(uri), position, newName)));
         var result = new HashMap<String,List<TextEdit>>();
         workspaceEdit.getChanges().forEach((key, edits) -> {
             var sorted = new ArrayList<>(edits);
@@ -55,7 +56,7 @@ class ScriptRenameTest {
 
     @Test
     void renameWorkflow() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
         var contents = """
@@ -66,9 +67,8 @@ class ScriptRenameTest {
                 HELLO()
             }
             """;
-        open(service, uri, contents);
-        service.updateNow();
-        var changes = rename(service, uri, new Position(0, 9), "hi");
+        server.open("main.nf", contents);
+        var changes = rename(server, uri, new Position(0, 9), "hi");
 
         assertThat(changes.get(uri)).hasSize(2);
         assertThat(changes.get(uri).get(0).getRange().getStart()).isEqualTo(new Position(0, 9));
@@ -81,7 +81,7 @@ class ScriptRenameTest {
 
     @Test
     void renameWorkflowInput() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
         var contents = """
@@ -93,9 +93,8 @@ class ScriptRenameTest {
                 greeting.view()
             }
             """;
-        open(service, uri, contents);
-        service.updateNow();
-        var changes = rename(service, uri, new Position(2, 4), "message");
+        server.open("main.nf", contents);
+        var changes = rename(server, uri, new Position(2, 4), "message");
 
         assertThat(changes.get(uri)).hasSize(2);
         assertThat(changes.get(uri).get(0).getRange().getStart()).isEqualTo(new Position(2, 4));
@@ -108,7 +107,7 @@ class ScriptRenameTest {
 
     @Test
     void renameProcess() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
         var contents = """
@@ -121,9 +120,8 @@ class ScriptRenameTest {
                 HELLO()
             }
             """;
-        open(service, uri, contents);
-        service.updateNow();
-        var changes = rename(service, uri, new Position(0, 8), "hi");
+        server.open("main.nf", contents);
+        var changes = rename(server, uri, new Position(0, 8), "hi");
 
         assertThat(changes.get(uri)).hasSize(2);
         assertThat(changes.get(uri).get(0).getRange().getStart()).isEqualTo(new Position(0, 8));
@@ -136,7 +134,7 @@ class ScriptRenameTest {
 
     @Test
     void renameProcessInput() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
         var contents = """
@@ -148,9 +146,8 @@ class ScriptRenameTest {
                 "echo $greeting"
             }
             """;
-        open(service, uri, contents);
-        service.updateNow();
-        var changes = rename(service, uri, new Position(2, 8), "message");
+        server.open("main.nf", contents);
+        var changes = rename(server, uri, new Position(2, 8), "message");
 
         assertThat(changes.get(uri)).hasSize(2);
         assertThat(changes.get(uri).get(0).getRange().getStart()).isEqualTo(new Position(2, 8));
@@ -163,16 +160,15 @@ class ScriptRenameTest {
 
     @Test
     void renameLocalVariable() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
         var contents = """
             def msg = 'hello'
             println msg
             """;
-        open(service, uri, contents);
-        service.updateNow();
-        var changes = rename(service, uri, new Position(0, 4), "message");
+        server.open("main.nf", contents);
+        var changes = rename(server, uri, new Position(0, 4), "message");
 
         assertThat(changes.get(uri)).hasSize(2);
         assertThat(changes.get(uri).get(0).getRange().getStart()).isEqualTo(new Position(0, 4));
@@ -185,7 +181,7 @@ class ScriptRenameTest {
 
     @Test
     void renameFunction() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
         var contents = """
@@ -196,9 +192,8 @@ class ScriptRenameTest {
                 hello()
             }
             """;
-        open(service, uri, contents);
-        service.updateNow();
-        var changes = rename(service, uri, new Position(0, 4), "hi");
+        server.open("main.nf", contents);
+        var changes = rename(server, uri, new Position(0, 4), "hi");
 
         assertThat(changes.get(uri)).hasSize(2);
         assertThat(changes.get(uri).get(0).getRange().getStart()).isEqualTo(new Position(0, 4));
@@ -211,7 +206,7 @@ class ScriptRenameTest {
 
     @Test
     void renameFunctionParameter() {
-        var service = getScriptService();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
 
         var contents = """
@@ -219,9 +214,8 @@ class ScriptRenameTest {
                 println greeting
             }
             """;
-        open(service, uri, contents);
-        service.updateNow();
-        var changes = rename(service, uri, new Position(0, 10), "message");
+        server.open("main.nf", contents);
+        var changes = rename(server, uri, new Position(0, 10), "message");
 
         assertThat(changes.get(uri)).hasSize(2);
         assertThat(changes.get(uri).get(0).getRange().getStart()).isEqualTo(new Position(0, 10));

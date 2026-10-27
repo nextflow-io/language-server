@@ -26,7 +26,7 @@ import java.util.Stack;
 import java.util.stream.Collectors;
 
 import groovy.lang.Tuple3;
-import nextflow.lsp.services.script.ScriptAstCache;
+import nextflow.lsp.ast.ScriptView;
 import nextflow.script.ast.ASTNodeMarker;
 import nextflow.script.ast.AssignmentExpression;
 import nextflow.script.ast.ProcessNode;
@@ -64,7 +64,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private SourceUnit sourceUnit;
 
-    private ScriptAstCache ast;
+    private ScriptView ast;
 
     private boolean verbose;
 
@@ -74,7 +74,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private VariableContext vc = new VariableContext();
 
-    public DataflowVisitor(SourceUnit sourceUnit, ScriptAstCache ast, boolean verbose) {
+    public DataflowVisitor(SourceUnit sourceUnit, ScriptView ast, boolean verbose) {
         this.sourceUnit = sourceUnit;
         this.ast = ast;
         this.verbose = verbose;

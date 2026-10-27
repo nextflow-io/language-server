@@ -20,10 +20,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
-import nextflow.lsp.TestLanguageClient;
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
-import nextflow.lsp.services.LanguageServerConfiguration;
-import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.CodeActionContext;
 import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.Position;
@@ -108,19 +106,18 @@ class ConfigPreviewTest {
 
     /**
      * The config files are written to disk and never opened, so that the
-     * preview has to scan the workspace to find them, as it does in practice
-     * when only a script is open.
+     * preview has to find them in the workspace index, as it does in
+     * practice when only a script is open.
      */
     static Map<?,?> previewConfig(List<String> profiles) {
         writeWorkspaceFile("nextflow.config", CONFIG);
         writeWorkspaceFile("conf/extra.config", EXTRA_CONFIG);
-        var configService = newConfigService();
-        var scriptService = getScriptService(new TestLanguageClient(), configService);
+        var server = TestServer.start();
 
         var uri = getUri("main.nf");
-        open(scriptService, uri, SCRIPT);
-        var arguments = List.of(asJson(uri), asJson("ALIGN"), asJson(profiles), asJson(null));
-        return (Map<?,?>) scriptService.executeCommand("nextflow.server.previewConfig", arguments, LanguageServerConfiguration.defaults());
+        server.open("main.nf", SCRIPT);
+        var arguments = List.<Object>of(asJson(uri), asJson("ALIGN"), asJson(profiles), asJson(null));
+        return (Map<?,?>) executeCommand(server, "nextflow.server.previewConfig", arguments);
     }
 
     /**
@@ -134,16 +131,13 @@ class ConfigPreviewTest {
      * @param qualifiedName
      */
     static Map<?,?> preview(String config, String script, String process, List<String> profiles, String qualifiedName) {
-        var services = getScriptAndConfigServices();
-        var scriptService = services.script();
-        var configService = services.config();
-        open(configService, getUri("nextflow.config"), config);
-        configService.updateNow();
+        var server = TestServer.start();
+        server.open("nextflow.config", config);
 
         var uri = getUri("main.nf");
-        open(scriptService, uri, script);
-        var arguments = List.of(asJson(uri), asJson(process), asJson(profiles), asJson(qualifiedName));
-        return (Map<?,?>) scriptService.executeCommand("nextflow.server.previewConfig", arguments, LanguageServerConfiguration.defaults());
+        server.open("main.nf", script);
+        var arguments = List.<Object>of(asJson(uri), asJson(process), asJson(profiles), asJson(qualifiedName));
+        return (Map<?,?>) executeCommand(server, "nextflow.server.previewConfig", arguments);
     }
 
     static Map<?,?> preview(String config) {
@@ -179,11 +173,11 @@ class ConfigPreviewTest {
             .toList();
     }
 
-    static List<String> codeActionTitles(ScriptService service, String uri, int line, int character) {
+    static List<String> codeActionTitles(TestServer server, String uri, int line, int character) {
         var position = new Position(line, character);
         var params = new CodeActionParams(new TextDocumentIdentifier(uri), new Range(position, position), new CodeActionContext(List.of()));
-        return service.codeAction(params).stream()
-            .map(CodeAction::getTitle)
+        return server.call(s -> s.codeAction(params)).stream()
+            .map(action -> action.getRight().getTitle())
             .toList();
     }
 
@@ -393,10 +387,9 @@ class ConfigPreviewTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("invocations")
     void offerCodeActionForEachQualifiedNameOfInvocation(String location, int line, int character, List<String> expected) {
-        var services = getScriptAndConfigServices();
-        var scriptService = services.script();
+        var server = TestServer.start();
         var uri = getUri("main.nf");
-        open(scriptService, uri, """
+        server.open("main.nf", """
             process ALIGN {
                 script:
                 \"""
@@ -417,9 +410,8 @@ class ConfigPreviewTest {
                 SUB2()
             }
             """);
-        scriptService.updateNow();
 
-        assertThat(codeActionTitles(scriptService, uri, line, character)).isEqualTo(expected);
+        assertThat(codeActionTitles(server, uri, line, character)).isEqualTo(expected);
     }
 
     @Test
@@ -447,18 +439,46 @@ class ConfigPreviewTest {
                 SUB()
             }
             """;
-        // the workspace scan reads from disk and drops in-memory documents
         writeWorkspaceFile("main.nf", main);
-        var scriptService = getScriptService();
-        // getScriptService opens main.nf as an empty stub, so restore it
-        open(scriptService, getUri("main.nf"), main);
-        scriptService.updateNow();
-        // the first update defers the workspace scan
-        scriptService.updateNow();
+        var server = TestServer.start();
 
         // the qualified name uses the alias at the call site, not the process name
-        assertThat(codeActionTitles(scriptService, getUri("subworkflows/sub.nf"), 4, 4))
+        assertThat(codeActionTitles(server, getUri("subworkflows/sub.nf"), 4, 4))
             .containsExactly("Preview config for SUB:ALIGN_DNA");
+    }
+
+    @Test
+    void qualifyInvocationWithTheEditedAliasOnceRebuilt() {
+        writeWorkspaceFile("modules/align.nf", """
+            process ALIGN {
+                script:
+                \"""
+                echo align
+                \"""
+            }
+            """);
+        var sub = """
+            include { ALIGN as ALIGN_DNA } from '../modules/align.nf'
+
+            workflow SUB {
+                main:
+                ALIGN_DNA()
+            }
+            """;
+        writeWorkspaceFile("subworkflows/sub.nf", sub);
+        writeWorkspaceFile("main.nf", """
+            include { SUB } from './subworkflows/sub.nf'
+
+            workflow {
+                SUB()
+            }
+            """);
+        var server = TestServer.start();
+        var uri = getUri("subworkflows/sub.nf");
+        server.open("subworkflows/sub.nf", sub);
+        server.change("subworkflows/sub.nf", sub.replace("ALIGN_DNA", "ALIGN_RNA"));
+        server.settle();
+        assertThat(codeActionTitles(server, uri, 4, 4)).containsExactly("Preview config for SUB:ALIGN_RNA");
     }
 
     @Test

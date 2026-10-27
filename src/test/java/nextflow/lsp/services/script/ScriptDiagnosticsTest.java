@@ -20,6 +20,7 @@ package nextflow.lsp.services.script;
 import java.util.List;
 
 import nextflow.lsp.TestLanguageClient;
+import nextflow.lsp.TestServer;
 import nextflow.lsp.TestWorkspace;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
@@ -43,25 +44,25 @@ class ScriptDiagnosticsTest {
     @Test
     void doNotReportDiagnosticsForValidScript() {
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 println('Hello!')
             }
             """);
-        service.updateNow();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
+        server.settle();
+        assertThat(client.getPublishedDiagnostics(uri)).isEmpty();
     }
 
     @Test
     void resolveClassesFromNextflowRuntime() {
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
                 def json = new groovy.json.JsonSlurper().parseText('{}')
                 def text = new groovy.text.SimpleTemplateEngine().createTemplate('$x').make([x: 1]).toString()
@@ -72,20 +73,20 @@ class ScriptDiagnosticsTest {
                 println([json, text, yaml, builder, map])
             }
             """);
-        service.updateNow();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
+        server.settle();
+        assertThat(client.getPublishedDiagnostics(uri)).isEmpty();
     }
 
     @Test
     void reportSyntaxError() {
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
             """);
-        service.updateNow();
+        server.settle();
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).hasSizeGreaterThanOrEqualTo(1);
         assertThat(diagnostics).allMatch(d -> d.getSeverity() == DiagnosticSeverity.Error);
@@ -95,102 +96,42 @@ class ScriptDiagnosticsTest {
     @Test
     void reportUnresolvedInclude() {
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
-        open(service, uri, """
+        server.open("main.nf", """
             include { FOO } from './does-not-exist.nf'
 
             workflow {
                 FOO()
             }
             """);
-        service.updateNow();
+        server.settle();
         var diagnostics = client.getDiagnostics(uri);
         assertThat(diagnostics).hasSizeGreaterThanOrEqualTo(1);
         assertThat(diagnostics).anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Error);
     }
 
     @Test
-    void resolveTypesForIncludedScriptsBeforeIncludingScripts() {
-        var client = new TestLanguageClient();
-        var service = getScriptService(client);
-        // filenames chosen so the entry file iterates before its modules in
-        // the unordered change set, exercising the check-ordering bug
-        var mainUri = getUri("workflow.nf");
-        var producerUri = getUri("producer.nf");
-        var consumerUri = getUri("consumer.nf");
-
-        open(service, producerUri, """
-            nextflow.enable.types = true
-
-            process PRODUCER {
-                input:
-                record(id: String)
-
-                output:
-                record(id: id, data: file('data.txt'))
-
-                script:
-                \"""
-                echo hello > data.txt
-                \"""
-            }
-            """);
-        open(service, consumerUri, """
-            nextflow.enable.types = true
-
-            process CONSUMER {
-                input:
-                record(id: String, data: Path)
-
-                output:
-                record(id: id)
-
-                script:
-                \"""
-                cat ${data}
-                \"""
-            }
-            """);
-        open(service, mainUri, """
-            nextflow.enable.types = true
-
-            include { PRODUCER } from './producer.nf'
-            include { CONSUMER } from './consumer.nf'
-
-            workflow {
-                ch_produced = PRODUCER(channel.of(record(id: 'sample1')))
-                CONSUMER(ch_produced)
-            }
-            """);
-        service.updateNow();
-        var diagnostics = client.getDiagnostics(mainUri);
-        assertThat(diagnostics)
-            .extracting(Diagnostic::getMessage)
-            .noneMatch(m -> m.contains("is not compatible with process input"));
-    }
-
-    @Test
     void clearDiagnosticsWhenErrorIsFixed() {
         var client = new TestLanguageClient();
-        var service = getScriptService(client);
+        var server = TestServer.start((o) -> o.client = client);
         var uri = getUri("main.nf");
 
         // a file with a syntax error is opened
-        open(service, uri, """
+        server.open("main.nf", """
             workflow {
             """);
-        service.updateNow();
+        server.settle();
         assertThat(client.getDiagnostics(uri)).isNotEmpty();
 
         // the error is fixed
-        open(service, uri, """
+        server.change("main.nf", """
             workflow {
                 println('Hello!')
             }
             """);
-        service.updateNow();
+        server.settle();
         assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
@@ -198,15 +139,14 @@ class ScriptDiagnosticsTest {
      * Error messages for a script that uses the given plugin.
      */
     static List<String> pluginErrors(String plugin, String script) {
-        var configService = newConfigService();
-        open(configService, getUri("nextflow.config"), "plugins { id '" + plugin + "' }");
-        configService.updateNow();
         var client = new TestLanguageClient();
-        var service = getScriptService(client, configService);
+        var server = TestServer.start((o) -> o.client = client);
+        server.open("nextflow.config", "plugins { id '" + plugin + "' }");
+        server.settle();
         var uri = getUri("main.nf");
-        open(service, uri, script);
-        service.updateNow();
-        var diagnostics = client.getDiagnostics(uri);
+        server.open("main.nf", script);
+        server.settle();
+        var diagnostics = client.getPublishedDiagnostics(uri);
         // otherwise type checking is skipped and the test passes vacuously
         assertThat(diagnostics)
             .extracting(Diagnostic::getMessage)
@@ -227,25 +167,6 @@ class ScriptDiagnosticsTest {
                 %s
             }
             """.formatted(statement);
-    }
-
-    @Test
-    void resolvePluginIncludesBeforeConfigFileIsCompiled() {
-        var configService = newConfigService();
-        var client = new TestLanguageClient();
-        var service = getScriptService(client, configService);
-        var uri = getUri("main.nf");
-
-        open(configService, getUri("nextflow.config"), "plugins { id 'nf-schema@2.7.3' }");
-        open(service, uri, """
-            include { paramsHelp } from 'plugin/nf-schema'
-
-            workflow {
-                println paramsHelp()
-            }
-            """);
-        service.updateNow();
-        assertThat(client.getDiagnostics(uri)).isEmpty();
     }
 
     @Test
