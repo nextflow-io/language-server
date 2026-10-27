@@ -187,6 +187,45 @@ class ScriptHoverTest {
     }
 
     @Test
+    void omitBlockTagsFromDocumentation() {
+        var server = TestServer.start();
+        var uri = getUri("main.nf");
+
+        server.open("main.nf", """
+            /**
+             * Greet someone.
+             *
+             * @param name the name
+             *   to greet
+             */
+            def greet(name) {
+            }
+
+            workflow {
+                greet('World')
+            }
+            """);
+        var value = getHoverHint(server, uri, new Position(10, 5));
+
+        assertThat(value).isEqualTo("```nextflow\ndef greet(name)\n```\n\n---\n\nGreet someone.");
+    }
+
+    @Test
+    void showNamedParamsOfFunctionWithGenericOptionsType() {
+        var server = TestServer.start();
+        var uri = getUri("main.nf");
+
+        server.open("main.nf", """
+            workflow {
+                file('*.fq', hidden: true)
+            }
+            """);
+        var value = getHoverHint(server, uri, new Position(1, 5));
+
+        assertThat(value).contains("Available options:").contains("`hidden: Boolean`");
+    }
+
+    @Test
     void returnNullWhenHoveringOverWhitespace() {
         var server = TestServer.start();
         var uri = getUri("main.nf");

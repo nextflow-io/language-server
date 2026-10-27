@@ -534,10 +534,7 @@ public class ASTNodeStringUtils {
     private static String namedParams(Parameter[] parameters) {
         if( parameters.length == 0 )
             return null;
-        var param = parameters[0];
-        if( !Types.isEqual(param.getType(), ClassHelper.MAP_TYPE) )
-            return null;
-        var namedParams = asNamedParams(param);
+        var namedParams = asNamedParams(parameters[0]);
         if( namedParams.isEmpty() )
             return null;
         var builder = new StringBuilder();
@@ -572,13 +569,16 @@ public class ASTNodeStringUtils {
         var first = lines[0];
         var lengthToRemove = Math.min(first.length(), 3);
         appendLine(builder, first.substring(lengthToRemove));
-        // append lines that start with an asterisk (*)
+        // append lines that start with an asterisk (*), up to the first block tag
         for( int i = 1; i < n - 1; i++ ) {
             var line = lines[i];
             var star = line.indexOf('*');
-            var at = line.indexOf('@');
-            if( at == -1 && star > -1 )
-                appendLine(builder, line.substring(star + 1));
+            if( star == -1 )
+                continue;
+            var text = line.substring(star + 1);
+            if( text.trim().startsWith("@") )
+                break;
+            appendLine(builder, text);
         }
         return builder.toString().trim();
     }
