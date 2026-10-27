@@ -101,7 +101,7 @@ public class ASTNodeStringUtils {
         else if( node.isEnum() )
             builder.append("enum ");
         else
-            builder.append("class ");
+            builder.append("type ");
         builder.append(node.getNameWithoutPackage());
         return builder.toString();
     }

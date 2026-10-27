@@ -64,7 +64,7 @@ class ASTNodeStringUtilsTest {
     void getLabelAndDocsForClass() {
         var classNode = new ClassNode(Channel.class);
 
-        assertThat(ASTNodeStringUtils.getLabel(classNode)).isEqualTo("class Channel");
+        assertThat(ASTNodeStringUtils.getLabel(classNode)).isEqualTo("type Channel");
 
         var enumNode = withGroovydoc(new ClassNode(SequenceTypes.class), """
             /**
