@@ -27,16 +27,15 @@ import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
 /**
- * Give each test its own workspace directory, so that tests can run
- * concurrently. The directory is created under `build/testWorkspaces/`
+ * Give each test its own workspace directory, so that tests never see
+ * each other's files. The directory is created under `build/testWorkspaces/`
  * on first use and deleted after the test.
  *
  * Register it with `@ExtendWith(TestWorkspace.class)` on test classes
  * that use TestServer, EngineHarness, or the workspace helpers in
  * TestUtils, all of which resolve paths against it. The workspace is
  * bound to the thread that runs the test, so they must be used from
- * the test thread (e.g. not from a dynamic test that runs concurrently
- * with its factory).
+ * the test thread.
  */
 public class TestWorkspace implements BeforeEachCallback, AfterEachCallback {
 

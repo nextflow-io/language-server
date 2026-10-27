@@ -16,11 +16,13 @@ Tests are the executable specification of the language server. Read them first t
 
 Reports are written to `build/reports/tests/test/index.html`. CI runs `make test`.
 
-Tests run in parallel: classes and methods are concurrent, on a fixed pool of 4 threads (`src/test/resources/junit-platform.properties`). The default timeout is 60 s, as a hang guard only.
+Tests run sequentially. The default timeout is 60 s, as a hang guard only (`src/test/resources/junit-platform.properties`).
 
-- Each test gets its own workspace directory under `build/testWorkspaces/`, created on first use and deleted after the test, so that concurrent tests never see each other's files. It is bound to the test thread, so use the workspace, `TestServer`, and `TestUtils` only from the test thread.
-- Tests must not share mutable state. A `@TestFactory` whose dynamic tests share one server is marked `@Execution(ExecutionMode.SAME_THREAD)`.
-- Tests that use real threads (the production engine, pools, or an HTTP server) are `@Isolated`, with a `@Timeout` hang guard, since other tests would slow them down.
+- Each test gets its own workspace directory under `build/testWorkspaces/`, created on first use and deleted after the test, so that tests never see each other's files. It is bound to the test thread, so use the workspace, `TestServer`, and `TestUtils` only from the test thread.
+- Tests must not share mutable state.
+- Tests that use real threads (the production engine, pools, or an HTTP server) have a `@Timeout` hang guard.
+
+If parallel execution is restored, dynamic tests that share a server need `@Execution(ExecutionMode.SAME_THREAD)`, and tests that use real threads should be `@Isolated`.
 
 ## Libraries
 
