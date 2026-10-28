@@ -44,8 +44,8 @@ Outside `src/main`: `src/spec` holds `SpecWriter`, which the `buildSpec` task ru
 | Thread | Runs | Must not |
 |---|---|---|
 | lsp4j reader | `NextflowLanguageServer` handlers: canonicalize the URI, `Engine.submit` or `Engine.request`, return. Also the callbacks of client requests. | touch engine state, block, or do I/O |
-| `nextflow-engine` | every mailbox task and timer: events, requests, background slices, parsing, analysis, provider bodies, publishing diagnostics | wait on anything but its own read-pool futures |
-| read pool (`ForkJoinPool`, `max(1, cores − 1)`) | `Builder` file reads | touch engine state, parse |
+| `nextflow-engine` | every mailbox task and timer: events, requests, background slices, analysis, provider bodies, publishing diagnostics | wait on anything but its own read-pool futures |
+| read pool (`ForkJoinPool`, `max(1, cores − 1)`) | `Builder` file reads and parsing | touch engine state, analyse |
 | `nextflow-io-N` (4) | directory walks | touch engine state; it returns an `Event` |
 | `nextflow-fetch-N` (2) | plugin registry fetches | touch engine state; it returns an `Event` |
 
@@ -72,7 +72,7 @@ flowchart TB
     PR -->|response| C
     IO[io pool: walk] -->|Event| Q
     F[fetch pool: registry] -->|Event| Q
-    RP[read pool] -->|file text| B
+    RP[read pool] -->|source units| B
 ```
 
 Events only bump input versions; nothing is built when an event is applied. Files are built by requests, for what they need, and by background slices: immediately while a project is indexing or requests are parked, and after the debounce (`Engine.DEFAULT_DEBOUNCE`) otherwise.
@@ -118,7 +118,7 @@ Engine                                    # engine thread
 `Builder.build` rebuilds every entry of a batch from its current text, in these stages:
 
 1. **Keep unchanged**: an entry whose text, include targets and other inputs are unchanged keeps its last build.
-2. **Read and parse** each file (reads on the read pool), and discover its includes; the stale closure of each include target joins the batch, until the batch is closed.
+2. **Read and parse** each file (on the read pool), and discover its includes; the stale closure of each include target joins the batch, until the batch is closed.
 3. **Analyse** the batch in post-order, dependencies first: configs, then script includes, names, and type checking.
 4. **Index** the AST for providers (node parents and owners).
 5. **Commit** new stamps and dependency edges, then collect dependency-only entries that no workspace entry reaches any more.
@@ -139,7 +139,7 @@ Providers implement the interfaces in `services` and are created per request in 
 - **Engine state is touched only on the engine thread**, because nothing in `engine` is locked; engine entry points check the thread and throw otherwise.
 - **Reader-thread handlers only canonicalize and submit**, so that the reader never blocks and messages enter the mailbox in client order.
 - **Pool work captures only immutable copies and returns an `Event` on every path**, because results re-enter the engine only through the mailbox, and a walk that never returns leaves its folder indexing and its parked requests waiting.
-- **Parsing and analysis run on the engine thread**, because nf-lang writes to shared `ClassHelper` nodes while parsing and analysis writes across files.
+- **Analysis runs on the engine thread**, because it writes across files and shares non-thread-safe caches. Parsing runs on the read pool, because it touches only its own source unit.
 - **An analysed AST is never analysed again**: a rebuild parses a new `SourceUnit` from text, because the nf-lang phases are not idempotent.
 - **A batch is dependency-closed and each stage runs over the whole batch in post-order**, because dependents read the resolved names and inferred types of their dependencies.
 - **Every path an include could resolve to is a dependency, present or not**, because creating or deleting a file is detected only through these edges.
