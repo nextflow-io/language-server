@@ -134,9 +134,7 @@ public class LanguageServerCompiler extends Compiler {
      * Parse a source file and build the AST. Syntax errors are added
      * to the error collector, while any other exception propagates.
      *
-     * Not thread-safe, even for different source units: nf-lang
-     * writes positions and metadata to the shared ClassHelper node
-     * of a fully qualified name such as java.lang.String.
+     * Can be called concurrently for different source units.
      *
      * @param sourceUnit
      */

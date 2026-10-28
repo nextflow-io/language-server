@@ -40,6 +40,7 @@ import nextflow.config.ast.ConfigIncludeNode;
 import nextflow.config.control.ConfigResolveVisitor;
 import nextflow.config.ast.ConfigVisitorSupport;
 import nextflow.config.ast.ConfigNode;
+import nextflow.lsp.compiler.LanguageServerCompiler;
 import nextflow.lsp.services.config.ConfigAstParentVisitor;
 import nextflow.lsp.services.config.ConfigSpecVisitor;
 import nextflow.lsp.services.script.ParameterSchemaVisitor;
@@ -71,10 +72,9 @@ import org.eclipse.lsp4j.MessageType;
  *
  * Every entry in the batch is re-parsed from its current text and
  * analysed from scratch, so that its AST always reflects one
- * complete build. Files are read in parallel on the read pool;
- * everything else runs on the engine thread, because parsing writes
- * to shared Groovy AST nodes and analysis reads and writes across
- * files.
+ * complete build. Files are read and parsed in parallel on the read
+ * pool; everything else runs on the engine thread, because analysis
+ * reads and writes across files.
  *
  * An exception while building one file is contained to that file,
  * which gets an internal error instead of its analysis results.
@@ -369,8 +369,11 @@ final class Builder {
                 var document = documents.get(entry.uri);
                 var parsed = new Parsed(entry, entry.inputVersion, document.map(DocumentStore.OpenDocument::version).orElse(null));
                 var text = document.map(DocumentStore.OpenDocument::text).or(() -> Optional.ofNullable(texts.get(entry.uri)));
+                var compiler = project.compilerFor(entry.kind);
                 Callable<Void> task = () -> {
                     read(parsed, text);
+                    if( parsed.text != null )
+                        parse(parsed, compiler);
                     return null;
                 };
                 tasks.add(parsed);
@@ -393,8 +396,6 @@ final class Builder {
             for( var parsed : tasks ) {
                 if( parsed.internalError != null )
                     logInternalError(parsed, "parsing", parsed.internalError);
-                else if( parsed.text != null )
-                    parse(parsed);
                 if( parsed.readError != null )
                     workspace.engine().log(MessageType.Warning, "Failed to read " + parsed.entry.path + " -- " + parsed.readError);
             }
@@ -442,16 +443,14 @@ final class Builder {
         }
 
         /**
-         * Parse a file. Runs on the engine thread, because nf-lang
-         * writes to shared Groovy AST nodes while parsing.
+         * Parse a file. Runs on the read pool, so it must not touch
+         * any shared state other than the compiler configuration.
+         * An exception is reported by the caller as an internal error.
          */
-        private void parse(Parsed parsed) {
-            workspace.engine().checkEngineThread();
-            var entry = parsed.entry;
-            var compiler = project.compilerFor(entry.kind);
-            var unit = compiler.createSourceUnit(entry.uri, parsed.text);
+        private static void parse(Parsed parsed, LanguageServerCompiler compiler) {
+            var unit = compiler.createSourceUnit(parsed.entry.uri, parsed.text);
             parsed.unit = unit;
-            contained(parsed, "parsing", () -> compiler.parse(unit));
+            compiler.parse(unit);
         }
 
         // -- register and discover
