@@ -45,7 +45,7 @@ Outside `src/main`: `src/spec` holds `SpecWriter`, which the `buildSpec` task ru
 |---|---|---|
 | lsp4j reader | `NextflowLanguageServer` handlers: canonicalize the URI, `Engine.submit` or `Engine.request`, return. Also the callbacks of client requests. | touch engine state, block, or do I/O |
 | `nextflow-engine` | every mailbox task and timer: events, requests, background slices, analysis, provider bodies, publishing diagnostics | wait on anything but its own read-pool futures |
-| read pool (`ForkJoinPool`, `max(1, cores − 1)`) | `Builder` file reads and parsing | touch engine state, analyse |
+| read pool (`ForkJoinPool`, `cores − 1` clamped to 1–4) | `Builder` file reads and parsing | touch engine state, analyse |
 | `nextflow-io-N` (4) | directory walks | touch engine state; it returns an `Event` |
 | `nextflow-fetch-N` (2) | plugin registry fetches | touch engine state; it returns an `Event` |
 
