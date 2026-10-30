@@ -415,6 +415,9 @@ public class ASTNodeStringUtils {
     }
 
     private static boolean isDeclaringTypeVisible(ClassNode declaringType) {
+        // plugin functions have no declaring type
+        if( ClassHelper.isDynamicTyped(declaringType) )
+            return false;
         if( declaringType.implementsInterface(ClassHelper.makeCached(DslScope.class)) )
             return false;
         if( declaringType.implementsInterface(ClassHelper.makeCached(Namespace.class)) )
