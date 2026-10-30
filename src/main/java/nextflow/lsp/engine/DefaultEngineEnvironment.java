@@ -123,7 +123,9 @@ public final class DefaultEngineEnvironment implements EngineEnvironment {
 
     @Override
     public PluginRegistryClient registry(String registryUrl) {
-        return new HttpPluginRegistryClient(registryUrl);
+        return new LocalPluginRegistryClient(
+            LocalPluginRegistryClient.pluginsDir(System.getenv()),
+            new HttpPluginRegistryClient(registryUrl));
     }
 
     @Override

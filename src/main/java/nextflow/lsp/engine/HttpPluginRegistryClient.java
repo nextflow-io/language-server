@@ -20,14 +20,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.time.Duration;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 import groovy.json.JsonSlurper;
-import nextflow.lsp.spec.ConfigSpecFactory;
 import nextflow.lsp.spec.PluginSpec;
-import nextflow.lsp.spec.ScriptSpecFactory;
 import nextflow.lsp.util.Logger;
 
 import static java.net.http.HttpResponse.BodyHandlers;
@@ -101,7 +98,7 @@ class HttpPluginRegistryClient implements PluginRegistryClient {
         // select plugin release (or latest if not specified)
         var release = pluginRelease(response);
         return release != null
-            ? new Found(pluginSpec(release))
+            ? new Found(PluginSpec.fromJson((String) release.get("spec")))
             : new NotFound();
     }
 
@@ -115,24 +112,6 @@ class HttpPluginRegistryClient implements PluginRegistryClient {
             return (Map) response.get("pluginRelease");
         }
         return null;
-    }
-
-    private static PluginSpec pluginSpec(Map release) {
-        var definitions = pluginDefinitions(release);
-        return new PluginSpec(
-            ConfigSpecFactory.fromDefinitions(definitions),
-            ScriptSpecFactory.fromDefinitions(definitions, "Factory"),
-            ScriptSpecFactory.fromDefinitions(definitions, "Function"),
-            ScriptSpecFactory.fromDefinitions(definitions, "Operator")
-        );
-    }
-
-    private static List<Map> pluginDefinitions(Map release) {
-        var specJson = (String) release.get("spec");
-        if( specJson == null )
-            return Collections.emptyList();
-        var spec = (Map) new JsonSlurper().parseText(specJson);
-        return (List<Map>) spec.get("definitions");
     }
 
 }

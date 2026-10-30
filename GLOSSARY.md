@@ -71,7 +71,7 @@ Terms of the language server. Nextflow language terms (process, workflow, config
 ## Plugins
 
 **Plugin spec**
-: The config scopes, factories, functions, and operators of a plugin version, fetched from the registry and used to check config files and plugin includes.
+: The config scopes, factories, functions, and operators of a plugin version, read from the locally installed plugin or fetched from the registry, and used to check config files and plugin includes.
 
 **Registry**
 : The Nextflow plugin registry at `nextflow.pluginRegistryUrl`, from which plugin specs are fetched off the engine thread and cached per registry. See [Configuration](docs/configuration.md#plugins).

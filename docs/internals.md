@@ -24,7 +24,7 @@ nextflow.lsp/
 │   ├── Builder                # rebuilds a dependency-closed batch from text
 │   ├── DiagnosticsLedger      # last published diagnostics per URI; publishes only differences
 │   ├── IndexProgress          # work-done progress "Indexing"
-│   ├── PluginSpecs            # per-registry cache of plugin specs; PluginRegistryClient, HttpPluginRegistryClient
+│   ├── PluginSpecs            # per-registry cache of plugin specs; PluginRegistryClient, LocalPluginRegistryClient, HttpPluginRegistryClient
 │   ├── ProjectHandle          # ProjectView of a request; ScriptEntryView, ConfigEntryView
 │   └── FileKind, FileAccess, Uris, Settings   # file kinds, injectable I/O, canonical URIs, settings parsing
 ├── ast/                       # read-only views for providers (ProjectView, AstView, ScriptView, ConfigView), AST helpers
@@ -47,7 +47,7 @@ Outside `src/main`: `src/spec` holds `SpecWriter`, which the `buildSpec` task ru
 | `nextflow-engine` | every mailbox task and timer: events, requests, background slices, analysis, provider bodies, publishing diagnostics | wait on anything but its own read-pool futures |
 | read pool (`ForkJoinPool`, `cores − 1` clamped to 1–4) | `Builder` file reads and parsing | touch engine state, analyse |
 | `nextflow-io-N` (4) | directory walks | touch engine state; it returns an `Event` |
-| `nextflow-fetch-N` (2) | plugin registry fetches | touch engine state; it returns an `Event` |
+| `nextflow-fetch-N` (2) | plugin spec fetches (installed plugins, then registry) | touch engine state; it returns an `Event` |
 
 Request futures are completed on the engine thread, and lsp4j writes the responses. Tests replace every thread, the clock, the file system and the registry through `EngineEnvironment`.
 
