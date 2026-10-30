@@ -86,6 +86,28 @@ class ScriptHoverTest {
     }
 
     @Test
+    void showSignatureWhenHoveringOverPluginFunctionCall() {
+        var server = TestServer.start();
+        var uri = getUri("main.nf");
+
+        server.open("nextflow.config", "plugins { id 'nf-schema@2.7.3' }");
+        server.settle();
+        server.open("main.nf", """
+            nextflow.enable.types = true
+
+            include { samplesheetToList } from 'plugin/nf-schema'
+
+            workflow {
+                samplesheetToList('s.csv', 'schema.json')
+            }
+            """);
+        server.settle();
+        var value = getHoverHint(server, uri, new Position(5, 5));
+
+        assertThat(value).isEqualTo("```nextflow\nsamplesheetToList(arg0, arg1) -> List\n```");
+    }
+
+    @Test
     void showLabelWhenHoveringOverWorkflowInvocation() {
         var server = TestServer.start();
         var uri = getUri("main.nf");

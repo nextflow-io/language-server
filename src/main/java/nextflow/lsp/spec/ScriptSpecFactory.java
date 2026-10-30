@@ -113,7 +113,9 @@ public class ScriptSpecFactory {
     }
 
     private static ClassNode rawType(String name) {
-        return STANDARD_TYPES.getOrDefault(name, ClassHelper.dynamicType());
+        var type = STANDARD_TYPES.get(name);
+        // a raw type, not the generic declaration (e.g. List, not List<E>)
+        return type != null ? type.getPlainNodeReference() : ClassHelper.dynamicType();
     }
 
 }
