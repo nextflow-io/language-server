@@ -61,6 +61,8 @@ These settings apply to the `nextflow.server.previewDag` command, which returns 
 |---|---|---|---|
 | `nextflow.pluginRegistryUrl` | string | `"https://registry.nextflow.io/api/"` | Plugin registry used to fetch the definitions of plugins used by the pipeline. Must be an HTTP or HTTPS URL. |
 
+Plugins installed locally are read from the plugins directory before the registry, so that unpublished plugins can be checked too. The plugins directory is resolved like Nextflow: `$NXF_PLUGINS_DIR`, otherwise `$NXF_HOME/plugins`, otherwise `~/.nextflow/plugins`. A plugin with a version (`id 'nf-hello@1.0.0'`) uses the installed release if there is one. A plugin without a version uses the registry, or the latest installed release if the registry doesn't have it. Specs are cached for the session, so reinstalling the same version requires restarting the language server.
+
 ## Debugging
 
 | Setting | Type | Default | Description |

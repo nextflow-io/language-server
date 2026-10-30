@@ -28,12 +28,15 @@ import java.util.function.IntConsumer;
 
 /**
  * Production environment: a dedicated engine thread, a read pool
- * with one thread per spare core, and small IO and fetch pools.
+ * with one thread per spare core up to a small cap, and small IO
+ * and fetch pools.
  * Every thread is a daemon thread.
  *
  * @author Ben Sherman <bentshermann@gmail.com>
  */
 public final class DefaultEngineEnvironment implements EngineEnvironment {
+
+    private static final int MAX_READ_THREADS = 4;
 
     private static final int IO_THREADS = 4;
 
@@ -42,7 +45,7 @@ public final class DefaultEngineEnvironment implements EngineEnvironment {
     private final SerialExecutor engineExecutor = new ThreadSerialExecutor("nextflow-engine");
 
     private final ExecutorService readPool = new ForkJoinPool(
-        Math.max(1, Runtime.getRuntime().availableProcessors() - 1),
+        Math.min(Math.max(1, Runtime.getRuntime().availableProcessors() - 1), MAX_READ_THREADS),
         ForkJoinPool.defaultForkJoinWorkerThreadFactory,
         null,
         false);
@@ -120,7 +123,9 @@ public final class DefaultEngineEnvironment implements EngineEnvironment {
 
     @Override
     public PluginRegistryClient registry(String registryUrl) {
-        return new HttpPluginRegistryClient(registryUrl);
+        return new LocalPluginRegistryClient(
+            LocalPluginRegistryClient.pluginsDir(System.getenv()),
+            new HttpPluginRegistryClient(registryUrl));
     }
 
     @Override

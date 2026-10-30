@@ -15,9 +15,11 @@
  */
 package nextflow.lsp.spec;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import groovy.json.JsonSlurper;
 import nextflow.config.spec.SpecNode;
 import org.codehaus.groovy.ast.MethodNode;
 
@@ -26,4 +28,29 @@ public record PluginSpec(
     List<MethodNode> factories,
     List<MethodNode> functions,
     List<MethodNode> operators
-) {}
+) {
+
+    /**
+     * Create a plugin spec from the contents of a plugin's
+     * `spec.json`, or an empty spec if it is null or blank.
+     *
+     * @param specJson
+     */
+    public static PluginSpec fromJson(String specJson) {
+        var definitions = definitions(specJson);
+        return new PluginSpec(
+            ConfigSpecFactory.fromDefinitions(definitions),
+            ScriptSpecFactory.fromDefinitions(definitions, "Factory"),
+            ScriptSpecFactory.fromDefinitions(definitions, "Function"),
+            ScriptSpecFactory.fromDefinitions(definitions, "Operator")
+        );
+    }
+
+    private static List<Map> definitions(String specJson) {
+        if( specJson == null || specJson.isBlank() )
+            return Collections.emptyList();
+        var spec = (Map) new JsonSlurper().parseText(specJson);
+        return (List<Map>) spec.get("definitions");
+    }
+
+}
