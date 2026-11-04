@@ -1,0 +1,41 @@
+name: Nextflow language server CI
+# read more here: https://help.github.com/en/articles/workflow-syntax-for-github-actions#on
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # ratchet:actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # runs Gradle and provides the Java 25 toolchain of both builds (Nextflow and this project)
+      - name: Setup Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # ratchet:actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # ratchet:gradle/actions/setup-gradle@v6
+
+      # tests against unreleased nf-lang; the other Nextflow modules resolve from the Seqera repo
+      - name: Compile
+        run: |
+          git clone --depth 1 https://github.com/nextflow-io/nextflow ../nextflow
+          make
+
+      - name: Test
+        run: |
+          make test

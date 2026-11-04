@@ -1,0 +1,23 @@
+flowchart TB
+  subgraph " "
+    subgraph params
+      v0["echo"]
+    end
+    v1{ }
+    v7([APPEND])
+    click v7 href "main.nf" _blank
+    subgraph s1[" "]
+      v2([TOUCH])
+      click v2 href "main.nf" _blank
+    end
+    subgraph s2[" "]
+      v4([DEFAULT])
+      click v4 href "main.nf" _blank
+    end
+    v0 --> v1
+    v0 --> v2
+    v2 --> v7
+    v4 --> v7
+    v1 --> s1
+    v1 --> s2
+  end

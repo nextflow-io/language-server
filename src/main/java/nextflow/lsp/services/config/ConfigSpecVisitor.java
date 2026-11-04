@@ -1,0 +1,368 @@
+/*
+ * Copyright 2024-2025, Seqera Labs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package nextflow.lsp.services.config;
+
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
+import java.util.stream.Collectors;
+
+import nextflow.config.ast.ConfigApplyBlockNode;
+import nextflow.config.ast.ConfigAssignNode;
+import nextflow.config.ast.ConfigBlockNode;
+import nextflow.config.ast.ConfigNode;
+import nextflow.config.ast.ConfigVisitorSupport;
+import nextflow.config.spec.SpecNode;
+import nextflow.lsp.spec.ConfigSpecFactory;
+import nextflow.lsp.spec.PluginRef;
+import nextflow.lsp.spec.PluginSpec;
+import nextflow.script.ast.ASTNodeMarker;
+import nextflow.script.control.PhaseAware;
+import nextflow.script.control.Phases;
+import nextflow.script.control.ReturnStatementVisitor;
+import nextflow.script.control.TypeCheckingVisitor;
+import nextflow.script.types.ParamsMap;
+import nextflow.script.types.TypeCheckingUtils;
+import nextflow.script.dsl.Types;
+import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.ClassHelper;
+import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.CodeVisitorSupport;
+import org.codehaus.groovy.ast.FieldNode;
+import org.codehaus.groovy.ast.GenericsType;
+import org.codehaus.groovy.ast.expr.ClosureExpression;
+import org.codehaus.groovy.ast.expr.ConstantExpression;
+import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.expr.VariableExpression;
+import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
+import org.codehaus.groovy.control.messages.WarningMessage;
+import org.codehaus.groovy.runtime.DefaultGroovyMethods;
+import org.codehaus.groovy.syntax.SyntaxException;
+import org.codehaus.groovy.syntax.Token;
+
+import static nextflow.script.ast.ASTUtils.*;
+
+/**
+ * Validate config options against the config spec.
+ *
+ * Config scopes from third-party plugins are inferred
+ * from the `plugins` block, if specified.
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public class ConfigSpecVisitor extends ConfigVisitorSupport {
+
+    private SourceUnit sourceUnit;
+
+    private PluginLookup plugins;
+
+    private Stack<String> scopes = new Stack<>();
+
+    /**
+     * Source of plugin specs for the plugins declared by a config file.
+     */
+    public interface PluginLookup {
+
+        /**
+         * Get the spec of a plugin release, or null if it is not
+         * available (unknown, or still being fetched).
+         *
+         * @param ref
+         */
+        PluginSpec get(PluginRef ref);
+
+        /**
+         * Whether the spec of a plugin release is not known yet,
+         * because it is still being fetched.
+         *
+         * @param ref
+         */
+        boolean isPending(PluginRef ref);
+    }
+
+    public ConfigSpecVisitor(SourceUnit sourceUnit, PluginLookup plugins) {
+        this.sourceUnit = sourceUnit;
+        this.plugins = plugins;
+    }
+
+    @Override
+    protected SourceUnit getSourceUnit() {
+        return sourceUnit;
+    }
+
+    private SpecNode.Scope spec;
+
+    // the plugins declared by the last visited config file
+    private List<PluginRef> pluginRefs = List.of();
+
+    // whether the config scopes of some declared plugins are not known yet
+    private boolean pendingScopes;
+
+    /**
+     * Synthetic type for the params declared by this config file. Fields are
+     * added as param assignments are visited, so a params reference is typed
+     * by the declarations above it.
+     */
+    private ClassNode paramsType;
+
+    /**
+     * Get the plugins declared by the config file, after {@link #visit}.
+     */
+    public List<PluginRef> getPluginRefs() {
+        return pluginRefs;
+    }
+
+    public void visit() {
+        var moduleNode = sourceUnit.getAST();
+        if( !(moduleNode instanceof ConfigNode cn) )
+            return;
+        this.spec = getPluginScopes(cn);
+        this.paramsType = new ClassNode(ParamsMap.class);
+        cn.setSpec(spec);
+        super.visit(cn);
+        this.spec = null;
+        this.paramsType = null;
+        this.pendingScopes = false;
+    }
+
+    private SpecNode.Scope getPluginScopes(ConfigNode cn) {
+        var defaultScopes = ConfigSpecFactory.defaultScopes();
+        var pluginScopes = pluginConfigScopes(cn);
+        var children = new HashMap<String, SpecNode>();
+        children.putAll(defaultScopes);
+        children.putAll(pluginScopes);
+        return new SpecNode.Scope("", children);
+    }
+
+    private Map<String, SpecNode> pluginConfigScopes(ConfigNode cn) {
+        // get plugin refs from `plugins` block
+        var refs = cn.getConfigStatements().stream()
+            .map(stmt ->
+                stmt instanceof ConfigApplyBlockNode node && "plugins".equals(node.name) ? node : null
+            )
+            .filter(node -> node != null)
+            .flatMap(node -> node.statements.stream())
+            .map((call) -> {
+                var arguments = asMethodCallArguments(call);
+                var firstArg = arguments.get(0);
+                return firstArg instanceof ConstantExpression ce ? ce.getText() : null;
+            })
+            .filter(ref -> ref != null)
+            .map((ref) -> {
+                var tokens = ref.split("@");
+                var name = tokens[0];
+                var version = tokens.length == 2 ? tokens[1] : null;
+                return new PluginRef(name, version);
+            })
+            .toList();
+
+        // fetch plugin specs from plugin registry
+        var entries = refs.stream()
+            .map((ref) -> plugins.get(ref))
+            .filter(spec -> spec != null)
+            .map(spec -> spec.configScopes())
+            .toList();
+
+        pendingScopes = refs.stream().anyMatch(ref -> plugins.isPending(ref));
+        pluginRefs = refs;
+
+        // collect config scopes from plugin specs
+        var result = new HashMap<String, SpecNode>();
+        for( var entry : entries )
+            result.putAll(entry);
+        return result;
+    }
+
+    @Override
+    public void visitConfigAssign(ConfigAssignNode node) {
+        var names = new ArrayList<>(scopes);
+        names.addAll(node.names);
+        applyParamsType(node.value);
+
+        // validate dynamic scopes (env, params, etc)
+        var scope = names.get(0);
+        if( "env".equals(scope) ) {
+            var envName = String.join(".", DefaultGroovyMethods.tail(names));
+            if( envName.contains(".") )
+                addError("Invalid environment variable name '" + envName + "'", node);
+            return;
+        }
+        if( "params".equals(scope) ) {
+            declareParam(names, node.value);
+            return;
+        }
+
+        // validate config option
+        var fqName = String.join(".", names);
+        if( fqName.startsWith("process.ext.") )
+            return;
+        var option = spec.getOption(names);
+        if( option == null ) {
+            // the scope may be defined by a plugin whose spec is not known yet
+            if( pendingScopes && !ConfigSpecFactory.defaultScopes().containsKey(scope) )
+                return;
+            var message = "Unrecognized config option '" + fqName + "'";
+            addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
+            return;
+        }
+        // validate type
+        var expectedTypes = option.types().stream()
+            .map(t -> fromType(t))
+            .toList();
+        var actualType = inferredType(node.value, names);
+        if( !isAnyAssignableFrom(expectedTypes, actualType) ) {
+            var validTypes = expectedTypes.stream()
+                .map(cn -> Types.getName(cn))
+                .distinct()
+                .sorted()
+                .collect(Collectors.joining(", "));
+            var message = expectedTypes.size() == 1
+                ? "Config option '" + fqName + "' with type " + Types.getName(expectedTypes.get(0)) + " cannot be assigned to value with type " + Types.getName(actualType)
+                : "Config option '" + fqName + "' cannot be assigned to value with type " + Types.getName(actualType) + " -- valid types are: " + validTypes;
+            addWarning(message, String.join(".", node.names), node.getLineNumber(), node.getColumnNumber());
+        }
+    }
+
+    /**
+     * Declare a param from a config assignment. A param assigned at a nested
+     * name (`params.foo.bar`) or assigned twice with different types is
+     * declared as dynamic so that references to it are not type-checked.
+     */
+    private void declareParam(List<String> names, Expression value) {
+        if( names.size() < 2 )
+            return;
+        var name = names.get(1);
+        var type = names.size() == 2
+            ? inferredType(value, names)
+            : ClassHelper.dynamicType();
+        var existing = paramsType.getDeclaredField(name);
+        if( existing != null ) {
+            if( !Types.isEqual(existing.getType(), type) )
+                existing.setType(ClassHelper.dynamicType());
+            return;
+        }
+        var fn = new FieldNode(name, Modifier.PUBLIC, type, paramsType, null);
+        fn.setHasNoRealSourcePosition(true);
+        fn.setDeclaringClass(paramsType);
+        fn.setSynthetic(true);
+        paramsType.addField(fn);
+    }
+
+    /**
+     * Type every `params` reference in an expression with the params declared
+     * so far, instead of the generic map type from the config DSL.
+     */
+    private void applyParamsType(Expression value) {
+        value.visit(new CodeVisitorSupport() {
+            @Override
+            public void visitVariableExpression(VariableExpression node) {
+                if( "params".equals(node.getName()) )
+                    node.putNodeMetaData(ASTNodeMarker.INFERRED_TYPE, paramsType);
+            }
+        });
+    }
+
+    private ClassNode fromType(Type type) {
+        if( type instanceof Class c ) {
+            return ClassHelper.makeCached(c).getPlainNodeReference();
+        }
+
+        if( type instanceof ParameterizedType pt ) {
+            var cn = fromType(pt.getRawType());
+            var gts = Arrays.stream(pt.getActualTypeArguments())
+                .map(t -> new GenericsType(fromType(t)))
+                .toArray(GenericsType[]::new);
+            cn.setGenericsTypes(gts);
+            return cn;
+        }
+
+        return ClassHelper.dynamicType();
+    }
+
+    private ClassNode inferredType(Expression node, List<String> scopes) {
+        new TypeCheckingVisitor(sourceUnit).visit(node);
+        var type = TypeCheckingUtils.getType(node);
+        if( node instanceof ClosureExpression ce && "process".equals(scopes.get(0)) ) {
+            var visitor = new ReturnStatementVisitor(sourceUnit, sourceUnit.getErrorCollector());
+            visitor.visit(ce, ClassHelper.dynamicType(), ce.getCode());
+            var inferredReturnType = visitor.getInferredReturnType();
+            return inferredReturnType != null ? inferredReturnType : ClassHelper.dynamicType();
+        }
+        return type;
+    }
+
+    private boolean isAnyAssignableFrom(List<ClassNode> targetTypes, ClassNode sourceType) {
+        if( targetTypes.isEmpty() || ClassHelper.isObjectType(sourceType) )
+            return true;
+        for( var targetType : targetTypes ) {
+            if( Types.isAssignableFrom(targetType, sourceType, false) )
+                return true;
+        }
+        return false;
+    }
+
+    @Override
+    public void visitConfigBlock(ConfigBlockNode node) {
+        // exclude selector name from scope stack
+        if( node.kind != null ) {
+            super.visitConfigBlock(node);
+            return;
+        }
+        // exclude profiles.<profile> from scope stack
+        if( scopes.size() == 1 && "profiles".equals(scopes.get(0)) ) {
+            scopes.clear();
+            super.visitConfigBlock(node);
+            scopes.push("profiles");
+            return;
+        }
+        // otherwise visit block statements normally
+        scopes.push(node.name);
+        super.visitConfigBlock(node);
+        scopes.pop();
+    }
+
+    @Override
+    public void addError(String message, ASTNode node) {
+        var cause = new ConfigSpecError(message, node);
+        var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
+        sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
+    }
+
+    private void addWarning(String message, String tokenText, int startLine, int startColumn) {
+        var token = new Token(0, tokenText, startLine, startColumn);
+        sourceUnit.getErrorCollector().addWarning(WarningMessage.POSSIBLE_ERRORS, message, token, sourceUnit);
+    }
+
+    private class ConfigSpecError extends SyntaxException implements PhaseAware {
+
+        public ConfigSpecError(String message, ASTNode node) {
+            super(message, node);
+        }
+
+        @Override
+        public int getPhase() {
+            return Phases.NAME_RESOLUTION;
+        }
+    }
+
+}

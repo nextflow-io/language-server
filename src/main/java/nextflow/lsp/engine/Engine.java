@@ -1,0 +1,548 @@
+/*
+ * Copyright 2024-2025, Seqera Labs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package nextflow.lsp.engine;
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+
+import org.eclipse.lsp4j.MessageParams;
+import org.eclipse.lsp4j.MessageType;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
+import org.eclipse.lsp4j.services.LanguageClient;
+
+/**
+ * Single-threaded owner of all language service state.
+ *
+ * Events and requests are tasks in one FIFO mailbox (the engine
+ * executor), in the order they are submitted. A request runs at its
+ * position in that order, after building what it needs, so it
+ * observes every earlier event and no later one. Requests that need
+ * a whole project are parked until the project is indexed.
+ * Background work runs in short slices between mailbox tasks.
+ *
+ * Every task contains its own errors: an exception is logged and
+ * the engine continues, while a VirtualMachineError terminates the
+ * process with status 1 so that the client can restart the server.
+ *
+ * {@link #submit}, {@link #request}, {@link #shutdown} and
+ * {@link #isIdle} can be called from any thread. Everything else
+ * must be called on the engine thread.
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public final class Engine {
+
+    public static final Duration DEFAULT_DEBOUNCE = Duration.ofMillis(500);
+
+    private final EngineEnvironment env;
+
+    private final SerialExecutor executor;
+
+    private final LanguageClient client;
+
+    private final Duration debounce;
+
+    private final DocumentStore documents;
+
+    private final EngineState state;
+
+    // updated from any thread, for isIdle()
+    private final AtomicInteger queuedTasks = new AtomicInteger();
+
+    private final AtomicInteger ioInFlight = new AtomicInteger();
+
+    // engine-confined (volatile only so that isIdle() can read them)
+    private volatile SerialExecutor.Cancellable background;
+
+    private final List<RequestTask<?>> parked = new ArrayList<>();
+
+    private boolean shutdown;
+
+    // consecutive background slices that failed
+    private int backgroundFailures;
+
+    public Engine(EngineEnvironment env, LanguageClient client, Duration debounce, EngineState.Factory stateFactory) {
+        this.env = env;
+        this.executor = env.engineExecutor();
+        this.client = client;
+        this.debounce = debounce;
+        this.documents = new DocumentStore(executor);
+        this.state = stateFactory.create(this);
+    }
+
+    // -- public API (any thread)
+
+    /**
+     * Queue an event.
+     *
+     * @param event
+     */
+    public void submit(Event event) {
+        enqueue(event.getClass().getSimpleName(), () -> onEvent(event));
+    }
+
+    /**
+     * Queue a request.
+     *
+     * The returned future is completed on the engine thread: with the
+     * result of the body, with the empty value if the request can't be
+     * routed, or exceptionally if the body fails. Cancelling the future
+     * before the body starts means the body never runs.
+     *
+     * @param spec
+     * @param emptyValue
+     * @param body
+     */
+    public <T> CompletableFuture<T> request(RequestSpec spec, T emptyValue, Function<RequestContext, T> body) {
+        var task = new RequestTask<>(spec, emptyValue, body);
+        task.future.whenComplete((result, error) -> {
+            if( task.future.isCancelled() )
+                enqueue("drop " + spec.method(), () -> dropParked(task));
+        });
+        if( !enqueue(spec.method(), () -> onRequest(task)) )
+            fail(task, ResponseErrorCode.InvalidRequest, "Server is stopped");
+        return task.future;
+    }
+
+    /**
+     * Queue the shutdown: stop background work, fail parked requests
+     * with InvalidRequest and shut down the pools. Requests that
+     * arrive afterwards fail with InvalidRequest.
+     */
+    public CompletableFuture<Object> shutdown() {
+        var result = new CompletableFuture<Object>();
+        var queued = enqueue("shutdown", () -> {
+            try {
+                onShutdown();
+            }
+            finally {
+                result.complete(null);
+            }
+        });
+        if( !queued )
+            result.complete(null);
+        return result;
+    }
+
+    /**
+     * Whether the engine has nothing to do: no queued tasks, no
+     * background work, and no IO in flight.
+     */
+    public boolean isIdle() {
+        return queuedTasks.get() == 0
+            && ioInFlight.get() == 0
+            && background == null;
+    }
+
+    // -- API for the engine state (engine thread)
+
+    EngineEnvironment environment() {
+        return env;
+    }
+
+    LanguageClient client() {
+        return client;
+    }
+
+    Duration debounce() {
+        return debounce;
+    }
+
+    DocumentStore documents() {
+        checkEngineThread();
+        return documents;
+    }
+
+    /**
+     * Throw an IllegalStateException unless called on the engine thread.
+     */
+    void checkEngineThread() {
+        executor.checkThread();
+    }
+
+    /**
+     * Schedule background work after the given delay, replacing any
+     * pending background work. The delay is ignored while requests
+     * are parked, since they need the background work to finish.
+     *
+     * @param delay
+     */
+    void scheduleBackground(Duration delay) {
+        checkEngineThread();
+        if( shutdown )
+            return;
+        if( !parked.isEmpty() )
+            delay = Duration.ZERO;
+        if( background != null )
+            background.cancel();
+        background = executor.schedule(delay, contained("background", this::runBackground));
+    }
+
+    /**
+     * Run blocking work on the IO pool and submit the resulting event,
+     * if any. An exception is logged and produces no event, so work
+     * that the index waits on must return an event on every path.
+     *
+     * @param description
+     * @param work
+     */
+    void submitIo(String description, Callable<Event> work) {
+        runOn(env.ioExecutor(), description, work);
+    }
+
+    /**
+     * Run a plugin registry request on the fetch pool, like
+     * {@link #submitIo}.
+     *
+     * @param description
+     * @param work
+     */
+    void submitFetch(String description, Callable<Event> work) {
+        runOn(env.fetchExecutor(), description, work);
+    }
+
+    private void runOn(Executor pool, String description, Callable<Event> work) {
+        ioInFlight.incrementAndGet();
+        try {
+            pool.execute(() -> {
+                try {
+                    var event = work.call();
+                    if( event != null )
+                        submit(event);
+                }
+                catch( InterruptedException e ) {
+                    Thread.currentThread().interrupt();
+                }
+                catch( VirtualMachineError e ) {
+                    fatal(description, e);
+                    throw e;
+                }
+                catch( Throwable e ) {
+                    logError("Unexpected error in " + description, e);
+                }
+                finally {
+                    ioInFlight.decrementAndGet();
+                }
+            });
+        }
+        catch( RejectedExecutionException e ) {
+            ioInFlight.decrementAndGet();
+            if( !shutdown )
+                logError("Failed to start " + description, e);
+        }
+    }
+
+    // -- mailbox
+
+    private boolean enqueue(String description, Runnable action) {
+        queuedTasks.incrementAndGet();
+        var task = contained(description, action);
+        try {
+            executor.execute(() -> {
+                try {
+                    task.run();
+                }
+                finally {
+                    queuedTasks.decrementAndGet();
+                }
+            });
+            return true;
+        }
+        catch( RejectedExecutionException e ) {
+            queuedTasks.decrementAndGet();
+            System.err.println("Engine is stopped -- dropping task: " + description);
+            return false;
+        }
+    }
+
+    private Runnable contained(String description, Runnable action) {
+        return () -> {
+            try {
+                action.run();
+            }
+            catch( VirtualMachineError e ) {
+                fatal(description, e);
+                throw e;
+            }
+            catch( Throwable e ) {
+                logError("Unexpected error in " + description, e);
+            }
+        };
+    }
+
+    private void fatal(String description, VirtualMachineError e) {
+        try {
+            logError("Fatal error in " + description + " -- exiting", e);
+        }
+        catch( Throwable ignored ) {
+        }
+        env.exiter().accept(1);
+    }
+
+    void log(MessageType type, String message) {
+        System.err.println(message);
+        client.logMessage(new MessageParams(type, message));
+    }
+
+    void logError(String message, Throwable e) {
+        var trace = new StringWriter();
+        e.printStackTrace(new PrintWriter(trace));
+        log(MessageType.Error, message + "\n" + trace);
+    }
+
+    // -- events
+
+    /**
+     * Apply an event. Parked requests are resumed only by background
+     * work, never here, so background work must be scheduled whenever
+     * requests are parked after an event.
+     * The state schedules it for the changes it knows about, and this
+     * method schedules it in any case (e.g. if the state throws).
+     *
+     * @param event
+     */
+    private void onEvent(Event event) {
+        if( shutdown )
+            return;
+        if( event instanceof Event.DidOpen e ) {
+            if( !documents.open(e.params()) )
+                return;
+        }
+        else if( event instanceof Event.DidChange e ) {
+            if( !documents.change(e.params()) ) {
+                log(MessageType.Warning, "Ignoring change of a document that is not open: " + e.params().getTextDocument().getUri());
+                return;
+            }
+        }
+        else if( event instanceof Event.DidClose e ) {
+            var uri = Uris.canonical(e.params().getTextDocument().getUri());
+            if( uri.isEmpty() || !documents.close(uri.get()) )
+                return;
+        }
+        try {
+            state.apply(event);
+        }
+        finally {
+            if( !parked.isEmpty() && background == null )
+                scheduleBackground(Duration.ZERO);
+        }
+    }
+
+    private void onShutdown() {
+        if( shutdown )
+            return;
+        shutdown = true;
+        if( background != null ) {
+            background.cancel();
+            background = null;
+        }
+        failParked(ResponseErrorCode.InvalidRequest, "Server is shutting down");
+        env.readPool().shutdownNow();
+        if( env.ioExecutor() instanceof ExecutorService io )
+            io.shutdownNow();
+        if( env.fetchExecutor() instanceof ExecutorService fetch )
+            fetch.shutdownNow();
+        // tasks that are already queued still run, and fail their requests
+        executor.shutdown();
+    }
+
+    // -- requests
+
+    private void onRequest(RequestTask<?> task) {
+        if( task.future.isDone() )
+            return;
+        if( shutdown ) {
+            fail(task, ResponseErrorCode.InvalidRequest, "Server is shutting down");
+            return;
+        }
+        task.versionAtArrival = documentVersion(task.spec.uri());
+        guarded(task, () -> {
+            if( !tryRun(task) )
+                park(task);
+        });
+    }
+
+    private void park(RequestTask<?> task) {
+        parked.add(task);
+        scheduleBackground(Duration.ZERO);
+    }
+
+    private void failParked(ResponseErrorCode code, String message) {
+        var pending = new ArrayList<>(parked);
+        parked.clear();
+        for( var task : pending )
+            fail(task, code, message);
+    }
+
+    private void dropParked(RequestTask<?> task) {
+        parked.remove(task);
+    }
+
+    /**
+     * Resume every parked request that can now run, in FIFO order.
+     */
+    private void resumeParked() {
+        if( parked.isEmpty() )
+            return;
+        var pending = new ArrayList<>(parked);
+        parked.clear();
+        for( var task : pending ) {
+            if( task.future.isDone() )
+                continue;
+            guarded(task, () -> {
+                if( !tryRun(task) )
+                    parked.add(task);
+            });
+        }
+    }
+
+    /**
+     * Build what the request needs and run it, unless it needs a
+     * project that is not indexed yet.
+     *
+     * @return false if the request must be parked
+     */
+    private boolean tryRun(RequestTask<?> task) {
+        var route = state.route(task.spec);
+        if( route.isEmpty() ) {
+            task.completeEmpty();
+            return true;
+        }
+        var r = route.get();
+        var need = task.spec.need();
+        if( (need == Need.PROJECT || need == Need.ALL) && !r.isIndexed() )
+            return false;
+        // only differs if the request was parked
+        if( task.spec.positionBased() && !Objects.equals(documentVersion(task.spec.uri()), task.versionAtArrival) ) {
+            fail(task, ResponseErrorCode.ContentModified, "Content modified");
+            return true;
+        }
+        r.prepare(cancelChecker(task.future));
+        run(task, r);
+        return true;
+    }
+
+    private <T> void run(RequestTask<T> task, EngineState.Route route) {
+        if( task.future.isDone() )
+            return;
+        var context = route.context(cancelChecker(task.future));
+        guarded(task, () -> task.future.complete(task.body.apply(context)));
+    }
+
+    /**
+     * Run a step of a request, and fail the request if the step throws.
+     *
+     * @param task
+     * @param action
+     */
+    private void guarded(RequestTask<?> task, Runnable action) {
+        try {
+            action.run();
+        }
+        catch( VirtualMachineError e ) {
+            throw e;
+        }
+        catch( Throwable e ) {
+            failExceptionally(task, e);
+        }
+    }
+
+    private void failExceptionally(RequestTask<?> task, Throwable e) {
+        if( task.future.isCancelled() )
+            return;
+        if( !(e instanceof CancellationException) && !(e instanceof ResponseErrorException) )
+            logError("Unexpected error in " + task.spec.method(), e);
+        task.future.completeExceptionally(e);
+    }
+
+    private static void fail(RequestTask<?> task, ResponseErrorCode code, String message) {
+        task.future.completeExceptionally(new ResponseErrorException(new ResponseError(code, message, null)));
+    }
+
+    private static CancelChecker cancelChecker(CompletableFuture<?> future) {
+        return () -> {
+            if( future.isCancelled() )
+                throw new CancellationException();
+        };
+    }
+
+    private Integer documentVersion(String uri) {
+        return Uris.canonical(uri)
+            .map(documents::version)
+            .orElse(null);
+    }
+
+    // -- background
+
+    private void runBackground() {
+        background = null;
+        boolean more;
+        try {
+            more = state.runSlice();
+            backgroundFailures = 0;
+        }
+        catch( VirtualMachineError e ) {
+            throw e;
+        }
+        catch( Throwable e ) {
+            logError("Unexpected error in background work", e);
+            // retry once, then release the parked requests, which would
+            // otherwise wait for the next input event
+            if( ++backgroundFailures == 1 )
+                scheduleBackground(debounce);
+            else
+                failParked(ResponseErrorCode.InternalError, "Background work failed; see the language server log");
+            return;
+        }
+        resumeParked();
+        if( more )
+            scheduleBackground(Duration.ZERO);
+    }
+
+    private static final class RequestTask<T> {
+        final RequestSpec spec;
+        final T emptyValue;
+        final Function<RequestContext, T> body;
+        final CompletableFuture<T> future = new CompletableFuture<>();
+        Integer versionAtArrival;
+
+        RequestTask(RequestSpec spec, T emptyValue, Function<RequestContext, T> body) {
+            this.spec = spec;
+            this.emptyValue = emptyValue;
+            this.body = body;
+        }
+
+        void completeEmpty() {
+            future.complete(emptyValue);
+        }
+    }
+
+}

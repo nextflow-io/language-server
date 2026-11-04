@@ -1,0 +1,125 @@
+/*
+ * Copyright 2024-2025, Seqera Labs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package nextflow.lsp.engine;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.UnaryOperator;
+
+import nextflow.lsp.services.LanguageServerConfiguration;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+
+/**
+ * Scriptable engine state that records what the engine asks of it.
+ *
+ * Background work is modelled as a number of pending slices. When
+ * the last one runs, the PROJECT/ALL targets become indexed.
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+final class FakeState implements EngineState {
+
+    final Engine engine;
+
+    final List<String> log = new ArrayList<>();
+
+    boolean indexed = true;
+
+    int pendingSlices;
+
+    final Set<String> unroutable = new HashSet<>();
+
+    RuntimeException applyError;
+
+    RuntimeException routeError;
+
+    RuntimeException prepareError;
+
+    Runnable onPrepare;
+
+    RuntimeException sliceError;
+
+    int slices;
+
+    FakeState(Engine engine) {
+        this.engine = engine;
+    }
+
+    @Override
+    public void apply(Event event) {
+        log.add("event " + event.getClass().getSimpleName());
+        if( applyError != null )
+            throw applyError;
+        if( event instanceof Event.DidOpen || event instanceof Event.DidChange || event instanceof Event.DidClose )
+            engine.scheduleBackground(engine.debounce());
+    }
+
+    @Override
+    public Optional<Route> route(RequestSpec spec) {
+        log.add("route " + spec.method());
+        if( routeError != null )
+            throw routeError;
+        if( spec.uri() != null && unroutable.contains(spec.uri()) )
+            return Optional.empty();
+        return Optional.of(new FakeRoute(spec));
+    }
+
+    @Override
+    public boolean runSlice() {
+        slices++;
+        log.add("slice");
+        if( sliceError != null )
+            throw sliceError;
+        if( pendingSlices > 0 ) {
+            pendingSlices--;
+            if( pendingSlices == 0 )
+                indexed = true;
+        }
+        return pendingSlices > 0;
+    }
+
+    private final class FakeRoute implements Route {
+
+        private final RequestSpec spec;
+
+        FakeRoute(RequestSpec spec) {
+            this.spec = spec;
+        }
+
+        @Override
+        public void prepare(CancelChecker cancelChecker) {
+            log.add("prepare " + spec.method());
+            if( onPrepare != null )
+                onPrepare.run();
+            if( prepareError != null )
+                throw prepareError;
+        }
+
+        @Override
+        public boolean isIndexed() {
+            return indexed;
+        }
+
+        @Override
+        public RequestContext context(CancelChecker cancelChecker) {
+            return new RequestContext(LanguageServerConfiguration.defaults(), null, List.of(), cancelChecker, UnaryOperator.identity());
+        }
+    }
+
+}

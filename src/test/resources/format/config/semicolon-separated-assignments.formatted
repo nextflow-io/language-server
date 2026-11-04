@@ -1,0 +1,2 @@
+process.cpus = 2
+process.memory = 8.GB

@@ -1,0 +1,150 @@
+/*
+ * Copyright 2024-2025, Seqera Labs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package nextflow.lsp.services.script;
+
+import java.util.List;
+
+import nextflow.lsp.spec.PluginSpec;
+import nextflow.script.ast.ASTNodeMarker;
+import nextflow.script.ast.FunctionNode;
+import nextflow.script.ast.IncludeNode;
+import nextflow.script.ast.ScriptNode;
+import nextflow.script.ast.ScriptVisitorSupport;
+import nextflow.script.control.PhaseAware;
+import nextflow.script.control.Phases;
+import nextflow.script.control.SeverityAware;
+import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
+import org.codehaus.groovy.syntax.SyntaxException;
+
+/**
+ * Resolve plugin includes against plugin specs.
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+public class ResolvePluginIncludeVisitor extends ScriptVisitorSupport {
+
+    private SourceUnit sourceUnit;
+
+    private PluginResolver plugins;
+
+    /**
+     * Source of plugin specs for the plugin includes of a script.
+     */
+    public interface PluginResolver {
+
+        /**
+         * Get the spec of the plugin with the given name, as declared
+         * by the governing config file, or null if it is not available.
+         *
+         * @param name
+         */
+        PluginSpec get(String name);
+
+        /**
+         * Whether the spec of the given plugin is still being fetched,
+         * in which case a missing spec is not reported.
+         *
+         * @param name
+         */
+        boolean isPending(String name);
+    }
+
+    public ResolvePluginIncludeVisitor(SourceUnit sourceUnit, PluginResolver plugins) {
+        this.sourceUnit = sourceUnit;
+        this.plugins = plugins;
+    }
+
+    @Override
+    protected SourceUnit getSourceUnit() {
+        return sourceUnit;
+    }
+
+    public void visit() {
+        var moduleNode = sourceUnit.getAST();
+        if( moduleNode instanceof ScriptNode sn )
+            super.visit(sn);
+    }
+
+    @Override
+    public void visitInclude(IncludeNode node) {
+        var source = node.source.getText();
+        if( !source.startsWith("plugin/") )
+            return;
+        var pluginName = source.split("/")[1];
+        var spec = plugins.get(pluginName);
+        if( spec == null ) {
+            if( plugins.isPending(pluginName) )
+                return;
+            addError("Plugin '" + pluginName + "' does not exist or is not specified in the configuration file", node);
+            return;
+        }
+        for( var entry : node.entries ) {
+            var entryName = entry.name;
+            var functions = findMethods(spec.functions(), entryName);
+            if( functions.size() == 1 ) {
+                entry.setTarget(functions.get(0));
+                continue;
+            }
+            if( functions.size() > 1 ) {
+                // an include can only have one target, so overloads are resolved
+                // per call by PluginCallVisitor
+                var target = new FunctionNode(entry.getNameOrAlias());
+                target.setSynthetic(true);
+                target.putNodeMetaData(ASTNodeMarker.METHOD_OVERLOADS, functions);
+                entry.setTarget(target);
+                continue;
+            }
+            if( !findMethods(spec.factories(), entryName).isEmpty() )
+                continue;
+            if( !findMethods(spec.operators(), entryName).isEmpty() )
+                continue;
+            addError("Included name '" + entryName + "' is not defined in plugin '" + pluginName + "'", node);
+        }
+    }
+
+    private static List<MethodNode> findMethods(List<MethodNode> methods, String name) {
+        return methods.stream()
+            .filter(mn -> mn.getName().equals(name))
+            .toList();
+    }
+
+    @Override
+    public void addError(String message, ASTNode node) {
+        var cause = new ResolveIncludeError(message, node);
+        var errorMessage = new SyntaxErrorMessage(cause, sourceUnit);
+        sourceUnit.getErrorCollector().addErrorAndContinue(errorMessage);
+    }
+
+    private class ResolveIncludeError extends SyntaxException implements PhaseAware, SeverityAware {
+
+        public ResolveIncludeError(String message, ASTNode node) {
+            super(message, node);
+        }
+
+        @Override
+        public int getPhase() {
+            return Phases.INCLUDE_RESOLUTION;
+        }
+
+        @Override
+        public boolean isSoftError() {
+            return true;
+        }
+    }
+}

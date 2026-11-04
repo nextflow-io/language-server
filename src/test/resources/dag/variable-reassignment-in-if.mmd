@@ -1,0 +1,20 @@
+flowchart TB
+  subgraph " "
+    subgraph params
+      v3["bar"]
+    end
+    v1([FOO])
+    click v1 href "main.nf" _blank
+    v4{ }
+    subgraph s1[" "]
+      v5([BAR])
+      click v5 href "main.nf" _blank
+    end
+    subgraph publish
+      v8["versions"]
+    end
+    v3 --> v4
+    v1 --> v8
+    v5 --> v8
+    v4 --> s1
+  end

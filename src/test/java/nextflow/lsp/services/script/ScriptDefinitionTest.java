@@ -1,0 +1,127 @@
+/*
+ * Copyright 2024-2025, Seqera Labs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package nextflow.lsp.services.script;
+
+import nextflow.lsp.TestServer;
+import nextflow.lsp.TestWorkspace;
+import org.eclipse.lsp4j.DefinitionParams;
+import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
+import static nextflow.lsp.TestUtils.*;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Specifies go to definition in scripts.
+ *
+ * @author Ben Sherman <bentshermann@gmail.com>
+ */
+@ExtendWith(TestWorkspace.class)
+class ScriptDefinitionTest {
+
+    static Location getDefinition(TestServer server, String uri, Position position) {
+        var locations = server
+            .call(s -> s.definition(new DefinitionParams(new TextDocumentIdentifier(uri), position)))
+            .getLeft();
+        return locations.size() > 0 ? locations.get(0) : null;
+    }
+
+    @Test
+    void getDefinitionOfWorkflowInSameFile() {
+        var server = TestServer.start();
+        var uri = getUri("main.nf");
+
+        var contents = """
+            workflow HELLO {
+            }
+
+            workflow {
+                HELLO()
+            }
+            """;
+        server.open("main.nf", contents);
+        var location = getDefinition(server, uri, new Position(4, 4));
+
+        assertThat(location).isNotNull();
+        assertThat(location.getUri()).isEqualTo(uri);
+        assertThat(location.getRange().getStart()).isEqualTo(new Position(0, 0));
+        assertThat(location.getRange().getEnd()).isEqualTo(new Position(1, 1));
+    }
+
+    @Test
+    void getDefinitionOfWorkflowInDifferentFile() {
+        var server = TestServer.start();
+        var mainUri = getUri("main.nf");
+        var moduleUri = getUri("module.nf");
+
+        server.open("module.nf", """
+            workflow HELLO {
+                take:
+                target
+
+                main:
+                println "Hello, ${target}!"
+            }
+            """);
+        server.open("main.nf", """
+            include { HELLO } from './module.nf'
+
+            workflow {
+                HELLO('World')
+            }
+            """);
+        var location = getDefinition(server, mainUri, new Position(3, 4));
+
+        assertThat(location).isNotNull();
+        assertThat(location.getUri()).isEqualTo(moduleUri);
+        assertThat(location.getRange().getStart()).isEqualTo(new Position(0, 0));
+        assertThat(location.getRange().getEnd()).isEqualTo(new Position(6, 1));
+    }
+
+    @Test
+    void getDefinitionOfRecordTypeInCast() {
+        var server = TestServer.start();
+        var mainUri = getUri("main.nf");
+        var moduleUri = getUri("Problem.nf");
+
+        server.open("Problem.nf", """
+            record Problem {
+                id: String
+            }
+            """);
+        server.open("main.nf", """
+            include { Problem } from './Problem.nf'
+
+            nextflow.enable.types = true
+
+            workflow {
+                problem = record(id: 'example') as Problem
+                println problem.id
+            }
+            """);
+        var location = getDefinition(server, mainUri, new Position(5, 40));
+
+        assertThat(location).isNotNull();
+        assertThat(location.getUri()).isEqualTo(moduleUri);
+        assertThat(location.getRange().getStart()).isEqualTo(new Position(0, 0));
+        assertThat(location.getRange().getEnd()).isEqualTo(new Position(2, 1));
+    }
+
+}
