@@ -51,6 +51,7 @@ import nextflow.lsp.services.script.ScriptHoverProvider;
 import nextflow.lsp.services.script.ScriptLinkProvider;
 import nextflow.lsp.services.script.ScriptReferenceProvider;
 import nextflow.lsp.services.script.ScriptSemanticTokensProvider;
+import nextflow.lsp.services.script.ScriptSignatureHelpProvider;
 import nextflow.lsp.services.script.ScriptSymbolProvider;
 import nextflow.lsp.services.script.WorkspacePreviewProvider;
 import nextflow.lsp.util.JsonUtils;
@@ -106,6 +107,9 @@ import org.eclipse.lsp4j.SemanticTokensParams;
 import org.eclipse.lsp4j.SemanticTokensWithRegistrationOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.SetTraceParams;
+import org.eclipse.lsp4j.SignatureHelp;
+import org.eclipse.lsp4j.SignatureHelpOptions;
+import org.eclipse.lsp4j.SignatureHelpParams;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.TextEdit;
@@ -230,6 +234,8 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
             false);
         result.setSemanticTokensProvider(semanticTokensOptions);
         result.setRenameProvider(true);
+        var signatureHelpOptions = new SignatureHelpOptions(List.of("(", ","));
+        result.setSignatureHelpProvider(signatureHelpOptions);
         result.setWorkspaceSymbolProvider(true);
         return result;
     }
@@ -431,6 +437,15 @@ public class NextflowLanguageServer implements LanguageServer, LanguageClientAwa
                 .map(ast -> new ScriptHoverProvider(ast).hover(textDocument, params.getPosition()))
                 .orElseGet(() -> new ConfigHoverProvider(project.configView()).hover(textDocument, params.getPosition()));
         });
+    }
+
+    @Override
+    public CompletableFuture<SignatureHelp> signatureHelp(SignatureHelpParams params) {
+        var textDocument = ClientUris.canonical(params.getTextDocument());
+        return fileRequest("textDocument/signatureHelp", textDocument.getUri(), null, (ctx) ->
+            ctx.project().scripts()
+                .map(ast -> new ScriptSignatureHelpProvider(ast).signatureHelp(textDocument, params.getPosition(), params.getContext()))
+                .orElse(null));
     }
 
     @Override

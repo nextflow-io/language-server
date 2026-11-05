@@ -11,6 +11,7 @@ The following language features are currently supported:
 - hover hints
 - rename
 - semantic highlighting
+- signature help for function, process, and workflow calls
 - DAG preview for workflows
 - config preview for processes
 
