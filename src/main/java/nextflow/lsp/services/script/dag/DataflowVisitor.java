@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -38,6 +39,7 @@ import nextflow.script.ast.WorkflowNode;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.expr.BinaryExpression;
+import org.codehaus.groovy.ast.expr.BooleanExpression;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.DeclarationExpression;
 import org.codehaus.groovy.ast.expr.Expression;
@@ -74,10 +76,19 @@ public class DataflowVisitor extends ScriptVisitorSupport {
 
     private VariableContext vc = new VariableContext();
 
+    private boolean expandWorkflowCalls;
+
+    private Map<Node,Map<String,Node>> emitNodes = new HashMap<>();
+
     public DataflowVisitor(SourceUnit sourceUnit, ScriptView ast, boolean verbose) {
+        this(sourceUnit, ast, verbose, false);
+    }
+
+    public DataflowVisitor(SourceUnit sourceUnit, ScriptView ast, boolean verbose, boolean expandWorkflowCalls) {
         this.sourceUnit = sourceUnit;
         this.ast = ast;
         this.verbose = verbose;
+        this.expandWorkflowCalls = expandWorkflowCalls;
 
         stackPreds.push(new HashSet<>());
     }
@@ -160,7 +171,11 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     public void visitIfElse(IfStatement node) {
         // visit the conditional expression
         var controlPreds = visitWithPreds(node.getBooleanExpression());
-        var controlDn = current.addNode("", Node.Type.CONTROL, null, controlPreds);
+        var condition = conditionText(node.getBooleanExpression());
+        // the condition of an if statement includes its parentheses
+        if( condition.startsWith("(") && condition.endsWith(")") )
+            condition = condition.substring(1, condition.length() - 1).strip();
+        var controlDn = current.addNode(condition, Node.Type.CONTROL, null, controlPreds);
 
         // visit the if branch
         vc.pushScope();
@@ -207,6 +222,36 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         }
     }
 
+    /**
+     * Get the source text of a condition from the source unit,
+     * which holds the text that was compiled. Returns "" if the
+     * text can't be resolved.
+     *
+     * @param node
+     */
+    private String conditionText(BooleanExpression node) {
+        ASTNode target = node.getLineNumber() != -1 ? node : node.getExpression();
+        var first = target.getLineNumber();
+        var last = target.getLastLineNumber();
+        if( first == -1 || last < first )
+            return "";
+        var source = sourceUnit.getSource();
+        var builder = new StringBuilder();
+        for( int i = first; i <= last; i++ ) {
+            var line = source.getLine(i, null);
+            if( line == null )
+                return "";
+            var begin = i == first ? target.getColumnNumber() - 1 : 0;
+            var end = i == last ? target.getLastColumnNumber() - 1 : line.length();
+            if( begin < 0 || end > line.length() || begin > end )
+                return "";
+            if( i > first )
+                builder.append('\n');
+            builder.append(line, begin, end);
+        }
+        return builder.toString().strip();
+    }
+
     // expressions
 
     @Override
@@ -224,6 +269,10 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         }
 
         var defNode = (MethodNode) node.getNodeMetaData(ASTNodeMarker.METHOD_TARGET);
+        if( expandWorkflowCalls && defNode instanceof WorkflowNode wn ) {
+            visitWorkflowCall(name, wn, asMethodCallArguments(node));
+            return;
+        }
         if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
             var preds = visitWithPreds(node.getArguments());
             var dn = addNode(name, Node.Type.OPERATOR, defNode, preds);
@@ -289,6 +338,10 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         // x | f => f(x)
         if( rhs instanceof VariableExpression ve ) {
             var defNode = asMethodVariable(ve.getAccessedVariable());
+            if( expandWorkflowCalls && defNode instanceof WorkflowNode wn ) {
+                visitWorkflowCall(ve.getName(), wn, List.of(lhs));
+                return;
+            }
             if( defNode instanceof WorkflowNode || defNode instanceof ProcessNode ) {
                 var label = ve.getName();
                 var preds = visitWithPreds(lhs);
@@ -301,6 +354,40 @@ public class DataflowVisitor extends ScriptVisitorSupport {
         super.visitBinaryExpression(node);
     }
 
+    /**
+     * Expand a workflow call into a node for each take, the call
+     * itself, and a node for each emit.
+     *
+     * @param label
+     * @param workflow
+     * @param args
+     */
+    private void visitWorkflowCall(String label, WorkflowNode workflow, List<Expression> args) {
+        var takes = workflow.getParameters();
+        stackPreds.push(new HashSet<>());
+        for( int i = 0; i < Math.max(takes.length, args.size()); i++ ) {
+            var argPreds = i < args.size() ? visitWithPreds(args.get(i)) : new HashSet<Node>();
+            if( i < takes.length )
+                addNode("take:" + takes[i].getName(), Node.Type.INPUT, takes[i], argPreds);
+            else
+                currentPreds().addAll(argPreds);
+        }
+        var preds = stackPreds.pop();
+
+        var dn = addNode(label, Node.Type.OPERATOR, workflow, preds);
+        vc.putSymbol(label, dn);
+
+        var emits = new HashMap<String,Node>();
+        for( var stmt : asBlockStatements(workflow.emits) ) {
+            var emit = ((ExpressionStatement) stmt).getExpression();
+            var name = typedOutputName(emit);
+            var emitLabel = name != null ? "emit:" + name : "emit";
+            var emitDn = current.addNode(emitLabel, Node.Type.OUTPUT, ast.getURI(emit), new HashSet<>(Set.of(dn)));
+            emits.put(name, emitDn);
+        }
+        emitNodes.put(dn, emits);
+    }
+
     @Override
     public void visitDeclarationExpression(DeclarationExpression node) {
         visitAssignment(node, true);
@@ -309,7 +396,7 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     @Override
     public void visitTernaryExpression(TernaryExpression node) {
         var controlPreds = visitWithPreds(node.getBooleanExpression());
-        var controlDn = current.addNode("", Node.Type.CONTROL, null, controlPreds);
+        var controlDn = current.addNode(conditionText(node.getBooleanExpression()), Node.Type.CONTROL, null, controlPreds);
 
         current.pushSubgraph(controlDn);
         var truePreds = visitWithPreds(node.getTrueExpression());
@@ -437,6 +524,11 @@ public class DataflowVisitor extends ScriptVisitorSupport {
     }
 
     private void visitWorkflowOut(WorkflowNode workflow, String label, String propName) {
+        var emitDn = getEmitNode(label, propName);
+        if( emitDn != null ) {
+            currentPreds().add(emitDn);
+            return;
+        }
         if( propName == null ) {
             addOperatorPred(label, workflow);
             return;
@@ -451,6 +543,16 @@ public class DataflowVisitor extends ScriptVisitorSupport {
             .ifPresent((call) -> {
                 addOperatorPred(label, workflow);
             });
+    }
+
+    private Node getEmitNode(String label, String propName) {
+        var callDn = getSymbol(label);
+        var emits = callDn != null ? emitNodes.get(callDn) : null;
+        if( emits == null )
+            return null;
+        if( propName != null )
+            return emits.get(propName);
+        return emits.size() == 1 ? emits.values().iterator().next() : null;
     }
 
     private String typedOutputName(Expression emit) {
