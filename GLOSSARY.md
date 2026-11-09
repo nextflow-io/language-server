@@ -84,6 +84,9 @@ Terms of the language server. Nextflow language terms (process, workflow, config
 **Standalone bundle**
 : The release package for one platform: the shadow jar, a `jlink` runtime, and a launcher. See [ADR 20261021](docs/adr/20261021-standalone-bundle-aot-cache.md).
 
+**API index**
+: The names of the language and config files, with their docs links, signatures, summaries, and types, attached to each release as `api-index.json` for docs tools. Not used by the language server. See [API index](docs/api-index.md).
+
 **Launcher**
 : The `bin/nextflow-lsp` script of the bundle, which starts the bundled JVM and creates the AOT cache on first run.
 

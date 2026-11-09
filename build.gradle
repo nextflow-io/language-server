@@ -129,6 +129,20 @@ task buildSpec(type: JavaExec) {
   outputs.cacheIf { true }
 }
 
+// the API index is a release asset for docs tools, not part of the jar
+task buildApiIndex(type: JavaExec) {
+  description = 'Build the API index of the Nextflow language for docs tools'
+  group = 'build'
+
+  dependsOn compileSpecGroovy
+  classpath = sourceSets.spec.runtimeClasspath
+  mainClass.set('nextflow.ApiIndexWriter')
+  systemProperty 'logback.configurationFile', file('src/spec/resources/logback.xml').absolutePath
+  args "$buildDir/generated/api-index.json", providers.gradleProperty('version').getOrElse('')
+
+  outputs.file("$buildDir/generated/api-index.json")
+}
+
 processResources {
   dependsOn buildSpec
   from(buildSpec.outputs.files) {

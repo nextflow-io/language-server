@@ -37,7 +37,7 @@ nextflow.lsp/
 └── util/                      # Includes, JsonUtils, LanguageServerUtils, Logger, Positions
 ```
 
-Outside `src/main`: `src/spec` holds `SpecWriter`, which the `buildSpec` task runs to generate the core `definitions.json`. `gradle/bundle.gradle` builds the standalone bundle per platform, with the launcher `src/bundle/nextflow-lsp`, which trains the AOT cache by running `AotTraining` on a copy of nf-core/methylseq that the build clones.
+Outside `src/main`: `src/spec` holds `SpecWriter`, which the `buildSpec` task runs to generate the core `definitions.json`, and `ApiIndexWriter`, which the `buildApiIndex` task runs to generate the [API index](api-index.md) for releases. `gradle/bundle.gradle` builds the standalone bundle per platform, with the launcher `src/bundle/nextflow-lsp`, which trains the AOT cache by running `AotTraining` on a copy of nf-core/methylseq that the build clones.
 
 ## Threads
 

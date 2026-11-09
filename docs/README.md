@@ -6,3 +6,4 @@ Reference docs for the current state of the language server. Terms are defined i
 - [Configuration](configuration.md): every setting that the language server reads from the client.
 - [Internals](internals.md): the packages, threads, and the path of a notification or request, for contributors.
 - [Testing](testing.md): testing conventions, fixtures, golden files, and the benchmark.
+- [API index](api-index.md): the index of the language that each release has for docs tools, and how it is built and checked.

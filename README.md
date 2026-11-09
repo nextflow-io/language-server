@@ -25,6 +25,8 @@ For other editors, download the language server from [GitHub releases](https://g
 
 The language server communicates over standard input/output. See [Editor support](docs/editors.md) for how to set it up with other editors, including Zed, Neovim, and Emacs.
 
+Each release also has `api-index.json`, an index of the language for docs tools that link code examples to the Nextflow docs. See [API index](docs/api-index.md).
+
 ## Configuration
 
 The language server reads its settings from the `workspace/didChangeConfiguration` notification. See [Configuration](docs/configuration.md) for the available settings and their defaults, and the [Nextflow VS Code extension](https://github.com/nextflow-io/vscode-language-nextflow/blob/master/package.json) for an example client.
