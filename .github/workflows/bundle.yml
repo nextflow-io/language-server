@@ -1,5 +1,6 @@
 # Builds the standalone bundles for all targets on Linux, smoke-tests each one
-# on a native runner, and attaches them (and the jar) to a GitHub release when run manually.
+# on a native runner, builds the API index, and attaches them (with the jar and the API index)
+# to a GitHub release when run manually.
 name: Bundle
 
 on:
@@ -98,6 +99,41 @@ jobs:
           path: build/bundle/*-macos-arm64.tar.gz*
           if-no-files-found: error
 
+  # the API index of the language for docs tools, with its links checked against the live docs
+  api-index:
+    name: API index
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Java
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # ratchet:actions/setup-java@v6
+        with:
+          distribution: corretto
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # ratchet:gradle/actions/setup-gradle@v6
+
+      - name: Build
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: ./gradlew buildApiIndex "-Pversion=$VERSION"
+
+      - name: Check links
+        run: python3 scripts/check-api-index.py build/generated/api-index.json build/api-index.json
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # ratchet:actions/upload-artifact@v7
+        with:
+          name: api-index
+          path: build/api-index.json
+          if-no-files-found: error
+
   smoke:
     name: Smoke test (${{ matrix.target }})
     needs: build
@@ -160,7 +196,7 @@ jobs:
   release:
     name: Release
     if: github.event_name == 'workflow_dispatch'
-    needs: [build, smoke]
+    needs: [build, smoke, api-index]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -174,6 +210,11 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # ratchet:actions/download-artifact@v8
         with:
           name: jar
+          path: dist
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # ratchet:actions/download-artifact@v8
+        with:
+          name: api-index
           path: dist
 
       - name: Attach bundles to the release

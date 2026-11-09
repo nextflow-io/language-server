@@ -54,7 +54,7 @@ To make a new release of the language server:
 
 1. Checkout the appropriate branch of Nextflow (`STABLE-*` if present, otherwise `master`) and the language server (`STABLE-*` if present, otherwise `main`).
 2. Run `make test` and `make bench`. Stop the release if anything fails.
-3. Run the [Bundle](.github/workflows/bundle.yml) workflow manually from the same branch of the language server, with the release version (e.g. `26.10.1`). The workflow builds the bundles for all platforms, tests each one on its platform, and creates a draft GitHub release `v<version>` with the bundles, their SHA-256 checksums, and the language server JAR.
+3. Run the [Bundle](.github/workflows/bundle.yml) workflow manually from the same branch of the language server, with the release version (e.g. `26.10.1`). The workflow builds the bundles for all platforms, tests each one on its platform, and creates a draft GitHub release `v<version>` with the bundles, their SHA-256 checksums, the language server JAR, and the [API index](docs/api-index.md).
 4. Add a list of notable changes to the draft release and publish it. The release tag is created at the built commit when the release is published. No release commit.
 
 The JAR is included as a fallback for platforms without a bundle and for releases of the VS Code extension that predate the bundle, so it must run on Java 17.
